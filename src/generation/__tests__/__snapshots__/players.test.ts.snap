@@ -1,0 +1,50 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`procedural generation squad shape snapshot 1`] = `
+[
+  {
+    "ovr": 68,
+    "role": "BATTER",
+  },
+  {
+    "ovr": 71,
+    "role": "BATTER",
+  },
+  {
+    "ovr": 71,
+    "role": "BATTER",
+  },
+  {
+    "ovr": 69,
+    "role": "BATTER",
+  },
+  {
+    "ovr": 69,
+    "role": "WK_BATTER",
+  },
+  {
+    "ovr": 61,
+    "role": "ALLROUNDER",
+  },
+  {
+    "ovr": 60,
+    "role": "ALLROUNDER",
+  },
+  {
+    "ovr": 66,
+    "role": "BOWLER",
+  },
+  {
+    "ovr": 72,
+    "role": "BOWLER",
+  },
+  {
+    "ovr": 74,
+    "role": "BOWLER",
+  },
+  {
+    "ovr": 73,
+    "role": "BOWLER",
+  },
+]
+`;

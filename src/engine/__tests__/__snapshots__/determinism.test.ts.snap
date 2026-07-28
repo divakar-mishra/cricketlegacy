@@ -1,0 +1,13 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`determinism & golden master matches a committed golden-master summary 1`] = `
+{
+  "format": "T20",
+  "margin": "16 runs",
+  "scores": [
+    "178/3 (20.0)",
+    "162/7 (20.0)",
+  ],
+  "winner": "away",
+}
+`;

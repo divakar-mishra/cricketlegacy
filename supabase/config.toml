@@ -1,0 +1,2 @@
+[functions.daily-verification]
+verify_jwt = true

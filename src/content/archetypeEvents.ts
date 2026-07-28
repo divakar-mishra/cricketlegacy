@@ -1,0 +1,201 @@
+import { StoryEvent } from '../game/narrative';
+
+const isArchetype = (id: string) => (ctx: Parameters<NonNullable<StoryEvent['condition']>>[0]) =>
+  ctx.save.experience?.playerArchetype === id;
+
+export const ARCHETYPE_EVENTS: StoryEvent[] = [
+  {
+    id: 'prodigy_spotlight',
+    trigger: 'CAREER_START',
+    title: 'The Prospect Everyone Knows',
+    speaker: '{selector}',
+    priority: 40,
+    once: true,
+    condition: isArchetype('PRODIGY'),
+    body: 'Before your first match, cameras wait by the rope. {selector} says talent has bought attention, not patience.',
+    choices: [
+      {
+        id: 'embrace',
+        label: 'Embrace the expectation',
+        desc: 'Faster recognition, heavier pressure',
+        effects: { brand: 8, nationalRep: 4, confidence: 4, relationship: [{ id: 'selector', delta: 5 }], flags: { prodigy_pressure: 1 } },
+        resultText: 'You step toward the cameras. Every score will now feel louder.',
+      },
+      {
+        id: 'protect',
+        label: 'Keep the circle small',
+        desc: 'Build trust and discipline',
+        effects: { integrity: 5, morale: 5, relationship: [{ id: 'coach', delta: 9 }], flags: { prodigy_grounded: 1 } },
+        resultText: '{coach} closes the dressing-room door. Development comes before headlines.',
+      },
+    ],
+  },
+  {
+    id: 'prodigy_expectation_debt',
+    trigger: 'BAD_MATCH',
+    title: 'Expectation Has a Memory',
+    speaker: '{selector}',
+    weight: 4,
+    once: false,
+    condition: (ctx) => isArchetype('PRODIGY')(ctx) && (ctx.save.story?.flags.prodigy_setback ?? 0) < 3,
+    body: '{selector} reminds you that prodigies are compared with the future people imagined for them.',
+    choices: [
+      {
+        id: 'own',
+        label: 'Own the failure',
+        effects: { confidence: -2, integrity: 4, relationship: [{ id: 'selector', delta: 4 }], flags: { prodigy_setback: 1 } },
+        resultText: 'The honesty buys patience, though the next innings still matters.',
+      },
+      {
+        id: 'defy',
+        label: 'Reject the label',
+        effects: { confidence: 5, brand: 3, relationship: [{ id: 'selector', delta: -7 }], flags: { prodigy_setback: 1 } },
+        resultText: 'The response is fearless. The selector writes something down without smiling.',
+      },
+    ],
+  },
+  {
+    id: 'late_bloomer_notice',
+    trigger: 'GOOD_MATCH',
+    title: 'The File Reopens',
+    speaker: '{selector}',
+    priority: 8,
+    once: true,
+    condition: isArchetype('LATE_BLOOMER'),
+    body: 'Years after the pathway moved on, {selector} asks for your old reports. One performance has reopened the argument.',
+    choices: [
+      {
+        id: 'patient',
+        label: 'Let the numbers build',
+        effects: { nationalRep: 6, integrity: 4, relationship: [{ id: 'selector', delta: 10 }], flags: { late_bloomer_case: 1 } },
+        resultText: 'You ask for nothing. The next score will become the second page of the case.',
+      },
+      {
+        id: 'push',
+        label: 'Ask your agent to push',
+        effects: { brand: 5, nationalRep: 3, relationship: [{ id: 'agent', delta: 9 }, { id: 'selector', delta: -3 }], flags: { late_bloomer_case: 1 } },
+        resultText: '{agent} gets your name into every conversation. Some selectors resent the noise.',
+      },
+    ],
+  },
+  {
+    id: 'late_bloomer_clock',
+    trigger: 'SEASON_END',
+    title: 'The Shorter Runway',
+    speaker: '{mentor}',
+    weight: 5,
+    once: true,
+    condition: isArchetype('LATE_BLOOMER'),
+    body: '{mentor} is honest: your best years may be arriving now, but there are fewer of them to waste.',
+    choices: [
+      {
+        id: 'specialize',
+        label: 'Build one undeniable weapon',
+        effects: { confidence: 5, relationship: [{ id: 'mentor', delta: 8 }], flags: { late_bloomer_focus: 1 } },
+        resultText: 'The next pre-season will be narrower, harder and more deliberate.',
+      },
+      {
+        id: 'all_in',
+        label: 'Chase every opportunity',
+        effects: { form: 6, morale: -3, brand: 4, flags: { late_bloomer_workload: 1 } },
+        resultText: 'Rest is postponed. The career accelerates, and the body keeps the bill.',
+      },
+    ],
+  },
+  {
+    id: 'specialist_blueprint',
+    trigger: 'MILESTONE',
+    title: 'A Skill With Your Name On It',
+    speaker: '{coach}',
+    priority: 9,
+    once: true,
+    condition: isArchetype('SPECIALIST'),
+    body: '{coach} shows you footage of the moment your defining skill broke the match open.',
+    choices: [
+      {
+        id: 'double_down',
+        label: 'Make it your signature',
+        effects: { form: 5, confidence: 5, relationship: [{ id: 'coach', delta: 8 }], flags: { specialist_signature: 1 } },
+        resultText: 'Opponents will prepare for it. Your task is to make preparation irrelevant.',
+      },
+      {
+        id: 'broaden',
+        label: 'Add a second dimension',
+        effects: { morale: 4, relationship: [{ id: 'coach', delta: 3 }], flags: { specialist_broadened: 1 } },
+        resultText: 'The signature remains, but the next chapter will be harder to predict.',
+      },
+    ],
+  },
+  {
+    id: 'specialist_targeted',
+    trigger: 'BAD_MATCH',
+    title: 'They Built a Plan For You',
+    speaker: '{rival}',
+    weight: 4,
+    once: true,
+    condition: isArchetype('SPECIALIST'),
+    body: '{rival} admits the opposition spent the week removing your strongest option.',
+    choices: [
+      {
+        id: 'refine',
+        label: 'Make the weapon sharper',
+        effects: { confidence: 3, relationship: [{ id: 'rival', delta: 4 }, { id: 'coach', delta: 5 }], flags: { specialist_refined: 1 } },
+        resultText: 'You choose mastery over disguise.',
+      },
+      {
+        id: 'counter',
+        label: 'Develop the counter',
+        effects: { form: -2, morale: 3, relationship: [{ id: 'rival', delta: -4 }], flags: { specialist_counter: 1 } },
+        resultText: 'Short-term comfort is traded for a new answer next season.',
+      },
+    ],
+  },
+  {
+    id: 'comeback_rehab_room',
+    trigger: 'INJURY',
+    title: 'The Quiet Room',
+    speaker: '{mentor}',
+    priority: 30,
+    once: true,
+    condition: isArchetype('COMEBACK'),
+    body: 'The team leaves for a match while you remain in rehab. {mentor} asks what the comeback will be built on.',
+    choices: [
+      {
+        id: 'patient',
+        label: 'Trust the recovery',
+        effects: { morale: 7, integrity: 4, relationship: [{ id: 'mentor', delta: 12 }, { id: 'coach', delta: 5 }], flags: { comeback_patient: 1 } },
+        resultText: 'The return date stops being the only measure of progress.',
+      },
+      {
+        id: 'rush',
+        label: 'Fight for an early return',
+        effects: { confidence: 6, morale: -3, relationship: [{ id: 'coach', delta: -8 }], flags: { comeback_rushed: 1 } },
+        resultText: 'The hunger is obvious. So is the risk.',
+      },
+    ],
+  },
+  {
+    id: 'comeback_return',
+    trigger: 'GOOD_MATCH',
+    title: 'Back Under the Lights',
+    speaker: '{captain}',
+    priority: 12,
+    once: true,
+    condition: (ctx) => isArchetype('COMEBACK')(ctx) && Boolean(ctx.save.flags['archetype:hadInjury']),
+    body: '{captain} waits at the rope after your first defining performance back. The dressing room knows what this one cost.',
+    choices: [
+      {
+        id: 'team',
+        label: 'Thank the people who stayed',
+        effects: { morale: 8, integrity: 5, relationship: [{ id: 'captain', delta: 10 }, { id: 'coach', delta: 8 }], flags: { comeback_completed: 1 } },
+        resultText: 'The comeback becomes a shared memory, not a solitary triumph.',
+      },
+      {
+        id: 'statement',
+        label: 'Tell everyone you are not done',
+        effects: { brand: 8, confidence: 7, relationship: [{ id: 'rival', delta: -6 }], flags: { comeback_completed: 1 } },
+        resultText: 'The message reaches every opponent before the team bus leaves.',
+      },
+    ],
+  },
+];
