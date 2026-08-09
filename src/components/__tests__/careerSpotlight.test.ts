@@ -12,11 +12,11 @@ const managerHub = fs.readFileSync(
 );
 
 describe('career hub spotlight', () => {
-  it('uses a real stadium asset with graphics-aware restrained motion', () => {
+  it('uses a real stadium asset without a repeating animation', () => {
     expect(spotlight).toContain("require('../../assets/generated/career-stadium.png')");
-    expect(spotlight).toContain("graphics === 'high'");
-    expect(spotlight).toContain('withRepeat');
-    expect(spotlight).toContain('cancelAnimation');
+    expect(spotlight).not.toContain('withRepeat');
+    expect(spotlight).not.toContain('useSharedValue');
+    expect(spotlight).not.toContain('entering=');
     expect(spotlight).toContain('accessibilityRole="header"');
   });
 

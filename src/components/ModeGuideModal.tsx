@@ -17,7 +17,7 @@ import { AppText as Text } from './AppText';
 import { Button } from './Button';
 import { Icon, IconName } from './Icon';
 
-export interface ModeGuideStep {
+interface ModeGuideStep {
   icon: IconName;
   title: string;
   body: string;

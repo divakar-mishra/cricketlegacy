@@ -5,6 +5,7 @@ import { acceptAuctionOffer, generateAuctionOffers } from '../auction';
 import { makeRng } from '../../engine/rng';
 import { emptyStats } from '../stats';
 import { nextUserFixtureId } from '../season';
+import { currentPlayerCalendarEvent } from '../playerCalendar';
 
 function makeCareer(overall = 75): SaveGame {
   const v = overall;
@@ -69,7 +70,8 @@ describe('franchise auction — real wages', () => {
     expect(save.players.user.contract!.wage).toBe(80_000);
     expect(save.players.user.contract!.yearsLeft).toBeGreaterThanOrEqual(3);
     expect(save.auctionOffers).toBeUndefined();
-    expect(nextUserFixtureId(save)).toBeTruthy();
+    expect(nextUserFixtureId(save)).toBeUndefined();
+    expect(currentPlayerCalendarEvent(save)?.kind).toBe('TRAINING');
   });
 
   it('never downgrades a player already on a bigger wage', () => {

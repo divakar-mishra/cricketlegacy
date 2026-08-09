@@ -30,10 +30,10 @@ describe('manager career ladder', () => {
     expect(iccEventsForYear(2027)).toEqual([
       expect.objectContaining({
         id: 'world-test-championship-2027',
-        name: 'World Test Championship 2027',
+        name: 'World Test Championship Final 2027',
         type: 'WORLD_TEST_CHAMPIONSHIP',
         format: 'TEST',
-        teams: 8,
+        teams: 2,
       }),
     ]);
   });

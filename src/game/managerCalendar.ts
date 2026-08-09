@@ -16,12 +16,13 @@ import {
   DIV2_LEAGUE_ID,
   DIV3_LEAGUE_ID,
 } from '../generation/world';
-import { addCoins, matchReward } from './economy';
+import { addCoins, matchReward, vipCoinMultiplier } from './economy';
 import { domesticLeagueName } from './domesticBranding';
 import { clamp } from '../utils/math';
+import { managerSalaryFor } from './managerJobs';
 import {
+  annualInternationalPlans,
   generateCountryInternationalWindowFixtures,
-  internationalWindowPlan,
 } from './intlCalendar';
 
 export const MANAGER_PHASE_ORDER: ManagerCalendarPhase[] = [
@@ -100,10 +101,6 @@ export function managerPhaseUnlocked(
   return level === 'ELITE' || level === 'NATIONAL';
 }
 
-export function managerCompetitionId(phase: ManagerCalendarPhase): string | undefined {
-  return phase === 'OFF_SEASON' ? undefined : PHASE_COMPETITION[phase];
-}
-
 function fixtureMonth(phase: Exclude<ManagerCalendarPhase, 'OFF_SEASON'>, round: number): number {
   if (phase === 'LIST_A') return [9, 9, 9, 10, 10, 10, 11][round - 1] ?? 11;
   if (phase === 'FIRST_CLASS') return [12, 1, 1, 2, 2, 3, 3][round - 1] ?? 3;
@@ -114,7 +111,11 @@ function fixtureMonth(phase: Exclude<ManagerCalendarPhase, 'OFF_SEASON'>, round:
  * Build one complete manager year. Every tier and format is scheduled even
  * when the manager's current rank means a block will be simulated.
  */
-export function buildManagerSeasonCalendar(save: SaveGame, year: number): void {
+export function buildManagerSeasonCalendar(
+  save: SaveGame,
+  year: number,
+  startingPhase: ManagerCalendarPhase = 'LIST_A',
+): void {
   if (save.mode !== 'manager' || !save.currentSeasonId) return;
   const seasonId = save.currentSeasonId;
   const countryId = save.userTeamId ? save.teams[save.userTeamId]?.country : undefined;
@@ -123,7 +124,6 @@ export function buildManagerSeasonCalendar(save: SaveGame, year: number): void {
     'list-a': [],
     'first-class': [],
     't20-league': [],
-    'national-window': [],
   };
   const fixtures: Record<string, Fixture> = {};
 
@@ -163,16 +163,25 @@ export function buildManagerSeasonCalendar(save: SaveGame, year: number): void {
 
   const activeLeague = save.leagues[DIV1_LEAGUE_ID] ?? Object.values(save.leagues)[0];
   save.fixtures = fixtures;
-  const internationalPlan = internationalWindowPlan(year);
+  let internationalFixtureIds: string[] = [];
   if (save.managerCareerLevel === 'NATIONAL' && save.managerNationalTeamId) {
-    const nationalCountry =
-      save.teams[save.managerNationalTeamId]?.country ?? countryId ?? 'india';
-    fixtureIdsByCompetition['national-window'] =
-      generateCountryInternationalWindowFixtures(save, nationalCountry, {
-        controlledTeamId: save.managerNationalTeamId,
-        managerPhase: 'OFF_SEASON',
-      });
+    const nationalCountry = save.teams[save.managerNationalTeamId]?.country ?? countryId ?? 'india';
+    internationalFixtureIds = generateCountryInternationalWindowFixtures(save, nationalCountry, {
+      controlledTeamId: save.managerNationalTeamId,
+    });
   }
+  const internationalCompetitions: SeasonCompetition[] =
+    save.managerCareerLevel === 'NATIONAL'
+      ? annualInternationalPlans(year).map((plan) => ({
+          id: plan.id,
+          name: plan.name,
+          format: plan.format,
+          leagueId: activeLeague?.id ?? DIV1_LEAGUE_ID,
+          fixtureIds: internationalFixtureIds.filter(
+            (fixtureId) => save.fixtures[fixtureId]?.competitionId === plan.id,
+          ),
+        }))
+      : [];
   const competitions: SeasonCompetition[] = [
     {
       id: 'list-a',
@@ -195,17 +204,7 @@ export function buildManagerSeasonCalendar(save: SaveGame, year: number): void {
       leagueId: activeLeague?.id ?? DIV1_LEAGUE_ID,
       fixtureIds: fixtureIdsByCompetition['t20-league'],
     },
-    ...(fixtureIdsByCompetition['national-window'].length
-      ? [
-          {
-            id: internationalPlan.id,
-            name: internationalPlan.name,
-            format: internationalPlan.format,
-            leagueId: activeLeague?.id ?? DIV1_LEAGUE_ID,
-            fixtureIds: fixtureIdsByCompetition['national-window'],
-          },
-        ]
-      : []),
+    ...internationalCompetitions,
   ];
 
   save.seasons[seasonId] = {
@@ -221,12 +220,12 @@ export function buildManagerSeasonCalendar(save: SaveGame, year: number): void {
   }
   save.managerCalendar = {
     year,
-    phase: 'LIST_A',
-    phaseStartedAtMonth: 9,
-    offSeasonPrepared: false,
+    phase: startingPhase,
+    phaseStartedAtMonth: PHASE_START_MONTH[startingPhase],
+    offSeasonPrepared: startingPhase === 'OFF_SEASON',
     backgroundCoinsThisPhase: 0,
   };
-  save.currentMonth = 9;
+  save.currentMonth = PHASE_START_MONTH[startingPhase];
   save.championTeamId = undefined;
 }
 
@@ -238,7 +237,7 @@ export function managerControlledTeamId(
   save: SaveGame,
   phase = save.managerCalendar?.phase,
 ): string | undefined {
-  if (phase === 'OFF_SEASON' && save.managerCareerLevel === 'NATIONAL') {
+  if (phase && save.managerCareerLevel === 'NATIONAL') {
     return save.managerNationalTeamId;
   }
   return save.userTeamId;
@@ -562,16 +561,26 @@ function buildPhaseSummary(
   save: SaveGame,
   phase: Exclude<ManagerCalendarPhase, 'OFF_SEASON'>,
   walletCoins: number,
+  salaryCoins = 0,
 ): ManagerPhaseSummary {
   const tier = save.userDivision ?? 3;
   const standings = managerCompetitionStandings(save, phase, tier);
-  const userFixtures = regularFixtures(save, phase, tier).filter(
-    (fixture) => fixture.homeTeamId === save.userTeamId || fixture.awayTeamId === save.userTeamId,
+  const controlledTeamId = managerControlledTeamId(save, phase);
+  const nationalAssignment = save.managerCareerLevel === 'NATIONAL';
+  const userFixtures = phaseFixtures(save, phase).filter(
+    (fixture) =>
+      (nationalAssignment || fixture.divisionTier === tier) &&
+      (fixture.homeTeamId === controlledTeamId || fixture.awayTeamId === controlledTeamId),
   );
   const overRatePenalties = userFixtures.reduce((total, fixture) => {
-    if (fixture.homeTeamId === save.userTeamId) return total + (fixture.homePointsPenalty ?? 0);
+    if (fixture.homeTeamId === controlledTeamId) {
+      return total + (fixture.homePointsPenalty ?? 0);
+    }
     return total + (fixture.awayPointsPenalty ?? 0);
   }, 0);
+  const tournamentPosition = Object.values(save.internationalTournaments ?? {}).find(
+    (state) => state.year === (save.managerCalendar?.year ?? 2026) && state.managerPhase === phase,
+  )?.position;
   return {
     phase,
     year: save.managerCalendar?.year ?? 2026,
@@ -580,15 +589,60 @@ function buildPhaseSummary(
         (entry) => Boolean(entry[1]),
       ),
     ) as Partial<Record<DomesticTier, string>>,
-    userPosition:
-      standings.findIndex((row) => row.teamId === save.userTeamId) >= 0
+    userPosition: nationalAssignment
+      ? tournamentPosition
+      : standings.findIndex((row) => row.teamId === save.userTeamId) >= 0
         ? standings.findIndex((row) => row.teamId === save.userTeamId) + 1
         : undefined,
     userMatches: userFixtures.filter((fixture) => fixture.played).length,
-    userWins: userFixtures.filter((fixture) => fixture.winnerTeamId === save.userTeamId).length,
+    userWins: userFixtures.filter((fixture) => fixture.winnerTeamId === controlledTeamId).length,
     walletCoins,
+    salaryCoins,
     overRatePenalties,
   };
+}
+
+export const MANAGER_SALARY_COIN_DIVISOR = 200;
+
+/** Pay one personal-wallet salary at the end of each manager season. */
+export function processManagerSalary(save: SaveGame, year: number): number {
+  if (save.mode !== 'manager' || !save.userTeamId) return 0;
+  const team = save.teams[save.userTeamId];
+  if (!team) return 0;
+  const progression = (save.managerProgression ??= {
+    reputation: team.reputation,
+    currentClubId: team.id,
+    premiumAssistanceHistory: [],
+  });
+  if (progression.lastSalaryPaidYear === year) return 0;
+
+  const salary = Math.max(
+    0,
+    Math.round(progression.contractSalary ?? managerSalaryFor(team.reputation)),
+  );
+  const coinPayout = Math.floor(salary / MANAGER_SALARY_COIN_DIVISOR);
+  progression.contractSalary = salary;
+  progression.currentClubId = team.id;
+  progression.lastSalaryPaidYear = year;
+  progression.lastSalaryCoinPayout = coinPayout;
+  if (coinPayout > 0) save.wallet = addCoins(save.wallet, coinPayout);
+
+  const messageId = `manager-salary-${year}`;
+  const inbox = save.inbox ?? [];
+  if (!inbox.some((message) => message.id === messageId)) {
+    save.inbox = [
+      {
+        id: messageId,
+        kind: 'GENERAL' as const,
+        title: 'Salary received',
+        body: `+${coinPayout.toLocaleString()} Wallet Coins deposited from ${team.name}.`,
+        timestamp: Date.now(),
+        read: false,
+      },
+      ...inbox,
+    ].slice(0, 100);
+  }
+  return coinPayout;
 }
 
 function applyListAConfidenceCarry(save: SaveGame): void {
@@ -621,7 +675,9 @@ function moveToNextPhase(
   if (completed === 'LIST_A') applyListAConfidenceCarry(save);
   if (completed === 'FIRST_CLASS') {
     const champion = phaseChampion(save, completed, 1);
-    if (champion && champion === save.userTeamId) save.managerWonTierOneFirstClass = true;
+    if (save.managerCareerLevel !== 'NATIONAL' && champion && champion === save.userTeamId) {
+      save.managerWonTierOneFirstClass = true;
+    }
   }
   const index = MANAGER_PHASE_ORDER.indexOf(completed);
   const next = MANAGER_PHASE_ORDER[index + 1] ?? 'OFF_SEASON';
@@ -640,6 +696,9 @@ export interface AdvanceManagerCalendarResult {
   played?: number;
   total?: number;
 }
+
+/** Locked competitions pay an oversight stipend, not a full played-match reward. */
+export const MANAGER_BACKGROUND_REWARD_RATE = 0.3;
 
 /**
  * Simulate the current block until the user's next required match or the end of
@@ -685,7 +744,11 @@ export function advanceManagerCalendar(
       ) {
         const won = pending.winnerTeamId === save.userTeamId;
         const tied = pending.resultKind === 'TIE' || pending.resultKind === 'NO_RESULT';
-        const reward = matchReward(won, tied);
+        const reward = Math.floor(
+          matchReward(won, tied) *
+            MANAGER_BACKGROUND_REWARD_RATE *
+            vipCoinMultiplier(save.entitlements),
+        );
         save.wallet = addCoins(save.wallet, reward);
         walletCoins += reward;
         save.managerCalendar.backgroundCoinsThisPhase = walletCoins;
@@ -702,7 +765,8 @@ export function advanceManagerCalendar(
       continue;
     }
     if (!managerPhaseComplete(save)) continue;
-    const summary = buildPhaseSummary(save, phase, walletCoins);
+    const salaryCoins = phase === 'T20' ? processManagerSalary(save, save.managerCalendar.year) : 0;
+    const summary = buildPhaseSummary(save, phase, walletCoins, salaryCoins);
     save.managerCalendar.lastSummary = summary;
     moveToNextPhase(save, phase);
     return { kind: 'PHASE_ADVANCED', summary };
@@ -805,7 +869,8 @@ export function managerSquadReadiness(save: SaveGame): {
   total: number;
   tired: number;
 } {
-  const team = save.userTeamId ? save.teams[save.userTeamId] : undefined;
+  const teamId = managerControlledTeamId(save);
+  const team = teamId ? save.teams[teamId] : undefined;
   const squad = team?.playerIds.map((playerId) => save.players[playerId]).filter(Boolean) ?? [];
   return {
     healthy: squad.filter((player) => !player.injury).length,

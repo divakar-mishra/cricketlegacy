@@ -8,11 +8,10 @@ describe('popup contrast', () => {
   const starterPack = readComponent('StarterPackModal');
   const contextualOffer = readComponent('ContextualOffer');
   const onboarding = readComponent('Onboarding');
-  const shareAchievement = readComponent('ShareAchievementCard');
   const firstMatchGuide = readComponent('FirstMatchGuide');
 
   it('uses primary actions instead of gold-filled buttons inside popups', () => {
-    for (const source of [starterPack, contextualOffer, onboarding, shareAchievement]) {
+    for (const source of [starterPack, contextualOffer, onboarding]) {
       expect(source).not.toContain('variant="gold"');
       expect(source).toContain('variant="primary"');
     }

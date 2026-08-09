@@ -291,6 +291,116 @@ describe('save migrations', () => {
     expect(migrated?.userCapsAtSeasonStart).toBe(47);
   });
 
+  it('initializes manager salary and international cycle state when upgrading v23', () => {
+    const legacy = makeManagerSave();
+    legacy.schemaVersion = 23;
+    delete legacy.managerProgression!.contractSalary;
+    delete legacy.wtcCycles;
+
+    const migrated = runMigrations(JSON.parse(JSON.stringify(legacy)));
+
+    expect(migrated?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(migrated?.managerProgression?.contractSalary).toBeGreaterThan(0);
+    expect(migrated?.wtcCycles).toEqual({});
+  });
+
+  it('removes only unplayed eager ICC knockouts when upgrading v24', () => {
+    const legacy = makeCareerSave();
+    legacy.schemaVersion = 24;
+    const season = legacy.seasons[legacy.currentSeasonId!];
+    const base = Object.values(legacy.fixtures)[0];
+    legacy.fixtures['legacy-world-cup-semi'] = {
+      ...base,
+      id: 'legacy-world-cup-semi',
+      competition: 'INTL_TOURNAMENT',
+      competitionId: 't20-world-cup-2026',
+      cupRound: 'Semi-Final',
+      playoff: true,
+      played: false,
+    };
+    legacy.fixtures['legacy-world-cup-final'] = {
+      ...base,
+      id: 'legacy-world-cup-final',
+      competition: 'INTL_TOURNAMENT',
+      competitionId: 't20-world-cup-2026',
+      cupRound: 'Final',
+      playoff: true,
+      played: true,
+    };
+    season.fixtureIds.push('legacy-world-cup-semi', 'legacy-world-cup-final');
+
+    const migrated = runMigrations(JSON.parse(JSON.stringify(legacy)));
+
+    expect(migrated?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(migrated?.fixtures['legacy-world-cup-semi']).toBeUndefined();
+    expect(migrated?.fixtures['legacy-world-cup-final']).toBeDefined();
+    expect(migrated?.seasons[migrated.currentSeasonId!].fixtureIds).not.toContain(
+      'legacy-world-cup-semi',
+    );
+    expect(migrated?.internationalTournaments).toEqual({});
+  });
+
+  it('moves a v25 School player out of the senior roster and removes potential labels', () => {
+    const legacy = makeCareerSave(81);
+    legacy.schemaVersion = 25;
+    legacy.careerPathLevel = 'SCHOOL';
+    legacy.players[legacy.userPlayerId!].age = 14;
+    delete legacy.careerPathTeamId;
+    const fixture = Object.values(legacy.fixtures)[0];
+    fixture.competitionId = 'youth-u14';
+    fixture.homeTeamId = legacy.userTeamId!;
+    legacy.scoutReports = [
+      {
+        playerId: legacy.userPlayerId!,
+        knownOverall: legacy.players[legacy.userPlayerId!].overall,
+        uncertainty: 0.2,
+        scoutedYear: 2026,
+        recommended: true,
+        potentialBand: 'Generational',
+      } as never,
+    ];
+
+    const migrated = runMigrations(JSON.parse(JSON.stringify(legacy)));
+
+    expect(migrated?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(migrated?.careerPathTeamId).toBeDefined();
+    expect(migrated?.teams[migrated.userTeamId!].playerIds).not.toContain(migrated?.userPlayerId);
+    expect(migrated?.teams[migrated.careerPathTeamId!].playerIds).toContain(migrated?.userPlayerId);
+    expect(migrated?.fixtures[fixture.id].homeTeamId).toBe(migrated?.careerPathTeamId);
+    expect('potentialBand' in migrated!.scoutReports![0]).toBe(false);
+  });
+
+  it('starts exact per-format season ledgers without inventing v28 history', () => {
+    const legacy = makeCareerSave(82);
+    legacy.schemaVersion = 28;
+    const player = legacy.players[legacy.userPlayerId!];
+    player.seasonStats = {
+      matches: 8,
+      runs: 412,
+      balls: 300,
+      fours: 40,
+      sixes: 12,
+      highScore: 121,
+      notOuts: 1,
+      fifties: 3,
+      hundreds: 1,
+      wickets: 9,
+      ballsBowled: 210,
+      runsConceded: 240,
+      bestBowling: '4/28',
+      catches: 5,
+      stumpings: 0,
+    };
+    delete player.seasonFormatStats;
+
+    const migrated = runMigrations(JSON.parse(JSON.stringify(legacy)));
+    const migratedPlayer = migrated?.players[migrated.userPlayerId!];
+
+    expect(migrated?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(migratedPlayer?.seasonStats).toMatchObject({ matches: 8, runs: 412, wickets: 9 });
+    expect(migratedPlayer?.seasonFormatStats).toEqual({});
+  });
+
   it('rejects an unsupported migration gap instead of relabelling the save', () => {
     expect(runMigrations({ schemaVersion: 1, id: 'unsupported' })).toBeNull();
   });

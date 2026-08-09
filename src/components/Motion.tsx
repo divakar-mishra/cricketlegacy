@@ -1,7 +1,10 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import Animated, {
-  FadeInDown,
+  Easing,
+  FadeIn,
+  FadeOut,
+  ZoomIn,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -9,27 +12,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { radius as radii, useTheme } from '../theme';
 
-/**
- * Entrance animation for cards/sections/list items. Runs on the UI thread via
- * Reanimated so the meta-game feels alive (staggered fade + slide-up).
- */
-export function FadeInView({
-  children,
-  delay = 0,
-  duration = 320,
-  style,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  duration?: number;
-  style?: StyleProp<ViewStyle>;
-}) {
-  return (
-    <Animated.View entering={FadeInDown.duration(duration).delay(delay)} style={style}>
-      {children}
-    </Animated.View>
-  );
-}
+export const SMOOTH_MODAL_ENTER = FadeIn.duration(180).easing(Easing.out(Easing.quad));
+export const SMOOTH_MODAL_EXIT = FadeOut.duration(140).easing(Easing.in(Easing.quad));
+export const SMOOTH_CARD_ZOOM = ZoomIn.duration(200).easing(Easing.out(Easing.cubic));
 
 /** A shimmering placeholder for async/loading content. */
 export function Skeleton({
@@ -51,7 +36,11 @@ export function Skeleton({
   const anim = useAnimatedStyle(() => ({ opacity: pulse.value }));
   return (
     <Animated.View
-      style={[{ width, height, borderRadius: radius, backgroundColor: colors.surfaceAlt }, anim, style]}
+      style={[
+        { width, height, borderRadius: radius, backgroundColor: colors.surfaceAlt },
+        anim,
+        style,
+      ]}
     />
   );
 }

@@ -99,9 +99,7 @@ export function AchievementToast({ achievement, onDismiss }: Props) {
   const points = getTierPoints(achievement.tier);
   // Bronze slides in from the right (quicker, less intrusive).
   // Silver slides up from the bottom (standard).
-  const enterAnim = isBronze
-    ? SlideInRight.springify().damping(20)
-    : SlideInDown.springify().damping(15);
+  const enterAnim = isBronze ? SlideInRight.duration(180) : SlideInDown.duration(200);
   const exitAnim = isBronze ? SlideOutRight.duration(200) : SlideOutDown.duration(250);
 
   return (

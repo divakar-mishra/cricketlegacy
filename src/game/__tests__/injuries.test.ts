@@ -12,7 +12,14 @@ function fitPlayer(id: string, overall = 60): Player {
     age: 24,
     role: 'BATTER',
     battingStyle: 'RHB',
-    batting: { technique: overall, timing: overall, power: overall, footwork: overall, temperament: overall, running: overall },
+    batting: {
+      technique: overall,
+      timing: overall,
+      power: overall,
+      footwork: overall,
+      temperament: overall,
+      running: overall,
+    },
     bowling: { paceOrSpin: 20, accuracy: 20, movement: 20, variations: 20, stamina: 40 },
     fielding: { catching: 55, throwing: 55, agility: 55, keeping: 30 },
     meta: { fitness: 30, form: 60, confidence: 60, aggression: 55, discipline: 60 },
@@ -42,6 +49,17 @@ describe('injuries', () => {
       }
     }
     expect(injured).toBe(true);
+  });
+
+  it('accepts a 70 percent youth risk reduction without clamping it away', () => {
+    const p = fitPlayer('p3');
+    let normalInjuries = 0;
+    let protectedInjuries = 0;
+    for (let i = 0; i < 2000; i++) {
+      if (rollMatchInjury(p, 0, makeRng(5000 + i), 1)) normalInjuries++;
+      if (rollMatchInjury(p, 0, makeRng(5000 + i), 0.3)) protectedInjuries++;
+    }
+    expect(protectedInjuries).toBeLessThan(normalInjuries * 0.5);
   });
 
   it('tickInjuries decrements and clears', () => {

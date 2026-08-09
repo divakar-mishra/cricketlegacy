@@ -447,13 +447,6 @@ export function youthQualityBonus(save: SaveGame): number {
 
 /* ---------------- Scouting ---------------- */
 
-function potentialBand(potential: number): string {
-  if (potential >= 84) return 'Generational';
-  if (potential >= 74) return 'Star';
-  if (potential >= 64) return 'Solid';
-  return 'Fringe';
-}
-
 export const SCOUT_FEE = 25_000;
 
 export interface ScoutOutcome {
@@ -465,8 +458,9 @@ export interface ScoutOutcome {
 
 /**
  * Scout a player (a free agent or a rival). The first look is noisy; repeat
- * looks sharpen it toward the true rating and unlock a potential band. A better
- * chief scout means less noise and faster convergence.
+ * looks sharpen it toward the true current rating. A better chief scout means
+ * less noise and faster convergence. Hidden development ceilings are never
+ * exposed or used as a player-facing recommendation.
  */
 export function scoutPlayer(
   save: SaveGame,
@@ -492,9 +486,8 @@ export function scoutPlayer(
       playerId,
       knownOverall: clamp(p.overall + noise, 1, 99),
       uncertainty,
-      potentialBand: uncertainty < 0.4 ? potentialBand(p.potential) : 'Unclear',
       scoutedYear: currentYear(save),
-      recommended: false,
+      recommended: uncertainty < 0.4 && p.overall >= 68 && p.meta.form >= 42,
     };
     save.scoutReports.push(report);
     return { ok: true, cost: SCOUT_FEE, report };
@@ -508,13 +501,8 @@ export function scoutPlayer(
     1,
     99,
   );
-  if (existing.uncertainty < 0.4) existing.potentialBand = potentialBand(p.potential);
-  existing.recommended = existing.uncertainty < 0.4 && p.potential >= 70;
+  existing.recommended = existing.uncertainty < 0.4 && p.overall >= 68 && p.meta.form >= 42;
   return { ok: true, cost: SCOUT_FEE, report: existing };
-}
-
-export function scoutReportFor(save: SaveGame, playerId: string): ScoutReport | undefined {
-  return save.scoutReports?.find((r) => r.playerId === playerId);
 }
 
 /* ---------------- Youth academy ---------------- */

@@ -9,16 +9,12 @@ import {
 import { resolveStoryChoice } from '../careerEvents';
 import {
   ensureSeasonPassBranding,
+  playerDomesticBlueprints,
   synchronizeSeasonPassBranding,
   updateSeasonPassBranding,
 } from '../domesticBranding';
-import {
-  calculateClubRating,
-  hireStaff,
-  staffByRole,
-  superstarAttractionChance,
-} from '../manager';
-import { buildLeagueWorld } from '../../generation/world';
+import { calculateClubRating, hireStaff, staffByRole, superstarAttractionChance } from '../manager';
+import { buildPlayerLeagueWorld } from '../../generation/world';
 import { activateSeasonPass, SEASON_PASS_PERIOD_MS } from '../seasonPass';
 import { makeCareerSave, makeManagerSave } from './_depthHelpers';
 
@@ -72,16 +68,26 @@ describe('country-complete domestic worlds and premium aliases', () => {
     expect(COUNTRIES.find((country) => country.id === 'england')?.flag).toBe('ENG');
   });
 
-  it.each(COUNTRIES.map((country) => [country.id]))(
-    'builds two eight-club domestic divisions for %s',
-    (countryId) => {
-      const world = buildLeagueWorld(41, { country: countryId });
+  it.each(COUNTRIES.map((country) => [country.id, country.name]))(
+    'builds three eight-club domestic divisions for %s',
+    (countryId, countryName) => {
+      const requiredTeamId = playerDomesticBlueprints(countryId).find(
+        (team) => team.tier === 3,
+      )!.id;
+      const world = buildPlayerLeagueWorld(41, {
+        country: countryId,
+        userDivision: 3,
+        requiredTeamId,
+      });
       expect(world.divisions.tier1).toHaveLength(8);
       expect(world.divisions.tier2).toHaveLength(8);
-      expect([...world.divisions.tier1, ...world.divisions.tier2].every(
-        (teamId) => world.teams[teamId].country === countryId,
-      )).toBe(true);
-      expect(world.leagues['league-1'].name.toLowerCase()).toContain('domestic');
+      expect(world.divisions.tier3).toHaveLength(8);
+      expect(
+        [...world.divisions.tier1, ...world.divisions.tier2, ...world.divisions.tier3!].every(
+          (teamId) => world.teams[teamId].country === countryId,
+        ),
+      ).toBe(true);
+      expect(world.leagues['league-1'].name).toBe(`${countryName} Local T20 Division`);
     },
   );
 
@@ -99,10 +105,12 @@ describe('country-complete domestic worlds and premium aliases', () => {
     const originalTeam = save.teams[teamId].name;
     const originalLeague = save.leagues[leagueId].name;
 
-    expect(updateSeasonPassBranding(save, {
-      teamNames: { [teamId]: 'My City XI' },
-      leagueNames: { [leagueId]: 'My T20 Championship' },
-    }).ok).toBe(true);
+    expect(
+      updateSeasonPassBranding(save, {
+        teamNames: { [teamId]: 'My City XI' },
+        leagueNames: { [leagueId]: 'My T20 Championship' },
+      }).ok,
+    ).toBe(true);
     expect(save.teams[teamId].name).toBe('My City XI');
     expect(save.leagues[leagueId].name).toBe('My T20 Championship');
 
@@ -121,8 +129,8 @@ describe('manager staff market and club appeal', () => {
     team.budget = 10_000_000;
     save.finances!.transferBudget = team.budget;
     const current = staffByRole(save, 'BATTING_COACH')!;
-    const candidate = save.staffCandidates!
-      .filter((member) => member.role === 'BATTING_COACH')
+    const candidate = save
+      .staffCandidates!.filter((member) => member.role === 'BATTING_COACH')
       .sort((a, b) => b.quality - a.quality)[0];
     candidate.quality = Math.min(92, Math.max(candidate.quality, current.quality + 10));
     const beforeRating = calculateClubRating(save);

@@ -14,12 +14,11 @@ import Animated, {
   withDelay,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
   ZoomIn,
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Path, Polygon, RadialGradient, Stop } from 'react-native-svg';
-import { playHaptic } from '../audio';
+import { moment, playHaptic } from '../audio';
 import { Button, Screen } from '../components';
 import { AppText as Text } from '../components/AppText';
 import { ScreenProps } from '../navigation';
@@ -60,7 +59,7 @@ function StarParticle({
         true,
       ),
     );
-    scale.value = withDelay(delay, withSpring(1, { damping: 8 }));
+    scale.value = withDelay(delay, withTiming(1, { duration: 200 }));
     rotation.value = withDelay(delay, withRepeat(withTiming(360, { duration: 3000 }), -1, false));
   }, [delay, opacity, rotation, scale]);
 
@@ -219,15 +218,16 @@ export function HallOfFameCeremonyScreen({ navigation, route }: ScreenProps<'Hal
   useEffect(() => {
     // The plaque reveal (and its haptics) only fire once the highlight reel ends.
     if (phase !== 'plaque') return;
+    moment('trophy');
     playHaptic('notify-success');
     setTimeout(() => playHaptic('impact-heavy'), 500);
     setTimeout(() => playHaptic('impact-medium'), 1000);
 
-    sealScale.value = withDelay(200, withSpring(1, { damping: 8, stiffness: 120 }));
+    sealScale.value = withDelay(120, withTiming(1, { duration: 200 }));
     sealOpacity.value = withDelay(200, withTiming(1, { duration: 500 }));
-    titleY.value = withDelay(700, withSpring(0, { damping: 14 }));
+    titleY.value = withDelay(360, withTiming(0, { duration: 220 }));
     titleOpacity.value = withDelay(700, withTiming(1, { duration: 400 }));
-    cardY.value = withDelay(1000, withSpring(0, { damping: 14 }));
+    cardY.value = withDelay(560, withTiming(0, { duration: 220 }));
     cardOpacity.value = withDelay(1000, withTiming(1, { duration: 500 }));
     glowOpacity.value = withDelay(
       300,
@@ -382,7 +382,7 @@ function HighlightReel({
     <View style={reelStyles.overlay}>
       <LinearGradient colors={['#1A1005', '#2A1C08', '#0F0A03']} style={StyleSheet.absoluteFill} />
       <Text style={reelStyles.eyebrow}>CAREER HIGHLIGHTS</Text>
-      <Animated.View key={i} entering={ZoomIn.springify().damping(14)} style={reelStyles.beat}>
+      <Animated.View key={i} entering={ZoomIn.duration(200)} style={reelStyles.beat}>
         <Text style={reelStyles.emoji}>{beat.emoji}</Text>
         <Text style={reelStyles.headline}>{beat.headline}</Text>
         <Text style={reelStyles.sub}>{beat.sub}</Text>

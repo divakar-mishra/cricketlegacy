@@ -19,10 +19,15 @@ describe('player creation attribute dashboard', () => {
 
   it('puts avatar setup and difficulty where players can see them before review', () => {
     expect(source).toContain("'Identity & Avatar'");
-    expect(source).toContain('DEFAULT_AVATAR_CUSTOMIZATION');
-    expect(source).toContain('<PlayerAvatar');
-    expect(source).toContain('Create your player look');
+    expect(source).toContain('DEFAULT_AVATAR_CONFIG');
+    expect(source).toContain('<AvatarCustomizer');
     expect(source).toContain('label="Difficulty"');
-    expect(source).toContain('avatarCustomization,');
+    expect(source).toContain('avatarConfig,');
+  });
+
+  it('renders country flags through the cross-platform flag component', () => {
+    expect(source).toContain('CountryFlag,');
+    expect(source).toContain('<CountryFlag countryId={c.id} flag={c.flag} size={24} />');
+    expect(source).not.toContain('<Text style={styles.flag}>{c.flag}</Text>');
   });
 });

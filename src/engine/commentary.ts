@@ -98,7 +98,7 @@ const PHRASES: Record<Exclude<BallOutcome, 'W'>, string[]> = {
     'The carrom ball! Catches the outside edge — drops short of slip.',
     'Straightens off the pitch, takes the inside edge onto the thigh.',
     'Bouncer aimed at the body — the batter fends awkwardly, no damage.',
-    'Skids through the gate — bat and pad don\'t cooperate, but survives!',
+    "Skids through the gate — bat and pad don't cooperate, but survives!",
     'The arm ball! Batter plays for the turn — huge miss, dot ball.',
     'Dragged down short, the pull is uppish — finds mid-on.',
     'Clever change of pace — the batter swings through it, dot.',
@@ -456,7 +456,7 @@ const DISMISSAL_PHRASES: Record<Dismissal['type'], string[]> = {
     'Reverse-swings back and cannons into the stumps — BOWLED!',
     'Top of off! Clean bowled — an outstanding delivery.',
     'BOWLED all ends up — the off stump is celebrating by itself!',
-    'Goes through the defence like it wasn\'t there — BOWLED!',
+    "Goes through the defence like it wasn't there — BOWLED!",
     'The most complete delivery you will ever see — BOWLED!',
     'The bail flies off and the crowd erupts — BOWLED!',
     'Jagged back sharply — the stumps are disturbed — BOWLED!',
@@ -480,7 +480,7 @@ const DISMISSAL_PHRASES: Record<Dismissal['type'], string[]> = {
     'Short-pitched, fends awkwardly — gully takes it low — OUT!',
     'He went big over the top but only helped it to long-off — CAUGHT!',
     'Nicks it through and the keeper barely moves — CAUGHT behind!',
-    'The ball spirals up — an eternity in the air — and it\'s CAUGHT!',
+    "The ball spirals up — an eternity in the air — and it's CAUGHT!",
     'A regulation slip catch — beautifully taken — CAUGHT!',
     'A reflex catch at short leg — caught!',
     'Goes for the pull — the top edge travels straight up — CAUGHT!',
@@ -512,13 +512,13 @@ const DISMISSAL_PHRASES: Record<Dismissal['type'], string[]> = {
     'A dreadful mix-up — RUN OUT by a distance!',
     'RUN OUT! Sharp work and the bails are off in a flash.',
     'A bullet throw finds the stumps — run out!',
-    'Hesitation is fatal — RUN OUT at the striker\'s end!',
+    "Hesitation is fatal — RUN OUT at the striker's end!",
     'Yes! No! Yes! No! — RUN OUT! A needless mix-up ends the innings.',
     'The fielder picks up and hurls — direct hit — RUN OUT!',
     'Neither batter wanted that single — both in the same half!',
     'A superb piece of fielding — runs in, gathers and hits in one motion!',
     'Called through for a suicidal run — RUN OUT by miles!',
-    'The throw comes in flat and true — RUN OUT at the striker\'s end!',
+    "The throw comes in flat and true — RUN OUT at the striker's end!",
     'A comedy of errors — neither batter communicates and one goes — OUT!',
     'Dived but could not make his ground — RUN OUT! Agonising.',
     'The direct hit is brilliant — RUN OUT! The crowd goes crazy.',
@@ -585,59 +585,6 @@ const WICKET_FALL: string[] = [
   'An inspired delivery — the batter had no chance.',
 ];
 
-// ─── Milestone lines ─────────────────────────────────────────────────────────
-
-const FIFTY_LINES: string[] = [
-  'FIFTY! A composed half-century, and up comes the bat.',
-  'Fifty up! Raises the bat to a warm reception.',
-  'A well-crafted half-century — fifty to his name.',
-  'Reaches his fifty with a trademark flick off the pads.',
-  'Half-century! Patience and timing handsomely rewarded.',
-  'Fifty runs, and he salutes the dressing room.',
-  'A fighting fifty under real pressure — take a bow.',
-  'Milestone reached — a classy, chanceless half-century.',
-  'Fifty! This knock is really taking shape now.',
-  'FIFTY! The crowd rise to acknowledge a quality innings.',
-  'Half-ton reached — a vital contribution to the total.',
-  'Fifty runs and no sign of slowing down — this is a special knock.',
-  'What an innings this is — fifty up and growing!',
-  'Reaches the milestone and punches the air — well deserved!',
-  'Fifty — a measured, mature innings taking shape.',
-  'The half-century is up! A dressing-room celebration erupts.',
-  'Fifty off his own bat — the team owes him a debt.',
-  'Keeps it going — fifty runs and the belief is surging.',
-  'Fifty! And the partnership is well and truly in the groove.',
-  'FIFTY! A crucial milestone when the team needed it most.',
-  'Half-century — this batter is in the zone right now.',
-  'Fifty up! Every delivery is asking questions, every answer is correct.',
-];
-
-const HUNDRED_LINES: string[] = [
-  'HUNDRED! A magnificent century, and off comes the helmet!',
-  'Ton up! A hundred to savour, arms held aloft.',
-  'A century! Sheer class from the first ball to this.',
-  'Hundred! He soaks in a thunderous standing ovation.',
-  'Three figures! A truly special innings unfolding.',
-  'Century complete — a roar and a leap of pure joy.',
-  'A hundred under the lights, an innings for the ages.',
-  'Reaches the milestone — a glorious, defining century!',
-  'HUNDRED! The scoreboard clicks over to three figures.',
-  'A HUNDRED! He raises his bat and kisses the badge.',
-  'One hundred runs! An innings that will be talked about for years.',
-  'The century comes up — and the stadium is delirious!',
-  'HUNDRED! Pure ability, supreme concentration — a masterpiece.',
-  'Three figures! The bowlers finally have their answer — this batter has it all.',
-  'A century! Tears, joy, relief — the full range of emotion.',
-  'HUNDRED! He looks to the sky and soaks in every second.',
-  'The ton is reached — a statement innings of the highest calibre.',
-  'One. Hundred. Runs. A truly remarkable achievement in this match.',
-  'Century up — this has been batting at its very finest.',
-  'HUNDRED! The pressure-cooker atmosphere adds to the beauty of this knock.',
-  'One hundred — a historic innings that the crowd will never forget.',
-  'HUNDRED! The dressing room rises — a century of immense quality!',
-  'Three figures! An incredible innings that has turned this game.',
-];
-
 // ─── Situational / contextual phrases ────────────────────────────────────────
 
 const POWERPLAY_PHRASES: string[] = [
@@ -684,7 +631,7 @@ const DEATH_OVER_PHRASES: string[] = [
 
 // ─── Collapse / rout scenarios ────────────────────────────────────────────────
 
-export const COLLAPSE_PHRASES: string[] = [
+const COLLAPSE_PHRASES: string[] = [
   'Wickets are tumbling at an alarming rate — the innings is in freefall!',
   'Three down! The middle order has completely crumbled.',
   'This is a top-order collapse of the highest order — the batting side is in disarray.',
@@ -707,7 +654,7 @@ export const COLLAPSE_PHRASES: string[] = [
 
 // ─── Last-over thriller phrases ───────────────────────────────────────────────
 
-export const LAST_OVER_THRILLER_PHRASES: string[] = [
+const LAST_OVER_THRILLER_PHRASES: string[] = [
   'Last over. The match comes down to these six deliveries. Everything is on the line.',
   'Six balls to settle it. This is what limited-overs cricket was made for.',
   'The final over — and the noise in this ground is absolutely deafening!',
@@ -727,7 +674,7 @@ export const LAST_OVER_THRILLER_PHRASES: string[] = [
 
 // ─── Tailender heroics ────────────────────────────────────────────────────────
 
-export const TAILENDER_PHRASES: string[] = [
+const TAILENDER_PHRASES: string[] = [
   'The tail wags! The lower order refuses to go quietly.',
   'A lower-order partnership is building — this could yet save the innings!',
   'Who needs top-order runs? The tail is doing it themselves!',
@@ -738,55 +685,6 @@ export const TAILENDER_PHRASES: string[] = [
   'The lower order does not read the script. They just bat. And they are batting magnificently.',
   'The bowlers must be frustrated — they cannot finish this innings off!',
   'Tailenders with the nerve of top-order batters. This is unexpectedly riveting cricket.',
-];
-
-// ─── Partnership milestones ───────────────────────────────────────────────────
-
-export const PARTNERSHIP_MILESTONE_PHRASES: Record<number, string[]> = {
-  50: [
-    'Fifty for the partnership! A vital stand is taking shape.',
-    'The fifty-run partnership is up — this innings has steadied considerably.',
-    'Half a century of runs between these two batters. The bowlers are searching.',
-    'Fifty partnership! The total is now looking far more competitive.',
-    'A fifty stand, and the batting side are finding their feet once more.',
-  ],
-  100: [
-    'A HUNDRED for the partnership! A match-changing stand.',
-    'The century partnership is brought up — truly magnificent batting.',
-    'One hundred runs together — a partnership that has completely turned this match!',
-    'The hundred comes up, and the fielding captain calls a team huddle. Desperate measures.',
-    'A brilliant, unbroken hundred partnership. The bowling attack has been mastered.',
-  ],
-  150: [
-    'The 150 partnership! This pair is now in total command.',
-    'One hundred and fifty together — a magnificent stand that defines this innings.',
-    'The 150 is brought up and the crowd rises. They know they are watching something special.',
-  ],
-  200: [
-    'TWO HUNDRED for the partnership! A truly historic stand.',
-    'The double-century partnership is up — extraordinary cricket from both batters.',
-    'Two hundred runs together. This will be talked about for years to come.',
-  ],
-};
-
-// ─── Individual milestones (150, 200) ────────────────────────────────────────
-
-export const MILESTONE_150_LINES: string[] = [
-  '150! An absolutely magnificent innings — one hundred and fifty runs to the name!',
-  'One hundred and fifty! This batter has been in a class of their own today.',
-  'A HUNDRED AND FIFTY! The stadium erupts — a truly special individual innings.',
-  '150 up! The bowling attack has been taken apart systematically and brilliantly.',
-  'One-five-oh. One of the finest innings this ground has ever witnessed.',
-  '150 not out! The helmet comes off, the arms go wide — a career-defining knock.',
-  'MAGNIFICENT! 150 runs and no sign of stopping. What a batter, what an innings.',
-];
-
-export const MILESTONE_200_LINES: string[] = [
-  'TWO HUNDRED! A double century — one of the greatest individual innings ever seen here!',
-  '200! They have done it! Unbelievable scenes as the bat is raised high!',
-  'Double century! This player has entered immortality with an innings for the ages.',
-  'Two. Hundred. Runs. A staggering, once-in-a-generation innings of pure batting genius.',
-  '200 not out! The ground is on its feet and it will not sit down for a long time!',
 ];
 
 const TIGHT_CHASE_PHRASES: string[] = [
@@ -805,21 +703,6 @@ const PARTNERSHIP_PHRASES: string[] = [
   'The partnership grows — and so does the confidence in the batting camp.',
   'Two batters in form, building something special — the crowd loves it.',
   'A vital stand — this is exactly what the innings needed.',
-];
-
-const INNINGS_BREAK: readonly ((target: number) => string)[] = [
-  (t) => `That is the innings wrapped up — ${t} needed to win from here.`,
-  (t) => `A total is on the board. The chase requires ${t} runs.`,
-  (t) => `Innings break: the target is ${t}. Game well and truly on!`,
-  (t) => `They will need ${t} to get over the line — a serious ask.`,
-  (t) => `${t} required for victory. The chasing side regroups in the sheds.`,
-  (t) => `A competitive total set — ${t} is the number to chase down.`,
-  (t) => `The equation is simple enough: ${t} runs for the win.`,
-  (t) => `Half-time in the contest, and the target reads ${t}.`,
-  (t) => `${t} to win. Plenty of belief in both dressing rooms.`,
-  (t) => `Innings complete — a target of ${t} awaits the chasing side.`,
-  (t) => `The scoreboard reads ${t} to win. Buckle up for the second innings!`,
-  (t) => `${t} — that is the number. Can they chase it down?`,
 ];
 
 // ─── Player-name pools (use {name} placeholder) ───────────────────────────────
@@ -853,7 +736,7 @@ const NAMED_WICKET_LINES: string[] = [
 
 // ─── Exported types ───────────────────────────────────────────────────────────
 
-export interface BallCommentaryCtx {
+interface BallCommentaryCtx {
   outcome: BallOutcome;
   rng: Rng;
   dismissal?: Dismissal;
@@ -883,23 +766,24 @@ function fill(template: string, name: string): string {
 }
 
 /**
- * Returns a single commentary line for a delivery outcome.
- * Preserves its original signature exactly (kept for back-compat).
- */
-export function commentaryFor(outcome: BallOutcome, rng: Rng, dismissal?: Dismissal): string {
-  if (outcome === 'W') {
-    if (dismissal) return pick(DISMISSAL_PHRASES[dismissal.type], rng);
-    return pick(WICKET_FALL, rng);
-  }
-  return pick(PHRASES[outcome], rng);
-}
-
-/**
  * Full contextual commentary. Weaves delivery, stroke, player name, and
  * situational flavour into the line. Fully deterministic via the rng.
  */
 export function ballCommentary(ctx: BallCommentaryCtx): string {
-  const { outcome, rng, dismissal, delivery, shot, runOut, strikerName, bowlerName, powerplay, deathOvers, tightChase, partnershipRuns } = ctx;
+  const {
+    outcome,
+    rng,
+    dismissal,
+    delivery,
+    shot,
+    runOut,
+    strikerName,
+    bowlerName,
+    powerplay,
+    deathOvers,
+    tightChase,
+    partnershipRuns,
+  } = ctx;
 
   if (outcome === 'W') {
     // Named wicket line (30% of the time when a name is provided)
@@ -924,49 +808,24 @@ export function ballCommentary(ctx: BallCommentaryCtx): string {
 
   // Situational commentary — only consume RNG when a context flag is actually set
   // (guards the RNG call to preserve backwards-compatible determinism)
-  const hasSituational = deathOvers || tightChase || powerplay || (partnershipRuns !== undefined && partnershipRuns >= 50);
+  const hasSituational =
+    deathOvers ||
+    tightChase ||
+    powerplay ||
+    (partnershipRuns !== undefined && partnershipRuns >= 50);
   if (hasSituational && rng() < 0.2) {
     if (deathOvers) return pick(DEATH_OVER_PHRASES, rng);
     if (tightChase) return pick(TIGHT_CHASE_PHRASES, rng);
     if (powerplay) return pick(POWERPLAY_PHRASES, rng);
-    if (partnershipRuns !== undefined && partnershipRuns >= 50) return pick(PARTNERSHIP_PHRASES, rng);
+    if (partnershipRuns !== undefined && partnershipRuns >= 50)
+      return pick(PARTNERSHIP_PHRASES, rng);
   }
 
   // Delivery-enriched line for dots
-  if (delivery && outcome === 'DOT' && rng() < 0.5) return `${cap(delivery.label)} — ${pick(PHRASES.DOT, rng).toLowerCase()}`;
+  if (delivery && outcome === 'DOT' && rng() < 0.5)
+    return `${cap(delivery.label)} — ${pick(PHRASES.DOT, rng).toLowerCase()}`;
 
   return pick(PHRASES[outcome], rng);
-}
-
-/** A batting-milestone line (50 or 100). Deterministic via the injected rng. */
-export function milestoneLine(kind: 'FIFTY' | 'HUNDRED', rng: Rng, playerName?: string): string {
-  const base = pick(kind === 'FIFTY' ? FIFTY_LINES : HUNDRED_LINES, rng);
-  return playerName ? `${playerName} — ${base}` : base;
-}
-
-/** A generic "a wicket has fallen" atmosphere line. */
-export function wicketFallLine(rng: Rng): string {
-  return pick(WICKET_FALL, rng);
-}
-
-/** An innings-break line that folds in the chase target. */
-export function inningsBreakLine(target: number, rng: Rng): string {
-  return pick(INNINGS_BREAK, rng)(target);
-}
-
-/** A powerplay situation commentary line. */
-export function powerplayLine(rng: Rng): string {
-  return pick(POWERPLAY_PHRASES, rng);
-}
-
-/** A death-over situation commentary line. */
-export function deathOverLine(rng: Rng): string {
-  return pick(DEATH_OVER_PHRASES, rng);
-}
-
-/** A tight-chase pressure line. */
-export function tightChaseLine(rng: Rng): string {
-  return pick(TIGHT_CHASE_PHRASES, rng);
 }
 
 /** A batting-collapse atmosphere line. */
@@ -982,23 +841,4 @@ export function lastOverThrillerLine(rng: Rng): string {
 /** A tailender-heroics line. */
 export function tailenderLine(rng: Rng): string {
   return pick(TAILENDER_PHRASES, rng);
-}
-
-/** A partnership milestone line (50/100/150/200). */
-export function partnershipMilestoneLine(runs: number, rng: Rng): string {
-  const key = runs >= 200 ? 200 : runs >= 150 ? 150 : runs >= 100 ? 100 : 50;
-  const pool = PARTNERSHIP_MILESTONE_PHRASES[key];
-  return pool ? pick(pool, rng) : `A ${runs}-run partnership — remarkable batting!`;
-}
-
-/** An individual milestone line for 150. */
-export function milestone150Line(rng: Rng, playerName?: string): string {
-  const base = pick(MILESTONE_150_LINES, rng);
-  return playerName ? `${playerName} — ${base}` : base;
-}
-
-/** An individual milestone line for 200. */
-export function milestone200Line(rng: Rng, playerName?: string): string {
-  const base = pick(MILESTONE_200_LINES, rng);
-  return playerName ? `${playerName} — ${base}` : base;
 }

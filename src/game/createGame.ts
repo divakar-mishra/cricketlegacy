@@ -1,4 +1,5 @@
 import { CREATION } from '../data/attributes';
+import { avatarFromLegacy, normalizeAvatarConfig } from '../avatar';
 import {
   BattingAttrs,
   BattingStyle,
@@ -24,7 +25,6 @@ import {
   DIV2_LEAGUE_ID,
   DIV3_LEAGUE_ID,
 } from '../generation/world';
-import { clamp } from '../utils/math';
 import { startingWallet } from './economy';
 import { boardTargetFor } from './finance';
 import { autoXI } from './squad';
@@ -32,6 +32,7 @@ import { generateYouthFixtures } from './youthFixtures';
 import { initialManagerLevel } from './managerCareer';
 import { buildManagerSeasonCalendar } from './managerCalendar';
 import { buildPlayerSeasonCalendar } from './playerCalendar';
+import { ensurePlayerLifeState } from './playerLife';
 import { ensureCompetitionFixtures } from './season';
 import { ensurePlayerCareerResources } from './career';
 
@@ -49,16 +50,10 @@ export interface UserPlayerInput {
   /**
    * Multiplier applied to all raw attributes after the user allocates their
    * point budget. Values < 1 represent younger starters whose physical
-   * development hasn't caught up yet. The potential ceiling is then set from
-   * the *unscaled* overall so young starters have the highest growth headroom.
+   * development hasn't caught up yet. The creation UI displays the resulting
+   * active rating directly; this multiplier is never hidden from the player.
    */
   attrScale?: number;
-  /**
-   * Added to the unscaled overall when computing `potential`. Higher values
-   * mean more room to grow via training. Young starters receive the largest
-   * bonus, making the U14 path the only route to a truly legendary ceiling.
-   */
-  potentialBonus?: number;
 }
 
 function deriveTraits(input: UserPlayerInput): string[] {
@@ -119,22 +114,9 @@ export function buildUserPlayer(input: UserPlayerInput): Player {
 
   player.overall = computeOverall(player);
 
-  // Potential is anchored to the *unscaled* ceiling + bonus so younger starters
-  // have the most room to grow via training. A U14 player with scaled-down stats
-  // still has a potential ceiling derived from what they COULD become.
-  let unscaledOverall = player.overall;
-  if (needsScale) {
-    const unscaledProxy = {
-      ...player,
-      batting: input.batting,
-      bowling: input.bowling,
-      fielding: input.fielding,
-      meta: { ...input.meta, form: CREATION.startForm } as MentalPhysical,
-    };
-    unscaledOverall = computeOverall(unscaledProxy);
-  }
-  const bonus = input.potentialBonus ?? 12;
-  player.potential = clamp(unscaledOverall + bonus, player.overall + 2, 99);
+  // AI players retain an internal development ceiling, but the protagonist
+  // never has an invisible cap that can make paid or earned training stop.
+  player.potential = 99;
 
   return player;
 }
@@ -160,7 +142,7 @@ function makeSeason(
 /** Map career-start key → initial career path level. */
 function initialPathLevel(age: number): CareerPathLevel {
   if (age <= 15) return 'SCHOOL';
-  if (age <= 18) return 'U19';
+  if (age <= 19) return 'U19';
   return 'DOMESTIC';
 }
 
@@ -177,6 +159,7 @@ export function createCareerSave(params: {
   archetype?: import('../domain/types').CareerArchetype;
   ironman?: boolean;
   avatarCustomization?: import('../domain/types').AvatarCustomization;
+  avatarConfig?: import('../avatar').AvatarConfig;
 }): SaveGame {
   const now = Date.now();
   params.player.condition ??= 100;
@@ -188,22 +171,24 @@ export function createCareerSave(params: {
     country: selectedBlueprint?.country ?? params.player.nationality,
     requiredTeamId: params.teamId,
   });
+  const startLevel = initialPathLevel(params.player.age);
 
-  // Insert the user into their chosen team, replacing the weakest same-role player.
+  // The chosen Tier 3 club is a future destination for School/U19 starts.
+  // Only a senior starter is inserted into that professional roster now.
   const team = world.teams[params.teamId];
-  const squad = team.playerIds.map((id) => world.players[id]);
-  const sameRole = squad
-    .filter((p) => p.role === params.player.role)
-    .sort((a, b) => a.overall - b.overall);
-  const victim = sameRole[0] ?? [...squad].sort((a, b) => a.overall - b.overall)[0];
   world.players[params.player.id] = params.player;
-  team.playerIds = team.playerIds.map((id) => (id === victim.id ? params.player.id : id));
-  delete world.players[victim.id];
-  team.isUserTeam = true;
-
-  // Guarantee the user starts in the XI.
-  const finalSquad = team.playerIds.map((id) => world.players[id]);
-  team.xi = autoXI(finalSquad, params.player.id).map((p) => p.id);
+  if (startLevel === 'DOMESTIC') {
+    const squad = team.playerIds.map((id) => world.players[id]);
+    const sameRole = squad
+      .filter((p) => p.role === params.player.role)
+      .sort((a, b) => a.overall - b.overall);
+    const victim = sameRole[0] ?? [...squad].sort((a, b) => a.overall - b.overall)[0];
+    team.playerIds = team.playerIds.map((id) => (id === victim.id ? params.player.id : id));
+    delete world.players[victim.id];
+    team.isUserTeam = true;
+    const finalSquad = team.playerIds.map((id) => world.players[id]);
+    team.xi = autoXI(finalSquad, params.player.id).map((p) => p.id);
+  }
 
   // New Game+ legacy: a protégé starts with a head-start in money and profile.
   // The head-start scales with BOTH the generation count and the mentor's Legacy
@@ -213,8 +198,6 @@ export function createCareerSave(params: {
   const wallet = startingWallet(now);
   if (ng > 0) wallet.coins += ng * 500;
   if (legScore > 0) wallet.coins += legScore * 25; // up to +2,500 coins from a strong legacy
-
-  const startLevel = initialPathLevel(params.player.age);
 
   const save: import('../domain/types').SaveGame = {
     schemaVersion: SAVE_SCHEMA_VERSION,
@@ -260,6 +243,9 @@ export function createCareerSave(params: {
       kit: 'kit_white',
       celebration: 'cel_wave',
       avatarCustomization: params.avatarCustomization,
+      avatarConfig: params.avatarConfig
+        ? normalizeAvatarConfig(params.avatarConfig)
+        : avatarFromLegacy(params.avatarCustomization, 'kit_white'),
     },
   };
 
@@ -271,6 +257,7 @@ export function createCareerSave(params: {
     ensureCompetitionFixtures(save, 'first-class');
   }
   ensurePlayerCareerResources(save);
+  ensurePlayerLifeState(save);
   buildPlayerSeasonCalendar(save);
 
   return save;
@@ -339,8 +326,16 @@ export function createManagerSave(params: {
     managerCareerSeasons: 0,
     managerTitlesAtLevel: 0,
     managerNationalTeamId: `national-${country}`,
+    managerProgression: {
+      reputation: team.reputation,
+      currentClubId: team.id,
+      premiumAssistanceHistory: [],
+      contractSalary: Math.round(250_000 + team.reputation * 14_000),
+    },
     experience: {},
   };
-  buildManagerSeasonCalendar(save, 2026);
+  // A rookie appointment begins with the marquee T20 block in March. Later
+  // seasons use the complete September-August calendar.
+  buildManagerSeasonCalendar(save, 2026, 'T20');
   return save;
 }

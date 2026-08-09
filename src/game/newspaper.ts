@@ -22,7 +22,8 @@ function trophyNameForMatch(save: SaveGame, match: MatchState): string | undefin
   if (fixture.competition === 'CUP') return 'National Knockout Cup';
   if (fixture.competition === 'INTL_TOURNAMENT') {
     return (
-      save.internationalCalendar?.events.find((event) => event.id === fixture.competitionId)?.name ??
+      save.internationalCalendar?.events.find((event) => event.id === fixture.competitionId)
+        ?.name ??
       fixture.venue.split(' - ')[0] ??
       'International Championship'
     );
@@ -38,6 +39,53 @@ export interface TrophyNewspaperOptions {
   sourceId?: string;
   format?: NewspaperStory['format'];
   now?: number;
+}
+
+export interface TournamentEliminationNewspaperOptions {
+  competitionId: string;
+  tournamentName: string;
+  format: NewspaperStory['format'];
+  year: number;
+  position: number;
+  groupSize: number;
+  now?: number;
+}
+
+/** Build the explicit exit headline shown when the national side misses a knockout. */
+export function buildTournamentEliminationNewspaperStory(
+  save: SaveGame,
+  options: TournamentEliminationNewspaperOptions,
+): NewspaperStory | null {
+  if (save.mode !== 'career' || !save.userPlayerId) return null;
+  const player = save.players[save.userPlayerId];
+  if (!player) return null;
+
+  const now = options.now ?? Date.now();
+  const domesticClub = save.userTeamId ? save.teams[save.userTeamId]?.name : undefined;
+  return {
+    id: `paper-elimination-${options.competitionId}-${now}`,
+    matchId: `elimination-${options.competitionId}`,
+    createdAt: now,
+    season: options.year,
+    kind: 'ELIMINATION',
+    format: options.format,
+    edition: `THE CRICKET CHRONICLE | SEASON ${options.year}`,
+    kicker: 'TOURNAMENT EXIT',
+    headline: `ELIMINATED FROM ${options.tournamentName.toUpperCase()}`,
+    subheadline:
+      `${player.name}'s national side finishes ${options.position} of ` +
+      `${options.groupSize} and misses the semifinal places.`,
+    body:
+      `The group campaign is over after the final table placed the side outside the top two. ` +
+      `${player.name} receives the tournament experience reward and now returns ` +
+      `${domesticClub ? `to ${domesticClub}` : 'to domestic duty'} when the calendar resumes.`,
+    playerName: player.name,
+    opponentName: options.tournamentName,
+    result: 'LOSS',
+    runs: 0,
+    balls: 0,
+    wickets: 0,
+  };
 }
 
 /** Build a shareable champions edition for trophies settled outside a played Final. */
@@ -116,9 +164,8 @@ export function buildNewspaperStory(
     Boolean(performance.calledUp);
   if (!notable) return null;
 
-  const opponentId =
-    match.homeTeamId === userMatchTeamId ? match.awayTeamId : match.homeTeamId;
-  const opponentName = save.teams[opponentId]?.name ?? opponentId;
+  const opponentId = match.homeTeamId === userMatchTeamId ? match.awayTeamId : match.homeTeamId;
+  const opponentName = save.teams[opponentId]?.name ?? 'the opposition';
   const userInningsIndex = match.innings.findIndex(
     (innings) => innings.battingTeamId === userMatchTeamId,
   );
@@ -175,9 +222,7 @@ export function buildNewspaperStory(
       ? `${player.name} helped deliver the season's defining victory. The final whistle confirmed the trophy and a permanent place in club history.`
       : `${player.name} produced the defining individual performance of the match. ` +
         `Selectors and supporters will remember how the innings shifted when the pressure rose.`);
-  const season = save.currentSeasonId
-    ? (save.seasons[save.currentSeasonId]?.year ?? 2026)
-    : 2026;
+  const season = save.currentSeasonId ? (save.seasons[save.currentSeasonId]?.year ?? 2026) : 2026;
 
   return {
     id: `paper-${match.id}-${now}`,
@@ -204,11 +249,15 @@ export function buildNewspaperStory(
 /** Keep one article per match and cap the archive so saves stay small. */
 export function archiveNewspaperStory(save: SaveGame, story: NewspaperStory): void {
   save.experience ??= {};
+  const pending = (save.experience.mediaScrapbook ?? []).find(
+    (item) => item.id === save.experience?.pendingNewspaperId,
+  );
   const withoutDuplicate = (save.experience.mediaScrapbook ?? []).filter(
     (item) => item.matchId !== story.matchId,
   );
   save.experience.mediaScrapbook = [...withoutDuplicate, story].slice(-40);
-  save.experience.pendingNewspaperId = story.id;
+  save.experience.pendingNewspaperId =
+    pending?.kind === 'ELIMINATION' && story.kind !== 'ELIMINATION' ? pending.id : story.id;
 }
 
 export function markNewspaperSeen(save: SaveGame, storyId: string): void {

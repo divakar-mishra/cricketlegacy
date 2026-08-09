@@ -1,4 +1,11 @@
-import { applyMgrEffects, managerEventCount, nextManagerEvent, queueManagerEvent, renderMgr, resolveManagerChoice } from '../managerEvents';
+import {
+  applyMgrEffects,
+  managerEventCount,
+  nextManagerEvent,
+  queueManagerEvent,
+  renderMgr,
+  resolveManagerChoice,
+} from '../managerEvents';
 import { makeManagerSave } from './_depthHelpers';
 
 describe('manager press-conferences', () => {
@@ -33,5 +40,10 @@ describe('manager press-conferences', () => {
     expect(text).toContain('the club');
     expect(text).not.toContain('{team}');
     expect(text).not.toContain('{unknown_token}');
+  });
+
+  it('removes undefined values from manager copy', () => {
+    const save = makeManagerSave();
+    expect(renderMgr('undefined leads {team}.', save)).not.toContain('undefined');
   });
 });

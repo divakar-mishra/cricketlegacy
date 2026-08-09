@@ -17,7 +17,6 @@ import Animated, {
   withDelay,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { haptics } from '../audio';
@@ -58,8 +57,8 @@ export function AchievementCinematic({ achievement, onDismiss }: Props) {
   useEffect(() => {
     if (!achievement) return;
     haptics.impact();
-    scale.value = withSpring(1, { damping: 14, stiffness: 180 });
-    iconScale.value = withDelay(200, withSpring(1, { damping: 10, stiffness: 200 }));
+    scale.value = withTiming(1, { duration: 200 });
+    iconScale.value = withDelay(100, withTiming(1, { duration: 200 }));
     ring1.value = withDelay(
       300,
       withRepeat(

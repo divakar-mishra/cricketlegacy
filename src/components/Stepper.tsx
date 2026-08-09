@@ -15,6 +15,8 @@ type Props = {
   label: string;
   description?: string;
   value: number;
+  displayValue?: number | string;
+  progressValue?: number;
   max: number;
   onDec: () => void;
   onInc: () => void;
@@ -27,6 +29,8 @@ export function Stepper({
   label,
   description,
   value,
+  displayValue,
+  progressValue,
   max,
   onDec,
   onInc,
@@ -46,14 +50,14 @@ export function Stepper({
           </Text>
         ) : null}
         <ProgressBar
-          value={value / max}
+          value={(progressValue ?? value) / max}
           color={barColor ?? colors.primary}
           style={{ marginTop: spacing.sm }}
         />
       </View>
       <View style={styles.controls}>
         <StepButton symbol="-" label={`Decrease ${label}`} onPress={onDec} enabled={canDec} />
-        <Text style={styles.value}>{value}</Text>
+        <Text style={styles.value}>{displayValue ?? value}</Text>
         <StepButton
           symbol="+"
           label={`Increase ${label}`}

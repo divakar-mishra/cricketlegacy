@@ -52,9 +52,9 @@ function fmtCountdown(secs: number): string {
 
 function rewardLabel(r: { coins?: number; gems?: number; item?: string }): string {
   const parts: string[] = [];
-  if (r.coins) parts.push(`${r.coins} 🪙`);
-  if (r.gems) parts.push(`${r.gems} 💎`);
-  if (r.item) parts.push(PASS_ITEM_LABELS[r.item] ?? r.item);
+  if (r.coins) parts.push(`🪙 ${r.coins} Coins`);
+  if (r.gems) parts.push(`💎 ${r.gems} Gems`);
+  if (r.item) parts.push(`🎁 1x ${PASS_ITEM_LABELS[r.item] ?? 'Pass item'}`);
   return parts.join(' + ');
 }
 

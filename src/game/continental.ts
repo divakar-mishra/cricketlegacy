@@ -36,7 +36,12 @@ export interface ContinentalResult {
  * Resolve the Continental Cup from a set of qualifiers (best 4 recommended).
  * Records the champion on the save; the caller awards prize money / trophies.
  */
-export function resolveContinental(save: SaveGame, qualifiers: string[], rng: Rng): ContinentalResult {
+export function resolveContinental(
+  save: SaveGame,
+  qualifiers: string[],
+  rng: Rng,
+  creditUserTitle = true,
+): ContinentalResult {
   const teams = qualifiers.filter((id) => save.teams[id]);
   if (teams.length < 2) return { championId: undefined, userWon: false };
 
@@ -51,7 +56,9 @@ export function resolveContinental(save: SaveGame, qualifiers: string[], rng: Rn
 
   save.continentalChampion = championId;
   const userWon = championId === save.userTeamId;
-  if (userWon) save.continentalTitles = (save.continentalTitles ?? 0) + 1;
+  if (userWon && creditUserTitle) {
+    save.continentalTitles = (save.continentalTitles ?? 0) + 1;
+  }
   return { championId, userWon };
 }
 

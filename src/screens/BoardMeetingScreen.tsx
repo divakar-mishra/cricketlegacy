@@ -13,7 +13,6 @@ import Animated, {
   withDelay,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle, G, Line, Rect } from 'react-native-svg';
@@ -144,9 +143,9 @@ export function BoardMeetingScreen({ navigation, route }: ScreenProps<'BoardMeet
   useEffect(() => {
     if (!queueVisible) return;
     getKindConfig(kind).haptic();
-    emojiScale.value = withSpring(1, { damping: 10, stiffness: 160 });
-    cardY.value = withDelay(300, withSpring(0, { damping: 16 }));
-    cardOpacity.value = withDelay(300, withTiming(1, { duration: 400 }));
+    emojiScale.value = withTiming(1, { duration: 200 });
+    cardY.value = withDelay(120, withTiming(0, { duration: 220 }));
+    cardOpacity.value = withDelay(120, withTiming(1, { duration: 220 }));
     pulseScale.value = withDelay(
       600,
       withRepeat(

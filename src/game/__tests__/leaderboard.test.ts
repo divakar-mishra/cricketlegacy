@@ -21,15 +21,14 @@ function makeSave(): SaveGame {
 describe('leaderboard', () => {
   it('ranks by the chosen metric, best first', () => {
     const save = makeSave();
-    save.players[save.userPlayerId!].careerStats = { ...emptyStats(), runs: 99999 };
+    save.players[save.userPlayerId!].careerStats = { ...emptyStats(), runs: 99_999 };
     const board = leaderboard(save, 'runs', 'career', 10);
     expect(board.length).toBe(10);
     expect(board[0].isUser).toBe(true);
     expect(board[0].rank).toBe(1);
-    // Ranks are strictly increasing and values non-increasing.
-    for (let i = 1; i < board.length; i++) {
-      expect(board[i].rank).toBe(i + 1);
-      expect(board[i].value).toBeLessThanOrEqual(board[i - 1].value);
+    for (let index = 1; index < board.length; index++) {
+      expect(board[index].rank).toBe(index + 1);
+      expect(board[index].value).toBeLessThanOrEqual(board[index - 1].value);
     }
   });
 
@@ -38,14 +37,14 @@ describe('leaderboard', () => {
     save.players[save.userPlayerId!].careerStats = { ...emptyStats(), runs: 0 };
     const rank = userRank(save, 'runs', 'career');
     expect(rank).toBeGreaterThan(0);
-    expect(rank).toBeLessThanOrEqual(Object.values(save.players).filter((p) => !p.hidden).length);
+    expect(rank).toBeLessThanOrEqual(Object.values(save.players).filter((player) => !player.hidden).length);
   });
 
   it('excludes hidden youth prospects', () => {
     const save = makeSave();
-    const hiddenId = Object.values(save.players).find((p) => !p.isUserPlayer)!.id;
+    const hiddenId = Object.values(save.players).find((player) => !player.isUserPlayer)!.id;
     save.players[hiddenId].hidden = true;
     const board = leaderboard(save, 'overall', 'career', 100);
-    expect(board.some((r) => r.playerId === hiddenId)).toBe(false);
+    expect(board.some((row) => row.playerId === hiddenId)).toBe(false);
   });
 });

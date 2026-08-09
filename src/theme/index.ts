@@ -236,5 +236,3 @@ export const shadow = {
     elevation: 3,
   },
 } as const;
-
-export type ThemeColor = keyof typeof colors;

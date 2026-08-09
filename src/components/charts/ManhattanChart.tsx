@@ -24,7 +24,11 @@ const PAD_R = 6;
 const PAD_T = 14; // headroom for the max gridline label + wicket markers
 const PAD_B = 18; // room for the over-number axis
 
-export function ManhattanChart({ overs, width = 320, height = 140 }: ManhattanChartProps): ReactElement {
+export function ManhattanChart({
+  overs,
+  width = 320,
+  height = 140,
+}: ManhattanChartProps): ReactElement {
   const colors = useColors();
   const w = width > 0 ? width : 320;
   const h = height > 0 ? height : 140;
@@ -40,7 +44,15 @@ export function ManhattanChart({ overs, width = 320, height = 140 }: ManhattanCh
 
   return (
     <Svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-      <Line x1={PAD_L} y1={PAD_T} x2={w - PAD_R} y2={PAD_T} stroke={colors.border} strokeWidth={1} strokeDasharray="3 5" />
+      <Line
+        x1={PAD_L}
+        y1={PAD_T}
+        x2={w - PAD_R}
+        y2={PAD_T}
+        stroke={colors.border}
+        strokeWidth={1}
+        strokeDasharray="3 5"
+      />
       <SvgText
         x={PAD_L}
         y={PAD_T - 4}
@@ -52,7 +64,14 @@ export function ManhattanChart({ overs, width = 320, height = 140 }: ManhattanCh
         {`${maxRuns}`}
       </SvgText>
 
-      <Line x1={PAD_L} y1={baselineY} x2={w - PAD_R} y2={baselineY} stroke={colors.borderStrong} strokeWidth={1} />
+      <Line
+        x1={PAD_L}
+        y1={baselineY}
+        x2={w - PAD_R}
+        y2={baselineY}
+        stroke={colors.borderStrong}
+        strokeWidth={1}
+      />
 
       <G>
         {overs.map((o, i) => {
@@ -85,5 +104,3 @@ export function ManhattanChart({ overs, width = 320, height = 140 }: ManhattanCh
     </Svg>
   );
 }
-
-export default ManhattanChart;

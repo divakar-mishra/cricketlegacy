@@ -1,62 +1,15 @@
 /**
- * Online Leaderboard Service — backed by Supabase.
+ * Online leaderboard service backed by Supabase.
  *
- * Handles global score submission and fetching with offline fallback.
- * All calls are fire-and-forget safe — network errors are swallowed and
- * logged to the crash service.
- *
- * ─── Supabase Setup (one-time) ────────────────────────────────────────────────
- *  1. Create a free project at https://supabase.com
- *  2. Run the SQL below in the Supabase SQL Editor to create the table:
- *
- *     CREATE TABLE leaderboard (
- *       id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
- *       player_name TEXT NOT NULL,
- *       user_id     TEXT NOT NULL,
- *       score_type  TEXT NOT NULL,  -- 'career_runs' | 'career_wickets' | 'manager_titles' | 'gamerscore'
- *       score       INTEGER NOT NULL,
- *       country     TEXT,
- *       created_at  TIMESTAMPTZ DEFAULT NOW(),
- *       updated_at  TIMESTAMPTZ DEFAULT NOW()
- *     );
- *
- *     -- Unique constraint: one entry per user per score type
- *     CREATE UNIQUE INDEX leaderboard_user_type ON leaderboard(user_id, score_type);
- *
- *     -- Public read, authenticated write
- *     ALTER TABLE leaderboard ENABLE ROW LEVEL SECURITY;
- *     CREATE POLICY "Anyone can read" ON leaderboard FOR SELECT USING (true);
- *     CREATE POLICY "Users can upsert own row" ON leaderboard FOR INSERT WITH CHECK (true);
- *     CREATE POLICY "Users can update own row" ON leaderboard FOR UPDATE USING (true);
- *
- *     -- Hidden review table for impossible uploads. The client still receives
- *     -- a normal success path; these rows are excluded from public rankings.
- *     CREATE TABLE shadow_leaderboard (
- *       id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
- *       player_name TEXT NOT NULL,
- *       user_id     TEXT NOT NULL,
- *       score_type  TEXT NOT NULL,
- *       score       INTEGER NOT NULL,
- *       country     TEXT,
- *       reasons     TEXT[] NOT NULL DEFAULT '{}',
- *       created_at  TIMESTAMPTZ DEFAULT NOW()
- *     );
- *
- *  3. Copy your project URL + anon key into app.json extra.supabaseUrl / extra.supabaseAnonKey
- *  4. Set SUPABASE_ENABLED = true below and rebuild.
- * ─────────────────────────────────────────────────────────────────────────────
+ * Score submissions pass through the local sanity filter before entering the
+ * public table. Implausible rows are kept in the private review table instead.
+ * All network failures are non-fatal so careers remain playable offline.
  */
 
-import { leaderboardSanityCheck, LeaderboardSanityInput } from './antiCheat';
-import { captureException, addBreadcrumb } from './crash';
 import { SUPABASE_CONFIG } from '../config/supabase';
+import { leaderboardSanityCheck, type LeaderboardSanityInput } from './antiCheat';
+import { captureException } from './crash';
 import { getSupabaseClient } from './supabaseClient';
-
-// ─── Toggle ───────────────────────────────────────────────────────────────────
-// Supabase stays disabled until .env.local provides URL/key and
-// EXPO_PUBLIC_SUPABASE_ENABLED=true. Do not ship service_role/secret keys.
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ScoreType =
   | 'career_runs'
@@ -83,13 +36,13 @@ export interface LeaderboardResult {
   totalPlayers: number;
 }
 
-// ─── Supabase client (lazy) ───────────────────────────────────────────────────
-
-function getClient() {
-  return getSupabaseClient();
+interface LeaderboardRow {
+  player_name: string;
+  user_id: string;
+  score: number;
+  country?: string;
+  updated_at: string;
 }
-
-// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Submit or update a user's score. Call after season rollover, retirement, or
@@ -103,10 +56,8 @@ export async function submitScore(params: {
   country?: string;
   sanity?: Partial<LeaderboardSanityInput>;
 }): Promise<void> {
-  const client = getClient();
+  const client = getSupabaseClient();
   if (!client) return;
-
-  addBreadcrumb(`leaderboard.submit: ${params.scoreType}=${params.score}`);
 
   try {
     const verdict = leaderboardSanityCheck({
@@ -141,14 +92,14 @@ export async function submitScore(params: {
     if (error) {
       captureException(error, { context: 'leaderboard.submit' });
     }
-  } catch (e) {
-    captureException(e, { context: 'leaderboard.submit' });
+  } catch (error) {
+    captureException(error, { context: 'leaderboard.submit' });
   }
 }
 
 /**
- * Fetch the top N players for a given score type, along with the requesting
- * user's rank. Returns empty result on network error (offline safe).
+ * Fetch the top players for a score type, plus the requesting user's rank.
+ * Returns an empty result on network errors.
  */
 export async function fetchLeaderboard(
   scoreType: ScoreType,
@@ -162,11 +113,10 @@ export async function fetchLeaderboard(
     totalPlayers: 0,
   };
 
-  const client = getClient();
+  const client = getSupabaseClient();
   if (!client) return empty;
 
   try {
-    // Top N
     const { data, error, count } = await client
       .from('leaderboard')
       .select('player_name, user_id, score, country, updated_at', { count: 'exact' })
@@ -179,8 +129,8 @@ export async function fetchLeaderboard(
       return empty;
     }
 
-    const entries: LeaderboardEntry[] = data.map((row: any, idx: number) => ({
-      rank: idx + 1,
+    const entries: LeaderboardEntry[] = (data as LeaderboardRow[]).map((row, index) => ({
+      rank: index + 1,
       playerName: row.player_name,
       userId: row.user_id,
       score: row.score,
@@ -188,17 +138,15 @@ export async function fetchLeaderboard(
       updatedAt: row.updated_at,
     }));
 
-    // Find user's position
     let userRank: number | null = null;
     let userScore: number | null = null;
 
     if (userId) {
-      const userEntry = entries.find((e) => e.userId === userId);
+      const userEntry = entries.find((entry) => entry.userId === userId);
       if (userEntry) {
         userRank = userEntry.rank;
         userScore = userEntry.score;
       } else {
-        // User not in top N — fetch their actual rank
         const { data: rankData } = await client
           .from('leaderboard')
           .select('score')
@@ -224,13 +172,12 @@ export async function fetchLeaderboard(
       userScore,
       totalPlayers: count ?? entries.length,
     };
-  } catch (e) {
-    captureException(e, { context: 'leaderboard.fetch' });
+  } catch (error) {
+    captureException(error, { context: 'leaderboard.fetch' });
     return empty;
   }
 }
 
-/** Check if Supabase connectivity is available. */
 export function isOnlineLeaderboardEnabled(): boolean {
   return SUPABASE_CONFIG.enabled;
 }

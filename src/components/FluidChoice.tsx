@@ -1,10 +1,10 @@
 /**
- * FluidChoice — a glass dialogue-choice button with spring physics.
+ * FluidChoice — a glass dialogue-choice button with restrained timed motion.
  *
- * On press-in the button scales down with a spring; on release it springs back
+ * On press-in the button scales down; on release it eases back
  * and a brief "commit" morph (scale dip + accent glow) plays before the parent
  * advances to the next state. All motion uses Reanimated shared values on the
- * UI thread (withSpring / withTiming), so it stays fluid at 60/120 FPS.
+ * UI thread, so it stays fluid at 60/120 FPS.
  */
 import { useCallback } from 'react';
 import { Pressable, StyleProp, StyleSheet, ViewStyle } from 'react-native';
@@ -13,7 +13,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { haptics } from '../audio';
@@ -29,8 +28,6 @@ interface FluidChoiceProps {
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }
-
-const SPRING = { damping: 15, stiffness: 220, mass: 0.6 };
 
 export function FluidChoice({
   label,
@@ -50,12 +47,12 @@ export function FluidChoice({
   }));
 
   const onPressIn = useCallback(() => {
-    scale.value = withSpring(0.96, SPRING);
+    scale.value = withTiming(0.96, { duration: 80 });
     glow.value = withTiming(1, { duration: 120 });
   }, [scale, glow]);
 
   const onPressOut = useCallback(() => {
-    scale.value = withSpring(1, SPRING);
+    scale.value = withTiming(1, { duration: 120 });
     glow.value = withTiming(0, { duration: 220 });
   }, [scale, glow]);
 
@@ -64,7 +61,7 @@ export function FluidChoice({
     haptics.selection();
     // Commit morph: a quick dip then settle, so the tap feels physical before
     // the parent swaps in the next dialogue state.
-    scale.value = withSequence(withTiming(0.9, { duration: 90 }), withSpring(1, SPRING));
+    scale.value = withSequence(withTiming(0.9, { duration: 90 }), withTiming(1, { duration: 120 }));
     onPress();
   }, [disabled, onPress, scale]);
 

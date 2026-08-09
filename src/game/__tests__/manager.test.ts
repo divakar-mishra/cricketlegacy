@@ -73,7 +73,7 @@ describe('scouting', () => {
     const rep = save.scoutReports!.find((r) => r.playerId === targetId)!;
     expect(rep.uncertainty).toBeLessThan(0.4);
     expect(Math.abs(rep.knownOverall - truth)).toBeLessThanOrEqual(6);
-    expect(rep.potentialBand).not.toBe('Unclear');
+    expect('potentialBand' in rep).toBe(false);
   });
 });
 

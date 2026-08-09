@@ -3,6 +3,7 @@ import { computeOverall } from '../../engine/rating';
 import { makeRng } from '../../engine/rng';
 import {
   applyTraining,
+  canTrain,
   canTrainGroup,
   developPlayer,
   matchObjective,
@@ -79,12 +80,12 @@ describe('training', () => {
     const keeper = makePlayer({ role: 'WK_BATTER' });
     const allrounder = makePlayer({ role: 'ALLROUNDER' });
 
-    expect(trainingGroupsForRole('BATTER')).toEqual(['batting', 'fielding', 'fitness', 'mental']);
-    expect(trainingGroupsForRole('BOWLER')).toEqual(['bowling', 'fielding', 'fitness', 'mental']);
-    expect(trainingGroupsForRole('WK_BATTER')).toEqual(['batting', 'wicketkeeping', 'fielding', 'fitness']);
-    expect(trainingGroupsForRole('ALLROUNDER')).toEqual(['batting', 'bowling']);
+    expect(trainingGroupsForRole('BATTER')).toEqual(['batting', 'fitness', 'mental']);
+    expect(trainingGroupsForRole('BOWLER')).toEqual(['bowling', 'fitness', 'mental']);
+    expect(trainingGroupsForRole('WK_BATTER')).toEqual(['batting', 'wicketkeeping', 'fitness']);
+    expect(trainingGroupsForRole('ALLROUNDER')).toEqual(['batting', 'bowling', 'fitness']);
     expect(canTrainGroup(batter, 'bowling')).toBe(false);
-    expect(canTrainGroup(keeper, 'fielding')).toBe(true);
+    expect(canTrainGroup(keeper, 'fielding')).toBe(false);
     expect(canTrainGroup(keeper, 'mental')).toBe(false);
     expect(canTrainGroup(keeper, 'fitness')).toBe(true);
     expect(canTrainGroup(allrounder, 'bowling')).toBe(true);
@@ -103,7 +104,9 @@ describe('training', () => {
   });
 
   it('improves the two weakest attributes and costs more each session', () => {
-    const p = makePlayer({ batting: { technique: 30, timing: 70, power: 70, footwork: 40, temperament: 70, running: 70 } });
+    const p = makePlayer({
+      batting: { technique: 30, timing: 70, power: 70, footwork: 40, temperament: 70, running: 70 },
+    });
     const gains = applyTraining(p, 'batting', makeRng(5));
     expect(gains).toHaveLength(2);
     for (const g of gains) expect(g.to).toBeGreaterThan(g.from);
@@ -123,21 +126,24 @@ describe('training', () => {
     expect(trainingCost(sessionsDone(p, 'bowling'))).toBe(250);
   });
 
-  it('trains fielding, wicketkeeping, fitness, and mental as separate role focuses', () => {
-    const batter = makePlayer({
-      role: 'BATTER',
-      fielding: { catching: 30, throwing: 40, agility: 70, keeping: 20 },
-    });
+  it('caps a season at six sessions and one focus at three', () => {
+    const p = makePlayer({ role: 'ALLROUNDER' });
+    for (let i = 0; i < 3; i += 1) applyTraining(p, 'batting', makeRng(20 + i));
+
+    expect(canTrain(p, 'batting')).toBe(false);
+    expect(canTrain(p, 'bowling')).toBe(true);
+
+    for (let i = 0; i < 3; i += 1) applyTraining(p, 'bowling', makeRng(30 + i));
+    expect(sessionsDone(p)).toBe(6);
+    expect(canTrain(p, 'fitness')).toBe(false);
+  });
+
+  it('trains wicketkeeping, fitness, and mental as separate role focuses', () => {
     const keeper = makePlayer({
       role: 'WK_BATTER',
       fielding: { catching: 70, throwing: 70, agility: 70, keeping: 20 },
       meta: { fitness: 30, confidence: 20, aggression: 20, discipline: 20, form: 60 },
     });
-
-    applyTraining(batter, 'fielding', makeRng(4));
-    expect(batter.fielding.catching).toBeGreaterThan(30);
-    expect(batter.fielding.throwing).toBeGreaterThan(40);
-    expect(batter.fielding.keeping).toBe(20);
 
     applyTraining(keeper, 'wicketkeeping', makeRng(4));
     expect(keeper.fielding.keeping).toBeGreaterThan(20);
@@ -199,7 +205,19 @@ describe('form & rating', () => {
   });
 
   it('rating rewards runs and wickets', () => {
-    const star = matchRating(perf({ batted: true, runs: 80, balls: 45, fours: 8, sixes: 3, bowled: true, wickets: 2, runsConceded: 20, ballsBowled: 24 }));
+    const star = matchRating(
+      perf({
+        batted: true,
+        runs: 80,
+        balls: 45,
+        fours: 8,
+        sixes: 3,
+        bowled: true,
+        wickets: 2,
+        runsConceded: 20,
+        ballsBowled: 24,
+      }),
+    );
     const duck = matchRating(perf({ batted: true, runs: 0, balls: 2, out: true }));
     expect(star).toBeGreaterThan(duck);
     expect(star).toBeLessThanOrEqual(10);
@@ -234,7 +252,17 @@ describe('userPerformance & awards', () => {
           overs: 20,
           balls: 120,
           events: [],
-          batting: [{ playerId: 'user', runs: 45, balls: 30, fours: 4, sixes: 2, out: true, battedOrder: 0 }],
+          batting: [
+            {
+              playerId: 'user',
+              runs: 45,
+              balls: 30,
+              fours: 4,
+              sixes: 2,
+              out: true,
+              battedOrder: 0,
+            },
+          ],
           bowling: [],
         },
         {

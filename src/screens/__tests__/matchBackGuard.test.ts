@@ -6,7 +6,9 @@ const matchScreen = fs.readFileSync(path.join(__dirname, '..', 'MatchScreen.tsx'
 describe('match back navigation guard', () => {
   it('wires Android hardware back to the active-match leave confirmation', () => {
     expect(matchScreen).toContain("BackHandler.addEventListener('hardwareBackPress'");
-    expect(matchScreen).toContain('Leaving now will restart or forfeit the current match. Are you sure you want to leave?');
+    expect(matchScreen).toContain(
+      'Leaving now will restart or forfeit the current match. Are you sure you want to leave?',
+    );
     expect(matchScreen).toContain('Stay in match');
     expect(matchScreen).toContain('Leave match');
     expect(matchScreen).toContain('leaveDialogOpen');
@@ -14,11 +16,11 @@ describe('match back navigation guard', () => {
 });
 
 describe('match commentary surface', () => {
-  it('keeps latest and recent commentary accessible in the live match view', () => {
-    expect(matchScreen).toContain('Latest commentary ${display.feed[0].label}: ${display.feed[0].text}');
+  it('keeps one compact recent feed and the full archive accessible in the live match view', () => {
     expect(matchScreen).toContain('accessibilityLabel="Recent commentary"');
-    expect(matchScreen).toContain('styles.liveCommentaryCard');
-    expect(matchScreen).toContain('display.feed.slice(0, 4).map');
+    expect(matchScreen).toContain('accessibilityLabel="Open ball-by-ball commentary"');
+    expect(matchScreen).toContain('display.feed.slice(0, fastMatchUi ? 3 : 4)].reverse()');
+    expect(matchScreen).not.toContain('styles.liveCommentaryCard');
     expect(matchScreen).toContain('<CommentaryArchive');
   });
 });

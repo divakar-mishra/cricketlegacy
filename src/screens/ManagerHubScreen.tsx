@@ -9,7 +9,6 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { playHaptic } from '../audio';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import type { IconName } from '../components';
@@ -24,6 +23,7 @@ import {
   Icon,
   LeagueTable,
   LiveOpsCards,
+  MechanicInfoButton,
   ModeGuideModal,
   RewardModal,
   RewardModalData,
@@ -33,6 +33,7 @@ import {
 import { AppText as Text } from '../components/AppText';
 import { getAchievement } from '../game/achievements';
 import { managerIdentityLine, squadMorale } from '../game/careerExperience';
+import { ManagerStepType, resolveNextCareerStep } from '../game/careerStep';
 import { formatClubCurrency, seasonWageBill, sponsorIncome } from '../game/finance';
 import { calculateClubRating } from '../game/manager';
 import {
@@ -51,15 +52,12 @@ import {
   MANAGER_LEVEL_LABEL,
   upcomingIccEvents,
 } from '../game/managerCareer';
-import { MANAGER_MATCH_ANALYSIS_COINS, managerResourceUsed } from '../game/managerResources';
 import {
-  nextUserFixtureId,
-  nextUserFixturesByCompetition,
-  seasonChampionId,
-  seasonComplete,
-  standings,
-} from '../game/season';
-import { TEAM_TALK_OPTIONS } from '../game/teamTalk';
+  MANAGER_EMERGENCY_TEAM_TALK_COINS,
+  MANAGER_MATCH_ANALYSIS_COINS,
+  managerResourceUsed,
+} from '../game/managerResources';
+import { nextUserFixtureId, nextUserFixturesByCompetition, standings } from '../game/season';
 import { isDeadlineDay } from '../game/transferMarket';
 import { useIsCompact } from '../hooks/useResponsive';
 import { useT } from '../i18n';
@@ -111,7 +109,7 @@ const MANAGER_GUIDE_STEPS = [
   {
     icon: 'analytics' as const,
     title: 'Build a match plan',
-    body: 'Team talks, opposition analysis and tactics have explicit effects. Live tactics pause the match while you change approach, bowling plan or legal field.',
+    body: 'Opposition analysis, morale preparation and tactics have explicit effects. Live tactics pause the match while you change approach, bowling plan or legal field.',
     action: 'Choose one preparation edge, then adapt in-match when score pressure changes.',
   },
   {
@@ -149,13 +147,13 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   const claimDaily = useCareer((s) => s.claimDaily);
   const takeNewJob = useCareer((s) => s.takeNewJob);
   const playCupTie = useCareer((s) => s.playCupTie);
-  const giveTeamTalk = useCareer((s) => s.giveTeamTalk);
   const purchaseProduct = useCareer((s) => s.purchaseProduct);
   const applySquadRecovery = useCareer((s) => s.applySquadRecovery);
   const setTargetFixture = useCareer((s) => s.setTargetFixture);
   const runManagerResource = useCareer((s) => s.useManagerResource);
   const acceptManagerJobOffer = useCareer((s) => s.acceptManagerJobOffer);
   const declineManagerJobOffer = useCareer((s) => s.declineManagerJobOffer);
+  const acknowledgeManagerAppointment = useCareer((s) => s.acknowledgeManagerAppointment);
   const persist = useCareer((s) => s.persist);
   const pendingAchievementIds = useCareer((s) => s.pendingAchievementIds);
   const clearPendingAchievements = useCareer((s) => s.clearPendingAchievements);
@@ -167,7 +165,6 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   const [rewardModal, setRewardModal] = useState<RewardModalData | null>(null);
   const [xiExpanded, setXiExpanded] = useState(false);
   const [talkFlash, setTalkFlash] = useState<string | null>(null);
-  const [preMatchTalkOpen, setPreMatchTalkOpen] = useState(false);
   const [calendarSimulation, setCalendarSimulation] = useState<{
     played: number;
     total: number;
@@ -175,6 +172,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   const [dealBusy, setDealBusy] = useState<string | null>(null);
   const [toastIdx, setToastIdx] = useState(0);
   const prevPendingLenRef = useRef(-1);
+  const appointmentShownRef = useRef<string | null>(null);
   const dismissedTips = useSettings((s) => s.dismissedTips);
   const dismissTip = useSettings((s) => s.dismissTip);
   const showManagerGuide = !dismissedTips.includes('manager_hub_guide');
@@ -194,7 +192,8 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
 
   const confirmTokenRecovery = useCallback(() => {
     if (!save?.userTeamId) return;
-    const squad = (save.teams[save.userTeamId]?.playerIds ?? [])
+    const recoveryTeamId = managerControlledTeamId(save) ?? save.userTeamId;
+    const squad = (save.teams[recoveryTeamId]?.playerIds ?? [])
       .map((id) => save.players[id])
       .filter(Boolean);
     const avg = (values: number[]) =>
@@ -256,6 +255,27 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   );
 
   useEffect(() => {
+    const appointment = save?.managerAppointmentPending;
+    if (!appointment) return;
+    const appointmentKey = `${appointment.teamId}:${appointment.appointedAt}`;
+    if (appointmentShownRef.current === appointmentKey) return;
+    appointmentShownRef.current = appointmentKey;
+    const appointedTeam = save.teams[appointment.teamId];
+    Alert.alert(
+      `NEW APPOINTMENT: ${appointment.clubName}`,
+      [
+        `Back page: ${appointment.clubName} appoint their new manager.`,
+        `Board confidence: ${Math.round(save.boardConfidence ?? 75)}`,
+        `Grace period: ${save.managerGraceMatchesRemaining ?? 5} matches`,
+        `Senior squad: ${appointedTeam?.playerIds.length ?? 0} players`,
+        'Club-specific XI, training and scouting caches have been reset.',
+      ].join('\n'),
+      [{ text: 'Enter the office', onPress: acknowledgeManagerAppointment }],
+      { cancelable: false },
+    );
+  }, [acknowledgeManagerAppointment, save]);
+
+  useEffect(() => {
     if (
       pendingAchievementIds.length !== prevPendingLenRef.current &&
       pendingAchievementIds.length > 0
@@ -284,7 +304,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
 
   const goMenu = () => navigation.navigate('MainMenu');
 
-  if (!save || !save.userTeamId) {
+  if (!save || !save.userTeamId || !save.teams[save.userTeamId]) {
     return (
       <Screen>
         <ScreenHeader title="Manager" onBack={goMenu} />
@@ -295,8 +315,10 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   }
 
   const team = save.teams[save.userTeamId];
+  const activeManagedTeamId = managerControlledTeamId(save) ?? save.userTeamId;
+  const activeManagedTeam = save.teams[activeManagedTeamId] ?? team;
+  const isNationalManager = save.managerCareerLevel === 'NATIONAL';
   const season = save.currentSeasonId ? save.seasons[save.currentSeasonId] : undefined;
-  const pressN = save.managerStory?.pendingEventIds.length ?? 0;
   const table = standings(save);
   const squad = team.playerIds.map((id) => save.players[id]).filter(Boolean);
   const hasKeeper = squad.some((p) => p.role === 'WK_BATTER');
@@ -323,17 +345,13 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   const fixtureControlledTeamId = fixture?.managerPhase
     ? managerControlledTeamId(save, fixture.managerPhase)
     : save.userTeamId;
-  const fixtureControlledTeam = fixtureControlledTeamId
-    ? save.teams[fixtureControlledTeamId]
-    : team;
-  const teamTalkUsed = fixtureId ? Boolean(save.flags?.[`teamTalk:${fixtureId}`]) : false;
   const analysisUsed = managerResourceUsed(save, 'MATCH_ANALYSIS');
+  const emergencyTalkUsed = managerResourceUsed(save, 'EMERGENCY_TEAM_TALK');
   const opponentId = fixture
     ? fixture.homeTeamId === fixtureControlledTeamId
       ? fixture.awayTeamId
       : fixture.homeTeamId
     : undefined;
-  const done = seasonComplete(save);
   // Multi-format competitions unlocked at State/National level (empty for Club).
   const competitionOptions = nextUserFixturesByCompetition(save);
   const otherCompetitionOptions = competitionOptions.filter(
@@ -345,6 +363,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   const hasLegendBacking = (save.inventory?.manager_legend_backing ?? 0) > 0;
   const calendarProgress = save.managerCalendar ? managerPhaseProgress(save) : null;
   const squadReadiness = save.managerCalendar ? managerSquadReadiness(save) : null;
+  const nextStep = resolveNextCareerStep(save);
 
   const onSaveExit = async () => {
     useCareer.getState().scheduleReminders();
@@ -362,16 +381,17 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   };
 
   const requestMatchStart = () => {
-    if (fixture && !teamTalkUsed) {
-      setPreMatchTalkOpen(true);
-      return;
-    }
     void startMatch();
   };
 
   const prepareOppositionAnalysis = () => {
     const result = runManagerResource('MATCH_ANALYSIS');
     setTalkFlash(result.detail ?? result.reason ?? 'Opposition analysis is unavailable.');
+  };
+
+  const deliverEmergencyTeamTalk = () => {
+    const result = runManagerResource('EMERGENCY_TEAM_TALK');
+    setTalkFlash(result.detail ?? result.reason ?? 'Emergency team talk is unavailable.');
   };
 
   const startNextSeason = () => {
@@ -421,37 +441,104 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
       setCalendarSimulation(null);
       if (!result?.summary) return;
       const championId = result.summary.championTeamIds[save.userDivision ?? 3];
+      const backgroundBlock =
+        !isNationalManager &&
+        !managerPhaseUnlocked(save.managerCareerLevel ?? 'CLUB', result.summary.phase);
+      const formatLabel =
+        result.summary.phase === 'LIST_A'
+          ? '50-over List A'
+          : result.summary.phase === 'FIRST_CLASS'
+            ? 'four-day First-Class'
+            : '20-over T20';
       setRewardModal({
-        kicker: 'CALENDAR ADVANCED',
-        title: `${MANAGER_PHASE_LABEL[result.summary.phase]} complete`,
+        kicker: backgroundBlock ? 'AI-MANAGED BLOCK COMPLETE' : 'COMPETITION COMPLETE',
+        title: backgroundBlock
+          ? `${MANAGER_PHASE_LABEL[result.summary.phase]} background simulation`
+          : `${MANAGER_PHASE_LABEL[result.summary.phase]} complete`,
         subtitle: championId
           ? `${save.teams[championId]?.name ?? 'Champions'} won your division`
-          : 'The domestic world has advanced',
+          : isNationalManager
+            ? 'The national programme and domestic world have advanced'
+            : 'The domestic world has advanced',
         icon: 'calendar',
         items: [
-          `${result.summary.userWins}/${result.summary.userMatches} club wins`,
+          `Competition: ${formatLabel}`,
+          ...(backgroundBlock
+            ? [
+                `${MANAGER_LEVEL_LABEL[save.managerCareerLevel ?? 'CLUB']} does not yet unlock manual control, so club staff selected and managed the XI.`,
+              ]
+            : []),
+          `Club record: ${result.summary.userWins} wins from ${result.summary.userMatches} matches`,
           ...(result.summary.userPosition
             ? [`Division finish: ${ordinal(result.summary.userPosition)}`]
             : []),
           ...(result.summary.overRatePenalties
             ? [`Over-rate penalties: ${result.summary.overRatePenalties} point(s)`]
             : []),
+          result.summary.phase === 'T20'
+            ? `Effect: updates the T20 table and club records.`
+            : `Effect: updates this competition's table and club records; it does not alter the separate T20 table.`,
         ],
         balances: result.summary.walletCoins
-          ? [`Background match rewards: +${result.summary.walletCoins.toLocaleString()} coins`]
-          : [],
+          ? [
+              backgroundBlock
+                ? `Passive oversight stipend (30% match rate): +${result.summary.walletCoins.toLocaleString()} coins`
+                : `Match rewards: +${result.summary.walletCoins.toLocaleString()} coins`,
+              ...(result.summary.salaryCoins
+                ? [`Manager salary: +${result.summary.salaryCoins.toLocaleString()} coins`]
+                : []),
+            ]
+          : result.summary.salaryCoins
+            ? [`Manager salary: +${result.summary.salaryCoins.toLocaleString()} coins`]
+            : [],
       });
     };
     setTimeout(step, 80);
   };
 
-  const choosePreMatchTalk = (tone: (typeof TEAM_TALK_OPTIONS)[number]['value'] | null) => {
-    if (tone) {
-      const res = giveTeamTalk(tone);
-      setTalkFlash(res.text);
+  const runNextStep = () => {
+    switch (nextStep.action) {
+      case 'OPEN_JOB_OFFER': {
+        const offer = save.managerJobOffer;
+        if (!offer) return;
+        Alert.alert(
+          `Approach from ${offer.clubName}`,
+          `${offer.reason}\n\nReputation ${offer.reputation}\n${fmtMoney(offer.salaryPromise)}/season`,
+          [
+            { text: 'Stay loyal', style: 'cancel', onPress: declineManagerJobOffer },
+            {
+              text: 'Take the job',
+              onPress: () => {
+                const result = acceptManagerJobOffer();
+                if (!result.ok) Alert.alert('Move unavailable', result.reason);
+              },
+            },
+          ],
+        );
+        break;
+      }
+      case 'OPEN_PRESS':
+        navigation.navigate('Press');
+        break;
+      case 'PLAY_MATCH':
+        requestMatchStart();
+        break;
+      case 'ADVANCE_MANAGER_CALENDAR':
+        advanceCalendarBlock();
+        break;
+      case 'ADVANCE_SEASON':
+        if (nextStep.mode === 'manager' && nextStep.type === ManagerStepType.OFFSEASON) {
+          startNextSeason();
+        } else {
+          advanceSeason();
+        }
+        break;
+      case 'OPEN_JOB_SEARCH':
+        setTalkFlash('Choose one of the available club appointments below.');
+        break;
+      default:
+        break;
     }
-    setPreMatchTalkOpen(false);
-    void startMatch();
   };
 
   return (
@@ -498,24 +585,37 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
         }
       >
         <ScreenHeader
-          title={team.name}
-          subtitle={`Manager · Season ${season?.year ?? ''}`}
+          title={activeManagedTeam.name}
+          subtitle={`${isNationalManager ? 'National Head Coach' : 'Manager'} · Season ${season?.year ?? ''}`}
           onBack={goMenu}
         />
 
         <CareerSpotlight
           mode="manager"
           title={managerIdentity}
-          meta={`${team.name} | Club ${clubRating.toFixed(1)} | Board ${Math.round(save.boardConfidence ?? 65)} | Morale ${Math.round(squadMorale(save) ?? 60)}${hasLegendBacking ? ' | Legend backing' : ''}`}
-          accentColor={team.primaryColor}
+          meta={
+            isNationalManager
+              ? `${activeManagedTeam.name} | Year-round national duty | Reputation ${Math.round(save.managerProgression?.reputation ?? 75)}${hasLegendBacking ? ' | Legend backing' : ''}`
+              : `${team.name} | Club ${clubRating.toFixed(1)} | Board ${Math.round(save.boardConfidence ?? 65)} | Morale ${Math.round(squadMorale(save) ?? 60)}${hasLegendBacking ? ' | Legend backing' : ''}`
+          }
+          accentColor={activeManagedTeam.primaryColor}
           status={`SEASON ${season?.year ?? ''}`}
         />
 
         {lastImpact ? (
           <View style={styles.managerImpactBand}>
-            <Text style={styles.managerImpactTitle}>{lastImpact.headline}</Text>
+            <Text style={styles.managerImpactTitle}>Matchday Results · {lastImpact.headline}</Text>
             <Text style={styles.managerImpactText} numberOfLines={2}>
               {lastImpact.narrative}
+            </Text>
+            <Text style={styles.managerImpactText}>
+              {lastImpact.why[0]}
+              {lastImpact.leaguePosition
+                ? ` · League ${ordinal(lastImpact.leaguePosition.before)} → ${ordinal(lastImpact.leaguePosition.after)}`
+                : ''}
+              {lastImpact.changes.find((change) => change.label === 'Coins')
+                ? ` · Earnings +${Math.max(0, lastImpact.changes.find((change) => change.label === 'Coins')!.delta)} coins`
+                : ' · Earnings 0 coins'}
             </Text>
             <View style={styles.managerImpactChanges}>
               {lastImpact.changes.slice(0, 3).map((change) => (
@@ -537,90 +637,53 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
         {/* ── FM-style "Continue" hero: the single most important next action ── */}
         {(() => {
           const monthLabel = MONTHS[(save.currentMonth ?? 1) - 1] ?? '';
-          type Primary = {
-            eyebrow: string;
-            title: string;
-            sub: string;
-            label: string;
-            onPress: () => void;
-          };
-          let primary: Primary | null = null;
-          if (sacked) {
-            primary = null; // the "appoint a new club" card below becomes the focus
-          } else if (pressN > 0) {
-            primary = {
-              eyebrow: 'NEWS',
-              title: `${pressN} press item${pressN > 1 ? 's' : ''} waiting`,
-              sub: 'Face the media before your next match.',
-              label: '🎙️  Open Press Room',
-              onPress: () => navigation.navigate('Press'),
-            };
-          } else if (fixture && opponentId) {
-            primary = {
-              eyebrow: `NEXT · MATCHDAY${monthLabel ? ` · ${monthLabel}` : ''}`,
-              title: `${fixtureControlledTeam?.shortName ?? team.shortName} v ${save.teams[opponentId]?.shortName ?? ''}`,
-              sub: `vs ${save.teams[opponentId]?.name ?? ''}`,
-              label: '▶  Continue to Matchday',
-              onPress: requestMatchStart,
-            };
-          } else if (calendarProgress && calendarProgress.phase !== 'OFF_SEASON') {
-            primary = {
-              eyebrow: `${calendarProgress.months} | Tier ${save.userDivision ?? 3}`,
-              title: calendarProgress.unlocked
-                ? `Advance ${calendarProgress.label}`
-                : `${calendarProgress.label} is AI-managed`,
-              sub: calendarProgress.unlocked
-                ? 'Other clubs will play until your next required fixture or the block ends.'
-                : 'This competition is simulated in the background before your next unlocked block.',
-              label: calendarProgress.unlocked ? 'Advance calendar' : 'Simulate competition',
-              onPress: advanceCalendarBlock,
-            };
-          } else if (!done) {
-            primary = {
-              eyebrow: 'SEASON',
-              title: 'League fixtures complete',
-              sub: 'Advance the calendar to keep the season moving.',
-              label: 'Advance season',
-              onPress: advanceSeason,
-            };
-          } else if (calendarProgress?.phase === 'OFF_SEASON') {
-            primary = {
-              eyebrow: `${calendarProgress.months} | OFF-SEASON`,
-              title: 'Transfer Market & Contracts Window',
-              sub: 'Condition is restored. Complete transfers, contracts and training before September.',
-              label: `Begin ${season?.year ? season.year + 1 : 2027} season`,
-              onPress: startNextSeason,
-            };
-          } else {
-            const champ =
-              save.teams[seasonChampionId(save) ?? table[0]?.teamId ?? '']?.name ?? 'Champions';
-            primary = {
-              eyebrow: 'SEASON COMPLETE',
-              title: `🏆 ${champ} win the title`,
-              sub: 'Begin the next campaign.',
-              label: `Start Season ${(season?.year ?? 2026) + 1}`,
-              onPress: startNextSeason,
-            };
-          }
-          if (!primary) return null;
+          const eyebrow =
+            nextStep.mode === 'manager' && nextStep.type === ManagerStepType.MATCHDAY
+              ? `NEXT · MATCHDAY${monthLabel ? ` · ${monthLabel}` : ''}`
+              : nextStep.mode === 'manager' && nextStep.type === ManagerStepType.PRESS_REQUIRED
+                ? 'NEWS'
+                : nextStep.mode === 'manager' &&
+                    nextStep.type === ManagerStepType.JOB_OFFER_REQUIRED
+                  ? 'URGENT JOB OFFER'
+                  : nextStep.mode === 'manager' && nextStep.type === ManagerStepType.JOB_SEARCH
+                    ? 'CAREER'
+                    : isNationalManager
+                      ? `${calendarProgress?.months ?? 'SEASON'} | NATIONAL DUTY`
+                      : `${calendarProgress?.months ?? 'SEASON'} | Tier ${save.userDivision ?? 3}`;
+          const label =
+            nextStep.action === 'PLAY_MATCH'
+              ? 'Continue to Matchday'
+              : nextStep.action === 'OPEN_PRESS'
+                ? 'Open Press Room'
+                : nextStep.action === 'OPEN_JOB_OFFER'
+                  ? 'Review offer'
+                  : nextStep.action === 'OPEN_JOB_SEARCH'
+                    ? 'View club appointments'
+                    : nextStep.action === 'ADVANCE_MANAGER_CALENDAR'
+                      ? calendarProgress?.unlocked
+                        ? 'Advance calendar'
+                        : 'Simulate competition'
+                      : nextStep.mode === 'manager' && nextStep.type === ManagerStepType.OFFSEASON
+                        ? `Begin ${season?.year ? season.year + 1 : 2027} season`
+                        : 'Advance season';
           return (
-            <Animated.View entering={FadeInDown.duration(340).delay(20)}>
+            <View>
               <GlassSurface highlighted intensity={0.6} style={styles.continueHero}>
-                <Text style={styles.continueEyebrow}>{primary.eyebrow}</Text>
+                <Text style={styles.continueEyebrow}>{eyebrow}</Text>
                 <Text style={styles.continueTitle} numberOfLines={2}>
-                  {primary.title}
+                  {nextStep.title}
                 </Text>
                 <Text style={styles.continueSub} numberOfLines={2}>
-                  {primary.sub}
+                  {nextStep.detail}
                 </Text>
                 <Button
-                  label={primary.label}
+                  label={label}
                   variant="gold"
                   style={{ marginTop: spacing.md }}
-                  onPress={primary.onPress}
+                  onPress={runNextStep}
                 />
               </GlassSurface>
-            </Animated.View>
+            </View>
           );
         })()}
 
@@ -630,12 +693,18 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
             <Card>
               <View style={styles.calendarHeader}>
                 <View style={styles.calendarHeaderCopy}>
-                  <Text style={styles.calendarTitle}>
-                    {calendarProgress.label} | {calendarProgress.months}
-                  </Text>
+                  <View style={styles.calendarTitleRow}>
+                    <Text style={styles.calendarTitle}>
+                      {calendarProgress.label} | {calendarProgress.months}
+                    </Text>
+                    {calendarProgress.phase === 'FIRST_CLASS' ? (
+                      <MechanicInfoButton topicId="first-class-stamina" size={32} />
+                    ) : null}
+                  </View>
                   <Text style={styles.talkHint}>
-                    Tier {save.userDivision ?? 3} | {calendarProgress.userPlayed}/
-                    {calendarProgress.userTotal} club fixtures complete
+                    {isNationalManager
+                      ? `${activeManagedTeam.shortName} | ${calendarProgress.userPlayed}/${calendarProgress.userTotal} national fixtures complete`
+                      : `Tier ${save.userDivision ?? 3} | ${calendarProgress.userPlayed}/${calendarProgress.userTotal} club fixtures complete`}
                   </Text>
                 </View>
                 <Text
@@ -703,8 +772,8 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
             <Text style={styles.section}>Match Preparation</Text>
             <Card>
               <Text style={styles.talkHint}>
-                Review the XI or spend wallet coins on one opposition report for this fixture.
-                Reports give the selected XI +2 form and +1 morale; they never guarantee a result.
+                Review the XI, prepare one opposition report, or use one emergency morale lift.
+                These services improve preparation but never guarantee a result.
               </Text>
               <View style={styles.actionRow}>
                 <Button
@@ -725,6 +794,21 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
                   style={styles.actionFlex}
                   disabled={analysisUsed || save.wallet.coins < MANAGER_MATCH_ANALYSIS_COINS}
                   onPress={prepareOppositionAnalysis}
+                />
+                <Button
+                  label={
+                    emergencyTalkUsed
+                      ? 'Morale session used'
+                      : `Morale session · ${MANAGER_EMERGENCY_TEAM_TALK_COINS.toLocaleString()}`
+                  }
+                  variant={emergencyTalkUsed ? 'ghost' : 'secondary'}
+                  size="sm"
+                  fullWidth={false}
+                  style={styles.actionFlex}
+                  disabled={
+                    emergencyTalkUsed || save.wallet.coins < MANAGER_EMERGENCY_TEAM_TALK_COINS
+                  }
+                  onPress={deliverEmergencyTeamTalk}
                 />
               </View>
               {talkFlash ? <Text style={styles.talkFlash}>{talkFlash}</Text> : null}
@@ -748,7 +832,6 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
                   ]
                 : []),
               { key: 'office', icon: 'briefcase', label: 'Club Office', to: 'ClubOffice' },
-              { key: 'academy', icon: 'school', label: 'Academy', to: 'Academy' },
               { key: 'records', icon: 'trophy', label: 'Records', to: 'Records' },
             ] as {
               key: string;
@@ -759,7 +842,6 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
                 | 'Transfers'
                 | 'TransferDeadlineDay'
                 | 'ClubOffice'
-                | 'Academy'
                 | 'Records';
             }[]
           ).map((tile) => (
@@ -798,7 +880,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
           const levelColor = levelColors[mgrLevel] ?? colors.primary;
 
           return (
-            <Animated.View entering={FadeInDown.duration(320).delay(30)}>
+            <View>
               <View style={[styles.levelCard, { borderColor: levelColor }]}>
                 <View style={styles.levelHeader}>
                   <Text style={[styles.levelTitle, { color: levelColor }]}>
@@ -886,58 +968,16 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
                   </View>
                 )}
               </View>
-            </Animated.View>
+            </View>
           );
         })()}
 
-        {/* Headhunt offer — a bigger club wants you */}
-        {save.managerJobOffer && (
-          <Animated.View entering={FadeInDown.duration(340).delay(20)}>
-            <Card style={[styles.headhuntCard, { borderColor: colors.accent }]}>
-              <Text style={styles.headhuntTitle}>
-                📞 Approach from {save.managerJobOffer.clubName}
-              </Text>
-              <Text style={styles.headhuntReason}>{save.managerJobOffer.reason}</Text>
-              <View style={styles.headhuntMetaRow}>
-                <Text style={styles.headhuntMeta}>
-                  Reputation {save.managerJobOffer.reputation}
-                </Text>
-                <Text style={[styles.headhuntMeta, { color: colors.accent }]}>
-                  {fmtMoney(save.managerJobOffer.salaryPromise)}/season
-                </Text>
-              </View>
-              <View style={styles.headhuntActions}>
-                <Button
-                  label="✅ Take the job"
-                  variant="gold"
-                  fullWidth={false}
-                  style={{ flex: 1 }}
-                  onPress={() => {
-                    const res = acceptManagerJobOffer();
-                    if (!res.ok) return;
-                  }}
-                />
-                <Button
-                  label="🤝 Stay loyal"
-                  variant="secondary"
-                  fullWidth={false}
-                  style={{ flex: 1 }}
-                  onPress={() => declineManagerJobOffer()}
-                />
-              </View>
-              <Text style={styles.headhuntHint}>
-                Staying loyal is rewarded with a board-confidence boost.
-              </Text>
-            </Card>
-          </Animated.View>
-        )}
-
         {/* Win streak badge */}
         {(save.winStreak ?? 0) >= 3 && (
-          <Animated.View entering={FadeInDown.duration(320).delay(40)} style={styles.streakBadge}>
+          <View style={styles.streakBadge}>
             <Text style={styles.streakFire}>🔥</Text>
             <Text style={styles.streakText}>{save.winStreak} match win streak!</Text>
-          </Animated.View>
+          </View>
         )}
 
         {canClaimDaily ? (
@@ -960,15 +1000,6 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
                 });
               }
             }}
-          />
-        ) : null}
-
-        {pressN > 0 ? (
-          <Button
-            label={`🎙️ Press Room · ${pressN} waiting`}
-            variant="gold"
-            style={{ marginTop: spacing.md }}
-            onPress={() => navigation.navigate('Press')}
           />
         ) : null}
 
@@ -1044,7 +1075,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
               }[stage];
 
               return (
-                <Animated.View entering={FadeInDown.duration(300).delay(60)}>
+                <View>
                   <Card
                     style={[
                       styles.boardCard,
@@ -1055,7 +1086,10 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
                     ]}
                   >
                     <View style={styles.boardHeader}>
-                      <Text style={styles.boardHeaderTitle}>📋 Board Confidence</Text>
+                      <View style={styles.boardTitleRow}>
+                        <Text style={styles.boardHeaderTitle}>📋 Board Confidence</Text>
+                        <MechanicInfoButton topicId="board-grace" size={32} />
+                      </View>
                       <View
                         style={[
                           styles.stageBadge,
@@ -1074,7 +1108,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
 
                     {/* Confidence bar */}
                     <View style={styles.boardMeterTrack}>
-                      <Animated.View
+                      <View
                         style={[
                           styles.boardMeterFill,
                           { width: `${confidenceScore}%`, backgroundColor: stageConfig.color },
@@ -1107,7 +1141,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
                       </View>
                     )}
                   </Card>
-                </Animated.View>
+                </View>
               );
             })()
           : null}
@@ -1120,8 +1154,8 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
               Sponsor {fmtMoney(sponsor)} · Wages {fmtMoney(wages)}/yr
             </Text>
             <Text style={styles.boardPos}>
-              Club budget pays transfers, wages, staff and facilities. Coins/gems stay in Store and
-              Season Pass.
+              Wallet Coins pay for personal services like Opposition Analysis, while Club Budget
+              manages transfers, facilities, and player contracts.
             </Text>
           </View>
           <View style={styles.budgetMetrics}>
@@ -1166,13 +1200,14 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
 
         {/* Squad Recovery IAP — shown when multiple players have low match condition */}
         {(() => {
-          const lowCondition = (save.teams[save.userTeamId]?.playerIds ?? []).filter(
+          const recoveryTeamId = managerControlledTeamId(save) ?? save.userTeamId;
+          const lowCondition = (save.teams[recoveryTeamId]?.playerIds ?? []).filter(
             (id) => (save.players[id]?.condition ?? save.players[id]?.meta.fitness ?? 99) < 60,
           ).length;
           const recoveryTokens = save.inventory?.squad_recovery_token ?? 0;
           if (lowCondition < 3) return null;
           return (
-            <Animated.View entering={FadeInDown.duration(320).delay(50)}>
+            <View>
               <Pressable
                 style={[styles.iapBanner, { borderColor: colors.info }]}
                 disabled={dealBusy != null}
@@ -1198,12 +1233,12 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
                 </View>
                 <Text style={{ color: colors.info, fontSize: 20 }}>›</Text>
               </Pressable>
-            </Animated.View>
+            </View>
           );
         })()}
 
         {/* Manager Career Records */}
-        <Animated.View entering={FadeInDown.duration(300).delay(100)}>
+        <View>
           <Text style={styles.section}>📊 Your Management Record</Text>
           <Card>
             {(() => {
@@ -1268,7 +1303,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
               );
             })()}
           </Card>
-        </Animated.View>
+        </View>
 
         <Text style={styles.section}>Playing XI</Text>
         <Card>
@@ -1304,42 +1339,6 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
             </Pressable>
           ) : null}
         </Card>
-
-        {false && fixture && opponentId ? (
-          <>
-            <Text style={styles.section}>Team Talk</Text>
-            <Card>
-              <Text style={styles.talkHint}>
-                Rally the dressing room before you play — it swings their form.
-              </Text>
-              {teamTalkUsed ? (
-                <Text style={styles.talkFlash}>Team talk locked in for this match.</Text>
-              ) : null}
-              <View style={styles.talkRow}>
-                {TEAM_TALK_OPTIONS.map((o) => (
-                  <Pressable
-                    key={o.value}
-                    style={styles.talkChip}
-                    disabled={teamTalkUsed}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${o.label}: ${o.desc}`}
-                    onPress={() => {
-                      const res = giveTeamTalk(o.value);
-                      setTalkFlash(res.text);
-                    }}
-                  >
-                    <Text
-                      style={[styles.talkChipText, teamTalkUsed && { color: colors.textFaint }]}
-                    >
-                      {o.emoji} {o.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              {talkFlash ? <Text style={styles.talkFlash}>{talkFlash}</Text> : null}
-            </Card>
-          </>
-        ) : null}
 
         {/* Multi-format competition picker — appears once promoted to State/National */}
         {!save.managerCalendar && otherCompetitionOptions.length > 0 && (
@@ -1410,43 +1409,6 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
           onPress={onSaveExit}
         />
       </Screen>
-      <Modal
-        transparent
-        visible={preMatchTalkOpen}
-        animationType="fade"
-        onRequestClose={() => setPreMatchTalkOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Card style={styles.preMatchCard}>
-            <Text style={styles.preMatchTitle}>Pre-match team talk</Text>
-            <Text style={styles.preMatchBody}>
-              Set the mood before kickoff. One talk is allowed for this fixture.
-            </Text>
-            <View style={styles.preMatchTalkGrid}>
-              {TEAM_TALK_OPTIONS.map((o) => (
-                <Pressable
-                  key={o.value}
-                  style={styles.preMatchTalkBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${o.label}: ${o.desc}`}
-                  onPress={() => choosePreMatchTalk(o.value)}
-                >
-                  <Text style={styles.preMatchTalkLabel}>
-                    {o.emoji} {o.label}
-                  </Text>
-                  <Text style={styles.preMatchTalkDesc}>{o.desc}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Button
-              label="Skip talk"
-              variant="ghost"
-              style={{ marginTop: spacing.md }}
-              onPress={() => choosePreMatchTalk(null)}
-            />
-          </Card>
-        </View>
-      </Modal>
       <Modal transparent visible={Boolean(calendarSimulation)} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.simulationPanel} accessibilityLiveRegion="polite">
@@ -1567,7 +1529,14 @@ const makeStyles = (colors: ThemeColors) =>
       marginBottom: spacing.sm,
     },
     calendarHeaderCopy: { flex: 1, minWidth: 0 },
+    calendarTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
     calendarTitle: {
+      flex: 1,
+      minWidth: 0,
       color: colors.text,
       fontSize: fontSize.sm,
       fontWeight: fontWeight.heavy,
@@ -1747,9 +1716,18 @@ const makeStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
       marginBottom: spacing.sm,
     },
     boardHeaderTitle: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+    boardTitleRow: {
+      flexGrow: 1,
+      minWidth: 180,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
     boardConfidencePct: { fontSize: fontSize.xs, fontWeight: fontWeight.black, letterSpacing: 0.5 },
     stageBadge: {
       flexDirection: 'row',
@@ -1903,24 +1881,6 @@ const makeStyles = (colors: ThemeColors) =>
       fontSize: fontSize.xs,
       marginTop: spacing.sm,
     },
-    preMatchCard: { borderWidth: 1.5, borderColor: colors.accent },
-    preMatchTitle: {
-      color: colors.text,
-      fontSize: fontSize.lg,
-      fontWeight: fontWeight.black,
-      marginBottom: spacing.xs,
-    },
-    preMatchBody: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 19 },
-    preMatchTalkGrid: { gap: spacing.sm, marginTop: spacing.md },
-    preMatchTalkBtn: {
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surfaceAlt,
-      padding: spacing.md,
-    },
-    preMatchTalkLabel: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
-    preMatchTalkDesc: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 3 },
     streakBadge: {
       flexDirection: 'row',
       alignItems: 'center',

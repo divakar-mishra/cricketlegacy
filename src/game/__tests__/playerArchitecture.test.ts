@@ -2,17 +2,10 @@ import { TEAM_BLUEPRINTS } from '../../content/teams';
 import { SAVE_SCHEMA_VERSION } from '../../domain/types';
 import { buildManagerLeagueWorld, buildPlayerLeagueWorld } from '../../generation/world';
 import { runMigrations } from '../../storage/migrate';
-import {
-  accrueNationalRep,
-  declareInternationalCountry,
-  tickCareerResidency,
-} from '../career';
+import { accrueNationalRep, declareInternationalCountry, tickCareerResidency } from '../career';
 import { buildUserPlayer, createCareerSave } from '../createGame';
-import {
-  managerDomesticBlueprints,
-  playerDomesticBlueprints,
-} from '../domesticBranding';
-import { generateBilateralFixtures } from '../intlCalendar';
+import { managerDomesticBlueprints, playerDomesticBlueprints } from '../domesticBranding';
+import { generateInternationalWindowFixtures } from '../intlCalendar';
 import {
   buildPlayerSeasonCalendar,
   currentPlayerCalendarEvent,
@@ -104,8 +97,16 @@ describe('Player Career architecture', () => {
 
   it('stores literal school exams and senior weekly selection blocks', () => {
     const school = career(14);
+    const schoolState = buildPlayerSeasonCalendar(school)!;
+    expect(schoolState.events.filter((item) => item.kind === 'TRAINING')).toHaveLength(2);
+    expect(schoolState.events.filter((item) => item.kind === 'EXAM')).toHaveLength(2);
+    expect(schoolState.events.some((item) => item.kind === 'RECOVERY')).toBe(true);
+    expect(schoolState.events.some((item) => item.kind === 'SELECTION')).toBe(true);
+
     expect(currentPlayerCalendarEvent(school)?.kind).toBe('TRAINING');
     expect(resolvePlayerCalendarEvent(school, 'SKILL').ok).toBe(true);
+    expect(currentPlayerCalendarEvent(school)?.kind).toBe('TRAINING');
+    expect(resolvePlayerCalendarEvent(school, 'FITNESS').ok).toBe(true);
     expect(currentPlayerCalendarEvent(school)?.kind).toBe('EXAM');
 
     const senior = career(21);
@@ -119,7 +120,7 @@ describe('Player Career architecture', () => {
     expect(state.events.at(-1)?.kind).toBe('TRANSFER_WINDOW');
   });
 
-  it('unlocks residency eligibility, locks the first cap and schedules June-August tours', () => {
+  it('unlocks residency eligibility, locks only the first cap and schedules year-round tours', () => {
     const save = career();
     const resources = save.playerCareerResources!;
     save.teams[save.userTeamId!].country = 'australia';
@@ -132,15 +133,23 @@ describe('Player Career architecture', () => {
 
     save.players.user.overall = 85;
     save.nationalRep = 79;
-    expect(
-      accrueNationalRep(save, save.players.user, 10, { runs: 140, wickets: 5 }).calledUp,
-    ).toBe(true);
-    expect(resources.cappedCountry).toBe('australia');
+    expect(accrueNationalRep(save, save.players.user, 10, { runs: 140, wickets: 5 }).calledUp).toBe(
+      true,
+    );
+    expect(resources.cappedCountry).toBeUndefined();
+    expect(declareInternationalCountry(save, 'india').ok).toBe(true);
+    expect(declareInternationalCountry(save, 'australia').ok).toBe(true);
+    save.userCaps = 1;
+    resources.cappedCountry = 'australia';
     expect(declareInternationalCountry(save, 'india').ok).toBe(false);
 
-    const ids = generateBilateralFixtures(save, 2);
-    expect(ids).toHaveLength(5);
-    expect(ids.every((id) => [6, 7, 8].includes(save.fixtures[id].calendarMonth!))).toBe(true);
+    const ids = generateInternationalWindowFixtures(save);
+    expect(ids).toHaveLength(9);
+    expect(new Set(ids.map((id) => save.fixtures[id].calendarMonth))).toEqual(
+      new Set([10, 11, 1, 2, 6, 7]),
+    );
+    expect(ids.some((id) => save.fixtures[id].cupRound === 'Semi-Final')).toBe(false);
+    expect(ids.some((id) => save.fixtures[id].cupRound === 'Final')).toBe(false);
     expect(ids.every((id) => save.fixtures[id].homeTeamId === 'national-australia')).toBe(true);
   });
 
@@ -192,8 +201,7 @@ describe('Player Career architecture', () => {
     season.leagueIds = ['league-1', 'league-2'];
     season.competitions = season.competitions?.map((competition) => ({
       ...competition,
-      fixtureIds:
-        competition.id === 't20-league' ? retained.map((fixture) => fixture.id) : [],
+      fixtureIds: competition.id === 't20-league' ? retained.map((fixture) => fixture.id) : [],
     }));
     save.playerCalendar = undefined;
     save.schemaVersion = 20;

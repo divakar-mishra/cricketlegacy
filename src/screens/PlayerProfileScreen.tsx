@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import {
   Button,
   Card,
+  CountryFlag,
   PlayerAvatar,
   ProgressBar,
   RadarChart,
@@ -13,7 +14,7 @@ import { ATTR_GROUPS, ATTR_META } from '../data/attributes';
 import { kitColorHex } from '../data/cosmetics';
 import { getCountry } from '../data/countries';
 import { PlayerStats } from '../domain/types';
-import { battingMean, bowlingMean, computeOverall, fieldingMean, metaMean } from '../engine/rating';
+import { battingMean, bowlingMean, computeOverall, metaMean } from '../engine/rating';
 import { baseAttributeProgress, baseAttributeValue } from '../game/attributeDisplay';
 import { formatClubCurrency } from '../game/finance';
 import { injuryLabel } from '../game/injuries';
@@ -77,6 +78,9 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
   const relationships = isUser ? Object.values(save.relationships ?? {}) : [];
   const timeline = isUser ? (save.timeline ?? []) : [];
   const overall = computeOverall(player);
+  const visibleAttributeGroups = isUser
+    ? ATTR_GROUPS.filter((group) => group.id !== 'fielding')
+    : ATTR_GROUPS;
   const team = Object.values(save.teams).find((candidate) =>
     candidate.playerIds.includes(player.id),
   );
@@ -85,7 +89,7 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
     <Screen scroll>
       <ScreenHeader
         title={player.name}
-        subtitle={`${country?.flag ?? ''} ${ROLE_LABEL[player.role] ?? player.role} · Age ${player.age}`}
+        subtitle={`${country?.name ?? player.nationality} | ${ROLE_LABEL[player.role] ?? player.role} | Age ${player.age}`}
         onBack={() => navigation.goBack()}
       />
 
@@ -97,13 +101,22 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
           secondaryColor={team?.secondaryColor}
           kitColor={isUser ? kitColorHex(save.cosmetics?.kit) : team?.primaryColor}
           customization={isUser ? save.cosmetics?.avatarCustomization : undefined}
+          config={isUser ? save.cosmetics?.avatarConfig : undefined}
           profileFrame={isUser ? save.cosmetics?.profileFrame : undefined}
           size="lg"
           showRole
         />
-        <View style={styles.heroRatings}>
-          <Badge value={overall} label="OVR" big />
-          <Badge value={baseAttributeValue(player.meta.form)} label="FORM" />
+        <View style={styles.heroContent}>
+          {country ? (
+            <View style={styles.countryRow}>
+              <CountryFlag countryId={country.id} flag={country.flag} size={18} />
+              <Text style={styles.countryName}>{country.name}</Text>
+            </View>
+          ) : null}
+          <View style={styles.heroRatings}>
+            <Badge value={overall} label="OVR" big />
+            <Badge value={baseAttributeValue(player.meta.form)} label="FORM" />
+          </View>
         </View>
       </Card>
 
@@ -113,7 +126,6 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
           data={[
             { label: 'Batting', value: baseAttributeValue(battingMean(player)) },
             { label: 'Bowling', value: baseAttributeValue(bowlingMean(player)) },
-            { label: 'Fielding', value: baseAttributeValue(fieldingMean(player)) },
             { label: 'Mental', value: baseAttributeValue(metaMean(player)) },
           ]}
         />
@@ -197,7 +209,7 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
         </View>
       ) : null}
 
-      {ATTR_GROUPS.map((group) => {
+      {visibleAttributeGroups.map((group) => {
         const obj = player[group.id] as unknown as Record<string, number>;
         return (
           <View key={group.id} style={{ marginTop: spacing.lg }}>
@@ -337,8 +349,14 @@ const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     msg: { color: colors.textMuted, fontSize: fontSize.md, marginBottom: spacing.lg },
     hero: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.md },
+    heroContent: { flex: 1, gap: spacing.sm },
+    countryRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    countryName: {
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.semibold,
+    },
     heroRatings: {
-      flex: 1,
       flexDirection: 'row',
       justifyContent: 'space-around',
       alignItems: 'center',

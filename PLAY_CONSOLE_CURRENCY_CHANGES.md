@@ -1,16 +1,19 @@
-# Play Console Currency And Copy Changes
+# Play Console Product Checklist
 
-Status: **NO-GO** until actual Play Console and RevenueCat product configuration is exported and checked.
+Status: **NO-GO** until the Play Console and RevenueCat exports are compared
+against the active catalog in `src/services/purchases.ts`.
 
-Required copy changes:
+For every active product:
 
-- `remove_ads`: "VIP Upgrade + Remove Ads"; mention permanent ad removal, 60 Training Energy cap, +20% match coins.
-- `energy_refill`: "+30 Training Energy"; do not imply scheduled-match entry.
-- `energy_refill_3`: "+90 Training Energy"; do not imply scheduled-match entry.
-- `transfer_budget_sm`: avoid INR-only copy; describe configured small Board Investment for the active club economy.
-- `transfer_budget_lg`: avoid INR-only copy; describe configured large Board Investment for the active club economy.
-- `scout_full_reveal`: "Full Scout Intelligence"; one report token for one selected player.
-- `recovery_pack`: grants one Squad Recovery token; no automatic application and no injury cure.
-- `form_recovery`: "Mental Coaching Session"; form/confidence only.
-- `legend_status`: "Living Legend Edition"; hide until cosmetic-only implementation is verified.
+1. Product ID exactly matches the source catalog.
+2. Product type matches its restore policy: durable entitlement or consumable.
+3. Localized title and description promise only the implemented grant.
+4. The app displays provider-supplied localized pricing in release builds.
+5. Player-only and Manager-only products remain in their correct mode.
+6. Budget copy does not imply that an account coin balance is club money.
+7. Conditioning copy states that injuries are not healed.
+8. VIP copy states permanent ads-off, 60-energy cap and +20% match coins.
 
+The complete active catalog is documented in Section 13 of
+`docs/APP_COMPLETE_REFERENCE.md`. Retired hidden products must not be recreated
+in Play Console or RevenueCat.

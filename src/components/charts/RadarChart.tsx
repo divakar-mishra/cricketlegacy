@@ -59,13 +59,21 @@ export function RadarChart({ data, size = 260, max = 100 }: RadarChartProps): Re
   };
 
   const ringPolys = RINGS.map((f) => usable.map((_, i) => toPointStr(radius * f, i)).join(' '));
-  const dataPoints = usable.map((d, i) => toPointStr(radius * clamp01(d.value / safeMax), i)).join(' ');
+  const dataPoints = usable
+    .map((d, i) => toPointStr(radius * clamp01(d.value / safeMax), i))
+    .join(' ');
 
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <G>
         {ringPolys.map((points, i) => (
-          <Polygon key={`ring-${i}`} points={points} fill="none" stroke={colors.border} strokeWidth={1} />
+          <Polygon
+            key={`ring-${i}`}
+            points={points}
+            fill="none"
+            stroke={colors.border}
+            strokeWidth={1}
+          />
         ))}
       </G>
 
@@ -75,7 +83,14 @@ export function RadarChart({ data, size = 260, max = 100 }: RadarChartProps): Re
           const labelPos = polar(cx, cy, radius + pad * 0.5, angleAt(i));
           return (
             <G key={`axis-${i}`}>
-              <Line x1={cx} y1={cy} x2={outer.x} y2={outer.y} stroke={colors.border} strokeWidth={1} />
+              <Line
+                x1={cx}
+                y1={cy}
+                x2={outer.x}
+                y2={outer.y}
+                stroke={colors.border}
+                strokeWidth={1}
+              />
               <SvgText
                 x={labelPos.x}
                 y={labelPos.y}
@@ -104,11 +119,11 @@ export function RadarChart({ data, size = 260, max = 100 }: RadarChartProps): Re
       <G>
         {usable.map((d, i) => {
           const p = polar(cx, cy, radius * clamp01(d.value / safeMax), angleAt(i));
-          return <Circle key={`vertex-${i}`} cx={p.x} cy={p.y} r={2.6} fill={colors.primaryLight} />;
+          return (
+            <Circle key={`vertex-${i}`} cx={p.x} cy={p.y} r={2.6} fill={colors.primaryLight} />
+          );
         })}
       </G>
     </Svg>
   );
 }
-
-export default RadarChart;

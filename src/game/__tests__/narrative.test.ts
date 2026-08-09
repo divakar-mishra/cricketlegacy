@@ -50,7 +50,13 @@ describe('applyEffects', () => {
         coins: 200,
         relationship: [{ id: 'coach', delta: 20 }],
         flags: { testFlag: 2 },
-        addSponsor: { brand: 'Acme', tier: 'LOCAL', perMatchCoins: 30, signingBonus: 100, seasonsLeft: 2 },
+        addSponsor: {
+          brand: 'Acme',
+          tier: 'LOCAL',
+          perMatchCoins: 30,
+          signingBonus: 100,
+          seasonsLeft: 2,
+        },
       },
       2026,
       rng,
@@ -102,16 +108,42 @@ describe('renderText', () => {
     expect(text).toContain('the moment');
     expect(text).not.toContain('{unknown_token}');
   });
+
+  it('never exposes undefined values in story copy', () => {
+    const save = makeCareerSave();
+    expect(renderText('undefined meets {unknown_token}.', save)).toBe('meets the moment.');
+  });
 });
 
 describe('pickEvent', () => {
   const events: StoryEvent[] = [
-    { id: 'a', trigger: 'POST_MATCH', title: 'A', body: 'b', once: true, choices: [{ id: 'x', label: 'x', effects: {}, resultText: 'r' }] },
-    { id: 'b', trigger: 'GOOD_MATCH', title: 'B', body: 'b', condition: (c) => (c.rating ?? 0) >= 8, choices: [{ id: 'y', label: 'y', effects: {}, resultText: 'r' }] },
+    {
+      id: 'a',
+      trigger: 'POST_MATCH',
+      title: 'A',
+      body: 'b',
+      once: true,
+      choices: [{ id: 'x', label: 'x', effects: {}, resultText: 'r' }],
+    },
+    {
+      id: 'b',
+      trigger: 'GOOD_MATCH',
+      title: 'B',
+      body: 'b',
+      condition: (c) => (c.rating ?? 0) >= 8,
+      choices: [{ id: 'y', label: 'y', effects: {}, resultText: 'r' }],
+    },
   ];
   const ctx = (over: Partial<StoryContext>): StoryContext => {
     const save = makeCareerSave();
-    return { trigger: 'POST_MATCH', save, user: save.players[save.userPlayerId!], year: 2026, tier: 'X', ...over };
+    return {
+      trigger: 'POST_MATCH',
+      save,
+      user: save.players[save.userPlayerId!],
+      year: 2026,
+      tier: 'X',
+      ...over,
+    };
   };
 
   it('filters by trigger', () => {
@@ -124,7 +156,9 @@ describe('pickEvent', () => {
     seenCtx.save.story!.seenEventIds.push('a');
     expect(pickEvent(events, seenCtx, makeRng(1))).toBeUndefined();
 
-    expect(pickEvent(events, ctx({ trigger: 'GOOD_MATCH', rating: 5 }), makeRng(1))).toBeUndefined();
+    expect(
+      pickEvent(events, ctx({ trigger: 'GOOD_MATCH', rating: 5 }), makeRng(1)),
+    ).toBeUndefined();
     expect(pickEvent(events, ctx({ trigger: 'GOOD_MATCH', rating: 9 }), makeRng(1))?.id).toBe('b');
   });
 });
@@ -140,16 +174,20 @@ describe('match story queueing + resolution', () => {
     expect(rendered?.title).not.toMatch(/[{}]/);
     expect(rendered?.speaker ?? '').not.toMatch(/[{}]/);
     expect(rendered?.body).not.toMatch(/[{}]/);
-    expect(rendered?.choices.map((choice) => `${choice.label} ${choice.desc ?? ''}`).join(' ')).not.toMatch(
-      /[{}]/,
-    );
+    expect(
+      rendered?.choices.map((choice) => `${choice.label} ${choice.desc ?? ''}`).join(' '),
+    ).not.toMatch(/[{}]/);
     expect(rendered?.choices[0].label).toContain(save.relationships!.mentor.name);
   });
 
   it('always queues a beat when the user is dropped, and resolving applies + advances', () => {
     const save = makeCareerSave();
     save.story!.pendingEventIds = []; // clear the opening beat
-    maybeQueueMatchStory(save, { rating: 3, runs: 0, wickets: 0, won: false, selected: false }, makeRng(5));
+    maybeQueueMatchStory(
+      save,
+      { rating: 3, runs: 0, wickets: 0, won: false, selected: false },
+      makeRng(5),
+    );
     const rendered = nextPendingEvent(save);
     expect(rendered).not.toBeNull();
 
@@ -165,8 +203,23 @@ describe('sponsor economy', () => {
   it('pays per-match coins and expires/loses deals on rollover', () => {
     const save = makeCareerSave();
     save.sponsors = [
-      { id: 's1', brand: 'PayDeal', tier: 'LOCAL', perMatchCoins: 50, signingBonus: 0, seasonsLeft: 1 },
-      { id: 's2', brand: 'CleanCo', tier: 'GLOBAL', perMatchCoins: 80, signingBonus: 0, seasonsLeft: 3, requiresIntegrity: true },
+      {
+        id: 's1',
+        brand: 'PayDeal',
+        tier: 'LOCAL',
+        perMatchCoins: 50,
+        signingBonus: 0,
+        seasonsLeft: 1,
+      },
+      {
+        id: 's2',
+        brand: 'CleanCo',
+        tier: 'GLOBAL',
+        perMatchCoins: 80,
+        signingBonus: 0,
+        seasonsLeft: 3,
+        requiresIntegrity: true,
+      },
     ];
     const before = save.wallet.coins;
     const paid = paySponsorsForMatch(save);

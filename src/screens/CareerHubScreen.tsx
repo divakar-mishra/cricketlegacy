@@ -7,19 +7,18 @@
  * other tabs (Stats, Narrative, Progress, Profile) surface depth without
  * overwhelming the home view.
  */
-/* eslint-disable react-hooks/rules-of-hooks -- CareerHub has legacy empty/retired branches inside one large screen; split into loaded subcomponents before re-enabling. */
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import {
+  BackHandler,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { playHaptic } from '../audio';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
@@ -34,6 +33,7 @@ import {
   LeagueTable,
   LiveOpsCards,
   LockedFeatureCard,
+  MechanicInfoButton,
   ModeGuideModal,
   NewspaperModal,
   ProgressBar,
@@ -51,7 +51,7 @@ import { StarterPackModal } from '../components/StarterPackModal';
 import { kitColorHex } from '../data/cosmetics';
 import { COUNTRIES, getCountry } from '../data/countries';
 import { ECONOMY } from '../data/gameConfig';
-import type { NewspaperStory } from '../domain/types';
+import type { NewspaperStory, PlayerStats } from '../domain/types';
 import { computeOverall } from '../engine/rating';
 import {
   ACHIEVEMENTS,
@@ -60,7 +60,6 @@ import {
   totalGamerscore,
 } from '../game/achievements';
 import {
-  ACADEMY_COSTS,
   CAREER_PATH_LABEL,
   careerSelectionDecision,
   careerPathProgress,
@@ -72,6 +71,7 @@ import {
   TIER_LABEL,
 } from '../game/career';
 import { isInternationalFixture } from '../game/intlCalendar';
+import { matchDecisionAuthority } from '../game/matchAuthority';
 import { ARCHETYPE_PROFILES } from '../game/careerArchetypes';
 import {
   canRetire,
@@ -80,26 +80,17 @@ import {
   shouldPromptRetirement,
 } from '../game/careerEvents';
 import { playerIdentityLine } from '../game/careerExperience';
+import { CareerStepType, resolveNextCareerStep } from '../game/careerStep';
 import { areAdsRemoved, fixtureEnergyCost } from '../game/economy';
 import { renderText } from '../game/narrative';
 import { seasonAwards } from '../game/progression';
-import {
-  featureGate,
-  nextObviousAction,
-  seniorProfessionalFeaturesUnlocked,
-} from '../game/readiness';
+import { franchiseAuctionGate, seniorProfessionalFeaturesUnlocked } from '../game/readiness';
 import { rivalComparison } from '../game/rivalry';
-import { currentPlayerCalendarEvent, PlayerCalendarChoice } from '../game/playerCalendar';
-import {
-  nextUserFixtureId,
-  nextUserFixturesByCompetition,
-  seasonChampionId,
-  seasonComplete,
-  standings,
-} from '../game/season';
+import { PlayerCalendarChoice } from '../game/playerCalendar';
+import { nextUserFixtureId, nextUserFixturesByCompetition, standings } from '../game/season';
 import { emptyStats } from '../game/stats';
 import { trainingAttributeCeiling, youthOpponentQuality } from '../game/youthBalance';
-import { youthProgress } from '../game/youthFixtures';
+import { careerPlayingTeamId } from '../game/youthFixtures';
 import { ScreenProps } from '../navigation';
 import { accountPurchases, ads, analytics } from '../services';
 import { useCareer } from '../state/careerStore';
@@ -123,6 +114,8 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 type HubPage = 'home' | 'stats' | 'narrative' | 'progress' | 'profile';
+
+const EMPTY_PRESS_ARCHIVE: readonly NewspaperStory[] = [];
 
 const PLAYER_GUIDE_STEPS = [
   {
@@ -160,32 +153,62 @@ const PLAYER_GUIDE_STEPS = [
 ] as const;
 
 export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
-  const save = useCareer((s) => s.save);
-  const refreshEnergy = useCareer((s) => s.refreshEnergy);
-  const advanceSeason = useCareer((s) => s.advanceSeason);
-  const newSeason = useCareer((s) => s.newSeason);
-  const claimDaily = useCareer((s) => s.claimDaily);
-  const retire = useCareer((s) => s.retire);
-  const playCupTie = useCareer((s) => s.playCupTie);
-  const acceptAuctionOffer = useCareer((s) => s.acceptAuctionOffer);
-  const declineAuction = useCareer((s) => s.declineAuction);
-  const contractStatus = useCareer((s) => s.contractStatus);
-  const renewUserContract = useCareer((s) => s.renewUserContract);
-  const persist = useCareer((s) => s.persist);
-  const markFlagSeen = useCareer((s) => s.markFlagSeen);
-  const lastPromotion = useCareer((s) => s.lastPromotion);
-  const clearPromotion = useCareer((s) => s.clearPromotion);
-  const setTargetFixture = useCareer((s) => s.setTargetFixture);
-  const setCareerRestNext = useCareer((s) => s.setCareerRestNext);
-  const markNewspaperSeen = useCareer((s) => s.markNewspaperSeen);
-  const resolvePlayerWeek = useCareer((s) => s.resolvePlayerWeek);
-  const declareInternationalCountry = useCareer((s) => s.declareInternationalCountry);
-  const requestDomesticCountryMove = useCareer((s) => s.requestDomesticCountryMove);
-  const pendingStory = useCareer((s) => s.pendingStory);
-  const pendingAchievementIds = useCareer((s) => s.pendingAchievementIds);
-  const clearPendingAchievements = useCareer((s) => s.clearPendingAchievements);
+  const {
+    save,
+    refreshEnergy,
+    advanceSeason,
+    claimDaily,
+    retire,
+    playCupTie,
+    acceptAuctionOffer,
+    declineAuction,
+    contractStatus,
+    renewUserContract,
+    persist,
+    markFlagSeen,
+    lastPromotion,
+    clearPromotion,
+    setTargetFixture,
+    setCareerRestNext,
+    markNewspaperSeen,
+    resolvePlayerWeek,
+    declareInternationalCountry,
+    requestDomesticCountryMove,
+    pendingStory,
+    pendingAchievementIds,
+    clearPendingAchievements,
+    dismissStarterPack,
+  } = useCareer(
+    useShallow((s) => ({
+      save: s.save,
+      refreshEnergy: s.refreshEnergy,
+      advanceSeason: s.advanceSeason,
+      claimDaily: s.claimDaily,
+      retire: s.retire,
+      playCupTie: s.playCupTie,
+      acceptAuctionOffer: s.acceptAuctionOffer,
+      declineAuction: s.declineAuction,
+      contractStatus: s.contractStatus,
+      renewUserContract: s.renewUserContract,
+      persist: s.persist,
+      markFlagSeen: s.markFlagSeen,
+      lastPromotion: s.lastPromotion,
+      clearPromotion: s.clearPromotion,
+      setTargetFixture: s.setTargetFixture,
+      setCareerRestNext: s.setCareerRestNext,
+      markNewspaperSeen: s.markNewspaperSeen,
+      resolvePlayerWeek: s.resolvePlayerWeek,
+      declareInternationalCountry: s.declareInternationalCountry,
+      requestDomesticCountryMove: s.requestDomesticCountryMove,
+      pendingStory: s.pendingStory,
+      pendingAchievementIds: s.pendingAchievementIds,
+      clearPendingAchievements: s.clearPendingAchievements,
+      dismissStarterPack: s.dismissStarterPack,
+    })),
+  );
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const compact = useWindowDimensions().width < 480;
   const [page, setPage] = useState<HubPage>('home');
   const [canClaimDaily, setCanClaimDaily] = useState(false);
   const [rewardModal, setRewardModal] = useState<RewardModalData | null>(null);
@@ -197,7 +220,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     setActiveOffer(null);
   };
   const [showStarterPack, setShowStarterPack] = useState(false);
-  const dismissStarterPack = useCareer((s) => s.dismissStarterPack);
   const starterPackShownRef = useRef(false);
   const [toastIdx, setToastIdx] = useState(0);
   const [selectedNewspaper, setSelectedNewspaper] = useState<NewspaperStory | null>(null);
@@ -242,9 +264,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     });
   }, [pendingAchievementIds.length, clearPendingAchievements]);
 
-  const pulse = useSharedValue(1);
-  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
-
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -252,10 +271,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       const today = Math.floor(Date.now() / 86_400_000);
       setCanClaimDaily(useCareer.getState().save?.lastDailyClaim !== today);
       const currentSave = useCareer.getState().save;
-      const nextFixtureId = currentSave ? nextUserFixtureId(currentSave) : undefined;
-      const nextFixture =
-        nextFixtureId && currentSave ? currentSave.fixtures[nextFixtureId] : undefined;
-
       // Ad monetization: on returning to the hub, occasionally show an
       // interstitial (persistently capped at two per rolling hour). Suppressed for
       // players who removed ads — permanently (VIP) or via the timed Starter
@@ -266,19 +281,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         : 0;
       if (matchesPlayed >= 3) {
         void ads.maybeShowInterstitial(!areAdsRemoved(currentSave?.entitlements));
-      }
-
-      const canPlayMatch =
-        (currentSave?.wallet.energy ?? 0) >=
-        (nextFixture ? fixtureEnergyCost(nextFixture) : ECONOMY.energyPerMatch);
-      if (canPlayMatch) {
-        pulse.value = withRepeat(
-          withSequence(withTiming(1.04, { duration: 700 }), withTiming(1.0, { duration: 700 })),
-          -1,
-          false,
-        );
-      } else {
-        pulse.value = withTiming(1, { duration: 200 });
       }
 
       // The modest starter offer unlocks only after a completed match. Its
@@ -307,7 +309,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       return () => {
         active = false;
       };
-    }, [refreshEnergy, pulse]),
+    }, [refreshEnergy]),
   );
 
   const goMenu = useCallback(() => navigation.navigate('MainMenu'), [navigation]);
@@ -359,12 +361,31 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     setPage(p);
   };
 
-  const playedMatchesAllModes = useSettings((s) => s.playedMatchesAllModes);
   const dismissedTips = useSettings((s) => s.dismissedTips);
   const dismissTip = useSettings((s) => s.dismissTip);
   const showCareerGuide = !dismissedTips.includes('career_hub_guide');
+  const pressArchive = save?.experience?.mediaScrapbook ?? EMPTY_PRESS_ARCHIVE;
+  const pendingPressId = save?.experience?.pendingNewspaperId;
+  const stockUnlocked = save ? seniorProfessionalFeaturesUnlocked(save) : false;
+  const stockUnlockSeen = save?.flags?.stockUnlockSeen;
 
-  if (!save || !save.userPlayerId) {
+  useEffect(() => {
+    if (!pendingPressId) return;
+    const pending = pressArchive.find((story) => story.id === pendingPressId);
+    if (pending) setSelectedNewspaper(pending);
+  }, [pendingPressId, pressArchive]);
+
+  useEffect(() => {
+    if (!stockUnlocked || stockUnlockSeen) return;
+    markFlagSeen('stockUnlockSeen');
+    Alert.alert(
+      'Stock Market unlocked!',
+      'Now that you are a senior pro, you can invest a slice of your earnings in the market. Grow your wealth between matches, but remember that values can go down as well as up.',
+      [{ text: 'Got it' }],
+    );
+  }, [markFlagSeen, stockUnlocked, stockUnlockSeen]);
+
+  if (!save || !save.userPlayerId || !save.players[save.userPlayerId]) {
     return (
       <Screen>
         <ScreenHeader title="Career" onBack={goMenu} />
@@ -379,37 +400,39 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   const team = save.userTeamId ? save.teams[save.userTeamId] : undefined;
   const season = save.currentSeasonId ? save.seasons[save.currentSeasonId] : undefined;
   const stats = user.careerStats ?? emptyStats();
+  const domesticStats = user.domesticStats ?? emptyStats();
+  const internationalStats = user.internationalStats ?? emptyStats();
 
   // Memoize CPU-heavy computations so they don't re-run on every render tick.
   // These are pure reads of the save blob — only recalculate when save changes.
-  const table = useMemo(() => standings(save), [save]);
-  const fixtureId = useMemo(() => nextUserFixtureId(save), [save]);
+  const table = standings(save);
+  const fixtureId = nextUserFixtureId(save);
   const fixture = fixtureId ? save.fixtures[fixtureId] : undefined;
-  const fixtureTeamId = isInternationalFixture(fixture) ? fixture?.homeTeamId : save.userTeamId;
+  const matchAuthority = matchDecisionAuthority(save, fixture);
+  const activePathTeamId = careerPlayingTeamId(save, fixtureId);
+  const activePathTeam = activePathTeamId ? save.teams[activePathTeamId] : undefined;
+  const fixtureTeamId = isInternationalFixture(fixture) ? fixture?.homeTeamId : activePathTeamId;
   const fixtureTeam = fixtureTeamId ? save.teams[fixtureTeamId] : team;
   const nationalCountryId =
     save.playerCareerResources?.cappedCountry ??
     save.playerCareerResources?.declaredCountry ??
     user.nationality;
-  const countryName = useMemo(
-    () => getCountry(nationalCountryId)?.name ?? nationalCountryId,
-    [nationalCountryId],
-  );
+  const countryName = getCountry(nationalCountryId)?.name ?? 'Your country';
   const restRequested = Boolean(
     fixtureId && save.playerCareerResources?.requestedRestFixtureId === fixtureId,
   );
-  const selectionOutlook = useMemo(
-    () =>
-      fixture
-        ? isInternationalFixture(fixture)
-          ? {
-              selected: true,
-              reason: `Selected for ${countryName} in the June-August international window.`,
-            }
-          : careerSelectionDecision(save, fixture.format, fixture.id)
-        : null,
-    [countryName, fixture, save],
-  );
+  const selectionOutlook = fixture
+    ? isInternationalFixture(fixture)
+      ? {
+          selected: true,
+          reason:
+            (fixture.competitionId
+              ? save.playerCareerResources?.internationalSelections?.[fixture.competitionId]?.reason
+              : undefined) ??
+            `Selected for ${countryName}. National duty takes priority over a same-date domestic fixture.`,
+        }
+      : careerSelectionDecision(save, fixture.format, fixture.id)
+    : null;
   const matchEnergyCost = fixture ? fixtureEnergyCost(fixture) : ECONOMY.energyPerMatch;
   const canPlay = selectionOutlook?.selected === false || save.wallet.energy >= matchEnergyCost;
   const opponentId = fixture
@@ -417,38 +440,33 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       ? fixture.awayTeamId
       : fixture.homeTeamId
     : undefined;
-  const done = useMemo(() => seasonComplete(save), [save]);
-  const competitionOptions = useMemo(() => nextUserFixturesByCompetition(save), [save]);
-  const awards = useMemo(() => seasonAwards(save), [save]);
-  const nat = useMemo(() => nationalState(save), [save]);
-  const tier = useMemo(() => careerTier(save, user), [save, user]);
+  const competitionOptions = nextUserFixturesByCompetition(save);
+  const awards = seasonAwards(save);
+  const nat = nationalState(save);
+  const tier = careerTier(save, user);
   const storyN = save.story?.pendingEventIds.length ?? 0;
   const storyPreview = pendingStory();
   const offers = save.auctionOffers ?? [];
   const seniorProUnlocked = seniorProfessionalFeaturesUnlocked(save);
   const contract = seniorProUnlocked ? contractStatus() : null;
-  const rivalCmp = useMemo(() => rivalComparison(save), [save]);
-  const gamerscore = useMemo(() => totalGamerscore(save), [save]);
+  const rivalCmp = rivalComparison(save);
+  const gamerscore = totalGamerscore(save);
   const earnedCount = (save.achievements ?? []).length;
-  const inboxUnread = useMemo(() => (save.inbox ?? []).filter((m) => !m.read).length, [save.inbox]);
-  const nextAction = nextObviousAction(save, playedMatchesAllModes);
-  const calendarEvent = currentPlayerCalendarEvent(save);
+  const inboxUnread = (save.inbox ?? []).filter((message) => !message.read).length;
+  const nextStep = resolveNextCareerStep(save, {
+    pendingPromotion: Boolean(lastPromotion?.promoted),
+  });
+  const calendarEvent = nextStep.mode === 'career' ? nextStep.calendarEvent : undefined;
   const identityLine = playerIdentityLine(save);
   const lastImpact = save.experience?.lastMatchImpact;
-  const pressArchive = useMemo(
-    () => save.experience?.mediaScrapbook ?? [],
-    [save.experience?.mediaScrapbook],
-  );
   const latestPress = pressArchive[pressArchive.length - 1];
-  const pendingPressId = save.experience?.pendingNewspaperId;
-  useEffect(() => {
-    if (!pendingPressId) return;
-    const pending = pressArchive.find((story) => story.id === pendingPressId);
-    if (pending) setSelectedNewspaper(pending);
-  }, [pendingPressId, pressArchive]);
-  const primaryIsStory = storyN > 0 && Boolean(storyPreview);
-  const primaryIsCalendar =
-    !primaryIsStory && Boolean(calendarEvent && calendarEvent.kind !== 'MATCH');
+  const primaryIsStory =
+    nextStep.mode === 'career' && nextStep.type === CareerStepType.STORY_EVENT_REQUIRED;
+  const primaryIsCalendar = Boolean(
+    nextStep.mode === 'career' &&
+    nextStep.type === CareerStepType.TRAINING_MANDATORY &&
+    calendarEvent,
+  );
   const resolveCalendar = (choice?: PlayerCalendarChoice) => {
     const result = resolvePlayerWeek(choice);
     if (result.ok && result.outcome) {
@@ -459,25 +477,30 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     }
   };
   const runPrimaryAction = () => {
-    if (primaryIsStory) {
-      navigation.navigate('Narrative');
-      return;
-    }
-    if (primaryIsCalendar) {
-      resolveCalendar();
-      return;
-    }
-    switch (nextAction.id) {
+    switch (nextStep.action) {
+      case 'ACKNOWLEDGE_PROMOTION':
+        clearPromotion();
+        break;
+      case 'OPEN_STORY':
+        navigation.navigate('Narrative');
+        break;
+      case 'RESOLVE_CALENDAR':
+        resolveCalendar();
+        break;
       case 'REFILL_ENERGY':
         navigation.navigate('Purchase');
         break;
-      case 'PLAY_CUP_TIE':
-        if (playCupTie()) navigation.navigate('Match');
-        break;
-      case 'PLAY_NEXT_MATCH':
+      case 'PLAY_MATCH':
+      case 'SIMULATE_MATCH':
         void handlePlayMatch();
         break;
-      case 'TRAIN_PLAYER':
+      case 'ADVANCE_SEASON':
+        advanceSeason();
+        break;
+      case 'OPEN_TRANSFERS':
+        navigation.navigate('Transfers');
+        break;
+      case 'OPEN_TRAINING':
         navigation.navigate('Training');
         break;
       default:
@@ -485,25 +508,11 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     }
   };
 
-  // One-time celebratory popup when the personal Stock Market feature unlocks
-  // (turns 18 and reached domestic cricket). Gated by a persisted save flag.
-  const stockUnlocked = seniorProUnlocked;
-  useEffect(() => {
-    if (stockUnlocked && !save.flags?.stockUnlockSeen) {
-      markFlagSeen('stockUnlockSeen');
-      Alert.alert(
-        '📈 Stock Market unlocked!',
-        'Now that you are a senior pro, you can invest a slice of your earnings in the market. Grow your wealth between matches — but remember, values can go down as well as up.',
-        [{ text: 'Got it' }],
-      );
-    }
-  }, [stockUnlocked, save.flags?.stockUnlockSeen, markFlagSeen]);
-
-  const onSaveExit = useCallback(async () => {
+  const onSaveExit = async () => {
     useCareer.getState().scheduleReminders();
     await persist();
     goMenu();
-  }, [persist, goMenu]);
+  };
 
   const onRetire = () => {
     Alert.alert(
@@ -524,7 +533,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     return (
       <Screen scroll gradient={gradients.pitch}>
         <ScreenHeader title="A Career Remembered" onBack={goMenu} />
-        <Animated.View entering={FadeInDown.duration(400)}>
+        <View>
           <Card style={styles.retireCard}>
             <View style={styles.retireHeroRow}>
               <PlayerAvatar
@@ -534,6 +543,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 secondaryColor={team?.secondaryColor}
                 kitColor={kitColorHex(save.cosmetics?.kit)}
                 customization={save.cosmetics?.avatarCustomization}
+                config={save.cosmetics?.avatarConfig}
                 profileFrame={save.cosmetics?.profileFrame}
                 size="lg"
               />
@@ -553,26 +563,24 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             {(user.awards ?? []).length ? (
               <View style={styles.honours}>
                 {(user.awards ?? []).slice(0, 10).map((a, i) => (
-                  <Animated.View
+                  <View
                     key={i}
-                    entering={FadeInDown.duration(250).delay(i * 40)}
                     style={styles.honourPill}
                   >
                     <Text style={styles.honour}>🏅 {a}</Text>
-                  </Animated.View>
+                  </View>
                 ))}
               </View>
             ) : null}
           </Card>
-        </Animated.View>
+        </View>
         {timeline.length > 0 ? (
           <>
             <Text style={styles.section}>The Journey</Text>
             <Card style={styles.timelineCard}>
               {timeline.slice(0, 20).map((t, i) => (
-                <Animated.View
+                <View
                   key={i}
-                  entering={FadeInDown.duration(240).delay(80 + i * 30)}
                   style={styles.tlRow}
                 >
                   <View style={styles.tlLeft}>
@@ -583,7 +591,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                     <Text style={styles.tlYear}>{t.year}</Text>
                     <Text style={styles.tlText}>{renderText(t.text, save)}</Text>
                   </View>
-                </Animated.View>
+                </View>
               ))}
             </Card>
           </>
@@ -605,9 +613,15 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           <StatCard label="Draws" value={String(save.careerDraws ?? 0)} color={colors.textMuted} />
         </View>
         <Button
-          label="Share Career Legacy"
+          label="Open Legacy Museum"
           variant="secondary"
           style={{ marginTop: spacing.xl }}
+          onPress={() => navigation.navigate('PlayerLife', { initialTab: 'legacy' })}
+        />
+        <Button
+          label="Share Career Legacy"
+          variant="secondary"
+          style={{ marginTop: spacing.md }}
           onPress={() => {
             void Share.share({
               title: `${user.name} - Cricket Legacy`,
@@ -683,27 +697,39 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
 
   // ── Tab content helpers ────────────────────────────────────────────────────
 
-  const HomeTab = () => (
+  const renderHomeTab = () => (
     <>
-      <Animated.View entering={FadeInDown.duration(340).delay(20)}>
+      <View>
         <GlassSurface highlighted intensity={0.62} style={styles.nextChapterHero}>
           <Text style={styles.nextChapterEyebrow}>{identityLine}</Text>
           <Text style={styles.nextChapterTitle} numberOfLines={2}>
-            {primaryIsStory
-              ? storyPreview?.title
-              : primaryIsCalendar
-                ? calendarEvent?.title
-                : fixture && opponentId
-                  ? `${stats.matches === 0 ? 'First selection' : 'Next challenge'}: ${fixtureTeam?.shortName} v ${save.teams[opponentId]?.shortName}`
-                  : nextAction.label}
+            {primaryIsStory && storyPreview?.title ? storyPreview.title : nextStep.title}
           </Text>
           <Text style={styles.nextChapterReason} numberOfLines={2}>
-            {primaryIsStory
-              ? `${storyPreview?.speaker} is waiting for your answer.`
-              : primaryIsCalendar
-                ? `Month ${calendarEvent?.month}, week ${calendarEvent?.week}: ${calendarEvent?.detail}`
-                : nextAction.reason}
+            {primaryIsStory && storyPreview?.speaker
+              ? `${storyPreview.speaker} is waiting for your answer.`
+              : nextStep.detail}
           </Text>
+          {fixture && opponentId ? (
+            <View style={styles.nextFixtureStrip}>
+              <View style={styles.nextFixtureCopy}>
+                <Text style={styles.nextFixtureTeams} numberOfLines={1}>
+                  {fixtureTeam?.shortName} v {save.teams[opponentId]?.shortName}
+                </Text>
+                <Text
+                  style={[
+                    styles.nextFixtureStatus,
+                    { color: selectionOutlook?.selected ? colors.success : colors.warning },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {selectionOutlook?.selected ? 'Selected' : 'Bench / rest'} |{' '}
+                  {selectionOutlook?.selected ? `${matchEnergyCost} energy` : 'No energy cost'}
+                </Text>
+              </View>
+              <MechanicInfoButton topicId="selection-formula" size={34} />
+            </View>
+          ) : null}
           {primaryIsCalendar &&
           (calendarEvent?.kind === 'EXAM' ||
             calendarEvent?.kind === 'TRAINING' ||
@@ -753,19 +779,51 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           ) : (
             <Button
               label={
-                primaryIsStory
+                nextStep.action === 'OPEN_STORY'
                   ? 'Open story'
-                  : primaryIsCalendar
-                    ? 'Continue week'
-                    : nextAction.label
+                  : nextStep.action === 'PLAY_MATCH'
+                    ? 'Play match'
+                    : nextStep.action === 'SIMULATE_MATCH'
+                      ? 'Continue fixture'
+                      : nextStep.action === 'REFILL_ENERGY'
+                        ? 'Restore energy'
+                        : nextStep.action === 'ACKNOWLEDGE_PROMOTION'
+                          ? 'Continue'
+                          : nextStep.action === 'ADVANCE_SEASON'
+                            ? 'Advance season'
+                            : nextStep.action === 'OPEN_TRAINING'
+                              ? 'Open training'
+                              : 'Continue'
               }
               variant="gold"
               style={{ marginTop: spacing.md }}
               onPress={runPrimaryAction}
             />
           )}
+          {fixture && opponentId ? (
+            <View style={styles.nextFixtureActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setCareerRestNext(!restRequested)}
+                style={styles.heroTextAction}
+              >
+                <Text style={styles.heroTextActionLabel}>
+                  {restRequested ? 'Cancel planned rest' : 'Plan rest'}
+                </Text>
+              </Pressable>
+              {matchAuthority.canControlTeam ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => navigation.navigate('Squad')}
+                  style={styles.heroTextAction}
+                >
+                  <Text style={styles.heroTextActionLabel}>Captain&apos;s XI</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </GlassSurface>
-      </Animated.View>
+      </View>
 
       {calendarEvent?.kind === 'TRANSFER_WINDOW' ? (
         <Card style={styles.countryMoveCard}>
@@ -799,7 +857,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       ) : null}
 
       {lastImpact ? (
-        <View style={styles.impactStrip}>
+        <View style={[styles.impactStrip, compact && styles.impactStripCompact]}>
           <View style={{ flex: 1 }}>
             <Text style={styles.impactEyebrow}>LAST MATCH</Text>
             <Text style={styles.impactTitle}>{lastImpact.headline}</Text>
@@ -807,7 +865,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               {lastImpact.narrative}
             </Text>
           </View>
-          <View style={styles.impactChanges}>
+          <View style={[styles.impactChanges, compact && styles.impactChangesCompact]}>
             {lastImpact.changes.slice(0, 2).map((change) => (
               <Text
                 key={change.label}
@@ -854,14 +912,14 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
 
       {/* Daily reward */}
       {canClaimDaily && (
-        <Animated.View entering={FadeIn.duration(300)}>
+        <View>
           <Button
             label="🎁 Claim daily reward"
             variant="gold"
             style={{ marginTop: spacing.md }}
             onPress={handleClaimDaily}
           />
-        </Animated.View>
+        </View>
       )}
 
       {/* Win streak badge + streak protection offer */}
@@ -908,7 +966,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             <View key={o.teamId} style={styles.offerRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.offerTeam} numberOfLines={1}>
-                  {save.teams[o.teamId]?.name ?? o.teamId}
+                  {save.teams[o.teamId]?.name ?? 'Interested club'}
                 </Text>
                 <Text style={styles.offerMeta}>
                   ₹{Math.round(o.wagePromise / 52000)}k/wk · +{o.signingBonus.toLocaleString()}{' '}
@@ -982,23 +1040,26 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       ) : null}
 
       {/* Hero player card with avatar */}
-      <Animated.View entering={FadeInDown.duration(320).delay(60)}>
+      <View>
         <Card
-          style={styles.playerCard}
+          style={[styles.playerCard, compact && styles.playerCardCompact]}
           onPress={() => navigation.navigate('PlayerProfile', { playerId: user.id })}
         >
-          <PlayerAvatar
-            name={user.name}
-            role={user.role}
-            primaryColor={team?.primaryColor}
-            secondaryColor={team?.secondaryColor}
-            kitColor={kitColorHex(save.cosmetics?.kit)}
-            customization={save.cosmetics?.avatarCustomization}
-            profileFrame={save.cosmetics?.profileFrame}
-            size="lg"
-            showRole
-          />
-          <View style={{ flex: 1, marginLeft: spacing.md }}>
+          <View style={styles.playerAvatarWrap}>
+            <PlayerAvatar
+              name={user.name}
+              role={user.role}
+              primaryColor={team?.primaryColor}
+              secondaryColor={team?.secondaryColor}
+              kitColor={kitColorHex(save.cosmetics?.kit)}
+              customization={save.cosmetics?.avatarCustomization}
+              config={save.cosmetics?.avatarConfig}
+              profileFrame={save.cosmetics?.profileFrame}
+              size="lg"
+              showRole
+            />
+          </View>
+          <View style={[styles.playerIdentity, compact && styles.playerIdentityCompact]}>
             <Text style={styles.role}>{ROLE_LABEL[user.role] ?? user.role}</Text>
             <Text style={styles.styleLine}>
               {user.battingStyle === 'RHB' ? 'RH bat' : 'LH bat'}
@@ -1011,7 +1072,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               <Stat label="Wkts" value={stats.wickets} />
             </View>
             {/* OVR ring */}
-            <View style={styles.ovrRingMini}>
+            <View style={[styles.ovrRingMini, compact && styles.ovrRingMiniCompact]}>
               <Svg width={48} height={48} viewBox="0 0 48 48">
                 <Circle
                   cx={24}
@@ -1042,140 +1103,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             </View>
           </View>
         </Card>
-      </Animated.View>
-
-      {/* MATCHDAY */}
-      {(() => {
-        const pathLevel = save.careerPathLevel ?? 'DOMESTIC';
-        const isYouth = pathLevel === 'SCHOOL' || pathLevel === 'U19';
-        const youthProg = isYouth ? youthProgress(save) : null;
-        return isYouth && youthProg ? (
-          <Card
-            style={[
-              styles.auctionCard,
-              { borderColor: colors.primaryLight, marginBottom: spacing.md },
-            ]}
-          >
-            <Text style={[styles.auctionTitle, { color: colors.primaryLight }]}>
-              {pathLevel === 'SCHOOL' ? '🏫 School Cricket' : '🏏 U19 State Cricket'}
-            </Text>
-            <Text style={styles.note}>
-              You are on the academy books of {team?.name ?? 'your club'}. Prove yourself in{' '}
-              {pathLevel === 'SCHOOL' ? 'inter-district school cricket' : 'U19 state cricket'} to
-              earn a professional contract.
-            </Text>
-            <Text style={[styles.note, { color: colors.accent, marginTop: spacing.xs }]}>
-              {youthProg.played}/{youthProg.total} youth fixtures played this season
-            </Text>
-          </Card>
-        ) : null;
-      })()}
-      <Text style={styles.section}>Matchday</Text>
-      <Card>
-        {fixture && opponentId ? (
-          <>
-            <Text style={styles.vsLabel}>
-              {(() => {
-                const fx = fixtureId ? save.fixtures[fixtureId] : undefined;
-                if (fx?.competitionId === 'youth-u14') return 'School cricket fixture';
-                if (fx?.competitionId === 'youth-u19') {
-                  return fx.format === 'ODI' ? 'U19 List A block' : 'U19 T20 block';
-                }
-                if (fx?.competitionId === 'list-a') return 'September-November | List A';
-                if (fx?.competitionId === 'first-class') return 'December-March | First-Class';
-                if (fx?.competitionId === 't20-league') return 'March-May | T20';
-                return 'Next fixture';
-              })()}
-            </Text>
-            <Text style={styles.vsTeams}>
-              {fixtureTeam?.shortName} v {save.teams[opponentId]?.shortName}
-            </Text>
-            <Text style={styles.vsOpp}>vs {save.teams[opponentId]?.name}</Text>
-            <Text
-              style={[
-                styles.selectionStatus,
-                { color: selectionOutlook?.selected ? colors.success : colors.warning },
-              ]}
-            >
-              {selectionOutlook?.selected ? 'SELECTED' : 'BENCH / REST'}
-            </Text>
-            <Text style={styles.note}>{selectionOutlook?.reason}</Text>
-            <Text style={styles.note}>
-              {selectionOutlook?.selected ? `Energy cost: ${matchEnergyCost}` : 'Energy cost: 0'}
-            </Text>
-            <Button
-              label={restRequested ? 'Cancel planned rest' : 'Rest this match'}
-              variant="ghost"
-              size="sm"
-              style={{ marginTop: spacing.sm }}
-              onPress={() => setCareerRestNext(!restRequested)}
-            />
-            {primaryIsStory ? (
-              <Animated.View style={canPlay ? pulseStyle : undefined}>
-                <Button
-                  label={
-                    canPlay
-                      ? selectionOutlook?.selected
-                        ? 'Play match'
-                        : 'Continue fixture'
-                      : 'Not enough energy'
-                  }
-                  variant={canPlay ? 'primary' : 'secondary'}
-                  disabled={!canPlay}
-                  style={{ marginTop: spacing.md }}
-                  onPress={handlePlayMatch}
-                />
-              </Animated.View>
-            ) : null}
-            {!canPlay ? (
-              <View style={styles.energyRow}>
-                <Text style={styles.note}>Energy regenerates over time.</Text>
-                <Pressable onPress={() => navigation.navigate('Purchase')} style={styles.topUpBtn}>
-                  <Text style={styles.topUpText}>⚡ Top up</Text>
-                </Pressable>
-              </View>
-            ) : null}
-          </>
-        ) : !done ? (
-          <>
-            <Text style={styles.vsLabel}>Your league fixtures are done.</Text>
-            <Button
-              label="Advance season"
-              style={{ marginTop: spacing.md }}
-              onPress={advanceSeason}
-            />
-          </>
-        ) : (
-          <>
-            <Text style={styles.vsLabel}>Season complete</Text>
-            <Text style={styles.champion}>
-              🏆 {save.teams[seasonChampionId(save) ?? table[0]?.teamId ?? '']?.name ?? 'Champions'}{' '}
-              win the title
-            </Text>
-            {awards.topScorer && (
-              <Text style={styles.award}>
-                🏏 Most runs · {save.players[awards.topScorer.playerId]?.name} (
-                {awards.topScorer.runs})
-              </Text>
-            )}
-            {awards.topWicketTaker && (
-              <Text style={styles.award}>
-                🎯 Most wickets · {save.players[awards.topWicketTaker.playerId]?.name} (
-                {awards.topWicketTaker.wickets})
-              </Text>
-            )}
-            <Button
-              label={`Start Season ${(season?.year ?? 2026) + 1}`}
-              variant="gold"
-              style={{ marginTop: spacing.md }}
-              onPress={async () => {
-                await hapticTap();
-                newSeason();
-              }}
-            />
-          </>
-        )}
-      </Card>
+      </View>
 
       <CupCard
         save={save}
@@ -1272,13 +1200,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       </View>
       <View style={[styles.quickRow, { marginTop: spacing.sm }]}>
         <Button
-          label="🎯 Challenge"
-          variant="ghost"
-          fullWidth={false}
-          style={styles.flex}
-          onPress={() => navigation.navigate('DailyChallenge')}
-        />
-        <Button
           label="🏆 Records"
           variant="ghost"
           fullWidth={false}
@@ -1296,7 +1217,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     </>
   );
 
-  const StatsTab = () => (
+  const renderStatsTab = () => (
     <>
       <Text style={styles.section}>Career Statistics</Text>
       <View style={styles.statGrid}>
@@ -1322,14 +1243,10 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         <StatCard label="Catches" value={String(stats.catches)} color={colors.textMuted} />
       </View>
 
-      {/* Life stats */}
-      <Text style={styles.section}>Off the Field</Text>
-      <Card style={styles.lifeCard}>
-        <LifeStat label="Morale" value={user.morale ?? 70} color={colors.info} />
-        <View style={styles.lifeDivider} />
-        <LifeStat label="Brand" value={save.brand ?? 20} color={colors.accent} />
-        <View style={styles.lifeDivider} />
-        <LifeStat label="Integrity" value={save.integrity ?? 80} color={colors.success} />
+      <Text style={styles.section}>Domestic and International</Text>
+      <Card style={styles.scopeTable}>
+        <CareerScopeRow label="Domestic" stats={domesticStats} />
+        <CareerScopeRow label="International" stats={internationalStats} last />
       </Card>
 
       {/* League table */}
@@ -1346,7 +1263,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         const level = save.careerPathLevel ?? 'DOMESTIC';
         if (level !== 'DOMESTIC' && level !== 'INTERNATIONAL') return null;
         if ((save.auctionOffers?.length ?? 0) > 0) return null;
-        const gate = featureGate(save, 'FRANCHISE_AUCTION');
+        const gate = franchiseAuctionGate(save);
         if (gate.unlocked || !gate.reason) return null;
         const matches = user?.careerStats?.matches ?? 0;
         return (
@@ -1364,7 +1281,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     </>
   );
 
-  const NarrativeTab = () => (
+  const renderNarrativeTab = () => (
     <>
       {storyN > 0 && (
         <Button
@@ -1438,7 +1355,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                   ? 'Secure your place and chase national selection.'
                   : 'Win matches for your country and build a legacy.';
             return (
-              <Animated.View entering={FadeInDown.duration(350)}>
+              <View>
                 <Card style={styles.promotionCard}>
                   <Text style={styles.promotionKicker}>PROMOTED TO</Text>
                   <Text style={styles.promotionTitle}>{CAREER_PATH_LABEL[to]}</Text>
@@ -1450,14 +1367,8 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                   </View>
                   <Text style={styles.promotionLine}>New competitions: {competitions}</Text>
                   <Text style={styles.promotionLine}>Next objective: {nextObjective}</Text>
-                  <Button
-                    label="Continue"
-                    variant="gold"
-                    style={{ marginTop: spacing.sm }}
-                    onPress={clearPromotion}
-                  />
                 </Card>
-              </Animated.View>
+              </View>
             );
           })()
         : null}
@@ -1493,7 +1404,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                   </Text>
                 </>
               )}
-              {nat.capped && (
+              {nat.capped && isInternationalFixture(fixture) && (
                 <Button
                   label={canPlay ? `🧢 Represent ${countryName}` : 'Not enough energy'}
                   variant="gold"
@@ -1501,6 +1412,50 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                   style={{ marginTop: spacing.sm }}
                   onPress={() => navigation.navigate('Match', { intl: true })}
                 />
+              )}
+              {nat.capped && !isInternationalFixture(fixture) && (
+                <Text style={[styles.note, { marginTop: spacing.sm }]}>
+                  You remain contracted to {team?.name ?? 'your domestic club'}. International tours
+                  appear here when you are selected; domestic cricket continues between call-ups.
+                </Text>
+              )}
+              {nat.capped && nat.caps === 0 && (
+                <>
+                  <Text style={[styles.note, { marginTop: spacing.md }]}>
+                    Declared country: {countryName}. You may change between eligible countries until
+                    your first senior cap permanently locks allegiance.
+                  </Text>
+                  <View style={styles.countryChipGrid}>
+                    {(save.playerCareerResources?.eligibleCountries ?? [user.nationality]).map(
+                      (countryId) => {
+                        const country = getCountry(countryId);
+                        const selected = countryId === nationalCountryId;
+                        return (
+                          <Pressable
+                            key={countryId}
+                            accessibilityRole="button"
+                            style={[styles.countryChip, selected && styles.countryChipSelected]}
+                            onPress={() => {
+                              const result = declareInternationalCountry(countryId);
+                              if (!result.ok && result.reason) {
+                                Alert.alert('International eligibility', result.reason);
+                              }
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.countryChipText,
+                                selected && styles.countryChipTextSelected,
+                              ]}
+                            >
+                              {country?.name ?? 'Eligible country'}
+                            </Text>
+                          </Pressable>
+                        );
+                      },
+                    )}
+                  </View>
+                </>
               )}
               {!nat.capped && pathLevel === 'DOMESTIC' && (
                 <>
@@ -1539,7 +1494,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                                 selected && styles.countryChipTextSelected,
                               ]}
                             >
-                              {country?.name ?? countryId}
+                              {country?.name ?? 'Eligible country'}
                             </Text>
                           </Pressable>
                         );
@@ -1575,82 +1530,12 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         </>
       )}
 
-      {/* Sponsors */}
-      {(save.sponsors ?? []).length > 0 && (
-        <>
-          <Text style={styles.section}>Sponsors</Text>
-          {(save.sponsors ?? []).map((s) => (
-            <Card key={s.id} style={{ marginBottom: spacing.sm }}>
-              <View style={styles.tierRow}>
-                <Text style={styles.tierLabel}>{s.brand}</Text>
-                <Text style={styles.caps}>{s.tier}</Text>
-              </View>
-              <Text style={styles.note}>
-                +{s.perMatchCoins} coins/match · {s.seasonsLeft} season
-                {s.seasonsLeft !== 1 ? 's' : ''} left
-              </Text>
-            </Card>
-          ))}
-        </>
-      )}
-
-      {stockUnlocked ? (
-        <>
-          {/* Personal Finance */}
-          <Text style={styles.section}>Personal Finance</Text>
-          <Card onPress={() => navigation.navigate('InvestmentScreen')}>
-            <View style={styles.tierRow}>
-              <Text style={styles.tierLabel}>Stock Portfolio</Text>
-              <Text style={styles.caps}>
-                {save.stockInvestment?.currentValue
-                  ? `${save.stockInvestment.currentValue.toLocaleString()} coins`
-                  : 'No position'}
-              </Text>
-            </View>
-            <Text style={styles.note}>
-              {save.stockInvestment?.invested
-                ? `Invested: ${save.stockInvestment.invested.toLocaleString()} · Current: ${save.stockInvestment.currentValue.toLocaleString()}`
-                : 'Invest your match earnings in the stock market.'}
-            </Text>
-            <Button
-              label="📈 Manage Portfolio →"
-              variant="ghost"
-              size="sm"
-              style={{ marginTop: spacing.sm }}
-              onPress={() => navigation.navigate('InvestmentScreen')}
-            />
-          </Card>
-
-          <Card
-            style={{ marginTop: spacing.sm }}
-            onPress={() => navigation.navigate('AcademyManagement')}
-          >
-            <View style={styles.tierRow}>
-              <Text style={styles.tierLabel}>Cricket Academy</Text>
-              {save.personalAcademy && (
-                <Text style={styles.caps}>Tier {save.personalAcademy.tier}</Text>
-              )}
-            </View>
-            {save.personalAcademy ? (
-              <Text style={[styles.note, { color: colors.success, marginTop: 0 }]}>
-                {save.personalAcademy.name} · {save.personalAcademy.studentsCount} students · +
-                {save.personalAcademy.revenuePerSeason.toLocaleString()} coins/season
-              </Text>
-            ) : (
-              <Text style={[styles.note, { marginTop: 0 }]}>
-                No academy yet. Min cost: {ACADEMY_COSTS[1].toLocaleString()} coins.
-              </Text>
-            )}
-            <Button
-              label="🏫 Manage Academy →"
-              variant="ghost"
-              size="sm"
-              style={{ marginTop: spacing.sm }}
-              onPress={() => navigation.navigate('AcademyManagement')}
-            />
-          </Card>
-        </>
-      ) : null}
+      <Button
+        label="Player Life: media, support and finance"
+        variant="secondary"
+        style={{ marginTop: spacing.lg }}
+        onPress={() => navigation.navigate('PlayerLife')}
+      />
 
       {/* International Calendar (Feature 5 + 8) */}
       {save.capped && (
@@ -1730,7 +1615,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     </>
   );
 
-  const ProgressTab = () => {
+  const renderProgressTab = () => {
     // Shared with the New Game+ head-start so the meter reflects what's carried forward.
     const {
       score: legacyScore,
@@ -1744,7 +1629,14 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
 
     return (
       <>
-        <Text style={styles.section}>Selection Readiness</Text>
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitleInline}>Selection Readiness</Text>
+          {save.careerPathLevel === 'U19' ? (
+            <MechanicInfoButton topicId="u19-readiness" />
+          ) : (
+            <MechanicInfoButton topicId="selection-formula" />
+          )}
+        </View>
         <Card>
           <View style={styles.readinessGrid}>
             <InfoPill
@@ -1874,13 +1766,19 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     );
   };
 
-  const ProfileTab = () => (
+  const renderProfileTab = () => (
     <>
       <Button
         label="View Full Profile"
         variant="primary"
         style={{ marginTop: spacing.md }}
         onPress={() => navigation.navigate('PlayerProfile', { playerId: user.id })}
+      />
+      <Button
+        label="Player Life"
+        variant="secondary"
+        style={{ marginTop: spacing.sm }}
+        onPress={() => navigation.navigate('PlayerLife')}
       />
       {pressArchive.length > 0 ? (
         <>
@@ -1932,27 +1830,22 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     </>
   );
 
-  // ── Main render ────────────────────────────────────────────────────────────
-  // Memoize each tab so switching between them doesn't re-mount the content.
-  // The key dependency is `save` (data) + anything from local state each tab uses.
-
-  const pageContent = useMemo(() => {
+  const renderPageContent = () => {
     switch (page) {
       case 'home':
-        return <HomeTab />;
+        return renderHomeTab();
       case 'stats':
-        return <StatsTab />;
+        return renderStatsTab();
       case 'narrative':
-        return <NarrativeTab />;
+        return renderNarrativeTab();
       case 'progress':
-        return <ProgressTab />;
+        return renderProgressTab();
       case 'profile':
-        return <ProfileTab />;
+        return renderProfileTab();
       default:
-        return <HomeTab />;
+        return renderHomeTab();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, save, canPlay, canClaimDaily, contractFlash, storyN, lastPromotion, showCareerGuide]);
+  };
 
   return (
     <>
@@ -1977,13 +1870,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 onPress: () => handleTabChange('stats'),
               },
               {
-                key: 'narrative',
-                icon: 'book',
-                label: 'Story',
-                active: page === 'narrative',
-                onPress: () => handleTabChange('narrative'),
-              },
-              {
                 key: 'progress',
                 icon: 'trophy',
                 label: 'Progress',
@@ -2003,23 +1889,21 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       >
         <ScreenHeader
           title={user.name}
-          subtitle={`${team?.name ?? ''} · Season ${season?.year ?? ''} · Age ${user.age}`}
+          subtitle={`${activePathTeam?.name ?? team?.name ?? ''} · Season ${season?.year ?? ''} · Age ${user.age}`}
           onBack={goMenu}
         />
         <CareerSpotlight
           mode="player"
           title={identityLine}
           meta={`${CAREER_PATH_LABEL[save.careerPathLevel ?? 'DOMESTIC']} | ${countryName} | ${userOverall} OVR`}
-          accentColor={team?.primaryColor ?? colors.accent}
+          accentColor={activePathTeam?.primaryColor ?? team?.primaryColor ?? colors.accent}
           status={`FORM ${Math.round(user.meta.form)} | COND ${Math.round(save.playerCareerResources?.playerCondition ?? 100)} | TRUST ${Math.round(save.playerCareerResources?.coachTrust ?? 55)}`}
         />
-        <Animated.View entering={FadeInDown.duration(300)}>
+        <View>
           <WalletBar wallet={save.wallet} />
-        </Animated.View>
+        </View>
 
-        <Animated.View key={page} entering={FadeIn.duration(220)}>
-          {pageContent}
-        </Animated.View>
+        <View>{renderPageContent()}</View>
       </Screen>
       <AchievementToast achievement={currentToast} onDismiss={onDismissToast} />
       <ModeGuideModal
@@ -2091,12 +1975,31 @@ function Stat({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-function LifeStat({ label, value, color }: { label: string; value: number; color: string }) {
+function CareerScopeRow({
+  label,
+  stats,
+  last,
+}: {
+  label: string;
+  stats: PlayerStats;
+  last?: boolean;
+}) {
   const styles = useThemedStyles(makeStyles);
   return (
-    <View style={styles.lifeStat}>
-      <Text style={[styles.lifeValue, { color }]}>{value}</Text>
-      <Text style={styles.lifeLabel}>{label}</Text>
+    <View style={[styles.scopeRow, last && styles.scopeRowLast]}>
+      <Text style={styles.scopeLabel}>{label}</Text>
+      <View style={styles.scopeMetric}>
+        <Text style={styles.scopeValue}>{stats.matches}</Text>
+        <Text style={styles.scopeMeta}>M</Text>
+      </View>
+      <View style={styles.scopeMetric}>
+        <Text style={styles.scopeValue}>{stats.runs}</Text>
+        <Text style={styles.scopeMeta}>RUNS</Text>
+      </View>
+      <View style={styles.scopeMetric}>
+        <Text style={styles.scopeValue}>{stats.wickets}</Text>
+        <Text style={styles.scopeMeta}>WKTS</Text>
+      </View>
     </View>
   );
 }
@@ -2230,6 +2133,41 @@ const makeStyles = (colors: ThemeColors) =>
       lineHeight: 19,
       marginTop: spacing.xs,
     },
+    nextFixtureStrip: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+      paddingTop: spacing.sm,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderStrong,
+    },
+    nextFixtureCopy: { flex: 1, minWidth: 0 },
+    nextFixtureTeams: {
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+    },
+    nextFixtureStatus: { fontSize: fontSize.xs, marginTop: 2 },
+    nextFixtureActions: {
+      minHeight: 40,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.xs,
+    },
+    heroTextAction: {
+      minHeight: 38,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.sm,
+    },
+    heroTextActionLabel: {
+      color: colors.primaryLight,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+    },
     calendarChoiceRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -2325,6 +2263,7 @@ const makeStyles = (colors: ThemeColors) =>
       marginBottom: spacing.sm,
       padding: spacing.md,
     },
+    impactStripCompact: { alignItems: 'stretch', flexDirection: 'column', gap: spacing.sm },
     impactEyebrow: {
       color: colors.success,
       fontSize: 10,
@@ -2334,6 +2273,7 @@ const makeStyles = (colors: ThemeColors) =>
     impactTitle: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.bold },
     impactText: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 17, marginTop: 2 },
     impactChanges: { alignItems: 'flex-end', gap: 3, maxWidth: '42%' },
+    impactChangesCompact: { alignItems: 'flex-start', maxWidth: '100%' },
     impactDelta: { fontSize: fontSize.xs, fontWeight: fontWeight.bold, textAlign: 'right' },
     pressClip: {
       backgroundColor: colors.surface,
@@ -2379,6 +2319,10 @@ const makeStyles = (colors: ThemeColors) =>
     },
     // Player hero card
     playerCard: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg },
+    playerCardCompact: { alignItems: 'stretch', flexDirection: 'column', gap: spacing.md },
+    playerAvatarWrap: { alignItems: 'center', flexShrink: 0 },
+    playerIdentity: { flex: 1, marginLeft: spacing.md, minWidth: 0, paddingRight: 56 },
+    playerIdentityCompact: { marginLeft: 0, paddingRight: 0 },
     role: { color: colors.text, fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
     styleLine: {
       color: colors.textMuted,
@@ -2405,6 +2349,13 @@ const makeStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    ovrRingMiniCompact: {
+      alignSelf: 'flex-start',
+      marginTop: spacing.md,
+      position: 'relative',
+      right: 0,
+      top: 0,
+    },
     ovrCenterMini: { position: 'absolute', alignItems: 'center' },
     ovrValueMini: {
       color: colors.accent,
@@ -2428,6 +2379,36 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: spacing.xl,
       marginBottom: spacing.sm,
     },
+    sectionTitleRow: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+      marginBottom: spacing.xs,
+    },
+    sectionTitleInline: {
+      flex: 1,
+      minWidth: 0,
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    youthTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minWidth: 0,
+    },
+    selectionHeadingRow: {
+      minHeight: 38,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      marginTop: spacing.xs,
+    },
     vsLabel: { color: colors.textMuted, fontSize: fontSize.sm },
     vsTeams: {
       color: colors.text,
@@ -2443,6 +2424,7 @@ const makeStyles = (colors: ThemeColors) =>
       fontWeight: fontWeight.black,
       marginTop: spacing.md,
     },
+    selectionStatusInline: { flex: 1, minWidth: 0, marginTop: 0 },
     selectionReason: {
       color: colors.textMuted,
       fontSize: fontSize.sm,
@@ -2602,18 +2584,26 @@ const makeStyles = (colors: ThemeColors) =>
     },
     gsMax: { color: colors.textFaint, fontSize: fontSize.xs },
     gsLabel: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: spacing.xs },
-    // Life stats
-    lifeCard: { flexDirection: 'row', alignItems: 'center', marginTop: 0 },
-    lifeStat: { flex: 1, alignItems: 'center' },
-    lifeValue: { fontSize: fontSize.xl, fontWeight: fontWeight.black },
-    lifeLabel: {
-      color: colors.textFaint,
-      fontSize: 10,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-      marginTop: 2,
+    scopeTable: { paddingVertical: 0 },
+    scopeRow: {
+      minHeight: 58,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
     },
-    lifeDivider: { width: 1, height: 32, backgroundColor: colors.border },
+    scopeRowLast: { borderBottomWidth: 0 },
+    scopeLabel: {
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+      flex: 1,
+      minWidth: 0,
+    },
+    scopeMetric: { minWidth: 52, alignItems: 'flex-end' },
+    scopeValue: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
+    scopeMeta: { color: colors.textFaint, fontSize: 9, marginTop: 1 },
     promotionCard: {
       borderColor: colors.accent,
       borderWidth: 1.5,

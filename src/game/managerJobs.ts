@@ -17,7 +17,7 @@ const MIN_REP_GAP = 4; // the suitor must be clearly bigger than your current cl
 const OFFER_CHANCE = 0.45; // not every strong season attracts an approach
 
 /** Seasonal salary a club of the given reputation would offer a head coach. */
-function salaryFor(reputation: number): number {
+export function managerSalaryFor(reputation: number): number {
   return Math.round(250_000 + reputation * 14_000);
 }
 
@@ -65,7 +65,7 @@ export function generateManagerJobOffer(save: SaveGame, rng: Rng): ManagerJobOff
     teamId: club.id,
     clubName: club.name,
     reputation: club.reputation,
-    salaryPromise: salaryFor(club.reputation),
+    salaryPromise: managerSalaryFor(club.reputation),
     reason:
       club.reputation >= 80
         ? 'A giant of the game wants a proven winner at the helm.'
@@ -79,6 +79,54 @@ export interface JobMoveResult {
   ok: boolean;
   reason?: string;
   toTeamId?: string;
+}
+
+/** Reset every cache and protection counter that belongs to the previous club. */
+export function applyManagerAppointment(
+  save: SaveGame,
+  teamId: string,
+  contractSalary?: number,
+): JobMoveResult {
+  const newTeam = save.teams[teamId];
+  if (!newTeam) return { ok: false, reason: 'That club is no longer available.' };
+  const previousTeamId = save.userTeamId;
+  if (previousTeamId && save.teams[previousTeamId]) {
+    save.teams[previousTeamId].isUserTeam = false;
+  }
+
+  save.userTeamId = teamId;
+  newTeam.isUserTeam = true;
+  newTeam.xi = undefined;
+  save.flags = { ...(save.flags ?? {}), sacked: false };
+  save.boardConfidence = 75;
+  save.managerGraceMatchesRemaining = 5;
+  save.managerMatchesAtCurrentClub = 0;
+  save.managerAppointmentPending = {
+    teamId,
+    clubName: newTeam.name,
+    appointedAt: Date.now(),
+  };
+  save.managerProgression = {
+    reputation: save.managerProgression?.reputation ?? newTeam.reputation,
+    currentClubId: teamId,
+    premiumAssistanceHistory: save.managerProgression?.premiumAssistanceHistory ?? [],
+    contractSalary: Math.max(
+      0,
+      Math.round(contractSalary ?? managerSalaryFor(newTeam.reputation)),
+    ),
+    lastSalaryPaidYear: save.managerProgression?.lastSalaryPaidYear,
+    lastSalaryCoinPayout: save.managerProgression?.lastSalaryCoinPayout,
+  };
+  save.trainingFocus = Object.fromEntries(
+    Object.entries(save.trainingFocus ?? {}).filter(([playerId]) =>
+      newTeam.playerIds.includes(playerId),
+    ),
+  );
+  save.scoutReports = [];
+
+  const year = save.currentSeasonId ? (save.seasons[save.currentSeasonId]?.year ?? 2026) : 2026;
+  save.boardObjective = { year, targetPosition: boardTargetFor(newTeam.reputation) };
+  return { ok: true, toTeamId: teamId };
 }
 
 /**
@@ -103,23 +151,10 @@ export function acceptManagerJob(save: SaveGame): JobMoveResult {
     }
   }
 
-  // Step down at the old club.
-  if (save.userTeamId && save.teams[save.userTeamId]) {
-    save.teams[save.userTeamId].isUserTeam = false;
-  }
-
-  // Take charge of the new club.
-  save.userTeamId = offer.teamId;
-  newTeam.isUserTeam = true;
-  save.flags = { ...(save.flags ?? {}), sacked: false };
-
-  // Fresh board relationship + an objective scaled to the bigger club.
-  save.boardConfidence = 65;
-  const year = save.currentSeasonId ? (save.seasons[save.currentSeasonId]?.year ?? 2026) : 2026;
-  save.boardObjective = { year, targetPosition: boardTargetFor(newTeam.reputation) };
-
+  const result = applyManagerAppointment(save, offer.teamId, offer.salaryPromise);
+  if (!result.ok) return result;
   save.managerJobOffer = undefined;
-  return { ok: true, toTeamId: offer.teamId };
+  return result;
 }
 
 /** Decline the headhunt — loyalty is rewarded by the board (confidence + rep). */

@@ -8,16 +8,27 @@ import {
   AchievementDef,
   achievementGemReward,
   achievementProgress,
-  ACHIEVEMENTS,
+  achievementsForMode,
   earnedAchievements,
   getTierPoints,
-  MAX_GAMERSCORE,
+  maxGamerscore,
   pendingAchievements,
   totalGamerscore,
 } from '../game/achievements';
-import { leaderboard, LeaderMetric, METRIC_LABEL, userRank } from '../game/leaderboard';
-import { seasonAwards } from '../game/progression';
+import {
+  MANAGER_HOF_MIN_SCORE,
+  managerLegacyScore,
+  qualifiesForManagerHall,
+  summarizeManager,
+} from '../game/hallOfFame';
+import {
+  activeManagerRecords,
+  ManagerLeaderboardKind,
+  ManagerLeaderboardRow,
+  rankManagerRows,
+} from '../game/managerRecords';
 import { standings } from '../game/season';
+import { emptyStats } from '../game/stats';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import { useHallOfFame } from '../state/hofStore';
@@ -32,9 +43,9 @@ import {
   useThemedStyles,
 } from '../theme';
 
-const METRICS: LeaderMetric[] = ['runs', 'wickets', 'overall'];
 type HofTab = 'players' | 'managers';
 type MainTab = 'records' | 'achievements' | 'hof';
+type StatView = 'all' | 'domestic' | 'international' | 'T20' | 'ODI' | 'TEST';
 
 const TIER_COLOR: Record<string, string> = {
   bronze: '#CD7F32',
@@ -49,14 +60,19 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
   const loadHof = useHallOfFame((s) => s.load);
   const styles = useThemedStyles(makeStyles);
   const { colors } = useTheme();
-  const [metric, setMetric] = useState<LeaderMetric>('runs');
-  const [hofTab, setHofTab] = useState<HofTab>('players');
+  const [statView, setStatView] = useState<StatView>('all');
+  const [hofTab, setHofTab] = useState<HofTab>(save?.mode === 'manager' ? 'managers' : 'players');
   const [mainTab, setMainTab] = useState<MainTab>('records');
   const [achFilter, setAchFilter] = useState<'all' | 'earned' | 'locked'>('all');
+  const [managerStatKind, setManagerStatKind] = useState<ManagerLeaderboardKind>('runs');
 
   useEffect(() => {
     void loadHof();
   }, [loadHof]);
+
+  useEffect(() => {
+    setHofTab(save?.mode === 'manager' ? 'managers' : 'players');
+  }, [save?.mode]);
 
   if (!save) {
     return (
@@ -69,24 +85,34 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
   }
 
   const rec = save.records;
-  const awards = seasonAwards(save);
-  const nameOf = (id?: string) => (id ? (save.players[id]?.name ?? '—') : '—');
-  const board = leaderboard(save, metric, 'career', 10);
-  const myRank = userRank(save, metric, 'career');
   const earned = earnedAchievements(save);
   const pending = pendingAchievements(save);
-  const totalAch = ACHIEVEMENTS.length;
+  const achievementCatalog = achievementsForMode(save);
+  const totalAch = achievementCatalog.length;
   const earnedCount = earned.length;
   const gamerscore = totalGamerscore(save);
+  const gamerscoreMax = maxGamerscore(save);
   const leagueRows = save.mode === 'manager' ? standings(save) : [];
+  const managerRecords = save.mode === 'manager' ? activeManagerRecords(save) : null;
+  const managerRankedRows = managerRecords
+    ? rankManagerRows(managerRecords.rows, managerStatKind)
+    : [];
+  const activeManagerEntry = summarizeManager(save);
+  const activeManagerScore = activeManagerEntry ? managerLegacyScore(activeManagerEntry) : 0;
+  const managerHofEntries =
+    activeManagerEntry &&
+    qualifiesForManagerHall(activeManagerEntry) &&
+    !hof.managers.some((entry) => entry.saveId === save.id)
+      ? [activeManagerEntry, ...hof.managers]
+      : hof.managers;
 
   const achList: AchievementDef[] =
-    achFilter === 'earned' ? earned : achFilter === 'locked' ? pending : ACHIEVEMENTS;
+    achFilter === 'earned' ? earned : achFilter === 'locked' ? pending : achievementCatalog;
 
   const tabCfg: { key: MainTab; label: string }[] = [
-    { key: 'records', label: '📊 Records' },
-    { key: 'achievements', label: `🏅 Achievements (${earnedCount})` },
-    { key: 'hof', label: '🏛️ Hall of Fame' },
+    { key: 'records', label: 'Records' },
+    { key: 'achievements', label: `Achievements (${earnedCount})` },
+    { key: 'hof', label: 'Hall of Fame' },
   ];
 
   return (
@@ -117,38 +143,86 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
       {/* ── RECORDS TAB ─────────────────────────────────────────────── */}
       {mainTab === 'records' && (
         <>
-          {/* Personal Career Best — the user player's own numbers */}
+          {/* Verified player numbers, split by career scope and format. */}
           {(() => {
             if (save.mode !== 'career' || !save.userPlayerId) return null;
             const me = save.players[save.userPlayerId];
-            const cs = me?.careerStats;
-            if (!me || !cs || cs.matches <= 0) return null;
-            const dismissals = Math.max(0, cs.matches - cs.notOuts);
+            if (!me) return null;
+            const statOptions: { key: StatView; label: string }[] = [
+              { key: 'all', label: 'Overall' },
+              { key: 'domestic', label: 'Domestic' },
+              { key: 'international', label: 'International' },
+              { key: 'T20', label: 'T20' },
+              { key: 'ODI', label: 'One-Day' },
+              { key: 'TEST', label: 'First-Class' },
+            ];
+            const cs =
+              statView === 'all'
+                ? me.careerStats
+                : statView === 'domestic'
+                  ? me.domesticStats
+                  : statView === 'international'
+                    ? me.internationalStats
+                    : me.formatStats?.[statView];
+            const verified = cs ?? emptyStats();
+            const dismissals = Math.max(0, verified.matches - verified.notOuts);
             const avg =
               dismissals > 0
-                ? (cs.runs / dismissals).toFixed(1)
-                : cs.runs > 0
-                  ? cs.runs.toFixed(1)
+                ? (verified.runs / dismissals).toFixed(1)
+                : verified.runs > 0
+                  ? verified.runs.toFixed(1)
                   : '—';
-            const sr = cs.balls > 0 ? ((cs.runs / cs.balls) * 100).toFixed(1) : '—';
+            const sr =
+              verified.balls > 0 ? ((verified.runs / verified.balls) * 100).toFixed(1) : '—';
             const items: { label: string; value: string; accent?: string }[] = [
-              { label: 'Matches', value: String(cs.matches) },
-              { label: 'Runs', value: String(cs.runs), accent: colors.primaryLight },
-              { label: 'High Score', value: String(cs.highScore), accent: colors.accent },
+              { label: 'Matches', value: String(verified.matches) },
+              { label: 'Runs', value: String(verified.runs), accent: colors.primaryLight },
+              { label: 'High Score', value: String(verified.highScore), accent: colors.accent },
               { label: 'Average', value: avg },
               { label: 'Strike Rate', value: sr },
-              { label: '100s / 50s', value: `${cs.hundreds} / ${cs.fifties}` },
-              { label: 'Wickets', value: String(cs.wickets), accent: colors.info },
-              { label: 'Best Bowling', value: cs.bestBowling || '—', accent: colors.info },
-              { label: 'Catches', value: String(cs.catches) },
+              { label: '100s / 50s', value: `${verified.hundreds} / ${verified.fifties}` },
+              { label: 'Wickets', value: String(verified.wickets), accent: colors.info },
+              {
+                label: 'Best Bowling',
+                value: verified.bestBowling || '—',
+                accent: colors.info,
+              },
+              { label: 'Catches', value: String(verified.catches) },
             ];
             return (
               <Animated.View entering={FadeInDown.duration(260)}>
-                <Text style={styles.section}>⭐ Your Career Best</Text>
+                <Text style={styles.section}>Your Career</Text>
+                <View style={styles.statViewGrid}>
+                  {statOptions.map((option) => {
+                    const selected = statView === option.key;
+                    return (
+                      <Pressable
+                        key={option.key}
+                        onPress={() => setStatView(option.key)}
+                        style={[styles.statViewButton, selected && styles.statViewButtonActive]}
+                      >
+                        <Text
+                          style={[
+                            styles.statViewButtonText,
+                            selected && styles.statViewButtonTextActive,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
                 <Card>
-                  <Text style={styles.careerBestName} numberOfLines={1}>
-                    {me.name}
-                  </Text>
+                  <View style={styles.careerBestHeader}>
+                    <Text style={styles.careerBestName} numberOfLines={1}>
+                      {me.name}
+                    </Text>
+                    <Text style={styles.careerBestScope}>
+                      {statOptions.find((option) => option.key === statView)?.label}
+                    </Text>
+                  </View>
                   <View style={styles.careerBestGrid}>
                     {items.map((it) => (
                       <View key={it.label} style={styles.careerBestItem}>
@@ -164,10 +238,75 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                       </View>
                     ))}
                   </View>
+                  {(statView === 'domestic' || statView === 'international') &&
+                  save.statsScopeTrackingStartedAt ? (
+                    <Text style={styles.scopeTrackingNote}>
+                      Scoped totals are exact from the records upgrade onward; Overall preserves the
+                      complete career total.
+                    </Text>
+                  ) : null}
                 </Card>
               </Animated.View>
             );
           })()}
+
+          {save.mode === 'manager' && managerRecords ? (
+            <Animated.View entering={FadeInDown.duration(270).delay(20)}>
+              <Text style={styles.section}>{managerRecords.competitionLabel} Season Leaders</Text>
+              <Card style={styles.managerRecordsPanel}>
+                <Text style={styles.tableHint}>
+                  Only {managerRecords.competitionLabel} performances from the current season are
+                  included. Players from your managed team are highlighted in gold.
+                </Text>
+                <View style={styles.managerStatTabs}>
+                  {(
+                    [
+                      ['runs', 'Most Runs'],
+                      ['wickets', 'Most Wickets'],
+                      ['highScore', 'High Scores'],
+                      ['bestBowling', 'Best Bowling'],
+                    ] as [ManagerLeaderboardKind, string][]
+                  ).map(([kind, label]) => {
+                    const selected = managerStatKind === kind;
+                    return (
+                      <Pressable
+                        key={kind}
+                        onPress={() => setManagerStatKind(kind)}
+                        style={[styles.managerStatTab, selected && styles.managerStatTabSelected]}
+                      >
+                        <Text
+                          style={[
+                            styles.managerStatTabText,
+                            selected && styles.managerStatTabTextSelected,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {managerRankedRows.length ? (
+                  <View style={styles.managerLeaderboard}>
+                    {managerRankedRows.map((row, index) => (
+                      <ManagerRecordRow
+                        key={row.playerId}
+                        row={row}
+                        rank={index + 1}
+                        kind={managerStatKind}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.empty}>
+                    No exact {managerRecords.competitionLabel} performances have been recorded in
+                    this season yet. This table updates after the next completed match.
+                  </Text>
+                )}
+              </Card>
+            </Animated.View>
+          ) : null}
 
           {save.mode === 'manager' && leagueRows.length > 0 && (
             <Animated.View entering={FadeInDown.duration(270).delay(20)}>
@@ -184,28 +323,6 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
               </Card>
             </Animated.View>
           )}
-
-          <Animated.View entering={FadeInDown.duration(280)}>
-            <Text style={styles.section}>All-time records</Text>
-            <Card>
-              <Line
-                label="Highest score"
-                value={
-                  rec?.highestScore
-                    ? `${rec.highestScore.name} · ${rec.highestScore.runs} (${rec.highestScore.year})`
-                    : '—'
-                }
-              />
-              <Line
-                label="Best bowling"
-                value={
-                  rec?.bestBowling
-                    ? `${rec.bestBowling.name} · ${rec.bestBowling.wickets}/${rec.bestBowling.runs} (${rec.bestBowling.year})`
-                    : '—'
-                }
-              />
-            </Card>
-          </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(300).delay(40)}>
             <Text style={styles.section}>🏆 Trophy Cabinet</Text>
@@ -257,100 +374,6 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
               </Card>
             )}
           </Animated.View>
-
-          <Animated.View entering={FadeInDown.duration(320).delay(80)}>
-            <Text style={styles.section}>This season leaders</Text>
-            <Card>
-              <Line
-                label="Most runs"
-                value={
-                  awards.topScorer
-                    ? `${nameOf(awards.topScorer.playerId)} · ${awards.topScorer.runs}`
-                    : '—'
-                }
-              />
-              <Line
-                label="Most wickets"
-                value={
-                  awards.topWicketTaker
-                    ? `${nameOf(awards.topWicketTaker.playerId)} · ${awards.topWicketTaker.wickets}`
-                    : '—'
-                }
-              />
-            </Card>
-
-            <Text style={styles.section}>Player Rankings</Text>
-            <View style={styles.chips}>
-              {METRICS.map((m) => {
-                const sel = metric === m;
-                return (
-                  <Pressable
-                    key={m}
-                    onPress={() => setMetric(m)}
-                    style={[styles.chip, sel && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, sel && styles.chipTextActive]}>
-                      {METRIC_LABEL[m]}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Card>
-              {board.map((r) => (
-                <View
-                  key={r.playerId}
-                  style={[styles.lbRow, r.isUser && { backgroundColor: colors.surfaceAlt }]}
-                >
-                  <Text style={[styles.lbRank, r.isUser && { color: colors.accent }]}>
-                    {r.rank}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.lbName,
-                      r.isUser && { color: colors.accent, fontWeight: fontWeight.bold },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {r.name} {r.isUser ? '★' : ''}
-                  </Text>
-                  <Text style={styles.lbTeam}>{r.teamName}</Text>
-                  <Text style={[styles.lbValue, r.isUser && { color: colors.accent }]}>
-                    {r.value}
-                  </Text>
-                </View>
-              ))}
-              {myRank > 10 ? <Text style={styles.lbYou}>Your rank · {myRank}</Text> : null}
-            </Card>
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.duration(340).delay(120)}>
-            <Text style={styles.section}>Centuries</Text>
-            <Card>
-              {rec?.centuries.length ? (
-                rec.centuries
-                  .slice(0, 12)
-                  .map((c, i) => (
-                    <Line key={i} label={`${c.year}`} value={`${c.name} · ${c.detail}`} />
-                  ))
-              ) : (
-                <Text style={styles.empty}>No hundreds yet — go make one.</Text>
-              )}
-            </Card>
-
-            <Text style={styles.section}>Five-wicket hauls</Text>
-            <Card>
-              {rec?.fiveWicketHauls.length ? (
-                rec.fiveWicketHauls
-                  .slice(0, 12)
-                  .map((c, i) => (
-                    <Line key={i} label={`${c.year}`} value={`${c.name} · ${c.detail}`} />
-                  ))
-              ) : (
-                <Text style={styles.empty}>No five-fers yet.</Text>
-              )}
-            </Card>
-          </Animated.View>
         </>
       )}
 
@@ -367,9 +390,12 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                 </View>
                 <View style={styles.gamerscoreDivider} />
                 <View style={{ flex: 1, paddingLeft: spacing.md }}>
-                  <ProgressBar value={gamerscore / MAX_GAMERSCORE} color={colors.accent} />
+                  <ProgressBar
+                    value={gamerscoreMax > 0 ? gamerscore / gamerscoreMax : 0}
+                    color={colors.accent}
+                  />
                   <Text style={styles.gamerscoreMax}>
-                    {gamerscore} / {MAX_GAMERSCORE} pts
+                    {gamerscore} / {gamerscoreMax} pts
                   </Text>
                 </View>
               </View>
@@ -446,7 +472,9 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
               career_50_caps: 'career_100_caps',
             };
             const nextChainId = isEarned ? CHAINS[a.id] : null;
-            const nextChain = nextChainId ? ACHIEVEMENTS.find((x) => x.id === nextChainId) : null;
+            const nextChain = nextChainId
+              ? achievementCatalog.find((x) => x.id === nextChainId)
+              : null;
             const nextChainEarned = nextChain ? earned.some((e) => e.id === nextChain.id) : false;
 
             return (
@@ -531,11 +559,13 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
           <Animated.View entering={FadeInDown.duration(280)}>
             {/* HoF Header Banner */}
             <View style={styles.hofHeader}>
-              <Text style={styles.hofHeaderEmoji}>🏛️</Text>
-              <View>
+              <View style={styles.hofMonogram}>
+                <Text style={styles.hofMonogramText}>HOF</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.hofHeaderTitle}>Hall of Fame</Text>
                 <Text style={styles.hofHeaderSub}>
-                  Legends that transcend every career you&apos;ve played.
+                  Player and manager legacies are ranked separately across saved careers.
                 </Text>
               </View>
             </View>
@@ -550,13 +580,72 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                     style={[styles.chip, sel && styles.chipActive]}
                   >
                     <Text style={[styles.chipText, sel && styles.chipTextActive]}>
-                      {t === 'players' ? '🏏 Players' : '📋 Managers'}
+                      {t === 'players' ? 'Player Careers' : 'Manager Careers'}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
           </Animated.View>
+
+          {hofTab === 'managers' && activeManagerEntry ? (
+            <Card style={styles.managerQualification}>
+              <View style={styles.managerQualificationHeader}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.managerQualificationTitle}>Current Manager Career</Text>
+                  <Text style={styles.managerQualificationClub} numberOfLines={1}>
+                    {activeManagerEntry.club}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.managerQualificationStatus,
+                    {
+                      color: qualifiesForManagerHall(activeManagerEntry)
+                        ? colors.success
+                        : colors.warning,
+                    },
+                  ]}
+                >
+                  {qualifiesForManagerHall(activeManagerEntry) ? 'INDUCTED' : 'BUILDING'}
+                </Text>
+              </View>
+              <View style={styles.managerQualificationStats}>
+                <HofStat
+                  label="Trophies"
+                  value={String(activeManagerEntry.trophies)}
+                  accent={colors.accent}
+                />
+                <HofStat
+                  label="Promotions"
+                  value={String(activeManagerEntry.promotions)}
+                  accent={colors.primaryLight}
+                />
+                <HofStat
+                  label="Win Rate"
+                  value={`${activeManagerEntry.winRate ?? 0}%`}
+                  accent={colors.success}
+                />
+                <HofStat
+                  label="Legends"
+                  value={String(activeManagerEntry.legendsProduced ?? 0)}
+                  accent={colors.info}
+                />
+              </View>
+              <ProgressBar
+                value={Math.min(1, activeManagerScore / MANAGER_HOF_MIN_SCORE)}
+                color={
+                  qualifiesForManagerHall(activeManagerEntry) ? colors.success : colors.warning
+                }
+                style={{ marginTop: spacing.sm }}
+              />
+              <Text style={styles.managerQualificationNote}>
+                Hall score {Math.round(activeManagerScore)} / {MANAGER_HOF_MIN_SCORE}. A trophy or
+                promotion grants immediate qualification; league finishes, win rate and legendary
+                players also build the score.
+              </Text>
+            </Card>
+          ) : null}
 
           {hofTab === 'players' ? (
             hof.players.length ? (
@@ -749,8 +838,8 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                 </Text>
               </Card>
             )
-          ) : hof.managers.length ? (
-            hof.managers.map((e, i) => {
+          ) : managerHofEntries.length ? (
+            managerHofEntries.map((e, i) => {
               const isFirst = i === 0;
               const isActive = e.saveId === save.id;
               const score = e.trophies + (e.promotions ?? 0);
@@ -869,13 +958,50 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
   );
 }
 
-function Line({ label, value }: { label: string; value: string }) {
+function ManagerRecordRow({
+  row,
+  rank,
+  kind,
+}: {
+  row: ManagerLeaderboardRow;
+  rank: number;
+  kind: ManagerLeaderboardKind;
+}) {
   const styles = useThemedStyles(makeStyles);
+  const primary =
+    kind === 'runs'
+      ? row.runs.toLocaleString()
+      : kind === 'wickets'
+        ? row.wickets.toLocaleString()
+        : kind === 'highScore'
+          ? row.highScore.toLocaleString()
+          : row.bestBowling;
+  const secondary =
+    kind === 'runs'
+      ? `${row.matches} matches | Avg ${row.average} | SR ${row.strikeRate}`
+      : kind === 'wickets'
+        ? `${row.matches} matches | Econ ${row.economy}`
+        : kind === 'highScore'
+          ? `${row.runs} runs | ${row.hundreds} hundreds`
+          : `${row.wickets} wickets | Econ ${row.economy}`;
   return (
-    <View style={styles.row}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value} numberOfLines={1}>
-        {value}
+    <View style={[styles.managerRecordRow, row.isManagedPlayer && styles.managerRecordRowManaged]}>
+      <Text style={[styles.managerRecordRank, row.isManagedPlayer && styles.managerRecordGold]}>
+        {rank}
+      </Text>
+      <View style={styles.managerRecordIdentity}>
+        <Text
+          style={[styles.managerRecordName, row.isManagedPlayer && styles.managerRecordGold]}
+          numberOfLines={1}
+        >
+          {row.name}
+        </Text>
+        <Text style={styles.managerRecordMeta} numberOfLines={1}>
+          {row.teamShort} | {secondary}
+        </Text>
+      </View>
+      <Text style={[styles.managerRecordValue, row.isManagedPlayer && styles.managerRecordGold]}>
+        {primary}
       </Text>
     </View>
   );
@@ -905,11 +1031,24 @@ const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     msg: { color: colors.textMuted, fontSize: fontSize.md, marginBottom: spacing.lg },
     careerBestName: {
+      flex: 1,
+      minWidth: 0,
       color: colors.text,
       fontSize: fontSize.md,
       fontWeight: fontWeight.heavy,
       fontFamily: fonts.display,
+    },
+    careerBestHeader: {
+      minHeight: 36,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
       marginBottom: spacing.sm,
+    },
+    careerBestScope: {
+      color: colors.primaryLight,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
     },
     careerBestGrid: { flexDirection: 'row', flexWrap: 'wrap' },
     careerBestItem: { width: '33.3%', paddingVertical: spacing.sm, alignItems: 'center' },
@@ -921,12 +1060,132 @@ const makeStyles = (colors: ThemeColors) =>
       letterSpacing: 0.5,
       marginTop: 2,
     },
-    mainTabRow: { marginTop: spacing.md, marginBottom: spacing.md },
-    mainTabContent: { gap: spacing.sm, paddingHorizontal: 0 },
-    mainTab: {
-      paddingHorizontal: spacing.md,
+    statViewGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginBottom: spacing.sm,
+    },
+    statViewButton: {
+      minWidth: '31%',
+      minHeight: 38,
+      flexGrow: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.sm,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    statViewButtonActive: {
+      backgroundColor: colors.surfaceAlt,
+      borderColor: colors.primary,
+    },
+    statViewButtonText: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.semibold,
+    },
+    statViewButtonTextActive: { color: colors.primaryLight },
+    managerRecordsPanel: { paddingVertical: spacing.sm },
+    managerStatTabs: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginBottom: spacing.sm,
+    },
+    managerStatTab: {
+      flexGrow: 1,
+      flexBasis: 120,
+      minHeight: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.sm,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceMuted,
+    },
+    managerStatTabSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryDark,
+    },
+    managerStatTabText: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+    },
+    managerStatTabTextSelected: { color: colors.white },
+    managerLeaderboard: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    managerRecordRow: {
+      minHeight: 58,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.sm,
       paddingVertical: spacing.sm,
-      borderRadius: radius.pill,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    managerRecordRowManaged: {
+      borderLeftWidth: 3,
+      borderLeftColor: colors.accent,
+      backgroundColor: `${colors.accent}18`,
+    },
+    managerRecordRank: {
+      width: 24,
+      color: colors.textFaint,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+      textAlign: 'center',
+    },
+    managerRecordIdentity: { flex: 1, minWidth: 0 },
+    managerRecordName: {
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+    },
+    managerRecordMeta: { color: colors.textFaint, fontSize: 10, marginTop: 2 },
+    managerRecordValue: {
+      minWidth: 48,
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.black,
+      textAlign: 'right',
+    },
+    managerRecordGold: { color: colors.accent },
+    scopeTrackingNote: {
+      color: colors.textFaint,
+      fontSize: 10,
+      lineHeight: 15,
+      marginTop: spacing.sm,
+      paddingTop: spacing.sm,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    mainTabRow: {
+      flexGrow: 0,
+      height: 44,
+      marginTop: spacing.md,
+      marginBottom: spacing.md,
+    },
+    mainTabContent: {
+      minHeight: 44,
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: 0,
+    },
+    mainTab: {
+      height: 40,
+      minWidth: 92,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.sm,
       backgroundColor: colors.surface,
       borderWidth: 1.5,
       borderColor: colors.border,
@@ -946,23 +1205,6 @@ const makeStyles = (colors: ThemeColors) =>
       letterSpacing: 1,
       marginTop: spacing.lg,
       marginBottom: spacing.sm,
-    },
-    row: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: 6,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
-      gap: spacing.md,
-    },
-    label: { color: colors.textFaint, fontSize: fontSize.sm, width: 64 },
-    value: {
-      color: colors.text,
-      fontSize: fontSize.sm,
-      fontWeight: fontWeight.medium,
-      flex: 1,
-      textAlign: 'right',
     },
     empty: { color: colors.textFaint, fontSize: fontSize.sm, paddingVertical: spacing.sm },
     hofHint: { color: colors.textFaint, fontSize: fontSize.xs, marginBottom: spacing.sm },
@@ -999,12 +1241,17 @@ const makeStyles = (colors: ThemeColors) =>
     },
     chips: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
     chip: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 40,
       paddingHorizontal: spacing.md,
       paddingVertical: 6,
-      borderRadius: radius.pill,
+      borderRadius: radius.sm,
       backgroundColor: colors.surface,
       borderWidth: 1.5,
       borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     chipActive: { backgroundColor: colors.primaryDark, borderColor: colors.primary },
     chipText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.semibold },
@@ -1274,13 +1521,28 @@ const makeStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       gap: spacing.md,
       backgroundColor: colors.surfaceAlt,
-      borderRadius: radius.lg,
+      borderRadius: radius.sm,
       padding: spacing.lg,
       marginBottom: spacing.md,
       borderWidth: 1,
       borderColor: colors.borderStrong,
     },
-    hofHeaderEmoji: { fontSize: 36 },
+    hofMonogram: {
+      width: 46,
+      height: 46,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      backgroundColor: `${colors.accent}18`,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    hofMonogramText: {
+      color: colors.accent,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.black,
+    },
     hofHeaderTitle: {
       color: colors.text,
       fontSize: fontSize.xl,
@@ -1288,6 +1550,47 @@ const makeStyles = (colors: ThemeColors) =>
       fontFamily: fonts.display,
     },
     hofHeaderSub: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+    managerQualification: {
+      borderRadius: radius.sm,
+      marginBottom: spacing.md,
+      borderColor: colors.borderStrong,
+    },
+    managerQualificationHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    managerQualificationTitle: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+    },
+    managerQualificationClub: {
+      color: colors.text,
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.heavy,
+      marginTop: 2,
+    },
+    managerQualificationStatus: {
+      fontSize: 10,
+      fontWeight: fontWeight.black,
+      flexShrink: 0,
+    },
+    managerQualificationStats: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      paddingVertical: spacing.sm,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    managerQualificationNote: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 17,
+      marginTop: spacing.sm,
+    },
     hofPlaque: {
       flexDirection: 'row',
       flexWrap: 'wrap',

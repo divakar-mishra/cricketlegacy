@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
-import { haptics } from '../audio';
+import Animated from 'react-native-reanimated';
+import { moment } from '../audio';
 import { MODAL_PRIORITY, useModalQueue } from '../context/ModalQueueContext';
 import {
   fonts,
@@ -16,6 +16,7 @@ import {
 import { AppText as Text } from './AppText';
 import { Button } from './Button';
 import { Icon, IconName } from './Icon';
+import { SMOOTH_CARD_ZOOM, SMOOTH_MODAL_ENTER, SMOOTH_MODAL_EXIT } from './Motion';
 
 export interface RewardModalData {
   kicker?: string;
@@ -36,7 +37,7 @@ export function RewardModal({ data, onClose }: Props) {
   const queueVisible = useModalQueue(Boolean(data), MODAL_PRIORITY.engagement, 'reward');
 
   useEffect(() => {
-    if (data && queueVisible) haptics.notify();
+    if (data && queueVisible) moment('reward');
   }, [data, queueVisible]);
 
   if (!data || !queueVisible) return null;
@@ -44,12 +45,12 @@ export function RewardModal({ data, onClose }: Props) {
   return (
     <Modal transparent visible statusBarTranslucent animationType="none" onRequestClose={onClose}>
       <Animated.View
-        entering={FadeIn.duration(180)}
-        exiting={FadeOut.duration(140)}
+        entering={SMOOTH_MODAL_ENTER}
+        exiting={SMOOTH_MODAL_EXIT}
         style={styles.backdrop}
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <Animated.View entering={ZoomIn.springify().damping(17)} style={[styles.card, shadow.card]}>
+        <Animated.View entering={SMOOTH_CARD_ZOOM} style={[styles.card, shadow.card]}>
           <View style={styles.iconWrap}>
             <Icon name={data.icon ?? 'gift'} size={30} color="#F7D06E" />
           </View>

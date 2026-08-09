@@ -1,6 +1,6 @@
 # Cricket Legacy UI/UX Specification
 
-Source-audited on 2026-07-28 against the current `D:\APP` working tree.
+Source-audited on 2026-07-30 against the current `D:\APP` working tree.
 
 ## 1. Scope and confidence
 
@@ -214,10 +214,13 @@ reserved for modals, hero cards and high-value moments.
 - safe-area top and bottom insets are respected;
 - horizontal padding is about 4.5% of viewport width, clamped to 12-24dp;
 - padded content is centered and capped at 980dp;
-- scrolling screens hide the vertical indicator, disable overscroll and clip
-  off-screen children;
-- sticky footers are measured at runtime and reserve equivalent scroll space;
-- sticky footers respect the bottom safe area;
+- scrolling screens hide the vertical indicator and disable overscroll;
+- Android scroll content is not aggressively clipped, avoiding disappearing
+  transformed/dynamic children during fast updates;
+- action footers are normal flex siblings below the scroll viewport, never
+  absolute overlays;
+- action footers use `flexShrink: 0` and include the bottom safe area, so the
+  final scroll item ends before the footer begins without a calculated spacer;
 - native gradients are retained on both Android and iOS.
 
 ### 6.2 Compact breakpoint
@@ -238,6 +241,36 @@ one fixed phone width.
 The app does not lock orientation and iPad support is enabled. The 980dp content
 cap prevents tablet layouts from stretching indefinitely, but many screens are
 still phone-first rather than tablet-specific split views.
+
+The shared footer and modular-avatar paths were exercised on an Android
+emulator at effective 360x800, 390x844, 412x915, 768x1024, 915x412 landscape
+and 1024x768 tablet viewports. In each case, the scroll viewport ended before
+the Player Creation or Cosmetics action footer and every avatar control remained
+reachable. This is targeted Android coverage, not a claim that every screen has
+been approved on every physical Android/iOS device.
+
+### 6.4 Career action state
+
+Player and Manager Home screens derive their primary action from the shared
+career-step resolver instead of independently rendering boolean-driven cards.
+Only one primary action is presented at a time.
+
+Player steps cover mandatory calendar events/training, selected matchday,
+benched/rested matchday, pending story decisions, off-season transfers, season
+wrap-up and youth promotion. The selected step owns its title, explanation,
+button label and action. A player who cannot afford training receives `Free
+Basic Nets`, which costs zero coins and improves exactly one weakest eligible
+attribute by one.
+
+Manager steps cover urgent job offers, appointment acknowledgement, world
+simulation, squad readiness, matchday, press events, off-season work and season
+rollover. Job offers take priority over routine cards. Accepting a job
+atomically switches the club and roster, resets board confidence to 75, starts
+a five-match grace period and queues the appointment presentation.
+
+Schema version 23 persists selection guarantees/boosts and manager appointment,
+job-match and grace-period state so reopening the app cannot recreate
+contradictory cards.
 
 ## 7. Reusable interaction system
 
@@ -261,10 +294,8 @@ Variants:
 
 Button press feedback:
 
-- scale springs from 1 to 0.96;
-- opacity moves to 0.88 in 80ms;
-- release returns opacity in 120ms;
-- spring uses damping 14, stiffness 300 and mass 0.7;
+- scale and opacity move to 0.96/0.88 over 80ms using timing animation;
+- release returns both values over 120ms without spring overshoot;
 - Android gets a bounded white 18% ripple;
 - disabled opacity is 0.45;
 - loading replaces the label with a spinner;
@@ -279,7 +310,7 @@ Button press feedback:
 - `SelectableCard`: 1.5px border, 12px radius, selected green border and
   `surfaceAlt`; selected state has a filled 20px radio dot.
 - `FluidChoice`: highlighted glass choice, enters over 420ms with 70ms row
-  staggering, presses to 0.96 and commits through a 0.9 scale dip.
+  staggering, presses to 0.96 and commits through a timed 0.9 scale dip.
 - `LockedFeatureCard`: muted surface, lock icon, reason and optional gold
   progress bar.
 
@@ -297,12 +328,14 @@ There is no Android elevation fallback in `GlassSurface`.
 
 ### 7.4 Header and navigation controls
 
-- `ScreenHeader` has a 40x40 bordered back button, a large text arrow, one-line
-  title, optional subtitle and optional right-side action.
+- `ScreenHeader` has a visible 44x44 `surfaceAlt` back button with a
+  `borderStrong` outline and chevron icon, a one-line title, optional subtitle
+  and optional right-side action.
 - `HubTabBar` is a glass bottom bar with Ionicons. Active tabs use a filled icon,
   gold text and a 28x3 gold top indicator.
 - Hub tabs support 46dp horizontal swipe navigation as well as taps.
-- Player hub tabs: Home, Stats, Story, Progress, Profile.
+- Player hub tabs: Home, Stats, Progress, Profile. Pending story decisions are
+  priority cards in Home rather than a hidden footer destination.
 - Manager hub tabs: Home, Club, Store, Academy, Records.
 
 ### 7.5 Progress, counters and loading
@@ -317,9 +350,14 @@ There is no Android elevation fallback in `GlassSurface`.
 ### 7.6 Icon and illustration language
 
 - The primary UI icon set is Ionicons through a shared `Icon` wrapper.
-- Cricket/player identity is supported by deterministic SVG avatars.
-- Avatars support face shape, skin tone, eye color, brows, hair style/color,
-  facial hair, moustache, kit color, role badge and premium/legend frames.
+- Cricket/player identity uses the supplied modular 512x512 PNG avatar pack:
+  186 registered assets and 300 deterministic recipes (150 male and 150
+  female). Every saved appearance stores stable asset IDs rather than image
+  objects or preset positions.
+- The shared layered renderer supports male/female appearance, narrow/medium/
+  wide rigs, skin tone, eyes, paired front/back hair, male beard and moustache,
+  headwear, outfit and the existing premium/legend profile frames. Headwear
+  hides hair visually while retaining the selected hairstyle.
 - A legendary/gold frame uses `#D5B56D`; its secondary dashed ring uses
   `#B9F23D`.
 - Operational player status uses platform-independent vector/view badges:
@@ -341,8 +379,9 @@ The Career Hub and Manager Hub share a 190dp stadium spotlight:
 - lower copy band uses `rgba(2,5,9,0.78)`;
 - a 42x3 rule inherits the active club/team accent;
 - the title remains white so club colors cannot reduce its contrast;
-- on High graphics, a 72dp diagonal white sheen travels across the viewport
-  every 4600ms; Low/Medium omit it.
+- the spotlight is static. It does not replay an entrance or looping sheen when
+  hub state updates, so cards do not black out or appear to rise from the
+  bottom during normal play.
 
 The wallet bar is one horizontal themed surface:
 
@@ -428,21 +467,42 @@ can still render independently in isolated tests when no queue provider exists.
 
 - Full-screen scrim: `rgba(0,0,0,0.48)`.
 - Themed glass card with `bgElevated` and `primaryDark` border.
-- Slides in with a spring, exits in 200ms.
+- Slides in from below over 200ms and fades out over 200ms.
 - Three six-second prompts: stance, chase reading and post-match review.
 - Can auto-advance, skip or move manually.
 
-### 9.4 Coach tip bubble
+### 9.4 Coach guidance placement
 
-- Positioned above the match footer, not in a native modal.
-- `bgElevated`, 24px radius, 2px primary border, matching speech tail.
-- Coach icon circle uses `surfaceAlt` and `primaryLight`.
-- The emoji bounces up 6dp and back over 800ms, repeated three times.
-- Enters with a spring from below and exits in 200ms.
-- Tip IDs cover match intro, shot selection, scoreboard, bowling plan, first
-  four, first wicket, DRS and tactics.
+- No Coach Tip is permanently or absolutely overlaid on the Career Hub,
+  Manager Hub or Matchday screen.
+- First-match instruction remains in the dismissible `FirstMatchGuide`.
+- Complex rules use inline info buttons and in-flow contextual guidance, so a
+  coaching message cannot cover a home card, scoreboard or match control.
 
-### 9.5 Reward popup
+### 9.5 Just-in-time mechanic guidance
+
+Complex simulation rules use a three-layer guidance system:
+
+1. Inline info buttons are 36dp square by default, use the Ionicons
+   `information-circle-outline` symbol and open the shared `GlassAlert` surface.
+   Each alert has one short summary and no more than three rule bullets.
+2. Contextual mechanic tips render in normal document flow, never as an
+   absolute overlay. They use `bgElevated`, a 1px primary border, a bulb icon,
+   concise copy, a "See the rule" action and a 36dp close action. Entry is a
+   220ms `FadeInDown`; exit is a 160ms fade. Dismissal is persisted in
+   `settingsStore`, and Replay game guides clears it.
+3. Cricket Academy is the searchable handbook in Settings. Its stable
+   four-segment control switches between Career, Match, Club and Physical
+   topics. Search spans all categories. Topic cards expand in place to reveal
+   exact rule bullets.
+
+Current inline placements cover Scout Confidence, tactical modifiers,
+First-Class over-rate, board grace, selection formula, U19 readiness, manager
+First-Class workload and Player Career match condition. Contextual tips are
+prioritized so only one is shown at a time; after dismissal, the next relevant
+undismissed mechanic can appear.
+
+### 9.6 Reward popup
 
 - Used by daily rewards, daily/weekly quests and season-pass claims.
 - Backdrop: `rgba(0,0,0,0.78)`.
@@ -450,10 +510,10 @@ can still render independently in isolated tests when no queue provider exists.
 - Icon disc: `#3A2800`, border `#C6902A`, icon `#F7D06E`.
 - Reward checks: `#7FD89A`.
 - CTA: gold Collect button.
-- Motion: 180ms fade, 140ms exit, spring ZoomIn with damping 17.
+- Motion: 180ms eased backdrop fade, 200ms cubic card zoom and 140ms exit.
 - Feedback: success notification haptic when data becomes visible.
 
-### 9.6 Starter pack popup
+### 9.7 Starter pack popup
 
 - Backdrop: `rgba(0,0,0,0.75)`.
 - Card: `#0F241A`, gold border `#C6902A`, 24px radius.
@@ -461,17 +521,17 @@ can still render independently in isolated tests when no queue provider exists.
 - Header and badge text: `#D5B56D`.
 - Badge: `#17211B`, border `#8A6A26`.
 - Content lists coins, gems and seven-day ad removal.
-- Motion: 200ms fade plus spring BounceIn with damping 16.
+- Motion: 180ms eased backdrop fade, 200ms cubic card zoom and 140ms exit.
 - Feedback: medium impact on show, success haptic on the CTA.
 
-### 9.7 Contextual monetization popup
+### 9.8 Contextual monetization popup
 
 Common shell:
 
 - backdrop `rgba(0,0,0,0.7)`;
 - theme surface-to-elevated gradient;
 - 24px radius, 1.5px border;
-- 320ms ZoomIn, spring damping 14/stiffness 180;
+- 200ms timed ZoomIn without spring overshoot;
 - icon glow pulses from 30% to 100% opacity every 900ms.
 
 | Trigger           | Accent    | Main behavior                  |
@@ -485,7 +545,7 @@ Common shell:
 The compact in-hub banner uses the same accent at 13% and 3% opacity, enters
 with a 400ms fade and includes an accent-colored CTA pill.
 
-### 9.8 Achievement presentation
+### 9.9 Achievement presentation
 
 Achievement tier colors:
 
@@ -495,6 +555,10 @@ Achievement tier colors:
 | Silver   | `#B8BEC5` | `rgba(184,190,197,0.12)` |
 | Gold     | `#E9B23B` | `rgba(233,178,59,0.14)`  |
 | Platinum | `#B4E4FF` | `rgba(180,228,255,0.14)` |
+
+Achievement catalogs are filtered by the active save mode. Player-only
+batting/bowling milestones do not appear in Manager Mode; manager team and
+career achievements have their own score denominator and unlock checks.
 
 Bronze:
 
@@ -516,11 +580,11 @@ Gold and platinum:
 - gold background `#1A1000 / #2A1F00 / #1A1000`;
 - platinum background `#000D1A / #001A2E / #000D1A`;
 - two continuously pulsing rings;
-- icon springs in after 200ms;
+- icon scales in over 200ms without spring overshoot;
 - 4.5-second auto-dismiss or tap to dismiss;
 - impact haptic on show.
 
-### 9.9 Share achievement popup
+### 9.10 Share achievement popup
 
 - Native fade modal with `rgba(0,0,0,0.8)` backdrop.
 - Share card is fixed at 320px wide with a 24px radius.
@@ -531,7 +595,7 @@ Gold and platinum:
 - Native builds capture a PNG through `react-native-view-shot` and use
   `expo-sharing`; Expo Go falls back to text sharing.
 
-### 9.10 Newspaper clipping
+### 9.11 Newspaper clipping
 
 - Backdrop: `rgba(8,10,12,0.82)`.
 - Paper: `#EEE1BD`; paper border/rules: `#8B7657` and `#AA9875`.
@@ -543,21 +607,21 @@ Gold and platinum:
 - Share targets are exposed through the system share sheet, including WhatsApp
   and Instagram when installed.
 
-### 9.11 Manager pre-match talk
+### 9.12 Manager pre-match talk
 
 - Backdrop: `rgba(0,0,0,0.68)`.
 - Standard card with 1.5px gold border.
 - Talk choices use `surfaceAlt`, themed border and stacked label/description.
 - Native modal fade; Skip Talk remains available.
 
-### 9.12 Manager world simulation
+### 9.13 Manager world simulation
 
 - Backdrop: `rgba(0,0,0,0.68)`.
 - Panel: theme surface, 12px radius, gold border, max width 420.
 - Gold activity spinner and gold 8px progress fill.
 - Live-region copy announces progress while all 24 clubs are simulated.
 
-### 9.13 Transfer bid war
+### 9.14 Transfer bid war
 
 - Backdrop: `rgba(0,0,0,0.75)`.
 - Card: `bgElevated`, 24px radius, 2px gold border, max height 76%.
@@ -567,7 +631,7 @@ Gold and platinum:
 - Primary counter button is green; Withdraw is bordered with green text.
 - Detail body scroll height is clamped from 190-300dp according to viewport.
 
-### 9.14 Commentary archive
+### 9.15 Commentary archive
 
 - Full-screen native slide modal.
 - Uses active theme background and safe areas.
@@ -576,7 +640,7 @@ Gold and platinum:
 - Rows enter over 180ms with up to 180ms of stagger.
 - Outcome chips inherit the commentary tone.
 
-### 9.15 Glass alerts
+### 9.16 Glass alerts
 
 Confirmations and errors use the app-owned `GlassAlert` service rather than
 React Native `Alert.alert`. This includes save deletion, prospect/player
@@ -590,33 +654,33 @@ purchase/ad failures.
 - Message: Inter, 13px/21px, centered, `#A8B1C0`, scrollable up to 300dp.
 - Primary confirm: green `#00C97A`; destructive action: red `#E5484D`;
   cancel: ghost button.
-- Motion: backdrop fades in over 180ms; card uses a 300ms spring `ZoomIn` with
-  damping 18; exit fade is 140ms.
+- Motion: backdrop fades in over 180ms; card uses a 200ms cubic `ZoomIn`; exit
+  fade is 140ms.
 - Alerts enter the global queue at priority 1 and retain native-style
   cancelable, destructive, dismiss and button-callback semantics.
 
-### 9.16 Training result popup
+### 9.17 Training result popup
 
-- This is an in-screen lower overlay rather than a native modal.
+- This is a transparent native modal centered over a full-screen scrim, so it
+  cannot be clipped by the training list or overlap the action footer.
 - Card: `bgElevated`, 24px radius, 2px primary-green border.
-- It springs from 0.5 scale through 1.08 to 1.0 and fades in over 180ms.
+- It fades in over 180ms and uses the shared 200ms cubic card zoom.
 - Overall improvement uses a gold pill with black text.
 - New attribute values use primary-light green; gain pills use success green.
 - Individual rows enter over 220ms with 80ms staggering.
-- It auto-dismisses after 2.8 seconds, fades out over 250ms and can be tapped
-  away early.
+- It appears immediately after a successful action and remains until dismissed.
 - A failed/blocked training action instead shows a themed card with warning
   border/text.
 
-### 9.17 Match DRS prompt and result
+### 9.18 Match DRS prompt and result
 
 - A reviewable user dismissal pauses the live loop.
 - Prompt: theme surface, 12px radius, 1.5px danger border.
 - Review action is info blue; Accept uses `surfaceAlt`.
-- The prompt enters from below with spring damping 18.
+- The prompt enters from below over 200ms.
 - Overturned result is full success green; upheld result is full danger red.
 - Result text is white with an 80%-white subtitle.
-- Result enters with the same spring and fades out over 300ms.
+- Result enters over 200ms and fades out over 300ms.
 
 ## 10. Match UI and UX
 
@@ -638,8 +702,9 @@ Live match supports:
 - current batter/bowler matchup;
 - required-run-rate pressure;
 - partnership;
-- recent commentary and full archive;
-- live, field and scorecard views;
+- one recent-commentary feed directly below the score/tactical header, plus a
+  full ball-by-ball archive;
+- one stable 2D live-field view with no live tabs;
 - manager live tactics;
 - career batting stance;
 - DRS review prompt;
@@ -663,6 +728,10 @@ At 2x and 4x:
 - numeric score CountUp is bypassed;
 - typewriter commentary is bypassed;
 - only the fast score/commentary essentials remain;
+- ordinary React UI updates are batched every two balls at 2x and every four
+  balls at 4x, while wickets, boundaries, milestones, over ends, innings ends
+  and match ends always render;
+- every delivery still enters the scorecard and commentary archive;
 - simulation outcome is unchanged; speed changes presentation pacing only.
 
 ### 10.3 Score and pressure colors
@@ -686,8 +755,8 @@ Full cinematic feedback runs only at 1x:
 - duration: 1100-1600ms with 12ms staggering;
 - normal events burst upward; wicket shards fall down;
 - particle rotation can reach +/-360 or 720 degrees;
-- center label springs in, holds 620ms, or 950ms for hundred/win, then fades in
-  260ms;
+- center label scales in over 200ms, holds 620ms, or 950ms for hundred/win,
+  then fades over 260ms;
 - center plate is `rgba(6,9,15,0.94)`, 8px radius;
 - floodlight beams use `rgba(185,242,61,0.09)`.
 
@@ -712,9 +781,10 @@ Wicket additionally produces:
 
 ### 10.5 Commentary motion
 
-- At 1x, current commentary types at 18ms per character with a dim cursor.
+- At 1x, the newest commentary types at 14ms per character.
 - At 2x/4x, the full line appears immediately.
-- Recent feed retains 12 entries.
+- The live feed stores 12 recent entries and displays four at 1x or one at
+  2x/4x.
 - Full archive is bounded to 2400 deliveries.
 - End-of-over and first-match coaching surfaces are hidden from fast UI.
 
@@ -722,22 +792,19 @@ Wicket additionally produces:
 
 2D field:
 
-- outfield `#0E2A1A`;
-- pitch `#B9915A`;
+- Standard palette: outfield `#0E2A1A`, pitch `#B9915A`, boundary/30-yard
+  ring `#176536`;
+- Stadium Noir palette: outfield `#050806`, pitch `#233D22`,
+  boundary/30-yard ring `#B9F23D`;
+- selecting Stadium Noir in Premium Clubhouse immediately supplies the Noir
+  palette to `FieldView` on Player and Manager matchdays;
 - normal trajectory uses muted text color;
 - four green, six gold, wicket red and extra blue;
 - ball flight lasts 460ms, or 620ms for a six.
 
-3D field:
-
-- shown only on High graphics, normal-speed rich UI and successful GL startup;
-- classic sky `#07110D`, grass `#176536`, ring `#7BCF8F`, boundary `#F1C75B`;
-- noir sky `#050806`, grass `#233D22`, ring `#B9F23D`, boundary `#D5B56D`;
-- geometry-only Three.js scene, no downloaded models or textures;
-- 190dp high, full width, with a "LIVE 3D" badge;
-- camera orbits slowly at 0.055 radians per second;
-- regular/four trajectory lasts 620ms, six lasts 900ms and uses a higher arc;
-- unavailable GL falls back to the 2D field.
+The 3D/GL match path has been removed. `expo-gl`, Three.js and their type
+packages are not runtime dependencies. This avoids black/blank canvases and
+keeps Player and Manager matches on the same predictable 2D renderer.
 
 ### 10.7 Match charts
 
@@ -745,6 +812,61 @@ Wicket additionally produces:
 - Manhattan chart: over-by-over bars with wickets called out in danger color.
 - Radar chart: role/attribute comparison around a themed polygon.
 - Sparkline: 15% translucent area, 2px line and latest-point dot.
+
+### 10.8 Visible match and progression rules
+
+- T20 performance has no hidden individual run or wicket cap. Delivery
+  probabilities determine outliers; a deterministic 56-match/14-match-per-team
+  distribution test guards plausible season totals and innings extremes.
+- The pre-match brief names the generated venue, format, pitch and weather, then
+  explains the practical cricket consequence of those conditions.
+- The Toss card names the winner. Bat First and Bowl First are selectable only
+  when the user is the manager, club captain or national captain for that
+  fixture; otherwise the AI captain's decision and the team batting first are
+  explained. Club captaincy never grants national-team authority. AI choices
+  account for format, pitch and weather.
+- A user all-rounder in the XI receives a minimum bowling allocation of two
+  overs in T20, four in ODI/List A and eight in a Test/First-Class innings.
+- Match speed never changes the deterministic engine result.
+- School/U19 match injury risk is reduced by 70%. School selection is
+  guaranteed unless the player is injured, deliberately rested or below 18
+  condition.
+- A 10.0 match rating grants +20 form, +15 confidence and +15 coach trust, plus
+  a next-match selection guarantee.
+- Being within three matches of a tracked record grants a +25 selection boost.
+- A player receives major tournament/trophy career credit only after appearing
+  in at least 40% of that tournament's team matches.
+- Manager lineups below 55 condition or 45 morale receive a temporary 15%
+  match-performance penalty. Interactive preparation with custom tactics
+  applies a fixture-scoped 10% performance boost and post-match morale gain.
+- Pause uses a neutral secondary surface with an amber outline; Skip to My
+  Batting locks immediately on the first tap and continues across an innings
+  break when required.
+
+### 10.9 Manager personal economy
+
+- Wallet Coins pay for personal services; Club Budget remains the only source
+  for transfers, facilities, staff and player contracts.
+- Opposition Analysis costs 650 Wallet Coins once per upcoming fixture and
+  grants the selected XI +2 form and +1 morale for that match preparation.
+- Match Preparation is a required pre-match stage for every manager fixture.
+  Watch, Key Moments and Instant Result remain unavailable until the plan is
+  confirmed. The basic report explains all unit ratings out of 100 with
+  Manageable/Strong/Elite danger labels; paid analysis names both threats,
+  identifies a weakness and can apply its recommended tactics directly.
+- Morale Session costs 8,000 Wallet Coins once per upcoming fixture and adds
+  +5 morale to the three lowest-morale squad players. It is an optional
+  preparation service, not a forced pre-match speech.
+- Fast-Track Scouting costs 6,000 Wallet Coins once per target per season. It
+  requires an existing report and adds 25 percentage points of Scout
+  Confidence immediately.
+- The annual contract salary is paid once when the T20 block completes. The
+  personal payout is `floor(contractSalary / 200)` Wallet Coins, appears in the
+  phase summary and creates one inbox notification.
+- AI-simulated user-club matches in locked manager competitions pay a 30%
+  oversight stipend from the normal match reward. Active VIP then applies its
+  20% multiplier. The phase modal labels the competition, licence reason,
+  wins-from-matches record, table effect and stipend.
 
 ## 11. Sound design
 
@@ -757,21 +879,31 @@ the iOS silent switch is active.
 | ------- | ------------------------- | ------ | ------ | ----------------------------------- |
 | Tap     | `ui_glass_tap.mp3`        | 0.52s  | 0.42   | Shared `Button` actions             |
 | Four    | `bat_impact_classic.mp3`  | 0.60s  | 0.78   | User boundary at 1x                 |
-| Six     | `bat_impact_classic.mp3`  | 0.60s  | 0.88   | User six at 1x                      |
+| Six     | `bat_impact_classic.mp3`  | 0.60s  | 0.88   | 0.90x heavy impact plus delayed crowd at 1x |
 | Wicket  | `stump_clack.mp3`         | 1.25s  | 0.86   | Every wicket, including fast speeds |
 | Fifty   | `stadium_crowd_cheer.mp3` | 6.03s  | 0.58   | Fifty milestone                     |
 | Hundred | `stadium_crowd_cheer.mp3` | 6.03s  | 0.65   | Hundred milestone                   |
 | Win     | `stadium_crowd_cheer.mp3` | 6.03s  | 0.68   | Match win                           |
 | Crowd   | `stadium_crowd_cheer.mp3` | 6.03s  | 0.52   | Innings break                       |
+| Coin    | `ui_glass_tap.mp3`        | 0.52s  | 0.62   | Toss reveal at 1.55x playback       |
+| Phone   | `ui_glass_tap.mp3`        | 0.52s  | 0.48   | Player Life inbox at 1.28x playback |
+| Trophy  | `stadium_crowd_cheer.mp3` | 6.03s  | 0.72   | Hall of Fame plaque at 1.06x        |
+| Defeat  | `stump_clack.mp3`         | 1.25s  | 0.62   | Match loss at 0.68x playback        |
 
 Important current behavior:
 
 - wicket and milestone sound/haptics still fire at 2x/4x;
 - four and six sound/haptics fire only when the 1x cinematic is shown;
+- fours use the normal impact transient; sixes disable pitch correction at a
+  0.90 playback rate and add a crowd layer after 70ms, making the events
+  distinguishable without a second impact asset;
 - innings-break crowd plays at every speed;
 - sound toggle independently gates these effects;
 - the app-level music controller loops `assets/audio/menu_ambient.mp3`
-  (2m 6.9s, 44.1kHz stereo MP3) at volume 0.25;
+  (2m 6.9s, 44.1kHz stereo MP3) and adapts its two-layer mix between Menu,
+  Match Calm, Match Tense, Victory and Defeat scenes;
+- the second layer reuses the same compact track from a shifted position with
+  scene-specific volume/rate, so tension changes without adding APK media;
 - disabling Music pauses and seeks the ambient track back to zero; enabling it
   starts playback and persisted settings are synchronized at app startup.
 
@@ -819,19 +951,23 @@ unavailable.
 | Progress fill                  | 480ms                                                       |
 | CountUp                        | 350ms cubic ease-out                                        |
 | Skeleton                       | 800ms repeated opacity pulse                                |
-| Button                         | Spring scale + 80/120ms opacity                             |
+| Button                         | Timed scale + 80/120ms opacity                              |
 | Fluid text                     | Word/character FadeInDown, 34ms default stagger, 1400ms cap |
-| Typewriter                     | 18ms/character at 1x only                                   |
-| Glass spotlight sweep          | 4600ms loop on High graphics                                |
+| Typewriter                     | 14ms/character for newest match commentary at 1x            |
+
+Shared modal presets are `FadeIn` 180ms with quadratic ease-out, `FadeOut`
+140ms with quadratic ease-in and `ZoomIn` 200ms with cubic ease-out. No
+`spring`, `withSpring`, `springify` or `BounceIn` animation remains in the
+application UI. Ambient glows, particles and ceremonial timing loops remain.
 
 ### 13.2 Screen-specific motion
 
 | Screen         | Main motion                                                          |
 | -------------- | -------------------------------------------------------------------- |
-| Splash         | 220ms fade plus spring scale from 0.85                               |
+| Splash         | 220ms fade plus timed scale from 0.85                                |
 | Main Menu      | 600ms hero fade, 320ms right-entering menu rows, 400ms continue card |
-| Career Hub     | Fade/FadeInDown sections and High-only spotlight sweep               |
-| Manager Hub    | FadeInDown sections and High-only spotlight sweep                    |
+| Career Hub     | Stable in-place hub sections; tab content is not remounted on updates |
+| Manager Hub    | Stable in-place hub sections; no repeating spotlight entrance         |
 | Training       | Progress/card entrances, stat pulse, temporary feedback popup        |
 | Transfers      | Fade/FadeInDown rows; timed bid-war entrance                         |
 | Records        | Extensive staged FadeInDown lists                                    |
@@ -842,11 +978,11 @@ unavailable.
 | Cosmetics      | Fade/ZoomIn selection feedback                                       |
 | Deadline Day   | Clock digit pop, repeating urgency glow and staggered ticker         |
 | Awards Night   | Sequential 1.1-second award reveals with pulsing glows               |
-| Board Meeting  | Emoji spring, card rise after 300ms, repeating 1.05 scale pulse      |
-| Injury Report  | Icon spring/pulse and 300-900ms staged sections                      |
-| Milestone      | Hero spring, repeated particles, auto-dismiss after 4 seconds        |
+| Board Meeting  | 200ms emoji scale, timed card rise and repeating 1.05 scale pulse    |
+| Injury Report  | 200ms icon scale/pulse and 300-900ms staged sections                 |
+| Milestone      | 200ms hero scale, repeated particles, auto-dismiss after 4 seconds   |
 | Hall of Fame   | 1.6-second highlight beats, rotating stars, staged gold plaque       |
-| Youth Graduate | Jersey spring, name rise, glow pulse and star bursts                 |
+| Youth Graduate | 200ms jersey scale, name rise, glow pulse and star bursts            |
 
 There is no user-facing Reduce Motion setting and no explicit binding to the
 operating system reduced-motion preference.
@@ -859,9 +995,9 @@ operating system reduced-motion preference.
 | Medium  | Balanced                                  |
 | High    | Full effects/richest presentation         |
 
-Current source-level effects of this setting include particle density, High-only
-3D match ground and High-only career spotlight sweep. It is not a global switch
-that disables every animation in the app.
+Current source-level effects of this setting include particle density and
+selected presentation effects. It is not a global switch that disables every
+animation in the app.
 
 ## 14. Ceremonial and high-emotion screens
 
@@ -875,9 +1011,9 @@ that disables every animation in the app.
 | Title        | `#C6902A` to `#4A2800` | `#F7D06E` |
 | Default      | `#1F8A46` to `#0A1912` | `#5BD183` |
 
-Twelve particles repeatedly rise 180-280dp. The hero springs from 0.1 scale,
-copy enters after 400ms, the tap hint after 1.5 seconds and the screen closes
-after four seconds or on tap.
+Twelve particles repeatedly rise 180-280dp. The hero scales from 0.1 to 1 over
+200ms, copy enters after 400ms, the tap hint after 1.5 seconds and the screen
+closes after four seconds or on tap.
 
 ### 14.2 Board meeting
 
@@ -941,66 +1077,94 @@ breaking-news badge, stats, recovery timeline and a blue-purple fast-track card
 - Deal status: pending `#F5A524`, agreed `#31A85A`, collapsed `#E5484D`,
   signed `#4C9AFF`.
 
+### 14.8 Player Life
+
+- The five-tab control wraps within the viewport and keeps each target at least
+  44dp high. It never uses absolute positioning for content layout.
+- Overview uses a single unframed flow: selection score, reason breakdown,
+  Domestic/International totals and a ten-row recent-appearance list.
+- Development and Finance use responsive rows with bounded minimum widths.
+  They collapse to one column before labels or actions can overlap.
+- The phone is one bounded surface, not nested cards. Feed, Inbox, News and
+  Money use compact icon tabs and vertically scrolling content.
+- Finance actions use theme success for positive balances/income, warning for
+  gated features and primary green only for active selection/actions.
+- The Legacy Museum uses the gold accent at 9% background and 33% border
+  opacity for earned-history emphasis, while empty states stay neutral.
+- Result feedback uses the shared serialized alert/reward surfaces, so purchase
+  and claim copy cannot render behind another popup.
+- Personal Physio costs 9,000 Wallet Coins, restores 25 condition and removes
+  one match from an active injury, up to three times per season.
+- Performance Analysis costs 12,000 Wallet Coins once per upcoming fixture.
+  Its persistent report names the threat, explains a weakness and match plan,
+  and links to/highlights the recommended Training focus. The real preparation
+  effects are +3 player confidence and +2 coach trust.
+- Sponsor negotiation choices wrap responsively and preview acceptance chance,
+  signing bonus, per-match income, two-season duration and form requirement.
+  Used negotiations and full two-sponsor slots disable all three choices.
+
 ## 15. Screen-by-screen UX catalog
 
 ### Entry, setup and account
 
-| Screen          | Current UX                                                                                                                                                |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Splash          | Centered emblem, app name, tagline and Loading copy; fades/scales in while daily session gate resolves.                                                   |
-| Main Menu       | Cricket-ground code hero, resume card with mode/name/season/wallet/last result, then icon-led New Game, Saves, Store, Account, Settings and Exit actions. |
-| New Game        | Two large mode choices describing Player Career and Manager Career.                                                                                       |
-| Player Creation | Multi-step identity, country, role, difficulty and visual avatar creation; uses responsive choices, color swatches and progress footer.                   |
-| Team Select     | Country-aware club selection with selected state and fixed start action.                                                                                  |
-| Saved Games     | Save-slot cards, empty slots, premium-slot lock and destructive delete confirmation.                                                                      |
-| Login           | Email/password account actions and guest play; busy buttons and queued glass error alerts.                                                                |
-| Settings        | Audio/gameplay switches, theme/language/graphics choices, guide replay, defaults and build metadata.                                                      |
-| League Editor   | Competition and club text inputs with active/inactive editor state.                                                                                       |
+| Screen          | Current UX                                                                                                                                                                                            |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Splash          | Centered emblem, app name, tagline and Loading copy; fades/scales in while daily session gate resolves.                                                                                               |
+| Main Menu       | Cricket-ground code hero, resume card with mode/name/season/wallet/last result, then icon-led New Game, Saves, Store, Account, Settings and Exit actions.                                             |
+| New Game        | Two large mode choices describing Player Career and Manager Career.                                                                                                                                   |
+| Player Creation | Multi-step identity, country, role, difficulty and visual avatar creation; includes the supplied 300 deterministic modular presets, male/female and manual part controls, exact active School ratings beside allocation values, a future Tier 3 destination choice and a responsive progress footer. |
+| Team Select     | Country-aware club selection with selected state and fixed start action.                                                                                                                              |
+| Saved Games     | Save-slot cards, empty slots, premium-slot lock and destructive delete confirmation.                                                                                                                  |
+| Login           | Guest access is active. Google sign-in is visibly marked "Coming soon"; cloud sign-in and email/password controls are not exposed by the current screen.                                               |
+| Settings        | Audio/gameplay switches, theme/language/graphics choices, Cricket Academy entry, guide replay, defaults and build metadata.                                                                           |
+| Cricket Academy | Searchable four-tab handbook with expandable, engine-audited rules for career progression, match tactics, club management and physicality.                                                            |
+| League Editor   | Competition and club text inputs with active/inactive editor state.                                                                                                                                   |
 
 ### Player career
 
-| Screen                 | Current UX                                                                                                                                                           |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Career Hub             | Five persistent tabs, career stadium spotlight, wallet, one primary next action, training/match/progression/story/profile data, daily rewards and contextual offers. |
-| Training               | Role-group training cards, costs, trainability, progress bars, attribute gain animation and temporary feedback message.                                              |
-| Player Profile         | Identity/avatar, current and career stats, attributes, contract/equipment and record details.                                                                        |
-| Contract Negotiation   | Staged offer, demands, club response and signed states with animated cards and held/disabled actions.                                                                |
-| Narrative              | Story event, choices, result effects and empty-story state; entered from bottom.                                                                                     |
-| Cosmetics              | Live player preview, category tabs, ownership/pass locks, equip actions and selection animation.                                                                     |
-| Daily Challenge        | Bronze/silver/gold target presentation, progress and reward claim.                                                                                                   |
-| U19 World Cup          | Youth international status, fixtures/progress, result and unavailable/empty states.                                                                                  |
-| International Calendar | Upcoming WTC/ICC/international events, phase details, fixtures and empty schedule state.                                                                             |
-| Injury Report          | Cinematic injury severity, time out, missed matches, recovery plan and optional gem fast-track.                                                                      |
-| Career retirement      | Career Hub switches to "A Career Remembered", final legacy summary and Hall of Fame route when retired.                                                              |
+| Screen                 | Current UX                                                                                                                                                                 |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Career Hub             | Four persistent tabs, career stadium spotlight, wallet and exactly one resolver-owned primary action; pending stories appear on Home above routine match/training content. Club/national captains receive a contextual XI/tactics action for the relevant fixture only. |
+| Training               | Role-group cards with six total/three-per-focus limits, the same 250/400/550/700/850/1,000 price curve at every career level, analyst focus highlighting, trainability, progress bars and an immediate centered result modal that cannot overlap the footer. |
+| Player Life            | Five responsive tabs: selection risk/recent ten, personal development services, finance/assets, bounded phone/media and a visual Legacy Museum with career backup tools.      |
+| Player Profile         | Identity/avatar, a code-rendered England cross that does not depend on Android emoji support, current and career stats, role-relevant batting/bowling attributes, contract/equipment and record details; fielding is engine-only and hidden. |
+| Contract Negotiation   | Staged offer, demands, club response and signed states with animated cards and held/disabled actions.                                                                      |
+| Narrative              | Story event, choices, result effects and empty-story state; entered from bottom.                                                                                           |
+| Cosmetics              | Live player preview, category tabs, ownership/pass locks, equip actions and selection animation.                                                                           |
+| Daily Challenge        | Bronze/silver/gold target presentation, progress and reward claim.                                                                                                         |
+| U19 World Cup          | Youth international status, fixtures/progress, result and unavailable/empty states.                                                                                        |
+| International Calendar | Year-round white-ball tours, bilateral WTC Tests, June-August ICC events, format-specific selection reasons, WTC standings, fixtures and empty schedule state.             |
+| Injury Report          | Cinematic injury severity, time out, missed matches, recovery plan and optional gem fast-track.                                                                            |
+| Career retirement      | Career Hub switches to "A Career Remembered", final legacy summary and Hall of Fame route when retired.                                                                    |
 
 ### Manager career
 
-| Screen                     | Current UX                                                                                                                                                                |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Manager Hub                | Club spotlight, board/morale/calendar readiness, one Continue action, domestic-year phase list, XI snapshot, talks/analysis, quick navigation, league table and live ops. |
-| Squad & Tactics            | XI and bench, role/fitness context, batting-order up/down controls and tactic selection.                                                                                  |
-| Transfers                  | Market/squad/loan tabs, compact rows, search/filter/sort, scout/sign actions and bid-war modal.                                                                           |
-| Transfer Deadline Day      | Live countdown, budget, world transfer ticker and links to real market/squad actions.                                                                                     |
-| Club Office                | Budget, staff/facilities, wages, analysis, recovery and club resource actions.                                                                                            |
-| Academy                    | Youth prospect list with age/role/overall and promotion/release actions.                                                                                                  |
-| Cricket Academy Management | Naming/opening and academy investment/upgrade flow.                                                                                                                       |
-| Staff Recruitment          | Candidate cards, costs, role effects and affordability states.                                                                                                            |
-| Wage Ledger                | Wage totals, cap/finance context and per-player wage rows.                                                                                                                |
-| Press Room                 | Speaker/event copy and response choices; result chips show good/bad/neutral effects.                                                                                      |
-| Board Meeting              | Full-screen sacked/praised/warning/extension ceremony.                                                                                                                    |
-| Youth Graduate             | Full-screen first-team debut ceremony.                                                                                                                                    |
+| Screen                     | Current UX                                                                                                                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manager Hub                | Club spotlight, urgent job/appointment alerts, one resolver-owned Continue action, matchday result with league-position change/earnings, required per-fixture Match Preparation, league table and live ops. |
+| Squad & Tactics            | Vertical Playing XI and bench lists, role/fitness context, batting-order controls, tactic selection and contextual info for tactics, condition and First-Class over-rate.                                     |
+| Transfers                  | Market/squad/loan tabs, compact rows, search/filter/sort, scout/sign actions, 6,000-coin report fast-track, bid-war modal and an engine-aligned Scout Confidence explanation.                                 |
+| Transfer Deadline Day      | Live countdown, budget, world transfer ticker and links to real market/squad actions.                                                                                                                         |
+| Club Office                | Budget, staff/facilities, wages, analysis, recovery and club resource actions.                                                                                                                                |
+| Academy                    | Youth prospect list with age/role/overall and promotion/release actions.                                                                                                                                      |
+| Cricket Academy Management | Naming/opening and academy investment/upgrade flow.                                                                                                                                                           |
+| Staff Recruitment          | Candidate cards, costs, role effects and affordability states.                                                                                                                                                |
+| Wage Ledger                | Wage totals, cap/finance context and per-player wage rows.                                                                                                                                                    |
+| Press Room                 | Speaker/event copy and response choices; result chips show good/bad/neutral effects.                                                                                                                          |
+| Board Meeting              | Full-screen sacked/praised/warning/extension ceremony.                                                                                                                                                        |
+| Youth Graduate             | Full-screen first-team debut ceremony.                                                                                                                                                                        |
 
 ### Shared game and progression
 
-| Screen                | Current UX                                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------- |
-| Match                 | Pre-match mode/tactics, live score, match views, decisions, speed/pause/skip and detailed result state. |
-| Records & Glory       | Mode-aware league history, trophies, hundreds, five-fers, Hall of Fame and legacy leaderboards.         |
-| Awards Night          | Sequential season champion, Golden Bat, Golden Ball and user finish reveals.                            |
-| Hall of Fame Ceremony | Career highlight reel followed by gold plaque induction.                                                |
-| Milestone Cinematic   | Four-second century/five-for/debut/title moment.                                                        |
-| Notification Inbox    | Type-colored notifications with right-entering rows, read states, clear and empty state.                |
-| Investment Portfolio  | Amount entry, risk/return status, withdraw flow and legacy funding tiers.                               |
+| Screen                | Current UX                                                                                                                                                      |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Match                 | Venue/surface briefing, animated Heads/Tails captain toss, persistent 2D live view, chronological commentary, decisions, stable 1x/2x/4x speed, pause/skip-innings/simulate and post-match analytics. |
+| Records & Glory       | Player career scope tabs plus manager season leaders filtered to the active T20/List A/First-Class format. Manager tables rank runs, wickets, high scores and best bowling, with every managed-club player shown on a gold background. Achievements, trophies and separate player/manager Hall of Fame views remain available. |
+| Awards Night          | Sequential season champion, Golden Bat, Golden Ball and user finish reveals.                                                                                    |
+| Hall of Fame Ceremony | Career highlight reel followed by gold plaque induction.                                                                                                        |
+| Milestone Cinematic   | Four-second century/five-for/debut/title moment.                                                                                                                |
+| Notification Inbox    | Type-colored notifications with right-entering rows, read states, clear and empty state.                                                                        |
+| Investment Portfolio  | Amount entry, risk/return status, withdraw flow and legacy funding tiers.                                                                                       |
 
 ### Store and live operations
 
@@ -1008,7 +1172,7 @@ breaking-news badge, stats, recovery timeline and a blue-purple fast-track card
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Store/Purchase    | Trust bar, starter window, first-purchase bonus, low-energy action, mode-specific Legend pack, gem-use education, season pass, mode tools, account upgrade, coins and gems. |
 | Season Pass       | Free/premium tracks, XP progress, claim flash/reward popup, premium activation and tier rows.                                                                               |
-| Premium Clubhouse | Noir stadium/office presentation, monthly reward, VIP progress and exclusive scenarios/cosmetics.                                                                           |
+| Premium Clubhouse | Noir stadium/office presentation, live-match Noir field palette, monthly reward, VIP progress and exclusive scenarios/cosmetics.                                            |
 
 ## 16. Store visual system
 
@@ -1084,7 +1248,7 @@ Current strengths:
   components and screens;
 - major buttons expose button role, label and disabled/selected state;
 - hub and commentary tabs expose tab roles;
-- player avatar and field/3D ground expose image/context labels;
+- player avatar and 2D field expose image/context labels;
 - modal close, guide dots, onboarding actions and transfer actions are labeled;
 - captain, injury, fitness and morale badges expose semantic labels, and fitness
   exposes a numeric progress-bar value;
@@ -1122,26 +1286,73 @@ Current gaps:
 ### 20.1 First launch
 
 Native splash -> daily session gate -> Main Menu -> five-slide onboarding.
-Guides can be replayed from Settings.
+Guides can be replayed from Settings. Settings also opens the searchable Cricket
+Academy for on-demand rule lookup.
 
 ### 20.2 Player career
 
-New Game -> Player Creation -> country/club setup -> Career Hub guide -> one
-highlighted next action -> training/story/match -> result/rewards/progression ->
-contracts and pathway advancement -> international career -> retirement ->
-career remembrance/Hall of Fame.
+New Game -> Player Creation -> country/future-club setup -> separate School XI -> Career Hub guide -> one
+highlighted next action plus relevant persisted-once mechanic tip ->
+training/story/match -> result/rewards/progression -> contracts and pathway
+advancement -> international career -> retirement -> career remembrance/Hall
+of Fame.
+
+At senior international level the player keeps both the domestic club contract
+and format-specific national eligibility. September-November can contain an
+ODI/T20I bilateral over List A; January-February contains bilateral WTC Tests
+over First-Class cricket; March-May remains the domestic/franchise T20 block;
+June-August hosts the current ICC event, WTC Final or overseas assignment.
+National selection takes priority on an exact date clash. The club match is
+simulated without the user, its calendar result says `Away on National Duty`,
+and an inbox item explains the absence. If no national fixture exists, or the
+player is not selected in that format, the normal domestic fixture remains the
+active match.
+
+Selection is independent for T20, ODI and Test assignments. Overall contributes
+40%, form 35%, national reputation 25%, with the existing format-readiness
+modifier added. Form below 40 drops the player from that squad and the
+remaining assignment fixtures are completed without the user; domestic matches
+remain available for rebuilding form. A call-up does not lock allegiance. The
+first played senior cap stores `cappedCountry` permanently.
+
+WTC league points come from the January-February bilateral Test series across a
+two-season cycle: 12 for a win and 4 for a draw. At the end of season two, the
+top two countries play one June Final. The Final stores the champion but does
+not add another league-table result. In years where the ODI World Cup also
+occurs, its group stage starts after the WTC Final slot.
+
+ICC World Cup and Champions Trophy knockouts are dynamic. A new tournament
+creates only the user's group fixtures. After the final group result, the table
+is ranked by points, wins and a stable tie-break. A top-two finish creates one
+semifinal; a semifinal win creates the Final. Finishing outside the top two
+creates no knockout fixture, grants `+3` national reputation and `+150` Season
+Pass XP exactly once, opens an `ELIMINATED FROM ...` newspaper clipping and
+returns the calendar to domestic duty or the remaining off-season.
 
 ### 20.3 Manager career
 
-New Game -> Team Select -> Manager Hub guide -> Continue action -> calendar
-phase -> XI/talk/analysis -> match -> board/calendar consequences -> transfers,
-office and academy -> awards/promotion/jobs -> Hall of Fame.
+New Game -> Team Select -> Manager Hub guide -> Continue action plus relevant
+board/tactics/workload tip -> calendar phase -> XI/preparation/analysis -> match ->
+board/calendar consequences -> transfers, office and academy ->
+awards/promotion/jobs -> Hall of Fame.
+
+At National Head Coach level, the same shared international generator used by
+Player Career schedules the controlled country. Autumn ODI/T20I bilaterals run
+during the List A phase, bilateral WTC Tests run during the First-Class phase,
+and ICC events or the WTC Final run in June-August. Domestic fixtures continue
+to simulate in the background. The active Manager Hub identity, next-opponent
+copy, Squad screen, XI changes, readiness, recovery, preparation and Opposition
+Analysis all target the national team during this level. ICC semifinals and
+Finals use the same result-driven qualification state described above.
 
 ### 20.4 Match
 
-Matchday setup -> presentation mode -> live decision loop -> event feedback ->
-result summary -> reward/ad option -> newspaper/achievement/milestone moment when
-eligible -> return to the owning hub.
+Venue/surface briefing -> captain Heads/Tails call and Bat/Bowl decision when
+won -> presentation mode -> live
+decision loop -> event feedback -> result summary -> reward/ad option ->
+newspaper/achievement/milestone moment when eligible -> return to the owning
+hub. Non-captain Player Career users retain personal match control without
+receiving team XI, tactics or toss authority.
 
 ### 20.5 Rewards and store
 
@@ -1181,15 +1392,55 @@ Primary implementation sources:
 - Controls: `Button.tsx`, `Card.tsx`, `SelectableCard.tsx`, `HubTabBar.tsx`,
   `GlassSurface.tsx`, `PlayerStatusBadges.tsx`
 - Guides/modals: `Onboarding.tsx`, `ModeGuideModal.tsx`,
-  `FirstMatchGuide.tsx`, `CoachTip.tsx`, `RewardModal.tsx`,
+  `FirstMatchGuide.tsx`, `RewardModal.tsx`,
   `StarterPackModal.tsx`, `ContextualOffer.tsx`, `GlassAlertModal.tsx`,
   `src/context/ModalQueueContext.tsx`
+- Mechanic guidance: `src/guidance/mechanics.ts`,
+  `MechanicInfoButton.tsx`,
+  `src/screens/CricketAcademyScreen.tsx`
 - Achievement/share: `AchievementToast.tsx`, `AchievementCinematic.tsx`,
-  `ShareAchievementCard.tsx`, `NewspaperModal.tsx`
+  `NewspaperModal.tsx`
 - Match: `src/screens/MatchScreen.tsx`, `CelebrationOverlay.tsx`,
-  `FieldView.tsx`, `StadiumScene3D.tsx`, `CommentaryArchive.tsx`,
-  `src/game/matchTiming.ts`
+  `FieldView.tsx`, `CommentaryArchive.tsx`, `src/game/matchTiming.ts`,
+  `src/engine/toss.ts`, `src/game/matchAuthority.ts`,
+  `src/engine/__tests__/seasonDistribution.test.ts`
+- Career state/transition: `src/game/careerStep.ts`,
+  `src/game/careerTransition.ts`, `src/storage/schema23.ts`,
+  `src/storage/schema24.ts`, `src/storage/schema25.ts`,
+  `src/storage/schema26.ts`, `src/storage/schema27.ts`,
+  `src/storage/schema28.ts`, `src/storage/schema29.ts`,
+  `src/storage/schema30.ts`
+- Avatar system: `src/avatar/*`, `src/components/avatar/*`,
+  `assets/avatar/runtime/*`, `scripts/generate-avatar-registry.mjs`,
+  `scripts/validate-avatar-pack.mjs`
+- Player Life: `src/screens/PlayerLifeScreen.tsx`,
+  `src/game/playerLife.ts`
+- International duty: `src/game/intlCalendar.ts`,
+  `src/game/playerCalendar.ts`, `src/game/season.ts`
 - Audio/haptics: `src/audio/*`, `assets/sfx/*.mp3`,
   `assets/audio/menu_ambient.mp3`
 - Settings: `src/state/settingsStore.ts`, `src/screens/SettingsScreen.tsx`
 - Screen implementations: `src/screens/*.tsx`
+
+## 23. Verification snapshot
+
+Verification on 2 August 2026:
+
+- `npm run generate:avatars`: generated 186 literal Metro asset registrations
+  and 300 deterministic presets.
+- `npm run validate:avatars`: validated all 186 assets and 300 unique presets.
+- `npm run typecheck`: passed.
+- `npm run lint`: passed with zero errors and zero warnings.
+- `npm test -- --runInBand --silent`: 119 suites, 579 tests and two snapshots
+  passed.
+- `npx expo-doctor`: all 20 checks passed.
+- Fresh Player and Manager careers crossed the previous post-team-selection
+  crash boundary on Android; process restart/resume preserved the Player avatar.
+- Settled Player and Manager hub screenshots were pixel-identical across timed
+  captures, confirming that removed entry loops no longer replay while idle.
+- Male hair/beard, female paired hair, helmet hair-hiding, preset selection,
+  Cosmetics saving and Profile reload were visually checked in the emulator.
+- The fresh release APK was installed and cold-launched with Metro stopped. It
+  reached the Account screen without an ErrorBoundary or Android runtime crash.
+  Play Billing is unavailable on the test emulator, and the configured
+  RevenueCat offering currently reports no registered Play Store products.

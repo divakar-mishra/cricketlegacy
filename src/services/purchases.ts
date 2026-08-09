@@ -1,13 +1,13 @@
 /**
  * In-app purchase (IAP) abstraction.
  *
- * Modeled on RevenueCat's `react-native-purchases` surface but with NO hard
- * dependency on it. In {@link MOCK_MODE} (default `true`) purchases resolve
+ * RevenueCat is loaded lazily so Expo Go and tests can run without its native
+ * module. In {@link MOCK_MODE} (development only) purchases resolve
  * successfully so the entitlement/wallet flow can be exercised end-to-end in
  * development without any store configuration.
  *
  * ---------------------------------------------------------------------------
- * TODO(provider): drop in `react-native-purchases` behind this exact interface.
+ * The live provider is implemented below and kept behind this interface.
  * Do NOT import it elsewhere — keep all SDK usage inside this module and flip
  * {@link MOCK_MODE} to `false`.
  *
@@ -61,9 +61,6 @@ export const MOCK_MODE = __DEV__; // auto-false in production builds
 type RevenueCatModule = any; // no static types — the dep may be absent
 let _rc: RevenueCatModule | null | undefined;
 let _rcConfigured = false;
-let _requestedAppUserId: string | null | undefined;
-let _identifiedAppUserId: string | null = null;
-let _identitySync: Promise<void> = Promise.resolve();
 
 function loadRevenueCat(): RevenueCatModule | null {
   if (_rc !== undefined) return _rc;
@@ -90,50 +87,9 @@ export function configurePurchases(keys: { ios?: string; android?: string }): vo
   try {
     RC.configure({ apiKey });
     _rcConfigured = true;
-    void syncRequestedPurchasesUser();
   } catch {
     /* leave unconfigured — purchase() will report not_configured */
   }
-}
-
-function syncRequestedPurchasesUser(): Promise<void> {
-  if (MOCK_MODE || !_rcConfigured || _requestedAppUserId === undefined) {
-    return Promise.resolve();
-  }
-
-  _identitySync = _identitySync
-    .catch(() => undefined)
-    .then(async () => {
-      const RC = loadRevenueCat();
-      const requested = _requestedAppUserId;
-      if (!RC || !_rcConfigured || requested === undefined) return;
-
-      if (requested === null) {
-        if (_identifiedAppUserId !== null) await RC.logOut();
-        _identifiedAppUserId = null;
-        return;
-      }
-
-      if (_identifiedAppUserId === requested) return;
-      await RC.logIn(requested);
-      _identifiedAppUserId = requested;
-    });
-
-  return _identitySync;
-}
-
-/** Associates store ownership with the authenticated application user. */
-export async function identifyPurchasesUser(appUserId: string): Promise<void> {
-  const normalized = appUserId.trim();
-  if (!normalized) throw new Error('A non-empty purchases user id is required.');
-  _requestedAppUserId = normalized;
-  await syncRequestedPurchasesUser();
-}
-
-/** Clears the identified RevenueCat user after application sign-out. */
-export async function clearPurchasesUser(): Promise<void> {
-  _requestedAppUserId = null;
-  await syncRequestedPurchasesUser();
 }
 
 /** Whether a live purchase backend is ready (SDK loaded + configured). */
@@ -329,13 +285,6 @@ const CATALOG: readonly ExtendedProduct[] = [
 
   // --- Coins ---
   {
-    id: 'coins_small',
-    title: 'Handful of Coins',
-    description: '1,000 coins',
-    priceString: '₹99',
-    kind: 'coins',
-  },
-  {
     id: 'coins_medium',
     title: 'Bag of Coins',
     description: '5,000 coins',
@@ -354,13 +303,6 @@ const CATALOG: readonly ExtendedProduct[] = [
 
   // --- Gems ---
   {
-    id: 'gems_small',
-    title: 'Pouch of Gems',
-    description: '80 gems',
-    priceString: '₹99',
-    kind: 'gems',
-  },
-  {
     id: 'gems_medium',
     title: 'Bag of Gems',
     description: '300 gems',
@@ -378,14 +320,6 @@ const CATALOG: readonly ExtendedProduct[] = [
   },
 
   // --- Bundles ---
-  {
-    id: 'bundle_starter',
-    title: 'Champion Bundle',
-    description: '8,000 coins + 200 gems',
-    priceString: '₹599',
-    kind: 'consumable',
-    badge: 'Bundle',
-  },
   {
     id: 'bundle_legend',
     title: 'Player Legend Edition',
@@ -422,15 +356,6 @@ const CATALOG: readonly ExtendedProduct[] = [
     priceString: '₹99',
     kind: 'consumable',
   },
-  {
-    id: 'energy_refill_3',
-    title: '3× Energy Refills',
-    description: '+90 energy for match play in either mode and Player Career training.',
-    priceString: '₹249',
-    kind: 'consumable',
-    badge: 'Save ₹50',
-  },
-
   // ── Manager-specific IAP ─────────────────────────────────────────────────
 
   {
@@ -450,14 +375,6 @@ const CATALOG: readonly ExtendedProduct[] = [
     priceString: '₹149',
     kind: 'consumable',
     badge: 'Manager',
-  },
-  {
-    id: 'transfer_budget_lg',
-    title: 'Mega Budget Injection',
-    description: 'Inject ₹2,000,000 into your transfer war chest. Go all-in.',
-    priceString: '₹399',
-    kind: 'consumable',
-    badge: 'Best Deal',
   },
   {
     id: 'scout_full_reveal',
@@ -513,15 +430,6 @@ const CATALOG: readonly ExtendedProduct[] = [
     kind: 'consumable',
     badge: 'Popular',
   },
-  {
-    id: 'legend_status',
-    title: 'Living Legend Edition',
-    description:
-      'Player-career prestige cosmetics. Does not grant stats, selection, trophies or Hall of Fame qualification.',
-    priceString: '₹1,999',
-    kind: 'entitlement',
-    badge: '👑 Prestige',
-  },
 ];
 
 /** Products intentionally surfaced in each active career mode. */
@@ -533,74 +441,19 @@ export const MODE_STORE_PRODUCT_IDS = {
 /** Account-wide products that remain useful in either career mode. */
 export const SHARED_STORE_PRODUCT_IDS = ['remove_ads'] as const;
 
-/**
- * Gem-exclusive premium items (not IAP — purchased with gems inside the app).
- * These are the gem "sinks" that give gems real purpose beyond coins conversion.
- * These do NOT go through the store flow; they're applied directly in the career store.
- */
-export const GEM_SHOP_ITEMS = [
-  {
-    id: 'gem_skip_training',
-    title: 'Skip Training Week',
-    description: "Instantly apply this week's training gains without waiting.",
-    gemCost: 50,
-    icon: '⚡',
-  },
-  {
-    id: 'gem_kit_colour',
-    title: 'Premium Kit Colour',
-    description: 'Unlock an exclusive kit colour for your player or club.',
-    gemCost: 80,
-    icon: '🎨',
-  },
-  {
-    id: 'gem_story_reroll',
-    title: 'Re-Roll Story Choice',
-    description: 'Reset a story event to try a different outcome.',
-    gemCost: 40,
-    icon: '🎲',
-  },
-  {
-    id: 'gem_scout_reveal',
-    title: 'Full Scout Report',
-    description: "Instantly reveal a player's true overall — no uncertainty.",
-    gemCost: 30,
-    icon: '🔍',
-  },
-  {
-    id: 'gem_avatar_unlock',
-    title: 'Premium Avatar',
-    description: 'Unlock an exclusive player avatar style.',
-    gemCost: 120,
-    icon: '👤',
-  },
-  {
-    id: 'gem_double_xp',
-    title: 'Double XP Weekend',
-    description: 'Earn double pass XP for the next 3 matches.',
-    gemCost: 60,
-    icon: '🌟',
-  },
-] as const;
-
 /** What each catalog product grants on success (business-facing, not applied here). */
 export const GRANTS: Readonly<Record<string, PurchaseGrant>> = {
   starter_pack: { coins: 3_000, gems: 50, entitlement: { removeAds: false } },
-  coins_small: { coins: 1_000 },
   coins_medium: { coins: 5_000 },
   coins_large: { coins: 15_000 },
-  gems_small: { gems: 80 },
   gems_medium: { gems: 300 },
   gems_large: { gems: 1_200 },
-  bundle_starter: { coins: 8_000, gems: 200 },
   bundle_legend: { coins: 20_000, gems: 600, entitlement: { removeAds: true } },
   remove_ads: { entitlement: { removeAds: true } },
   season_pass: { entitlement: {} },
   energy_refill: { energy: 30 },
-  energy_refill_3: { energy: 90 },
   // Manager-specific (budget injections handled in store, not wallet)
   transfer_budget_sm: { coins: 0 }, // handled specially in store
-  transfer_budget_lg: { coins: 0 }, // handled specially in store
   manager_legend_pack: { coins: 0 }, // manager-only entitlement handled in store
   scout_full_reveal: { gems: 0 }, // handled specially in store
   facility_upgrade_token: { gems: 0 }, // handled specially in store
@@ -609,7 +462,6 @@ export const GRANTS: Readonly<Record<string, PurchaseGrant>> = {
   contract_boost: { coins: 0 }, // handled specially in store
   form_recovery: { coins: 0 }, // handled specially in store
   training_accelerator: { coins: 0 }, // handled specially in store
-  legend_status: { coins: 0 }, // player prestige cosmetic entitlement handled in store
 };
 
 let mockPurchaseSeq = 0;
@@ -646,11 +498,6 @@ export async function getProducts(): Promise<ExtendedProduct[]> {
     return CATALOG.map((p) => ({ ...p, priceString: PRICE_UNAVAILABLE }));
   }
   return CATALOG.map((p) => ({ ...p }));
-}
-
-/** Returns only the starter pack if it hasn't been purchased yet. */
-export function getStarterPack(): ExtendedProduct {
-  return CATALOG.find((p) => p.id === 'starter_pack')!;
 }
 
 /**

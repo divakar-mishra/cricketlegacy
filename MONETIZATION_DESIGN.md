@@ -1,31 +1,29 @@
 # Monetization Design
 
-Status: **NO-GO** until billing verification, product metadata, multi-currency finances, and running-app sandbox flows pass.
+Status: **NO-GO** until live billing metadata, purchase restoration UI,
+multi-currency club finance and sandbox purchase flows are verified.
 
 ## Resource Separation
 
-- Account coins: account-level soft currency for player/career boosts and ordinary rewards.
-- Gems: premium account currency for paid actions such as scout intelligence and recovery.
-- Training Energy/Focus: optional development/preparation capacity; scheduled matches should not depend on it.
-- Club balance and transfer budget: manager-career club finance, never account coins.
-- Wage budget: manager-career salary capacity, never gems or account coins.
-- Player condition: fitness/form/confidence/injury; fitness recovery does not heal injuries.
-- Manager reputation: career progression/status, not spendable currency.
+- Account coins: soft currency for services, cosmetics and progression sinks.
+- Gems: premium currency for connected gem actions.
+- Training Focus: save-compatible `wallet.energy`; used by match/training flow.
+- Club balance and transfer budget: Manager Career finance, never account
+  coins or gems.
+- Player condition, form, confidence and injuries: gameplay state, not money.
+- Manager reputation: career status, not a spendable resource.
 
-## Product Principles
+## Product Rules
 
-- Gems never buy an auction player by themselves.
-- Instant Buyout, when implemented, must use gems only as a facilitation fee and still require club acquisition price, wage capacity, eligibility, and squad rules.
-- `recovery_pack` grants a token; it does not auto-apply.
+- Player and Manager premium editions are mode-guarded.
+- VIP and Season Pass are shared account-value products.
+- Squad Conditioning grants a stored token and never heals injuries.
 - Full Fitness Recovery is a gem action, not a real-money product.
-- `scout_full_reveal` grants one token/report for one player.
-- Mixed bundles split consumable grants from permanent entitlements in the ledger.
+- Full Scout Intelligence grants one exact-report token.
+- Consumables are not replayed during entitlement restoration.
+- Pending, cancelled, refunded, revoked or duplicate transactions are not
+  fulfilled.
+- Release UI must use verified localized store prices.
 
-## Current NO-GO Items
-
-- Real-money prices still require live ProductDetails/RevenueCat metadata in production.
-- Store UI organization is not complete.
-- `legend_status` still touches `legendGranted`, which is not purely cosmetic.
-- Contract boost, facility token, and training accelerator spend paths need deeper audits.
-- Multi-currency finance model is not implemented.
-
+The authoritative product list, grants, prices and mode visibility are in
+Section 13 of `docs/APP_COMPLETE_REFERENCE.md`.

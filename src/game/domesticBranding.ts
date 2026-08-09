@@ -3,21 +3,6 @@ import { DomesticTier, SaveGame } from '../domain/types';
 import { COUNTRIES_BY_ID, getCountry } from '../data/countries';
 import { isSeasonPassActive } from './seasonPass';
 
-const NICKNAMES = [
-  'Pioneers',
-  'Guardians',
-  'Voyagers',
-  'Strikers',
-  'Comets',
-  'Chargers',
-  'Mavericks',
-  'Falcons',
-  'Titans',
-  'Rangers',
-  'Blazers',
-  'Storm',
-] as const;
-
 const COLORS = [
   ['#006D77', '#FFDDD2'],
   ['#1D3557', '#E9C46A'],
@@ -28,54 +13,6 @@ const COLORS = [
   ['#003566', '#FFC300'],
   ['#3D405B', '#F2CC8F'],
 ] as const;
-
-function slug(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_|_$/g, '');
-}
-
-function shortName(city: string, nickname: string, index: number): string {
-  const letters = `${city[0] ?? 'C'}${nickname[0] ?? 'T'}${nickname[1] ?? 'M'}`.toUpperCase();
-  return index < 9 ? letters : `${letters.slice(0, 2)}${index % 10}`;
-}
-
-/** Fill a country's fictional pyramid to eight clubs in each division. */
-export function completeCountryTier(
-  countryId: string,
-  tier: DomesticTier,
-  existing: readonly TeamBlueprint[],
-): TeamBlueprint[] {
-  const country = COUNTRIES_BY_ID[countryId];
-  if (!country) return existing.filter((team) => team.tier === tier).slice(0, 8);
-  const selected = existing
-    .filter((team) => team.country === countryId && team.tier === tier)
-    .slice(0, 8);
-  const usedNames = new Set(selected.map((team) => team.name.toLowerCase()));
-  let index = 0;
-  while (selected.length < 8) {
-    const city = country.cities[index % country.cities.length];
-    const nickname = NICKNAMES[(index + (tier === 1 ? 0 : tier === 2 ? 5 : 8)) % NICKNAMES.length];
-    const name = `${city.name} ${nickname}`;
-    index += 1;
-    if (usedNames.has(name.toLowerCase())) continue;
-    usedNames.add(name.toLowerCase());
-    const palette = COLORS[(index + country.strength + tier) % COLORS.length];
-    const strengthBase = 48 + country.strength * 5 + (tier === 1 ? 7 : tier === 2 ? -2 : -10);
-    selected.push({
-      id: `${countryId}_${slug(city.id)}_${slug(nickname)}_${tier}`,
-      name,
-      shortName: shortName(city.name, nickname, index),
-      country: countryId,
-      primaryColor: palette[0],
-      secondaryColor: palette[1],
-      strength: Math.min(88, strengthBase - (selected.length % 5)),
-      tier,
-    });
-  }
-  return selected;
-}
 
 const MANAGER_NICKNAMES = [
   'Northstar',
@@ -107,10 +44,7 @@ const PLAYER_NICKNAMES = [
   'Dragons',
 ] as const;
 
-function countryPyramidBlueprints(
-  countryId: string,
-  mode: 'player' | 'manager',
-): TeamBlueprint[] {
+function countryPyramidBlueprints(countryId: string, mode: 'player' | 'manager'): TeamBlueprint[] {
   const country = COUNTRIES_BY_ID[countryId];
   if (!country) return [];
   const nicknames = mode === 'player' ? PLAYER_NICKNAMES : MANAGER_NICKNAMES;
@@ -121,9 +55,8 @@ function countryPyramidBlueprints(
       const nicknameOffset = mode === 'player' ? tier * 3 : (tier - 1) * 4;
       const city = country.cities[(index + cityOffset) % country.cities.length];
       const nickname = nicknames[(index + nicknameOffset) % nicknames.length];
-      const palette = COLORS[
-        (index + tier * 2 + country.strength + (mode === 'player' ? 3 : 0)) % COLORS.length
-      ];
+      const palette =
+        COLORS[(index + tier * 2 + country.strength + (mode === 'player' ? 3 : 0)) % COLORS.length];
       const strengthBase = 49 + country.strength * 4 + (tier === 1 ? 15 : tier === 2 ? 6 : -3);
       const short = `${city.name[0] ?? 'C'}${nickname[0]}${tier}${index + 1}`
         .replace(/[^A-Za-z0-9]/g, '')

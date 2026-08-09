@@ -629,15 +629,6 @@ export const STADIUMS: Stadium[] = [
   },
 ];
 
-const STADIUMS_BY_ID: Record<string, Stadium> = STADIUMS.reduce((acc, s) => {
-  acc[s.id] = s;
-  return acc;
-}, {} as Record<string, Stadium>);
-
-export function stadiumById(id: string): Stadium | undefined {
-  return STADIUMS_BY_ID[id];
-}
-
 /** All venues in a country. Matches the `country` id (case-insensitive). */
 export function stadiumsForCountry(country: string): Stadium[] {
   const key = country.toLowerCase();

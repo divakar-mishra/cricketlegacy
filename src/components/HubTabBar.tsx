@@ -6,7 +6,7 @@ import { fontWeight, radius, spacing, ThemeColors, useTheme, useThemedStyles } f
 import { AppText as Text } from './AppText';
 import { GlassSurface } from './GlassSurface';
 
-export interface HubTab {
+interface HubTab {
   key: string;
   /** Ionicons base name (the active state renders the filled variant). */
   icon: keyof typeof Ionicons.glyphMap;
@@ -62,11 +62,7 @@ export function HubTabBar({ tabs }: { tabs: HubTab[] }) {
                 accessibilityLabel={t.label}
               >
                 {t.active ? <View style={styles.indicator} /> : null}
-                <Ionicons
-                  name={name}
-                  size={22}
-                  color={t.active ? colors.accent : colors.textFaint}
-                />
+                <Ionicons name={name} size={22} color={t.active ? colors.text : colors.textMuted} />
                 <Text style={[styles.label, t.active && styles.labelActive]} numberOfLines={1}>
                   {t.label}
                 </Text>
@@ -99,6 +95,6 @@ const makeStyles = (colors: ThemeColors) =>
       borderRadius: 2,
       backgroundColor: colors.accent,
     },
-    label: { color: colors.textFaint, fontSize: 10, fontWeight: fontWeight.semibold },
-    labelActive: { color: colors.accent },
+    label: { color: colors.textMuted, fontSize: 10, fontWeight: fontWeight.semibold },
+    labelActive: { color: colors.text },
   });

@@ -1,7 +1,3 @@
-/**
- * InternationalCalendarScreen — 4-year ICC event cycle view.
- * Feature 8: upcoming events, global tournaments, player's international record.
- */
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Button, Card, Screen, ScreenHeader } from '../components';
@@ -11,6 +7,7 @@ import {
   buildIntlCalendar,
   internationalWindowFixtureIds,
   topIccTeams,
+  wtcStandings,
 } from '../game/intlCalendar';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
@@ -39,15 +36,16 @@ const MONTH_NAMES = [
   'Nov',
   'Dec',
 ];
-const EVENT_ICONS: Record<string, string> = {
-  WC: '🏆',
-  WTC: '🏆',
-  CT: '🥇',
-  SERIES: '🏏',
+
+const EVENT_MARK: Record<string, string> = {
+  WC: 'WC',
+  WTC: 'WTC',
+  CT: 'CT',
+  SERIES: 'S',
 };
 
 export function InternationalCalendarScreen({ navigation }: ScreenProps<'InternationalCalendar'>) {
-  const save = useCareer((s) => s.save);
+  const save = useCareer((state) => state.save);
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
 
@@ -63,43 +61,37 @@ export function InternationalCalendarScreen({ navigation }: ScreenProps<'Interna
   const currentYear = save.currentSeasonId
     ? (save.seasons[save.currentSeasonId]?.year ?? 2026)
     : 2026;
-  const generatedCalendar = buildIntlCalendar(currentYear, save);
-  const calendar =
-    save.internationalCalendar?.year === currentYear &&
-    save.internationalCalendar.events[0]?.id === generatedCalendar.events[0]?.id
-      ? save.internationalCalendar
-      : generatedCalendar;
+  const calendar = buildIntlCalendar(currentYear, save);
   const userPlayer = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
   const userCountry =
     save.playerCareerResources?.cappedCountry ??
     save.playerCareerResources?.declaredCountry ??
     userPlayer?.nationality;
-  const userCountryName = userCountry ? (getCountry(userCountry)?.name ?? userCountry) : '—';
-  const topTeams = topIccTeams(save, 5);
-
-  const upcomingEvents = calendar.events;
+  const userCountryName = userCountry ? (getCountry(userCountry)?.name ?? 'Your country') : '-';
   const windowFixtures = internationalWindowFixtureIds(save).map((id) => save.fixtures[id]);
+  const testTable = wtcStandings(save, currentYear);
+  const topTeams = topIccTeams(save, 5);
 
   return (
     <Screen scroll>
       <ScreenHeader title="International Calendar" onBack={() => navigation.goBack()} />
 
       <Card style={styles.windowCard}>
-        <Text style={styles.sectionLabel}>ANNUAL INTERNATIONAL WINDOW</Text>
-        <Text style={styles.windowTitle}>June to August</Text>
+        <Text style={styles.sectionLabel}>YEAR-ROUND INTERNATIONAL DUTY</Text>
+        <Text style={styles.windowTitle}>Tours plus ICC windows</Text>
         <Text style={styles.windowBody}>
-          Domestic cricket pauses for national camps and the season's global ICC event.
+          White-ball tours overlap List A, WTC Test series overlap First-Class cricket, and global
+          events remain in June-August. Your domestic contract stays active between call-ups.
         </Text>
         {save.capped ? (
           <Text style={styles.windowProgress}>
             {windowFixtures.filter((fixture) => fixture.played).length}/{windowFixtures.length}{' '}
-            scheduled matches completed
+            selected international matches completed
           </Text>
         ) : null}
       </Card>
 
-      {/* Player's international record */}
-      {save.capped && userPlayer && (
+      {save.capped && userPlayer ? (
         <Animated.View entering={FadeInDown.duration(300)}>
           <Card style={styles.recordCard}>
             <Text style={styles.sectionLabel}>YOUR INTERNATIONAL RECORD</Text>
@@ -110,101 +102,146 @@ export function InternationalCalendarScreen({ navigation }: ScreenProps<'Interna
                 <Text style={styles.capCountry}>{userCountryName}</Text>
               </View>
             </View>
-            {userPlayer.formatStats && (
+            {userPlayer.formatStats ? (
               <View style={styles.formatStats}>
-                {(['ODI', 'T20', 'TEST'] as const).map((fmt) => {
-                  const fs = userPlayer.formatStats?.[fmt];
-                  if (!fs?.matches) return null;
+                {(['ODI', 'T20', 'TEST'] as const).map((format) => {
+                  const stats = userPlayer.formatStats?.[format];
+                  if (!stats?.matches) return null;
                   return (
-                    <View key={fmt} style={styles.formatStatItem}>
-                      <Text style={styles.formatLabel}>{fmt}</Text>
-                      <Text style={styles.formatValue}>{fs.matches}M</Text>
-                      <Text style={styles.formatValue}>{fs.runs}R</Text>
-                      <Text style={styles.formatValue}>{fs.wickets}W</Text>
+                    <View key={format} style={styles.formatStatItem}>
+                      <Text style={styles.formatLabel}>{format}</Text>
+                      <Text style={styles.formatValue}>{stats.matches}M</Text>
+                      <Text style={styles.formatValue}>{stats.runs}R</Text>
+                      <Text style={styles.formatValue}>{stats.wickets}W</Text>
                     </View>
                   );
                 })}
               </View>
-            )}
+            ) : null}
           </Card>
         </Animated.View>
-      )}
+      ) : null}
 
-      {/* Upcoming events */}
-      <Text style={styles.section}>Upcoming Events ({currentYear})</Text>
-      {upcomingEvents.length > 0 ? (
-        upcomingEvents.map((ev, idx) => (
-          <Animated.View key={ev.id} entering={FadeInDown.duration(320).delay(idx * 50)}>
-            <Card style={styles.eventCard}>
-              <View style={styles.eventHeader}>
-                <Text style={styles.eventIcon}>{EVENT_ICONS[ev.type] ?? '🏏'}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.eventName}>{ev.name}</Text>
-                  <Text style={styles.eventMeta}>
-                    {ev.format} · {ev.months.map((m) => MONTH_NAMES[m] ?? m).join(' – ')}
-                  </Text>
-                </View>
-                {ev.teams.includes(userCountry ?? '') && (
-                  <View style={styles.qualBadge}>
-                    <Text style={styles.qualBadgeText}>You're in</Text>
-                  </View>
-                )}
+      <Text style={styles.section}>Assignments ({currentYear})</Text>
+      {calendar.events.map((event, index) => (
+        <Animated.View key={event.id} entering={FadeInDown.duration(320).delay(index * 50)}>
+          <Card style={styles.eventCard}>
+            <View style={styles.eventHeader}>
+              <View style={styles.eventMark}>
+                <Text style={styles.eventMarkText}>{EVENT_MARK[event.type] ?? 'S'}</Text>
               </View>
-              <Text style={styles.teamsLine}>
-                {ev.teams
-                  .slice(0, 4)
-                  .map((t) => getCountry(t)?.name ?? t)
-                  .join(' · ')}
-                {ev.teams.length > 4 && ` + ${ev.teams.length - 4} more`}
-              </Text>
-            </Card>
-          </Animated.View>
-        ))
-      ) : (
-        <Card>
-          <Text style={styles.emptyText}>No upcoming events this season.</Text>
-        </Card>
-      )}
-
-      {/* ICC Rankings */}
-      {topTeams.length > 0 && (
-        <>
-          <Text style={styles.section}>ICC Rankings (Top 5)</Text>
-          <Animated.View entering={FadeInDown.duration(340).delay(200)}>
-            <Card>
-              {topTeams.map((entry, idx) => (
+              <View style={styles.eventCopy}>
+                <Text style={styles.eventName}>{event.name}</Text>
+                <Text style={styles.eventMeta}>
+                  {event.format} |{' '}
+                  {event.months.map((month) => MONTH_NAMES[month] ?? month).join(' - ')}
+                </Text>
+              </View>
+              {event.selection ? (
                 <View
-                  key={entry.teamId}
                   style={[
-                    styles.rankRow,
-                    idx > 0 && {
-                      borderTopWidth: StyleSheet.hairlineWidth,
-                      borderTopColor: colors.border,
-                    },
+                    styles.selectionBadge,
+                    event.selection === 'NOT_SELECTED' && styles.selectionBadgeWarning,
                   ]}
                 >
-                  <Text style={styles.rankPos}>{idx + 1}</Text>
                   <Text
                     style={[
-                      styles.rankTeam,
-                      entry.teamId === userCountry && { color: colors.accent },
+                      styles.selectionBadgeText,
+                      event.selection === 'NOT_SELECTED' && styles.selectionTextWarning,
                     ]}
                   >
-                    {getCountry(entry.teamId)?.name ?? entry.teamId}
-                    {entry.teamId === userCountry ? ' ★' : ''}
+                    {event.selection === 'SELECTED'
+                      ? 'Selected'
+                      : event.selection === 'NOT_SELECTED'
+                        ? 'Not selected'
+                        : 'Pending'}
                   </Text>
-                  <Text style={styles.rankPoints}>{entry.points} pts</Text>
                 </View>
-              ))}
-            </Card>
-          </Animated.View>
+              ) : null}
+            </View>
+            <Text style={styles.teamsLine}>
+              {event.teams
+                .slice(0, 4)
+                .map((country) => getCountry(country)?.name ?? 'National side')
+                .join(' | ')}
+              {event.teams.length > 4 ? ` + ${event.teams.length - 4} more` : ''}
+            </Text>
+            {event.selectionReason ? (
+              <Text style={styles.selectionReason}>{event.selectionReason}</Text>
+            ) : null}
+          </Card>
+        </Animated.View>
+      ))}
+
+      {testTable.length > 0 ? (
+        <>
+          <Text style={styles.section}>World Test Championship</Text>
+          <Card>
+            {testTable.map((entry, index) => (
+              <View
+                key={entry.countryId}
+                style={[
+                  styles.rankRow,
+                  index > 0 && {
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: colors.border,
+                  },
+                ]}
+              >
+                <Text style={styles.rankPos}>{index + 1}</Text>
+                <Text
+                  style={[
+                    styles.rankTeam,
+                    entry.countryId === userCountry && { color: colors.accent },
+                  ]}
+                >
+                  {getCountry(entry.countryId)?.name ?? 'National side'}
+                </Text>
+                <Text style={styles.rankPoints}>
+                  {entry.points} pts | {entry.played} Tests
+                </Text>
+              </View>
+            ))}
+          </Card>
         </>
-      )}
+      ) : null}
+
+      {topTeams.length > 0 ? (
+        <>
+          <Text style={styles.section}>ICC Rankings</Text>
+          <Card>
+            {topTeams.map((entry, index) => (
+              <View
+                key={entry.teamId}
+                style={[
+                  styles.rankRow,
+                  index > 0 && {
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: colors.border,
+                  },
+                ]}
+              >
+                <Text style={styles.rankPos}>{index + 1}</Text>
+                <Text
+                  style={[
+                    styles.rankTeam,
+                    entry.teamId === userCountry && { color: colors.accent },
+                  ]}
+                >
+                  {getCountry(entry.teamId)?.name ?? 'National side'}
+                  {entry.teamId === userCountry ? ' (You)' : ''}
+                </Text>
+                <Text style={styles.rankPoints}>{entry.points} pts</Text>
+              </View>
+            ))}
+          </Card>
+        </>
+      ) : null}
 
       <Button
         label="Back"
         variant="ghost"
-        style={{ marginTop: spacing.xl }}
+        style={styles.backButton}
         onPress={() => navigation.goBack()}
       />
     </Screen>
@@ -232,27 +269,19 @@ const makeStyles = (colors: ThemeColors) =>
       marginBottom: spacing.sm,
     },
     recordCard: { marginTop: spacing.lg },
-    windowCard: {
-      marginTop: spacing.lg,
-      borderLeftColor: colors.info,
-      borderLeftWidth: 3,
-    },
-    windowTitle: {
-      color: colors.info,
-      fontSize: fontSize.xl,
-      fontWeight: fontWeight.black,
+    windowCard: { marginTop: spacing.lg, borderLeftColor: colors.info, borderLeftWidth: 3 },
+    windowTitle: { color: colors.info, fontSize: fontSize.xl, fontWeight: fontWeight.black },
+    windowBody: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      lineHeight: 20,
+      marginTop: spacing.xs,
     },
     windowProgress: {
       color: colors.accent,
       fontSize: fontSize.sm,
       fontWeight: fontWeight.bold,
       marginTop: spacing.sm,
-    },
-    windowBody: {
-      color: colors.textMuted,
-      fontSize: fontSize.sm,
-      lineHeight: 20,
-      marginTop: spacing.xs,
     },
     capRow: {
       flexDirection: 'row',
@@ -290,22 +319,35 @@ const makeStyles = (colors: ThemeColors) =>
       gap: spacing.sm,
       marginBottom: spacing.xs,
     },
-    eventIcon: { fontSize: 20 },
+    eventMark: {
+      width: 34,
+      height: 34,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    eventMarkText: { color: colors.accent, fontSize: 10, fontWeight: fontWeight.black },
+    eventCopy: { flex: 1, minWidth: 0 },
     eventName: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.heavy },
     eventMeta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
-    qualBadge: {
-      backgroundColor: colors.success + '22',
+    selectionBadge: {
+      borderWidth: 1,
+      borderColor: colors.success,
       borderRadius: radius.pill,
       paddingHorizontal: spacing.sm,
       paddingVertical: 2,
     },
-    qualBadgeText: { color: colors.success, fontSize: fontSize.xs, fontWeight: fontWeight.bold },
+    selectionBadgeWarning: { borderColor: colors.warning },
+    selectionBadgeText: { color: colors.success, fontSize: fontSize.xs, fontWeight: fontWeight.bold },
+    selectionTextWarning: { color: colors.warning },
     teamsLine: { color: colors.textFaint, fontSize: fontSize.xs },
-    emptyText: {
+    selectionReason: {
       color: colors.textMuted,
-      fontSize: fontSize.sm,
-      textAlign: 'center',
-      padding: spacing.md,
+      fontSize: fontSize.xs,
+      lineHeight: 17,
+      marginTop: spacing.xs,
     },
     rankRow: {
       flexDirection: 'row',
@@ -321,5 +363,6 @@ const makeStyles = (colors: ThemeColors) =>
       textAlign: 'center',
     },
     rankTeam: { flex: 1, color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.bold },
-    rankPoints: { color: colors.textMuted, fontSize: fontSize.sm },
+    rankPoints: { color: colors.textMuted, fontSize: fontSize.xs },
+    backButton: { marginTop: spacing.xl },
   });

@@ -12,6 +12,17 @@ describe('manager records league table', () => {
     expect(recordsScreen).toContain('P W L T NR Pts NRR are rebuilt from the canonical standings.');
     expect(recordsScreen).toContain('highlightTeamId={save.userTeamId}');
   });
+
+  it('shows only the active manager format and marks managed players in gold', () => {
+    expect(recordsScreen).toContain('activeManagerRecords(save)');
+    expect(recordsScreen).toContain('Only {managerRecords.competitionLabel} performances');
+    expect(recordsScreen).toContain('managerRecordRowManaged');
+    expect(recordsScreen).toContain('row.isManagedPlayer && styles.managerRecordGold');
+    expect(recordsScreen).toContain('Most Runs');
+    expect(recordsScreen).toContain('Most Wickets');
+    expect(recordsScreen).toContain('High Scores');
+    expect(recordsScreen).toContain('Best Bowling');
+  });
 });
 
 describe('records achievements economy copy', () => {

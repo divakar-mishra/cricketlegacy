@@ -1,16 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeOut,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
-  withTiming,
-  ZoomIn,
-} from 'react-native-reanimated';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { playHaptic } from '../audio';
 import {
   Button,
@@ -18,6 +8,9 @@ import {
   ProgressBar,
   Screen,
   ScreenHeader,
+  SMOOTH_CARD_ZOOM,
+  SMOOTH_MODAL_ENTER,
+  SMOOTH_MODAL_EXIT,
   AppText as Text,
   WalletBar,
 } from '../components';
@@ -32,6 +25,7 @@ import {
   trainingCost,
   trainingFocusesForRole,
 } from '../game/progression';
+import { nextUserFixtureId } from '../game/season';
 import { trainingAttributeCeiling } from '../game/youthBalance';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
@@ -76,34 +70,11 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
   const [busyGroup, setBusyGroup] = useState<TrainGroup | null>(null);
   const popupCounter = useRef(0);
 
-  // Animated values for the popup card
-  const popupScale = useSharedValue(0.5);
-  const popupOpacity = useSharedValue(0);
-
-  const showPopup = useCallback(
-    (gains: TrainGain[], newOvr: number, oldOvr: number) => {
-      popupCounter.current += 1;
-      const id = popupCounter.current;
-      setPopup({ id, gains, newOverall: newOvr, oldOverall: oldOvr });
-      popupScale.value = withSequence(
-        withSpring(1.08, { damping: 10, stiffness: 300 }),
-        withSpring(1.0, { damping: 14, stiffness: 200 }),
-      );
-      popupOpacity.value = withTiming(1, { duration: 180 });
-
-      // Auto-dismiss after 2.8 s
-      setTimeout(() => {
-        setPopup((p) => (p?.id === id ? null : p));
-        popupOpacity.value = withTiming(0, { duration: 250 });
-      }, 2800);
-    },
-    [popupScale, popupOpacity],
-  );
-
-  const popupAnimStyle = useAnimatedStyle(() => ({
-    opacity: popupOpacity.value,
-    transform: [{ scale: popupScale.value }],
-  }));
+  const showPopup = useCallback((gains: TrainGain[], newOvr: number, oldOvr: number) => {
+    popupCounter.current += 1;
+    const id = popupCounter.current;
+    setPopup({ id, gains, newOverall: newOvr, oldOverall: oldOvr });
+  }, []);
 
   if (!save || !save.userPlayerId) {
     return (
@@ -119,14 +90,15 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
   const overall = computeOverall(player);
   const done = sessionsDone(player);
   const visibleGroups = trainingFocusesForRole(player.role);
-  const totalAllowedSessions = Math.max(1, visibleGroups.length * TRAINING.maxSessionsPerSeason);
-  const left = visibleGroups.reduce(
-    (sum, group) =>
-      sum + Math.max(0, TRAINING.maxSessionsPerSeason - sessionsDone(player, group.id)),
-    0,
-  );
+  const totalAllowedSessions = TRAINING.maxSessionsPerSeason;
+  const left = Math.max(0, totalAllowedSessions - done);
   const progressPct = done / totalAllowedSessions;
   const acceleratorCharges = Math.max(0, save.inventory?.training_accelerator ?? 0);
+  const nextFixtureId = nextUserFixtureId(save);
+  const activeAnalysis =
+    nextFixtureId && save.playerLife?.lastAnalysisReport?.fixtureId === nextFixtureId
+      ? save.playerLife.lastAnalysisReport
+      : undefined;
 
   const onTrain = async (group: TrainGroup) => {
     if (busyGroup) return;
@@ -161,6 +133,17 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
         onBack={() => navigation.goBack()}
       />
       <WalletBar wallet={save.wallet} />
+
+      {activeAnalysis ? (
+        <View style={styles.analystBanner}>
+          <View style={styles.analystCopy}>
+            <Text style={styles.analystTitle}>
+              Analyst focus: {activeAnalysis.recommendedTrainingGroup.replace('_', ' ')}
+            </Text>
+            <Text style={styles.analystText}>{activeAnalysis.trainingReason}</Text>
+          </View>
+        </View>
+      ) : null}
 
       {acceleratorCharges > 0 ? (
         <View
@@ -247,9 +230,13 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
           const groupAvg = Math.round(attrs.reduce((s, a) => s + a.val, 0) / attrs.length);
           const isBusy = busyGroup === group.id;
           const groupDone = sessionsDone(player, group.id);
-          const groupLeft = Math.max(0, TRAINING.maxSessionsPerSeason - groupDone);
-          const groupCost = trainingCost(groupDone);
+          const groupLeft = Math.max(
+            0,
+            Math.min(Math.ceil(TRAINING.maxSessionsPerSeason / 2) - groupDone, left),
+          );
+          const groupCost = trainingCost(done);
           const groupTrainable = canTrain(player, group.id);
+          const canAfford = save.wallet.coins >= groupCost;
           const cost = groupCost;
           const trainable = groupTrainable;
           const cap = Math.min(
@@ -260,13 +247,17 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
           const possibleGain =
             trainable && improvableCount > 0 ? `+1 to +${TRAINING.gainMax}` : 'No gain available';
           const blockedByCap = improvableCount === 0;
+          const analystRecommended = activeAnalysis?.recommendedTrainingGroup === group.id;
 
           return (
             <Animated.View key={group.id} entering={FadeInDown.duration(300).delay(80 + idx * 50)}>
-              <Card style={styles.groupCard}>
+              <Card style={[styles.groupCard, analystRecommended && styles.recommendedGroup]}>
                 <View style={styles.groupHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.groupTitle}>{group.label}</Text>
+                    {analystRecommended ? (
+                      <Text style={styles.recommendedLabel}>Analyst recommendation</Text>
+                    ) : null}
                     <Text style={styles.groupAvg}>
                       Avg: {groupAvg} · {groupLeft} left
                     </Text>
@@ -275,14 +266,20 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
                     </Text>
                   </View>
                   <Button
-                    label={isBusy ? 'Training…' : trainable ? `Train · ${cost} 🪙` : 'Maxed'}
-                    size="sm"
-                    variant={
-                      groupTrainable && save.wallet.coins >= groupCost ? 'primary' : 'secondary'
+                    label={
+                      isBusy
+                        ? 'Training...'
+                        : trainable
+                          ? canAfford
+                            ? `Train · ${cost}`
+                            : `Need ${cost}`
+                          : 'Maxed'
                     }
+                    size="sm"
+                    variant={groupTrainable ? 'primary' : 'secondary'}
                     fullWidth={false}
                     loading={isBusy}
-                    disabled={!groupTrainable || save.wallet.coins < groupCost || !!busyGroup}
+                    disabled={!groupTrainable || !canAfford || !!busyGroup}
                     onPress={() => void onTrain(group.id)}
                   />
                 </View>
@@ -314,58 +311,55 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
         })}
 
         <Text style={styles.note}>
-          Training improves your two weakest attributes in a discipline. Costs rise each session and
-          reset every new season.
+          School, Under-19, Domestic and International careers use the same seasonal price curve:
+          250, 400, 550, 700, 850 and 1,000 coins. Choose up to six sessions per season, with no
+          more than three in one focus. Each session improves the two weakest eligible attributes.
         </Text>
       </ScrollView>
 
       {/* Gain popup overlay */}
       {popup ? (
-        <Animated.View style={[styles.popupOverlay, popupAnimStyle]}>
-          <View style={[styles.popupCard, shadow.card]}>
-            {/* OVR change header */}
-            <View style={styles.popupHeader}>
-              <Text style={styles.popupTitle}>Training Complete!</Text>
-              {popup.newOverall !== popup.oldOverall && (
-                <Animated.View
-                  entering={ZoomIn.duration(250).delay(200)}
-                  style={styles.ovrChangeBadge}
-                >
-                  <Text style={styles.ovrChangeText}>
-                    OVR {popup.oldOverall} → {popup.newOverall}
-                  </Text>
-                  <Text style={styles.ovrChangeDelta}>+{popup.newOverall - popup.oldOverall}</Text>
-                </Animated.View>
-              )}
-            </View>
+        <Modal transparent visible animationType="none" onRequestClose={() => setPopup(null)}>
+          <Animated.View
+            entering={SMOOTH_MODAL_ENTER}
+            exiting={SMOOTH_MODAL_EXIT}
+            style={styles.popupOverlay}
+          >
+            <Animated.View entering={SMOOTH_CARD_ZOOM} style={[styles.popupCard, shadow.card]}>
+              <View style={styles.popupHeader}>
+                <Text style={styles.popupTitle}>Training Complete!</Text>
+                {popup.newOverall !== popup.oldOverall && (
+                  <View style={styles.ovrChangeBadge}>
+                    <Text style={styles.ovrChangeText}>
+                      OVR {popup.oldOverall} → {popup.newOverall}
+                    </Text>
+                    <Text style={styles.ovrChangeDelta}>
+                      +{popup.newOverall - popup.oldOverall}
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-            {/* Individual gains */}
-            {popup.gains.map((g, i) => (
-              <Animated.View
-                key={g.key}
-                entering={FadeInDown.duration(220).delay(i * 80)}
-                style={styles.gainRow}
-              >
-                <Text style={styles.gainLabel}>{g.label}</Text>
-                <View style={styles.gainRight}>
-                  <Text style={styles.gainFrom}>{g.from}</Text>
-                  <Text style={styles.gainArrow}> → </Text>
-                  <Text style={styles.gainTo}>{g.to}</Text>
-                  <Animated.View
-                    entering={ZoomIn.duration(200).delay(100 + i * 80)}
-                    style={styles.gainDeltaBadge}
-                  >
-                    <Text style={styles.gainDelta}>+{g.to - g.from}</Text>
-                  </Animated.View>
+              {popup.gains.map((g) => (
+                <View key={g.key} style={styles.gainRow}>
+                  <Text style={styles.gainLabel}>{g.label}</Text>
+                  <View style={styles.gainRight}>
+                    <Text style={styles.gainFrom}>{g.from}</Text>
+                    <Text style={styles.gainArrow}> → </Text>
+                    <Text style={styles.gainTo}>{g.to}</Text>
+                    <View style={styles.gainDeltaBadge}>
+                      <Text style={styles.gainDelta}>+{g.to - g.from}</Text>
+                    </View>
+                  </View>
                 </View>
-              </Animated.View>
-            ))}
+              ))}
 
-            <Pressable onPress={() => setPopup(null)} style={styles.popupDismiss}>
-              <Text style={styles.popupDismissText}>Tap to dismiss</Text>
-            </Pressable>
-          </View>
-        </Animated.View>
+              <Pressable onPress={() => setPopup(null)} style={styles.popupDismiss}>
+                <Text style={styles.popupDismissText}>Tap to dismiss</Text>
+              </Pressable>
+            </Animated.View>
+          </Animated.View>
+        </Modal>
       ) : null}
     </Screen>
   );
@@ -374,6 +368,29 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     msg: { color: colors.textMuted, fontSize: fontSize.md, marginBottom: spacing.lg },
+    analystBanner: {
+      flexDirection: 'row',
+      borderWidth: 1,
+      borderLeftWidth: 3,
+      borderColor: colors.accent,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surfaceAlt,
+      padding: spacing.md,
+      marginTop: spacing.sm,
+    },
+    analystCopy: { flex: 1, minWidth: 0 },
+    analystTitle: {
+      color: colors.accent,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.heavy,
+      textTransform: 'capitalize',
+    },
+    analystText: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 17,
+      marginTop: spacing.xs,
+    },
     progressBox: {
       backgroundColor: colors.surface,
       borderRadius: radius.md,
@@ -451,6 +468,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
     flashText: { color: colors.warning, fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
     groupCard: { marginBottom: spacing.sm },
+    recommendedGroup: { borderColor: colors.accent, borderLeftWidth: 3 },
     groupHeader: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -462,6 +480,13 @@ const makeStyles = (colors: ThemeColors) =>
       fontSize: fontSize.md,
       fontWeight: fontWeight.heavy,
       fontFamily: fonts.display,
+    },
+    recommendedLabel: {
+      color: colors.success,
+      fontSize: 10,
+      fontWeight: fontWeight.bold,
+      marginTop: 2,
+      textTransform: 'uppercase',
     },
     groupAvg: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
     capLine: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 16, marginTop: 4 },
@@ -516,11 +541,10 @@ const makeStyles = (colors: ThemeColors) =>
 
     // Gain popup
     popupOverlay: {
-      position: 'absolute',
-      bottom: spacing.xxl,
-      left: spacing.lg,
-      right: spacing.lg,
-      zIndex: 100,
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.lg,
+      backgroundColor: 'rgba(0,0,0,0.62)',
     },
     popupCard: {
       backgroundColor: colors.bgElevated,

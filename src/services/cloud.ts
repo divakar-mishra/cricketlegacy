@@ -1,9 +1,9 @@
 /**
- * Cloud-save sync abstraction.
+ * Cloud-save synchronization foundation.
  *
- * When Supabase is enabled this talks to `public.cloud_saves` under RLS, scoped
- * to the signed-in Supabase Auth user. When Supabase is disabled, it falls back
- * to the old local-only AsyncStorage simulation for development tests only.
+ * With Supabase enabled, payloads are stored in `public.cloud_saves` under RLS
+ * and scoped to the authenticated Supabase user. The AsyncStorage path remains
+ * available for local development and deterministic tests.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,7 +13,6 @@ export interface CloudSlot {
   slot: number;
   mode: string;
   updatedAt: number;
-  /** Checksum of the stored payload (see {@link checksum}). */
   checksum: string;
 }
 
@@ -23,20 +22,15 @@ const LAST_SYNC_KEY = 'cloud:lastSyncAt';
 
 let lastSync: number | null = null;
 
-/**
- * Deterministic 32-bit djb2 checksum of a string, returned as 8 hex chars.
- * Used to detect divergence between local and remote payloads.
- */
+/** Deterministic 32-bit djb2 checksum returned as eight hexadecimal characters. */
 export function checksum(input: string): string {
   let hash = 5381;
-  for (let i = 0; i < input.length; i++) {
-    // hash * 33 + char, kept within 32 bits via Math.imul.
-    hash = (Math.imul(hash, 33) + input.charCodeAt(i)) | 0;
+  for (let index = 0; index < input.length; index++) {
+    hash = (Math.imul(hash, 33) + input.charCodeAt(index)) | 0;
   }
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-/** Best-effort parse of `mode`/`slot` from a `sg:<mode>:<slot>`-style key. */
 function parseSlot(key: string): { slot: number; mode: string } {
   const match = /(?:^|:)(career|manager):(\d+)$/.exec(key);
   if (match) return { mode: match[1], slot: Number(match[2]) };
@@ -50,7 +44,7 @@ function buildMeta(key: string, json: string): CloudSlot {
 
 function schemaVersionOf(json: string): number | null {
   try {
-    const parsed = JSON.parse(json) as { schemaVersion?: unknown; updatedAt?: unknown };
+    const parsed = JSON.parse(json) as { schemaVersion?: unknown };
     return typeof parsed.schemaVersion === 'number' ? parsed.schemaVersion : null;
   } catch {
     return null;
@@ -73,7 +67,7 @@ async function remoteIdentity() {
   return { client, userId: session.userId };
 }
 
-/** Uploads a save payload to the (simulated) remote. */
+/** Upload a serialized save payload. */
 export async function pushSave(key: string, json: string): Promise<{ ok: boolean }> {
   const remote = await remoteIdentity();
   if (remote) {
@@ -115,7 +109,7 @@ export async function pushSave(key: string, json: string): Promise<{ ok: boolean
   }
 }
 
-/** Downloads a save payload from the (simulated) remote. */
+/** Download a serialized save payload. */
 export async function pullSave(key: string): Promise<{ ok: boolean; json?: string }> {
   const remote = await remoteIdentity();
   if (remote) {
@@ -138,7 +132,7 @@ export async function pullSave(key: string): Promise<{ ok: boolean; json?: strin
   }
 }
 
-/** Lists metadata for all remote slots, most-recently-updated first. */
+/** List available remote slot metadata, newest first. */
 export async function listRemote(): Promise<CloudSlot[]> {
   const remote = await remoteIdentity();
   if (remote) {
@@ -148,12 +142,14 @@ export async function listRemote(): Promise<CloudSlot[]> {
         .select('slot, mode, remote_updated_at, checksum')
         .order('remote_updated_at', { ascending: false });
       if (error || !data) return [];
-      return (data as { slot?: unknown; mode?: unknown; remote_updated_at?: unknown; checksum?: unknown }[]).map((row) => ({
-        slot: typeof row.slot === 'number' ? row.slot : 0,
-        mode: typeof row.mode === 'string' ? row.mode : 'unknown',
-        updatedAt: typeof row.remote_updated_at === 'string' ? Date.parse(row.remote_updated_at) : 0,
-        checksum: typeof row.checksum === 'string' ? row.checksum : '',
-      }));
+      return (data as { slot?: unknown; mode?: unknown; remote_updated_at?: unknown; checksum?: unknown }[]).map(
+        (row) => ({
+          slot: typeof row.slot === 'number' ? row.slot : 0,
+          mode: typeof row.mode === 'string' ? row.mode : 'unknown',
+          updatedAt: typeof row.remote_updated_at === 'string' ? Date.parse(row.remote_updated_at) : 0,
+          checksum: typeof row.checksum === 'string' ? row.checksum : '',
+        }),
+      );
     } catch {
       return [];
     }
@@ -161,7 +157,7 @@ export async function listRemote(): Promise<CloudSlot[]> {
 
   try {
     const keys = await AsyncStorage.getAllKeys();
-    const metaKeys = keys.filter((k) => k.startsWith(META_PREFIX));
+    const metaKeys = keys.filter((key) => key.startsWith(META_PREFIX));
     if (metaKeys.length === 0) return [];
     const entries = await AsyncStorage.multiGet(metaKeys);
     const slots: CloudSlot[] = [];
@@ -170,7 +166,7 @@ export async function listRemote(): Promise<CloudSlot[]> {
       try {
         slots.push(JSON.parse(value) as CloudSlot);
       } catch {
-        /* skip corrupt metadata */
+        // Ignore corrupt metadata while keeping other slots available.
       }
     }
     return slots.sort((a, b) => b.updatedAt - a.updatedAt);
@@ -179,12 +175,10 @@ export async function listRemote(): Promise<CloudSlot[]> {
   }
 }
 
-/** Epoch millis of the last successful push, or `null` if never synced. */
 export function lastSyncAt(): number | null {
   return lastSync;
 }
 
-// Hydrate the in-memory lastSync from storage on load (guarded, never throws).
 void (async () => {
   try {
     const raw = await AsyncStorage.getItem(LAST_SYNC_KEY);
@@ -193,6 +187,6 @@ void (async () => {
       if (!Number.isNaN(parsed)) lastSync = parsed;
     }
   } catch {
-    /* ignore */
+    // Last-sync metadata is informational and must never block app startup.
   }
 })();

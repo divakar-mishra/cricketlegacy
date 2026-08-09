@@ -97,11 +97,11 @@ export function leaderboardSanityCheck(input: LeaderboardSanityInput): SanityVer
   if (
     reasons.length >= 2 ||
     reasons.some(
-      (r) =>
-        r.includes('impossible') ||
-        r.includes('above_global_limit') ||
-        r.includes('above_match_limit') ||
-        r.includes('suspicious_near_perfect_win_rate'),
+      (reason) =>
+        reason.includes('impossible') ||
+        reason.includes('above_global_limit') ||
+        reason.includes('above_match_limit') ||
+        reason.includes('suspicious_near_perfect_win_rate'),
     )
   ) {
     return { severity: 'shadowban', reasons };

@@ -50,6 +50,42 @@ describe('manager headhunt', () => {
     expect(save.teams[otherId].isUserTeam).toBe(true);
     expect(save.teams[fromId].isUserTeam).toBe(false);
     expect(save.managerJobOffer).toBeUndefined();
+    expect(save.managerProgression?.contractSalary).toBe(1_000_000);
+  });
+
+  it('starts a new club with its own roster, confidence 75 and five-match grace', () => {
+    const save = makeMgr();
+    const fromId = save.userTeamId!;
+    const otherId = save.divisions!.tier3!.find((id) => id !== fromId)!;
+    const targetRoster = [...save.teams[otherId].playerIds];
+    save.trainingFocus = { [save.teams[fromId].playerIds[0]]: 'batting' };
+    save.scoutReports = [
+      {
+        playerId: save.teams[fromId].playerIds[0],
+        knownOverall: 50,
+        uncertainty: 0.4,
+        scoutedYear: 2026,
+        recommended: false,
+      },
+    ];
+    save.managerJobOffer = {
+      teamId: otherId,
+      clubName: save.teams[otherId].name,
+      reputation: 85,
+      salaryPromise: 1_000_000,
+      reason: 'x',
+    };
+
+    expect(acceptManagerJob(save).ok).toBe(true);
+
+    expect(save.teams[save.userTeamId!].playerIds).toEqual(targetRoster);
+    expect(save.teams[save.userTeamId!].xi).toBeUndefined();
+    expect(save.boardConfidence).toBe(75);
+    expect(save.managerGraceMatchesRemaining).toBe(5);
+    expect(save.managerMatchesAtCurrentClub).toBe(0);
+    expect(save.trainingFocus).toEqual({});
+    expect(save.scoutReports).toEqual([]);
+    expect(save.managerAppointmentPending?.teamId).toBe(otherId);
   });
 
   it('declining is rewarded with a board-confidence boost', () => {

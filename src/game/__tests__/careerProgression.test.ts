@@ -2,8 +2,11 @@ import { TEAM_BLUEPRINTS } from '../../content/teams';
 import { Role, SaveGame } from '../../domain/types';
 import {
   accrueNationalRep,
+  applyCareerMatchReadiness,
+  careerSelectionDecision,
   careerTier,
   checkPathPromotion,
+  ensurePlayerCareerResources,
   isLegend,
   recordPathPerformance,
   resolveCareerStageForAge,
@@ -11,6 +14,7 @@ import {
 } from '../career';
 import { buildUserPlayer, createCareerSave } from '../createGame';
 import { matchImpactScore } from '../progression';
+import { synchronizeCareerPromotion } from '../careerTransition';
 
 function makeSave(role: Role, attr: number): SaveGame {
   const v = attr;
@@ -49,6 +53,37 @@ describe('matchImpactScore', () => {
 });
 
 describe('performance-based path promotion', () => {
+  it('moves School -> U19 -> reserved senior club without duplicate rosters', () => {
+    const save = makeSave('BATTER', 48);
+    const seniorTeamId = save.userTeamId!;
+    const schoolTeamId = save.careerPathTeamId!;
+
+    save.careerPathMatches = 6;
+    save.careerPathRuns = 220;
+    save.careerPathRatingSum = 36;
+    const u19 = checkPathPromotion(save);
+    synchronizeCareerPromotion(save, u19);
+    const u19TeamId = save.careerPathTeamId!;
+
+    expect(u19.to).toBe('U19');
+    expect(u19TeamId).not.toBe(schoolTeamId);
+    expect(save.teams[schoolTeamId].playerIds).not.toContain(save.userPlayerId);
+    expect(save.teams[u19TeamId].playerIds).toContain(save.userPlayerId);
+    expect(save.teams[seniorTeamId].playerIds).not.toContain(save.userPlayerId);
+
+    save.careerPathMatches = 7;
+    save.careerPathRuns = 400;
+    save.careerPathRatingSum = 49;
+    const domestic = checkPathPromotion(save);
+    synchronizeCareerPromotion(save, domestic);
+
+    expect(domestic.to).toBe('DOMESTIC');
+    expect(save.careerPathTeamId).toBeUndefined();
+    expect(save.teams[u19TeamId].playerIds).not.toContain(save.userPlayerId);
+    expect(save.teams[seniorTeamId].playerIds).toContain(save.userPlayerId);
+    expect(save.players[save.userPlayerId!].contract).toBeDefined();
+  });
+
   it('resolves age eligibility at every requested boundary', () => {
     expect(resolveCareerStageForAge(13)).toBe('SCHOOL');
     expect(resolveCareerStageForAge(14)).toBe('SCHOOL');
@@ -132,6 +167,51 @@ describe('performance-based path promotion', () => {
     oldU19.careerPathLevel = 'U19';
     oldU19.players.user.age = 20;
     expect(checkPathPromotion(oldU19).to).toBe('DOMESTIC');
+  });
+});
+
+describe('selection rewards', () => {
+  it('weights Overall, Form and Coach Trust at 40/35/25', () => {
+    const save = makeSave('BATTER', 60);
+    save.careerPathLevel = 'DOMESTIC';
+    const user = save.players[save.userPlayerId!];
+    const resources = ensurePlayerCareerResources(save)!;
+    user.meta.form = 40;
+    resources.coachTrust = 40;
+    const baseline = careerSelectionDecision(save, 'T20').userScore;
+
+    user.meta.form = 60;
+    const formBoosted = careerSelectionDecision(save, 'T20').userScore;
+    user.meta.form = 40;
+    resources.coachTrust = 60;
+    const trustBoosted = careerSelectionDecision(save, 'T20').userScore;
+
+    expect(formBoosted - baseline).toBeCloseTo(7, 5);
+    expect(trustBoosted - baseline).toBeCloseTo(5, 5);
+  });
+
+  it('a 10 rating grants form, trust, confidence and the next selection', () => {
+    const save = makeSave('BATTER', 55);
+    save.careerPathLevel = 'DOMESTIC';
+    const user = save.players[save.userPlayerId!];
+    user.meta.form = 35;
+    user.meta.confidence = 40;
+    save.playerCareerResources = undefined;
+
+    applyCareerMatchReadiness(save, {
+      fixtureId: 'rating-ten',
+      format: 'T20',
+      selected: true,
+      rating: 10,
+      ballsFaced: 45,
+    });
+    const resources = ensurePlayerCareerResources(save)!;
+
+    expect(user.meta.form).toBe(55);
+    expect(user.meta.confidence).toBe(55);
+    expect(resources.coachTrust).toBe(70);
+    expect(resources.selectionGuaranteeMatches).toBe(1);
+    expect(careerSelectionDecision(save, 'T20', 'next-fixture').selected).toBe(true);
   });
 });
 

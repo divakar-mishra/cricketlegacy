@@ -4,34 +4,20 @@
  * Premium cosmetics cost gems (gem sink), creating value for gem purchases.
  * Basic options are free. Premium options are gem-gated.
  */
-import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { avatarFromLegacy, normalizeAvatarConfig, outfitForKitId } from '../avatar';
+import type { AvatarConfig } from '../avatar';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
-import { Button, PlayerAvatar, Screen, ScreenHeader, WalletBar } from '../components';
+import { AvatarCustomizer, Button, Screen, ScreenHeader, WalletBar } from '../components';
 import { AppText as Text } from '../components/AppText';
-import {
-  AVATAR_BEARD_OPTIONS,
-  AVATAR_BROW_OPTIONS,
-  AVATAR_EYE_COLORS,
-  AVATAR_FACE_OPTIONS,
-  AVATAR_HAIR_COLORS,
-  AVATAR_HAIR_OPTIONS,
-  AVATAR_MOUSTACHE_OPTIONS,
-  AVATAR_SKIN_TONES,
-  DEFAULT_AVATAR_CUSTOMIZATION,
-} from '../data/avatar';
 import { CELEBRATIONS, cosmeticCost, CosmeticOption, KIT_COLORS } from '../data/cosmetics';
-import { AvatarCustomization } from '../domain/types';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import {
-  fonts,
   fontSize,
   fontWeight,
   radius,
-  shadow,
   spacing,
   ThemeColors,
   useTheme,
@@ -62,7 +48,7 @@ function CosmeticGrid({
     <View>
       <Text style={styles.sectionTitle}>{title}</Text>
       <View style={styles.optionGrid}>
-        {options.map((opt, idx) => {
+        {options.map((opt) => {
           const isSelected = selected === opt.id;
           const isFree = opt.gemCost === 0 && !opt.passExclusive;
           const isOwned = isFree || ownedIds.has(opt.id);
@@ -70,7 +56,7 @@ function CosmeticGrid({
           const isColor = opt.preview.startsWith('#');
 
           return (
-            <Animated.View key={opt.id} entering={FadeInDown.duration(220).delay(idx * 40)}>
+            <View key={opt.id}>
               <Pressable
                 style={[
                   styles.optionCard,
@@ -96,9 +82,9 @@ function CosmeticGrid({
                     <Text style={styles.previewEmoji}>{opt.preview}</Text>
                   )}
                   {isSelected && !isColor && (
-                    <Animated.View entering={ZoomIn.duration(200)} style={styles.selectedBadge}>
+                    <View style={styles.selectedBadge}>
                       <Text style={styles.selectedCheck}>✓</Text>
-                    </Animated.View>
+                    </View>
                   )}
                 </View>
                 <Text
@@ -149,84 +135,7 @@ function CosmeticGrid({
                   <Text style={styles.freeBadge}>FREE</Text>
                 )}
               </Pressable>
-            </Animated.View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-function ChoiceRow<T extends string>({
-  title,
-  options,
-  selected,
-  onSelect,
-}: {
-  title: string;
-  options: { id: T; label: string }[];
-  selected: T;
-  onSelect: (value: T) => void;
-}) {
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <View style={styles.builderGroup}>
-      <Text style={styles.builderLabel}>{title}</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.choiceRow}
-      >
-        {options.map((option) => {
-          const active = option.id === selected;
-          return (
-            <Pressable
-              key={option.id}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              onPress={() => onSelect(option.id)}
-              style={[styles.choiceChip, active && styles.choiceChipActive]}
-            >
-              <Text style={[styles.choiceText, active && styles.choiceTextActive]}>
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
-function ColorRow({
-  title,
-  colors: options,
-  selected,
-  onSelect,
-}: {
-  title: string;
-  colors: readonly string[];
-  selected: string;
-  onSelect: (value: string) => void;
-}) {
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <View style={styles.builderGroup}>
-      <Text style={styles.builderLabel}>{title}</Text>
-      <View style={styles.colorRow}>
-        {options.map((color) => {
-          const active = color === selected;
-          return (
-            <Pressable
-              key={color}
-              accessibilityRole="button"
-              accessibilityLabel={`${title} ${color}`}
-              accessibilityState={{ selected: active }}
-              onPress={() => onSelect(color)}
-              style={[styles.builderSwatchWrap, active && styles.builderSwatchWrapActive]}
-            >
-              <View style={[styles.builderSwatch, { backgroundColor: color }]} />
-            </Pressable>
+            </View>
           );
         })}
       </View>
@@ -245,21 +154,19 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
   // Initialise from the persisted equipped look; changes are committed on save.
   const equipped = save?.cosmetics;
   const avatar = 'avatar_custom';
-  const [avatarCustomization, setAvatarCustomization] = useState<AvatarCustomization>({
-    ...DEFAULT_AVATAR_CUSTOMIZATION,
-    ...(equipped?.avatarCustomization ?? {}),
-  });
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(() =>
+    normalizeAvatarConfig(
+      equipped?.avatarConfig ??
+        avatarFromLegacy(
+          equipped?.avatarCustomization,
+          equipped?.kit,
+          equipped?.profileFrame,
+        ),
+    ),
+  );
   const [kit, setKit] = useState<string>(equipped?.kit ?? 'kit_white');
   const [celebration, setCelebration] = useState<string>(equipped?.celebration ?? 'cel_wave');
   const [hasChanges, setHasChanges] = useState(false);
-
-  const updateAvatar = <K extends keyof AvatarCustomization>(
-    key: K,
-    value: AvatarCustomization[K],
-  ) => {
-    setAvatarCustomization((current) => ({ ...current, [key]: value }));
-    setHasChanges(true);
-  };
 
   const gems = save?.wallet.gems ?? 0;
   // Premium cosmetics already unlocked (persisted in the save's inventory).
@@ -302,7 +209,8 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
         avatar,
         kit,
         celebration,
-        avatarCustomization,
+        avatarCustomization: equipped?.avatarCustomization,
+        avatarConfig,
         profileFrame: equipped?.profileFrame,
         stadiumTheme: equipped?.stadiumTheme,
         officeTheme: equipped?.officeTheme,
@@ -345,34 +253,8 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
       />
       <WalletBar wallet={save.wallet} />
 
-      {/* Preview card */}
-      <Animated.View entering={FadeIn.duration(400)} style={styles.previewCard}>
-        <LinearGradient colors={[colors.surfaceAlt, colors.surface]} style={styles.previewGradient}>
-          <PlayerAvatar
-            name={
-              save.userPlayerId
-                ? (save.players[save.userPlayerId]?.name ?? 'Your Player')
-                : 'Your Player'
-            }
-            role={save.userPlayerId ? save.players[save.userPlayerId]?.role : undefined}
-            size="xl"
-            showRole
-            customization={avatarCustomization}
-            kitColor={KIT_COLORS.find((option) => option.id === kit)?.preview}
-            profileFrame={equipped?.profileFrame}
-          />
-          <Text style={styles.previewPlayerName}>
-            {save.userPlayerId ? save.players[save.userPlayerId]?.name : 'Your Player'}
-          </Text>
-          <Text style={styles.previewCelLabel}>
-            Celebration: {CELEBRATIONS.find((c) => c.id === celebration)?.preview ?? '👋'}{' '}
-            {CELEBRATIONS.find((c) => c.id === celebration)?.label}
-          </Text>
-        </LinearGradient>
-      </Animated.View>
-
       {/* Gem note */}
-      <Animated.View entering={FadeInDown.duration(300).delay(200)} style={styles.gemNote}>
+      <View style={styles.gemNote}>
         <Text style={styles.gemNoteText}>
           💎 You have{' '}
           <Text style={[styles.gemNoteText, { color: colors.info, fontWeight: fontWeight.black }]}>
@@ -380,59 +262,21 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
           </Text>
           . Premium cosmetics are gem-exclusive.
         </Text>
-      </Animated.View>
+      </View>
 
       <Text style={styles.sectionTitle}>Create Your Avatar</Text>
-      <View style={styles.builderSurface}>
-        <ColorRow
-          title="Skin tone"
-          colors={AVATAR_SKIN_TONES}
-          selected={avatarCustomization.skinTone}
-          onSelect={(value) => updateAvatar('skinTone', value)}
-        />
-        <ChoiceRow
-          title="Face shape"
-          options={AVATAR_FACE_OPTIONS}
-          selected={avatarCustomization.faceShape}
-          onSelect={(value) => updateAvatar('faceShape', value)}
-        />
-        <ChoiceRow
-          title="Hair"
-          options={AVATAR_HAIR_OPTIONS}
-          selected={avatarCustomization.hairStyle}
-          onSelect={(value) => updateAvatar('hairStyle', value)}
-        />
-        <ColorRow
-          title="Hair colour"
-          colors={AVATAR_HAIR_COLORS}
-          selected={avatarCustomization.hairColor}
-          onSelect={(value) => updateAvatar('hairColor', value)}
-        />
-        <ChoiceRow
-          title="Beard"
-          options={AVATAR_BEARD_OPTIONS}
-          selected={avatarCustomization.facialHair}
-          onSelect={(value) => updateAvatar('facialHair', value)}
-        />
-        <ChoiceRow
-          title="Moustache"
-          options={AVATAR_MOUSTACHE_OPTIONS}
-          selected={avatarCustomization.moustache}
-          onSelect={(value) => updateAvatar('moustache', value)}
-        />
-        <ChoiceRow
-          title="Brows"
-          options={AVATAR_BROW_OPTIONS}
-          selected={avatarCustomization.browStyle}
-          onSelect={(value) => updateAvatar('browStyle', value)}
-        />
-        <ColorRow
-          title="Eye colour"
-          colors={AVATAR_EYE_COLORS}
-          selected={avatarCustomization.eyeColor}
-          onSelect={(value) => updateAvatar('eyeColor', value)}
-        />
-      </View>
+      <AvatarCustomizer
+        value={avatarConfig}
+        onChange={(next) => {
+          setAvatarConfig(next);
+          setHasChanges(true);
+        }}
+        playerName={
+          save.userPlayerId ? (save.players[save.userPlayerId]?.name ?? 'Your Player') : 'Your Player'
+        }
+        showOutfits={false}
+        testID="player-cosmetics-avatar"
+      />
 
       {/* Kit color */}
       <CosmeticGrid
@@ -441,7 +285,14 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
         selected={kit}
         gems={gems}
         ownedIds={ownedIds}
-        onSelect={(id, cost) => handleSelect(id, cost, setKit)}
+        onSelect={(id, cost) =>
+          handleSelect(id, cost, (nextKit) => {
+            setKit(nextKit);
+            setAvatarConfig((current) =>
+              normalizeAvatarConfig({ ...current, outfitId: outfitForKitId(nextKit) }),
+            );
+          })
+        }
       />
 
       {/* Celebration */}
@@ -463,26 +314,6 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    previewCard: {
-      marginTop: spacing.md,
-      borderRadius: radius.xl,
-      overflow: 'hidden',
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      ...shadow.card,
-    },
-    previewGradient: {
-      padding: spacing.xl,
-      alignItems: 'center',
-    },
-    previewPlayerName: {
-      color: colors.text,
-      fontSize: fontSize.xl,
-      fontWeight: fontWeight.black,
-      fontFamily: fonts.display,
-    },
-    previewCelLabel: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 4 },
-
     gemNote: {
       backgroundColor: colors.surfaceAlt,
       borderRadius: radius.md,
@@ -492,47 +323,6 @@ const makeStyles = (colors: ThemeColors) =>
       borderColor: colors.info + '44',
     },
     gemNoteText: { color: colors.textMuted, fontSize: fontSize.sm, textAlign: 'center' },
-    builderSurface: {
-      paddingVertical: spacing.sm,
-      borderTopWidth: 1,
-      borderBottomWidth: 1,
-      borderColor: colors.border,
-    },
-    builderGroup: { paddingVertical: spacing.sm },
-    builderLabel: {
-      color: colors.textMuted,
-      fontSize: fontSize.xs,
-      fontWeight: fontWeight.bold,
-      marginBottom: spacing.xs,
-    },
-    choiceRow: { gap: spacing.xs, paddingRight: spacing.lg },
-    choiceChip: {
-      minHeight: 38,
-      minWidth: 74,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    choiceChipActive: { borderColor: colors.accent, backgroundColor: colors.surfaceAlt },
-    choiceText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.semibold },
-    choiceTextActive: { color: colors.accent },
-    colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    builderSwatchWrap: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      borderWidth: 2,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    builderSwatchWrapActive: { borderColor: colors.accent },
-    builderSwatch: { width: 32, height: 32, borderRadius: 16 },
-
     sectionTitle: {
       color: colors.textMuted,
       fontSize: fontSize.sm,

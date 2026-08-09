@@ -14,7 +14,7 @@ interface State {
 
 /**
  * App-wide safety net. Any render/runtime error in the tree is caught here and
- * reported (crash facade → Sentry when wired), showing a recoverable fallback
+ * reported through the local crash facade, showing a recoverable fallback
  * instead of a white screen. Production-critical for store review + reviews.
  */
 export class ErrorBoundary extends React.Component<Props, State> {
@@ -36,12 +36,12 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   render(): React.ReactNode {
     if (!this.state.hasError) return this.props.children;
-    return <ErrorFallback onReset={this.reset} />;
+    return <ErrorFallback message={this.state.message} onReset={this.reset} />;
   }
 }
 
 /** Themed fallback UI (a functional child so it can read the active palette). */
-function ErrorFallback({ onReset }: { onReset: () => void }) {
+function ErrorFallback({ message, onReset }: { message?: string; onReset: () => void }) {
   const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.wrap}>
@@ -50,6 +50,7 @@ function ErrorFallback({ onReset }: { onReset: () => void }) {
       <Text style={styles.body}>
         The game hit an unexpected snag. Your progress is saved — tap below to get back to it.
       </Text>
+      {__DEV__ && message ? <Text style={styles.diagnostic}>{message}</Text> : null}
       <Pressable style={styles.button} onPress={onReset} accessibilityRole="button" accessibilityLabel="Try again">
         <Text style={styles.buttonText}>Try again</Text>
       </Pressable>
@@ -69,6 +70,14 @@ const makeStyles = (colors: ThemeColors) =>
     emoji: { fontSize: 48, marginBottom: spacing.md },
     title: { color: colors.text, fontSize: fontSize.xl, fontWeight: fontWeight.black, marginBottom: spacing.sm },
     body: { color: colors.textMuted, fontSize: fontSize.md, textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl },
+    diagnostic: {
+      color: colors.warning,
+      fontSize: fontSize.xs,
+      lineHeight: 18,
+      marginBottom: spacing.lg,
+      maxWidth: 720,
+      textAlign: 'center',
+    },
     button: {
       backgroundColor: colors.primary,
       borderRadius: radius.md,

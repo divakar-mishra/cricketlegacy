@@ -14,8 +14,3 @@ export function useIsCompact(breakpoint: number = COMPACT_BREAKPOINT): boolean {
   const { width } = useWindowDimensions();
   return width < breakpoint;
 }
-
-/** Number of columns for a responsive card grid: 2 on normal phones, 1 on compact. */
-export function useResponsiveColumns(breakpoint: number = COMPACT_BREAKPOINT): 1 | 2 {
-  return useIsCompact(breakpoint) ? 1 : 2;
-}

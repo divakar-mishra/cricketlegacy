@@ -13,9 +13,11 @@ import { RootStackParamList } from './src/navigation';
 import {
   AcademyManagementScreen,
   AcademyScreen,
+  AvatarQAScreen,
   CareerHubScreen,
   ClubOfficeScreen,
   ContractNegotiationScreen,
+  CricketAcademyScreen,
   DailyChallengeScreen,
   InternationalCalendarScreen,
   InvestmentScreen,
@@ -28,6 +30,7 @@ import {
   NewGameScreen,
   NotificationInboxScreen,
   PlayerCreationScreen,
+  PlayerLifeScreen,
   PlayerProfileScreen,
   PremiumClubhouseScreen,
   PressConferenceScreen,
@@ -136,6 +139,8 @@ export default function App() {
                   />
                   <Stack.Screen name="SavedGames" component={SavedGamesScreen} />
                   <Stack.Screen name="Settings" component={SettingsScreen} />
+                  <Stack.Screen name="CricketAcademy" component={CricketAcademyScreen} />
+                  {__DEV__ ? <Stack.Screen name="AvatarQA" component={AvatarQAScreen} /> : null}
                   <Stack.Screen name="Login" component={LoginScreen} />
                   <Stack.Screen name="Purchase" component={PurchaseScreen} />
                   <Stack.Screen
@@ -148,6 +153,7 @@ export default function App() {
                   <Stack.Screen name="Squad" component={SquadScreen} />
                   <Stack.Screen name="Transfers" component={TransfersScreen} />
                   <Stack.Screen name="PlayerProfile" component={PlayerProfileScreen} />
+                  <Stack.Screen name="PlayerLife" component={PlayerLifeScreen} />
                   <Stack.Screen name="Records" component={RecordsScreen} />
                   <Stack.Screen
                     name="Narrative"

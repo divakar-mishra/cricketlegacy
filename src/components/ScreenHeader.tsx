@@ -1,7 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { fonts, fontSize, fontWeight, spacing, ThemeColors, useThemedStyles } from '../theme';
 import { AppText as Text } from './AppText';
-import { fonts, fontSize, fontWeight, radius, spacing, ThemeColors, useThemedStyles } from '../theme';
+import { Icon } from './Icon';
 
 type Props = {
   title: string;
@@ -17,19 +18,23 @@ export function ScreenHeader({ title, subtitle, onBack, right }: Props) {
       {onBack ? (
         <Pressable
           onPress={onBack}
-          hitSlop={12}
+          hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          style={({ pressed }) => [styles.back, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [styles.back, pressed && styles.backPressed]}
         >
-          <Text style={styles.backArrow}>‹</Text>
+          <Icon name="chevron-back" size={24} />
         </Pressable>
       ) : null}
       <View style={styles.titleWrap}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
           {title}
         </Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        {subtitle ? (
+          <Text style={styles.subtitle} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
       {right ? <View>{right}</View> : null}
     </View>
@@ -38,24 +43,35 @@ export function ScreenHeader({ title, subtitle, onBack, right }: Props) {
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backArrow: { color: colors.text, fontSize: 28, lineHeight: 30, marginTop: -4 },
-  titleWrap: { flex: 1 },
-  title: { color: colors.text, fontSize: fontSize.xl, fontWeight: fontWeight.heavy, fontFamily: fonts.display },
-  subtitle: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 2, fontFamily: fonts.medium },
-});
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    back: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    backPressed: { opacity: 0.65 },
+    titleWrap: { flex: 1, minWidth: 0 },
+    title: {
+      color: colors.text,
+      fontSize: fontSize.xl,
+      fontWeight: fontWeight.heavy,
+      fontFamily: fonts.display,
+    },
+    subtitle: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      marginTop: 2,
+      fontFamily: fonts.medium,
+    },
+  });

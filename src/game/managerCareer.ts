@@ -6,8 +6,8 @@
  *   STATE   : Unlocked after winning 1+ league title or transitioning from a
  *             cricket player legend (50+ caps or 8,000+ career runs).
  *             Full 3-format domestic access; national selectors are watching.
- *   NATIONAL: The pinnacle. Manages the national team in the annual
- *             June-August international window.
+ *   NATIONAL: The pinnacle. Manages the national team through year-round
+ *             bilateral tours, WTC Tests and June-August ICC events.
  *
  * Four-year cycle starting in 2026:
  *   T20 World Cup -> World Test Championship -> Champions Trophy -> ODI World Cup.
@@ -36,7 +36,7 @@ export const MANAGER_LEVEL_DESC: Record<ManagerCareerLevel, string> = {
   ELITE:
     'Compete through the full domestic year. Win the Tier 1 Four-Day Shield to earn the national job.',
   NATIONAL:
-    'Lead the full domestic programme and take charge of the national team during the global window.',
+    'Lead the national side through autumn tours, winter WTC Tests and the global tournament window.',
 };
 
 /** Seasons with boardConfidence ≥ 80 needed (without a title) to earn STATE promotion. */
@@ -259,21 +259,6 @@ export function upcomingIccEvents(fromYear: number, years = 4): IccEvent[] {
     out.push(...iccEventsForYear(y));
   }
   return out;
-}
-
-/**
- * Compatibility entry point for the manager's shared international generator.
- */
-export function generateIccTournamentFixtures(save: SaveGame, _event: IccEvent): string[] {
-  if (save.mode !== 'manager' || !save.managerNationalTeamId) return [];
-  const country =
-    save.teams[save.managerNationalTeamId]?.country ??
-    (save.userTeamId ? save.teams[save.userTeamId]?.country : undefined) ??
-    'india';
-  return generateCountryInternationalWindowFixtures(save, country, {
-    controlledTeamId: save.managerNationalTeamId,
-    managerPhase: save.managerCalendar ? 'OFF_SEASON' : undefined,
-  });
 }
 
 /**
