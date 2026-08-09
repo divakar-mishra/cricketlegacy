@@ -15,7 +15,12 @@ export interface SparklineProps {
 
 const PAD = 3;
 
-export function Sparkline({ values, width = 120, height = 36, color }: SparklineProps): ReactElement | null {
+export function Sparkline({
+  values,
+  width = 120,
+  height = 36,
+  color,
+}: SparklineProps): ReactElement | null {
   const colors = useColors();
   const col = color ?? colors.primary;
   const w = width > 0 ? width : 120;
@@ -65,5 +70,3 @@ export function Sparkline({ values, width = 120, height = 36, color }: Sparkline
     </Svg>
   );
 }
-
-export default Sparkline;

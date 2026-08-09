@@ -83,7 +83,7 @@ export function FirstMatchGuide({ active, onDone }: FirstMatchGuideProps) {
 
   return (
     <Animated.View
-      entering={SlideInDown.springify().damping(16)}
+      entering={SlideInDown.duration(200)}
       exiting={FadeOut.duration(200)}
       style={styles.wrap}
       pointerEvents="auto"

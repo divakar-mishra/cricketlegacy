@@ -1,4 +1,5 @@
 import { BowlerPlan } from '../intent';
+import { selectBowler } from '../ai';
 import { simulateInnings, InningsInput } from '../simulateInnings';
 import { LiveInnings } from '../liveInnings';
 import { LiveMatch } from '../liveMatch';
@@ -40,8 +41,88 @@ describe('LiveInnings (stepwise controller)', () => {
     expect(inn.balls).toBe(legal.length);
     const perOver: Record<number, number> = {};
     for (const e of legal) perOver[e.over] = (perOver[e.over] ?? 0) + 1;
-    const overs = Object.keys(perOver).map(Number).sort((a, b) => a - b);
+    const overs = Object.keys(perOver)
+      .map(Number)
+      .sort((a, b) => a - b);
     for (let i = 0; i < overs.length - 1; i++) expect(perOver[overs[i]]).toBe(6);
+  });
+
+  it('gives a selected T20 all-rounder at least two overs in auto and live play', () => {
+    const allRounder = { ...away.players[4], role: 'ALLROUNDER' as const };
+    const input = {
+      ...inningsInput(),
+      bowlingXI: away.players.map((player, index) => (index === 4 ? allRounder : player)),
+      preferredAllRounderId: allRounder.id,
+    };
+    const seed = seedFor(47);
+    const auto = simulateInnings(input, makeRng(seed));
+    const live = new LiveInnings(
+      { ...input, interactiveBowlerId: allRounder.id },
+      makeRng(seed),
+    ).runToEnd();
+
+    expect(
+      auto.bowling.find((card) => card.playerId === allRounder.id)?.balls,
+    ).toBeGreaterThanOrEqual(12);
+    expect(
+      live.bowling.find((card) => card.playerId === allRounder.id)?.balls,
+    ).toBeGreaterThanOrEqual(12);
+  });
+
+  it('treats an all-rounder minimum spell as a floor rather than an overs cap', () => {
+    const elite = {
+      ...away.players[4],
+      role: 'ALLROUNDER' as const,
+      bowlingStyle: 'PACE' as const,
+      bowling: {
+        paceOrSpin: 94,
+        accuracy: 96,
+        movement: 93,
+        variations: 92,
+        stamina: 95,
+      },
+      meta: { ...away.players[4].meta, form: 95 },
+    };
+    const support = away.players.slice(5, 10).map((player) => ({
+      ...player,
+      role: 'BOWLER' as const,
+      bowlingStyle: 'MEDIUM' as const,
+      bowling: {
+        paceOrSpin: 45,
+        accuracy: 45,
+        movement: 45,
+        variations: 45,
+        stamina: 55,
+      },
+      meta: { ...player.meta, form: 50 },
+    }));
+
+    const selected = selectBowler(
+      [elite, ...support],
+      {
+        format: 'T20',
+        conditions: NEUTRAL_CONDITIONS,
+        lastBowlerId: support[0].id,
+        oversBowled: {
+          [elite.id]: 2,
+          [support[0].id]: 2,
+          [support[1].id]: 2,
+          [support[2].id]: 2,
+          [support[3].id]: 2,
+          [support[4].id]: 2,
+        },
+        over: 14,
+        inningsOvers: 20,
+        striker: home.players[0],
+        bowlingFigures: {
+          [elite.id]: { balls: 12, runs: 8, wickets: 3 },
+        },
+        preferredPlayerId: elite.id,
+      },
+      () => 0,
+    );
+
+    expect(selected.id).toBe(elite.id);
   });
 
   it('honours batting intent: aggressive intent produces more sixes than defensive', () => {
@@ -50,13 +131,21 @@ describe('LiveInnings (stepwise controller)', () => {
     let blockSixes = 0;
 
     for (let i = 0; i < 60; i++) {
-      const bigLi = new LiveInnings({ ...inningsInput(), interactiveBatterId }, makeRng(seedFor(i + 300)));
+      const bigLi = new LiveInnings(
+        { ...inningsInput(), interactiveBatterId },
+        makeRng(seedFor(i + 300)),
+      );
       while (!bigLi.complete) bigLi.nextBall(bigLi.needsIntent() ? 'BIG' : undefined);
       bigSixes += bigLi.finalize().batting.find((b) => b.playerId === interactiveBatterId)!.sixes;
 
-      const blockLi = new LiveInnings({ ...inningsInput(), interactiveBatterId }, makeRng(seedFor(i + 300)));
+      const blockLi = new LiveInnings(
+        { ...inningsInput(), interactiveBatterId },
+        makeRng(seedFor(i + 300)),
+      );
       while (!blockLi.complete) blockLi.nextBall(blockLi.needsIntent() ? 'BLOCK' : undefined);
-      blockSixes += blockLi.finalize().batting.find((b) => b.playerId === interactiveBatterId)!.sixes;
+      blockSixes += blockLi
+        .finalize()
+        .batting.find((b) => b.playerId === interactiveBatterId)!.sixes;
     }
 
     expect(bigSixes).toBeGreaterThan(blockSixes);

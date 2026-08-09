@@ -21,10 +21,9 @@ export function formatClubCurrency(amount: number): string {
   const rounded = Math.round(Number.isFinite(amount) ? amount : 0);
   const sign = rounded < 0 ? '-' : '';
   const n = Math.abs(rounded);
-  if (n >= 10_000_000) return `${sign}₹${(n / 10_000_000).toFixed(2)}Cr`;
-  if (n >= 100_000) return `${sign}₹${(n / 100_000).toFixed(1)}L`;
-  if (n >= 1000) return `${sign}₹${Math.round(n / 1000)}k`;
-  return `${sign}₹${n}`;
+  if (n >= 1_000_000) return `${sign}$${(n / 1_000_000).toFixed(2)}m`;
+  if (n >= 1000) return `${sign}$${Math.round(n / 1000)}k`;
+  return `${sign}$${n}`;
 }
 
 /** Total seasonal wage bill for a squad. */

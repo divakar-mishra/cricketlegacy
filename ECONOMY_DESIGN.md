@@ -1,36 +1,37 @@
 # Economy Design
 
-Status: **NO-GO** for multi-currency release.
+Status: **NO-GO** for a fully localized multi-currency release.
 
 ## Current Model
 
-The current save model stores account coins, gems, and energy in `wallet`. Manager club money is stored on `Team.budget` and `SaveGame.finances.transferBudget`, with display formatting in `src/game/finance.ts`.
-
-## Required Model
-
-The tested canonical type now exists in `src/game/money.ts`:
-
-```ts
-type Money = {
-  amountMinor: string;
-  currencyCode: string;
-};
-```
-
-No club, transfer, wage, contract, auction, or financial-history amount should exist without an ISO 4217 `currencyCode`.
+- Account coins, gems and save-compatible `energy` live in `wallet`.
+- Manager club balance and transfer budget remain operational numeric values on
+  the team and manager-finance state.
+- `StoredMoney` and `CanonicalClubFinance` live in `src/domain/types.ts`.
+  Schema 14 initializes their persisted compatibility mirror with an ISO 4217
+  currency code.
+- Current gameplay still spends the numeric manager-finance fields, so the
+  canonical money mirror is not yet the sole source of truth.
 
 ## Rules
 
-- Account coins and gems must never display fiat symbols.
-- Google Play prices must never be stored as club finance.
-- Club finance currency follows the club/competition, not the user's app-store country.
-- Historical contracts and finance history keep their original currency.
-- Cross-currency transfers require a versioned game exchange-rate table.
+- Account coins and gems never display fiat symbols.
+- Store prices come from RevenueCat/Google Play metadata in release builds.
+- Club finance currency follows the club or competition, not the app-store
+  country.
+- Historical contracts and finance transactions must retain their original
+  currency.
+- Cross-currency transfers require a versioned in-game exchange-rate table.
 
-## Current Blockers
+## Remaining Blockers
 
-- The Money utility exists and is unit-tested, but it is not yet wired into persisted save data.
-- Existing `Team.budget`, `ClubFinances.transferBudget`, wages, staff wages, facility costs, and contract values are plain numbers.
-- `formatClubCurrency` still assumes INR-style display.
-- Legacy save migration for club/contract currencies is not implemented.
-- Auction/transfer currency ownership is not modeled.
+- Replace operational numeric club finance, wages and contracts with
+  `StoredMoney` end to end.
+- Select currency from the active club/country instead of the current
+  compatibility default.
+- Migrate historical finance and contract records without inventing precision.
+- Keep auction, transfer, wage and facility calculations in one currency-aware
+  service.
+
+The complete current economy and all live prices are documented in
+`docs/APP_COMPLETE_REFERENCE.md`.

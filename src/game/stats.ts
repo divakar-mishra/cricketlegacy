@@ -1,5 +1,7 @@
 import { Format, MatchState, PlayerStats, SaveGame } from '../domain/types';
 
+type CareerScope = 'domestic' | 'international';
+
 export function emptyStats(): PlayerStats {
   return {
     matches: 0,
@@ -21,7 +23,19 @@ export function emptyStats(): PlayerStats {
 }
 
 /** Career + season stat objects for a player (both created on demand). */
-function statTargets(save: SaveGame, playerId: string, format?: Format): PlayerStats[] {
+function matchScope(save: SaveGame, match: MatchState): CareerScope {
+  const fixture = save.fixtures[match.id];
+  return fixture?.competition === 'BILATERAL_SERIES' || fixture?.competition === 'INTL_TOURNAMENT'
+    ? 'international'
+    : 'domestic';
+}
+
+function statTargets(
+  save: SaveGame,
+  playerId: string,
+  format?: Format,
+  scope?: CareerScope,
+): PlayerStats[] {
   const p = save.players[playerId];
   if (!p) return [];
   if (!p.careerStats) p.careerStats = emptyStats();
@@ -32,6 +46,16 @@ function statTargets(save: SaveGame, playerId: string, format?: Format): PlayerS
     if (!p.formatStats) p.formatStats = {};
     if (!p.formatStats[format]) p.formatStats[format] = emptyStats();
     targets.push(p.formatStats[format]!);
+    if (!p.seasonFormatStats) p.seasonFormatStats = {};
+    if (!p.seasonFormatStats[format]) p.seasonFormatStats[format] = emptyStats();
+    targets.push(p.seasonFormatStats[format]!);
+  }
+  if (scope === 'domestic') {
+    if (!p.domesticStats) p.domesticStats = emptyStats();
+    targets.push(p.domesticStats);
+  } else if (scope === 'international') {
+    if (!p.internationalStats) p.internationalStats = emptyStats();
+    targets.push(p.internationalStats);
   }
   return targets;
 }
@@ -49,20 +73,29 @@ function updateBest(s: PlayerStats, wickets: number, runs: number): void {
 /** Merge a completed match into every involved player's career + season stats. */
 export function applyMatchToStats(save: SaveGame, match: MatchState): void {
   const format = match.format;
+  const scope = matchScope(save, match);
   const counted = new Set<string>();
   const countMatch = (playerId: string) => {
     if (counted.has(playerId)) return;
-    const targets = statTargets(save, playerId, format);
+    const targets = statTargets(save, playerId, format, scope);
     if (targets.length) {
       targets.forEach((s) => s.matches++);
       counted.add(playerId);
     }
   };
 
+  // An appearance belongs to every selected XI member, including a batter who
+  // was not required and a fielder who did not bowl.
+  for (const teamId of [match.homeTeamId, match.awayTeamId]) {
+    const team = save.teams[teamId];
+    const selected = team?.xi?.length ? team.xi : (team?.playerIds.slice(0, 11) ?? []);
+    selected.forEach(countMatch);
+  }
+
   for (const inn of match.innings) {
     for (const b of inn.batting) {
       if (b.balls === 0 && !b.out) continue; // did not bat
-      const targets = statTargets(save, b.playerId, format);
+      const targets = statTargets(save, b.playerId, format, scope);
       if (!targets.length) continue;
       countMatch(b.playerId);
       for (const s of targets) {
@@ -78,7 +111,7 @@ export function applyMatchToStats(save: SaveGame, match: MatchState): void {
     }
 
     for (const bw of inn.bowling) {
-      const targets = statTargets(save, bw.playerId, format);
+      const targets = statTargets(save, bw.playerId, format, scope);
       if (!targets.length) continue;
       countMatch(bw.playerId);
       for (const s of targets) {
@@ -91,7 +124,7 @@ export function applyMatchToStats(save: SaveGame, match: MatchState): void {
 
     for (const ev of inn.events) {
       if (!ev.isWicket || !ev.dismissal?.fielderId) continue;
-      const targets = statTargets(save, ev.dismissal.fielderId);
+      const targets = statTargets(save, ev.dismissal.fielderId, format, scope);
       if (!targets.length) continue;
       if (ev.dismissal.type === 'CAUGHT') targets.forEach((s) => s.catches++);
       else if (ev.dismissal.type === 'STUMPED') targets.forEach((s) => s.stumpings++);
@@ -101,5 +134,8 @@ export function applyMatchToStats(save: SaveGame, match: MatchState): void {
 
 /** Wipe every player's season stats (called on a new season). */
 export function resetSeasonStats(save: SaveGame): void {
-  for (const p of Object.values(save.players)) p.seasonStats = emptyStats();
+  for (const p of Object.values(save.players)) {
+    p.seasonStats = emptyStats();
+    p.seasonFormatStats = {};
+  }
 }

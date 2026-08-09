@@ -32,7 +32,9 @@ export function LeagueEditorScreen({ navigation }: ScreenProps<'LeagueEditor'>) 
     ),
   );
   const [teamNames, setTeamNames] = useState<Record<string, string>>(() =>
-    Object.fromEntries(teamIds.map((id) => [id, save?.teams[id]?.name ?? id])),
+    Object.fromEntries(
+      teamIds.map((id, index) => [id, save?.teams[id]?.name ?? `Team ${index + 1}`]),
+    ),
   );
 
   if (!save) {

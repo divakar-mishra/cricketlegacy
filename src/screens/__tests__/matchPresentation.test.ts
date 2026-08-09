@@ -3,8 +3,12 @@ import path from 'path';
 
 describe('shared match presentation', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'MatchScreen.tsx'), 'utf8');
+  const fieldSource = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'components', 'FieldView.tsx'),
+    'utf8',
+  );
 
-  it('retains a full multi-innings commentary archive and exposes the ball log', () => {
+  it('retains one recent feed plus a full multi-innings commentary archive', () => {
     expect(source).toContain('const commentaryArchiveRef = useRef<FeedItem[]>([])');
     expect(source).toContain('commentaryArchiveRef.current.push(item)');
     expect(source).toContain('commentaryArchiveRef.current.length > 2400');
@@ -28,18 +32,31 @@ describe('shared match presentation', () => {
     expect(source).toContain('const showCinematic = speedMultRef.current === 1');
     expect(source).toContain('if (showCinematic) fireCelebration');
     expect(source).toContain('const fastMatchUi = speedMult > 1');
-    expect(source).toContain('const liveViewVisible = fastMatchUi || matchView ===');
     expect(source).toContain('fastMatchUi && styles.scoreCardFast');
-    expect(source).toContain('fastMatchUi && styles.liveCommentaryCardFast');
-    expect(source).toContain("!fastMatchUi && graphics === 'high' && !threeDUnavailable");
+    expect(source).toContain('fastMatchUi && styles.midRowFast');
+    expect(source).toContain('fastMatchUi && styles.feedFast');
+    expect(source).toContain('renderCurrentStepRef.current');
     expect(source).toContain('speedMultRef.current === 1 || step.overComplete');
-    expect(source).toContain('speedMultRef.current === 1 && ev.outcome');
+    expect(source).toContain('renderCurrentStepRef.current &&');
+    expect(source).toContain('animate={!fastMatchUi}');
   });
 
-  it('uses 3D on high graphics with a 2D field fallback', () => {
-    expect(source).toContain("!fastMatchUi && graphics === 'high' && !threeDUnavailable");
-    expect(source).toContain('<StadiumScene3D');
+  it('uses a stable 2D live field and keeps detailed views post-match', () => {
     expect(source).toContain('<FieldView');
+    expect(source).not.toContain('<StadiumScene3D');
+    expect(source).not.toContain('matchViewTabs');
+    expect(source).toContain('<WagonWheel');
+    expect(source).toContain('topBatters(inn)');
+    expect(source).toContain('topBowlers(inn)');
+    expect(source).toContain('manhattanData(match.innings[0])');
+  });
+
+  it('applies the selected Premium Clubhouse Stadium Noir palette to the live field', () => {
+    expect(source).toContain('stadiumTheme={save?.seasonPassExperience?.selectedStadiumTheme}');
+    expect(fieldSource).toContain(
+      "NOIR: { outfield: '#050806', pitch: '#233D22', ring: '#B9F23D' }",
+    );
+    expect(fieldSource).toContain("stadiumTheme === 'stadium_noir'");
   });
 
   it('locks skip-to-batting after the first tap and hides irrelevant live missions', () => {
@@ -47,7 +64,22 @@ describe('shared match presentation', () => {
     expect(source).toContain('if (skipBusyRef.current) return;');
     expect(source).toContain('continueSkipAfterInningsBreak');
     expect(source).toContain('loading');
-    expect(source).toContain('if (fastMatchUi) return null;');
-    expect(source).toContain('if (!userInBatting && !met) return null;');
+    expect(source).not.toContain('Your Mission');
+    expect(source).not.toContain('missionCard');
+  });
+
+  it('requires manager preparation and explains opposition analysis before play modes unlock', () => {
+    expect(source).toContain('Review the opponent, choose a plan and confirm preparation');
+    expect(source).toContain('const [managerPreparationConfirmed, setManagerPreparationConfirmed]');
+    expect(source).toContain("mode !== 'manager' || managerPreparationConfirmed");
+    expect(source).toContain('Opposition unit ratings are out of 100');
+    expect(source).toContain('Apply Recommended Plan');
+    expect(source).toContain('Unlock Full Analysis');
+  });
+
+  it('uses the dismissible first-match guide without a live coach-card overlay', () => {
+    expect(source).toContain('<FirstMatchGuide');
+    expect(source).not.toContain('<CoachTip');
+    expect(source).not.toContain('tipShownThisMatchRef');
   });
 });

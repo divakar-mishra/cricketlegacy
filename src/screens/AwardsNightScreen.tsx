@@ -14,7 +14,6 @@ import Animated, {
   withDelay,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
   ZoomIn,
 } from 'react-native-reanimated';
@@ -118,7 +117,7 @@ function AwardReveal({ award, index }: { award: Award; index: number }) {
   useEffect(() => {
     const delay = index * 200;
     opacity.value = withDelay(delay, withTiming(1, { duration: 400 }));
-    scale.value = withDelay(delay, withSpring(1, { damping: 12, stiffness: 200 }));
+    scale.value = withDelay(delay, withTiming(1, { duration: 200 }));
     glow.value = withDelay(
       delay + 400,
       withRepeat(

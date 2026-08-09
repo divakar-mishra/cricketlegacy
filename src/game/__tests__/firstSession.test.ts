@@ -1,32 +1,5 @@
-import {
-  earlySessionPhase,
-  shouldShowAdvancedLiveOps,
-  shouldShowSeasonPass,
-} from '../readiness';
 import { seasonProgressMonth, validateSeasonState } from '../season';
 import { makeCareerSave } from './_depthHelpers';
-
-describe('first-session trust gates', () => {
-  it('hides the Season Pass for the first two matches (0 and 1), then reveals it', () => {
-    expect(shouldShowSeasonPass(0)).toBe(false);
-    expect(shouldShowSeasonPass(1)).toBe(false);
-    expect(shouldShowSeasonPass(2)).toBe(true);
-    expect(shouldShowSeasonPass(5)).toBe(true);
-  });
-
-  it('hides advanced liveops until the trusted loop', () => {
-    expect(shouldShowAdvancedLiveOps(0)).toBe(false);
-    expect(shouldShowAdvancedLiveOps(1)).toBe(false);
-    expect(shouldShowAdvancedLiveOps(2)).toBe(true);
-  });
-
-  it('progresses first -> second -> trusted across the opening matches', () => {
-    expect(earlySessionPhase(0)).toBe('FIRST_MATCH');
-    expect(earlySessionPhase(1)).toBe('SECOND_MATCH');
-    expect(earlySessionPhase(2)).toBe('TRUSTED_LOOP');
-    expect(earlySessionPhase(9)).toBe('TRUSTED_LOOP');
-  });
-});
 
 describe('validateSeasonState auto-heal', () => {
   it('repairs an out-of-range calendar month and a negative wallet', () => {

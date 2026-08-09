@@ -16,7 +16,7 @@
  *   - cancelScheduledNotificationAsync(id) / cancelAllScheduledNotificationsAsync()
  */
 
-export interface ScheduleLocalInput {
+interface ScheduleLocalInput {
   /** Optional stable identifier so a notification can be updated/cancelled. */
   id?: string;
   title: string;
@@ -26,7 +26,7 @@ export interface ScheduleLocalInput {
 }
 
 /** Stable notification identifiers for the app's recurring reminders. */
-export const NOTIF_ID = {
+const NOTIF_ID = {
   ENERGY_FULL: 'energy_full',
   DAILY_REMINDER: 'daily_reminder',
   STREAK_RISK: 'streak_risk',
@@ -58,8 +58,6 @@ interface NotificationsModule {
   getPermissionsAsync: () => Promise<PermissionStatus>;
   requestPermissionsAsync: (permissions?: unknown) => Promise<PermissionStatus>;
   scheduleNotificationAsync: (request: ScheduleRequest) => Promise<string>;
-  cancelScheduledNotificationAsync: (identifier: string) => Promise<void>;
-  cancelAllScheduledNotificationsAsync: () => Promise<void>;
   setNotificationHandler: (handler: unknown) => void;
   SchedulableTriggerInputTypes: { TIME_INTERVAL: string };
 }
@@ -88,7 +86,11 @@ function loadNotifications(): NotificationsModule | null {
     // Literal string is required so Metro can statically resolve the module.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = pickModule(require('expo-notifications'));
-    if (mod && typeof (mod as { scheduleNotificationAsync?: unknown }).scheduleNotificationAsync === 'function') {
+    if (
+      mod &&
+      typeof (mod as { scheduleNotificationAsync?: unknown }).scheduleNotificationAsync ===
+        'function'
+    ) {
       return mod as unknown as NotificationsModule;
     }
     return null;
@@ -114,19 +116,12 @@ async function ensurePermission(mod: NotificationsModule): Promise<boolean> {
   }
 }
 
-/** Requests notification permission. Resolves `false` if unavailable/denied. */
-export async function requestPermission(): Promise<boolean> {
-  const mod = loadNotifications();
-  if (!mod) return false;
-  return ensurePermission(mod);
-}
-
 /**
  * Schedules a local notification `seconds` from now. Resolves the platform
  * identifier, or `null` if notifications are unavailable or permission was not
  * granted. Never throws.
  */
-export async function scheduleLocal(input: ScheduleLocalInput): Promise<string | null> {
+async function scheduleLocal(input: ScheduleLocalInput): Promise<string | null> {
   const mod = loadNotifications();
   if (!mod) return null;
   try {
@@ -143,28 +138,6 @@ export async function scheduleLocal(input: ScheduleLocalInput): Promise<string |
     return await mod.scheduleNotificationAsync(request);
   } catch {
     return null;
-  }
-}
-
-/** Cancels a single scheduled notification by id. Safe no-op if unavailable. */
-export async function cancel(id: string): Promise<void> {
-  const mod = loadNotifications();
-  if (!mod) return;
-  try {
-    await mod.cancelScheduledNotificationAsync(id);
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Cancels all scheduled notifications. Safe no-op if unavailable. */
-export async function cancelAll(): Promise<void> {
-  const mod = loadNotifications();
-  if (!mod) return;
-  try {
-    await mod.cancelAllScheduledNotificationsAsync();
-  } catch {
-    /* ignore */
   }
 }
 
@@ -190,53 +163,45 @@ export function configureForegroundHandler(): void {
   }
 }
 
-/** Stable notification identifiers for the app's additional reminder types. */
-export const NOTIF_ID_EXT = {
-  ACHIEVEMENT_NEAR: 'achievement_near',
-  PLAYOFF_PRESSURE: 'playoff_pressure',
-  CONTRACT_EXPIRY: 'contract_expiry',
-  OPPONENT_WEAK: 'opponent_weak',
-} as const;
-
 // Randomized message variants for richer, less repetitive notifications.
 const ENERGY_FULL_BODIES = [
   "Captain, you're back at full energy — the squad is ready. Lead them to victory. 🏏",
-  "Full energy restored! The dressing room is buzzing. Time to take the field.",
+  'Full energy restored! The dressing room is buzzing. Time to take the field.',
   "⚡ You're back at 100%. The pitch is prepared — get out there and make it count.",
-  "Your energy is fully restored. The XI is warmed up and waiting for your call.",
-  "Ready to roll! Full energy means no excuses — go win that match. 🏆",
+  'Your energy is fully restored. The XI is warmed up and waiting for your call.',
+  'Ready to roll! Full energy means no excuses — go win that match. 🏆',
 ];
 
 const DAILY_REMINDER_BODIES = [
-  "Your daily reward is waiting at the pavilion. Claim your coins and keep the streak alive! 🔥",
+  'Your daily reward is waiting at the pavilion. Claim your coins and keep the streak alive! 🔥',
   "Morning, Captain. Your daily bonus is ready — don't let it expire unused.",
-  "🎁 Daily reward available! Collect your coins and get one step closer to legend status.",
+  '🎁 Daily reward available! Collect your coins and get one step closer to legend status.',
   "The treasury is full and waiting for you. Claim today's reward before midnight! 💰",
   "A new day, a new reward. Log in and collect what's yours before the clock runs out.",
 ];
 
 const STREAK_RISK_BODIES = [
   "🔥 Don't break your streak! Play a match today — every win counts toward your legacy.",
-  "Your win streak is on the line. Step up, Captain. The team is counting on you.",
-  "⚠️ Streak at risk! Less than a few hours left to play and keep the fire burning.",
+  'Your win streak is on the line. Step up, Captain. The team is counting on you.',
+  '⚠️ Streak at risk! Less than a few hours left to play and keep the fire burning.',
   "Don't let your hard-earned streak slip away. Jump in and dominate the opposition!",
-  "The streak lives or dies today. Are you going to let it end without a fight? 🏏",
+  'The streak lives or dies today. Are you going to let it end without a fight? 🏏',
 ];
 
 const MATCH_READY_BODIES = [
   "🏏 Matchday! Your next fixture is ready. The squad is primed — go show them what you're made of.",
-  "The opposition is warming up. Are you? Get in there and take the points.",
-  "Captain, the team needs your leadership. Matchday is here — time to deliver.",
-  "Your next match awaits. The pitch is set, the crowd is expecting fireworks. 🎆",
+  'The opposition is warming up. Are you? Get in there and take the points.',
+  'Captain, the team needs your leadership. Matchday is here — time to deliver.',
+  'Your next match awaits. The pitch is set, the crowd is expecting fireworks. 🎆',
   "Fixture alert! A win today could change everything — don't miss it.",
 ];
 
 const SEASON_ENDING_BODIES = [
-  "⏰ Season pass rewards expiring soon! Claim everything before the season resets.",
+  '⏰ Season pass rewards expiring soon! Claim everything before the season resets.',
   "Last chance to grab your battle pass rewards. Don't leave coins and gems on the table!",
-  "The season is closing. Finish your challenges and claim your final rewards. 🏆",
-  "Battle pass ending in 3 days. Are you leaving rewards unclaimed? Log in now!",
-  "Season finale incoming! Complete your objectives and collect your hard-earned prizes.",
+  'The season is closing. Finish your challenges and claim your final rewards. 🏆',
+  'Battle pass ending in 3 days. Are you leaving rewards unclaimed? Log in now!',
+  'Season finale incoming! Complete your objectives and collect your hard-earned prizes.',
 ];
 
 function pickLine(lines: readonly string[]): string {
@@ -267,7 +232,7 @@ export function scheduleDailyReminder(secondsUntil = 24 * 60 * 60): Promise<stri
 export function scheduleStreakRisk(secondsUntil = 20 * 60 * 60): Promise<string | null> {
   return scheduleLocal({
     id: NOTIF_ID.STREAK_RISK,
-    title: "🔥 Streak Alert — Play Today!",
+    title: '🔥 Streak Alert — Play Today!',
     body: pickLine(STREAK_RISK_BODIES),
     seconds: secondsUntil,
   });
@@ -289,111 +254,6 @@ export function scheduleSeasonEnding(secondsUntil = 3 * 24 * 60 * 60): Promise<s
     id: NOTIF_ID.SEASON_ENDING,
     title: '⏰ Season Rewards Expiring!',
     body: pickLine(SEASON_ENDING_BODIES),
-    seconds: secondsUntil,
-  });
-}
-
-/** Near-miss achievement nudge — fires when a player is close to an achievement. */
-export function scheduleAchievementNear(achievementName: string, progressDesc: string, secondsUntil = 2 * 60 * 60): Promise<string | null> {
-  return scheduleLocal({
-    id: NOTIF_ID_EXT.ACHIEVEMENT_NEAR,
-    title: `🏅 So Close — ${achievementName}`,
-    body: `${progressDesc}. Play now and make history! 🏏`,
-    seconds: secondsUntil,
-  });
-}
-
-/** Playoff pressure nudge — fires when the team is close to/needs a win for playoffs. */
-export function schedulePlayoffPressure(matchesLeft: number, secondsUntil = 6 * 60 * 60): Promise<string | null> {
-  const body = matchesLeft === 1
-    ? '🚨 Final regular-season match! Win to reach the playoffs — this is what it all comes down to.'
-    : `Only ${matchesLeft} matches left in the season. Every run, every wicket matters now. 🏆`;
-  return scheduleLocal({
-    id: NOTIF_ID_EXT.PLAYOFF_PRESSURE,
-    title: '🏆 Playoff Push!',
-    body,
-    seconds: secondsUntil,
-  });
-}
-
-/** Contract expiry reminder for player career. */
-export function scheduleContractExpiry(clubName: string, secondsUntil = 12 * 60 * 60): Promise<string | null> {
-  return scheduleLocal({
-    id: NOTIF_ID_EXT.CONTRACT_EXPIRY,
-    title: '📝 Contract Decision Needed',
-    body: `${clubName} is waiting on your contract decision. Don't leave them hanging — your career depends on it.`,
-    seconds: secondsUntil,
-  });
-}
-
-/** Matchday reminder with opponent info. */
-export function scheduleMatchVs(opponentName: string, secondsUntil = 8 * 60 * 60): Promise<string | null> {
-  return scheduleLocal({
-    id: NOTIF_ID.MATCH_READY,
-    title: `🏏 Matchday vs ${opponentName}`,
-    body: `The squad is ready. ${opponentName} awaits. Lead from the front and claim the points! ⚡`,
-    seconds: secondsUntil,
-  });
-}
-
-// ─── Additional rich notification types ──────────────────────────────────────
-
-/** Achievement unlocked — fires immediately after achievement check. */
-export function notifyAchievementUnlocked(title: string, description: string): Promise<string | null> {
-  return scheduleLocal({
-    id: `achievement_${Date.now()}`,
-    title: `🏅 Achievement Unlocked: ${title}`,
-    body: description,
-    seconds: 2,
-  });
-}
-
-/** Platinum achievement — special "legendary" notification. */
-export function notifyPlatinumAchievement(title: string): Promise<string | null> {
-  return scheduleLocal({
-    id: `platinum_${Date.now()}`,
-    title: `✦ PLATINUM: ${title}`,
-    body: '🌟 You have achieved something truly legendary. The Hall of Fame awaits.',
-    seconds: 2,
-  });
-}
-
-/** Transfer window closing — fires 24h before transfer reset. */
-export function scheduleTransferWindowClosing(secondsUntil = 24 * 60 * 60): Promise<string | null> {
-  return scheduleLocal({
-    id: 'transfer_window',
-    title: '🔁 Transfer Window Closing',
-    body: 'Last chance to strengthen your squad. The window closes soon — act now before it\'s too late!',
-    seconds: secondsUntil,
-  });
-}
-
-/** Board ultimatum — fires when confidence drops to orange zone. */
-export function scheduleBoardUltimatum(targetPosition: number, secondsUntil = 1): Promise<string | null> {
-  return scheduleLocal({
-    id: 'board_ultimatum',
-    title: '⚠️ Board Issues Ultimatum',
-    body: `Finish in the top ${targetPosition} or face the sack. The board has run out of patience. Deliver results.`,
-    seconds: secondsUntil,
-  });
-}
-
-/** Energy empty — invites watching an ad for a free refill. */
-export function scheduleEnergyEmptyAdOffer(secondsUntil = 1): Promise<string | null> {
-  return scheduleLocal({
-    id: 'energy_ad_offer',
-    title: '⚡ Out of Energy?',
-    body: 'Watch a short video for a FREE energy refill. Get back in the game immediately!',
-    seconds: secondsUntil,
-  });
-}
-
-/** Welcome back — fires if user hasn't played for 2 days. */
-export function scheduleWelcomeBack(secondsUntil = 48 * 60 * 60): Promise<string | null> {
-  return scheduleLocal({
-    id: 'welcome_back',
-    title: '👋 Your team misses you!',
-    body: 'The squad is ready and waiting. Don\'t leave them without a captain — get back in the game!',
     seconds: secondsUntil,
   });
 }

@@ -19,14 +19,8 @@ import {
   Player,
 } from '../domain/types';
 import { clamp } from '../utils/math';
-import { battingAggression, selectBowler } from './ai';
-import {
-  BowlerPlan,
-  FieldSetting,
-  Intent,
-  intentToAggression,
-  legalFieldSetting,
-} from './intent';
+import { battingAggression, requiredAllRounderBowler, selectBowler } from './ai';
+import { BowlerPlan, FieldSetting, Intent, intentToAggression, legalFieldSetting } from './intent';
 import { canBowl } from './rating';
 import { chance, pick, Rng } from './rng';
 import {
@@ -246,18 +240,23 @@ export class LiveInnings {
 
   private ensureOverStarted(): void {
     if (this.overStarted || this.finished) return;
-    const bowler = selectBowler(
-      this.effectiveBowlers,
-      {
-        format: this.format,
-        conditions: this.input.conditions,
-        lastBowlerId: this.lastBowlerId,
-        oversBowled: this.oversBowled,
-        over: this.overIndex,
-        striker: this.input.battingOrder[this.strikerIdx],
-      },
-      this.rng,
-    );
+    const selectionContext = {
+      format: this.format,
+      conditions: this.input.conditions,
+      lastBowlerId: this.lastBowlerId,
+      oversBowled: this.oversBowled,
+      over: this.overIndex,
+      striker: this.input.battingOrder[this.strikerIdx],
+      inningsOvers: this.maxOvers,
+      bowlingFigures: this.bowlerCards,
+      preferredPlayerId: this.input.interactiveBowlerId,
+    };
+    const bowler =
+      requiredAllRounderBowler(
+        this.effectiveBowlers,
+        selectionContext,
+        this.input.interactiveBowlerId,
+      ) ?? selectBowler(this.effectiveBowlers, selectionContext, this.rng);
     this.currentBowlerId = bowler.id;
     this.lastBowlerId = bowler.id;
     this.staminaNow = clamp(
@@ -467,7 +466,7 @@ export class LiveInnings {
 
     if (ev.isWicket) {
       this.wickets++;
-      if (ev.dismissal?.type !== 'RUN_OUT') bc.wickets++; // run-outs are not the bowler's wicket
+      if (ev.dismissal?.type !== 'RUN_OUT') bc.wickets++;
       const d: Dismissal = ev.dismissal!;
       if (d.type === 'CAUGHT') d.fielderId = randomFielder(this.fielders, bowler, this.rng).id;
       else if (d.type === 'STUMPED') d.fielderId = this.keeper.id;

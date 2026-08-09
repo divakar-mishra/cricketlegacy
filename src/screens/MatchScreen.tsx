@@ -42,12 +42,10 @@ import {
   ManhattanChart,
   Screen,
   ScreenHeader,
-  StadiumScene3D,
   WagonWheel,
 } from '../components';
-import type { WagonWheelShot } from '../components';
 import { getAchievement } from '../game/achievements';
-import { moment } from '../audio';
+import { moment, music } from '../audio';
 import { ads } from '../services';
 import { FORMATS } from '../data/gameConfig';
 import {
@@ -79,6 +77,9 @@ import { shotAngle, shotReach } from '../engine/shots';
 import { matchObjective } from '../game/progression';
 import { tacticalImpactSummary, tacticChangeImpact } from '../game/tactics';
 import { describeMatchup } from '../game/careerExperience';
+import { MANAGER_MATCH_ANALYSIS_COINS, managerResourceUsed } from '../game/managerResources';
+import { buildOppositionReport } from '../game/oppositionAnalysis';
+import { TossCall, TossChoice } from '../engine/toss';
 import { ScreenProps } from '../navigation';
 import { PlayResult, useCareer } from '../state/careerStore';
 import {
@@ -91,7 +92,6 @@ import {
   useTheme,
   useThemedStyles,
 } from '../theme';
-import { CoachTip, CoachTipId } from '../components/CoachTip';
 import { HeroBackground, VictoryHero } from '../components/HeroBackground';
 import { TypewriterText } from '../components/TypewriterText';
 import { useSettings } from '../state/settingsStore';
@@ -152,9 +152,18 @@ interface DRSState {
 interface Setup {
   homeTeamId: string;
   awayTeamId: string;
+  controlledTeamId?: string;
+  venue: string;
   conditions: Conditions;
   format: Format;
   isTest: boolean;
+  tossWinnerTeamId: string;
+  tossCoinFace: TossCall;
+  userCanCallToss: boolean;
+  tossChoice: TossChoice;
+  battingFirstTeamId: string;
+  userMayChooseToss: boolean;
+  tossReason: string;
 }
 
 const PITCH_LABEL: Record<string, string> = {
@@ -169,6 +178,30 @@ const WEATHER_LABEL: Record<string, string> = {
   OVERCAST: 'Overcast',
   HUMID: 'Humid',
 };
+
+function surfaceBriefing(conditions: Conditions, format: Format): string {
+  const { pitch, weather } = conditions;
+  if (pitch === 'GREEN' && weather === 'OVERCAST') {
+    return 'New-ball seam should be strongest early. Top-order patience and accurate pace matter.';
+  }
+  if (pitch === 'GREEN') {
+    return 'Expect pace, carry, and early movement before batting becomes easier.';
+  }
+  if (pitch === 'DUSTY') {
+    return format === 'TEST'
+      ? 'Spin and uneven bounce should grow across the match. First-innings runs carry extra value.'
+      : 'Slower balls and spin should grip. Clean rotation is safer than forcing every boundary.';
+  }
+  if (pitch === 'CRACKED') {
+    return 'Variable bounce raises wicket risk. Compact technique and disciplined lengths are rewarded.';
+  }
+  if (pitch === 'FLAT') {
+    return 'A high-scoring surface. Boundary prevention and changes of pace become decisive.';
+  }
+  return weather === 'HUMID'
+    ? 'A balanced surface with humidity aiding early movement. Conditions should settle later.'
+    : 'A balanced, true surface. Execution and match situation should outweigh the conditions.';
+}
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 const oversFromBalls = (balls: number): string => `${Math.floor(balls / 6)}.${balls % 6}`;
@@ -338,6 +371,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const commitDailyChallengeMatch = useCareer((s) => s.commitDailyChallengeMatch);
   const grantAdReward = useCareer((s) => s.grantAdReward);
   const setSaveTactics = useCareer((s) => s.setTactics);
+  const runManagerResource = useCareer((s) => s.useManagerResource);
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const TONE_COLOR = toneColors(colors);
@@ -396,17 +430,18 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const [managerTactics, setManagerTactics] = useState<Tactics>(
     save?.tactics ?? { batting: 'BALANCED', bowling: 'CONTAIN', field: 'BALANCED' },
   );
+  const [managerPreparationConfirmed, setManagerPreparationConfirmed] = useState(false);
+  const [managerAnalysisFlash, setManagerAnalysisFlash] = useState<string | null>(null);
   const [speedMult, setSpeedMult] = useState<MatchSpeed>(1);
-  const [matchView, setMatchView] = useState<'live' | 'field' | 'scorecard'>('live');
   const [commentaryOpen, setCommentaryOpen] = useState(false);
   const commentaryPauseRef = useRef(false);
   const [manualPaused, setManualPaused] = useState(false);
   const manualPauseRef = useRef(false);
-  const graphics = useSettings((s) => s.graphics);
-  const [threeDUnavailable, setThreeDUnavailable] = useState(false);
   // The live-match loop runs as a long-lived async closure, so it must read the
   // current speed from a ref — otherwise button/auto-slow changes never reach it.
   const speedMultRef = useRef<MatchSpeed>(1);
+  const fastRenderCountRef = useRef(0);
+  const renderCurrentStepRef = useRef(true);
   const changeSpeed = useCallback((next: MatchSpeed) => {
     speedMultRef.current = next;
     setSpeedMult(next);
@@ -427,10 +462,16 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const overSummaryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [matchRole, setMatchRole] = useState<'BATTING' | 'BOWLING' | 'NONE'>('NONE');
   const [setup, setSetup] = useState<Setup | null>(null);
+  const [selectedTossCall, setSelectedTossCall] = useState<TossCall | null>(null);
+  const [tossRevealed, setTossRevealed] = useState(false);
+  const [coinFlipping, setCoinFlipping] = useState(false);
+  const coinFlipRotation = useSharedValue(0);
+  const tossRevealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const coinFlipStyle = useAnimatedStyle(() => ({
+    transform: [{ perspective: 600 }, { rotateY: `${coinFlipRotation.value}deg` }],
+  }));
   const [result, setResult] = useState<PlayResult | null>(null);
   const [lastShot, setLastShot] = useState<LastShot | null>(null);
-  const [liveShots, setLiveShots] = useState<WagonWheelShot[]>([]);
-  const liveShotsRef = useRef<WagonWheelShot[]>([]);
   const [celebration, setCelebration] = useState<{ trigger: number; kind: CelebrationKind }>({
     trigger: 0,
     kind: null,
@@ -446,17 +487,13 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const [driveMode, setDriveMode] = useState<Mode | null>(null);
 
   // FTUE coach tips
-  const dismissedTips = useSettings((s) => s.dismissedTips);
-  const dismissTip = useSettings((s) => s.dismissTip);
   const playedMatchesAllModes = useSettings((s) => s.playedMatchesAllModes);
-  const [activeTip, setActiveTip] = useState<CoachTipId | null>(null);
   // First-match-only guided prompts (career mode, before any match ever played).
   const [firstGuideDone, setFirstGuideDone] = useState(false);
   const firstGuideDoneRef = useRef(false);
   const guidePauseRef = useRef(false);
   // Increments each over so the LiveTacticPanel pulses when the AI re-plans.
   const [tacticPulse, setTacticPulse] = useState(0);
-  const shownTipsRef = useRef<Set<string>>(new Set());
   const [partnershipRuns, setPartnershipRuns] = useState(0);
   const [partnershipBalls, setPartnershipBalls] = useState(0);
   const partnershipRunsRef = useRef(0);
@@ -486,11 +523,26 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveDialogOpen = useRef(false);
 
+  useEffect(
+    () => () => {
+      music.setMusicScene('MENU');
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (phase === 'prematch' || phase === 'live') music.setMusicScene('MATCH_CALM');
+    else if (phase === 'done') music.setMusicScene(result?.userWon ? 'VICTORY' : 'DEFEAT');
+  }, [phase, result?.userWon]);
+
   const userTeamId = save?.userTeamId;
   const userPlayerId = save?.userPlayerId;
   const nameOf = useCallback((id: string) => save?.players[id]?.name ?? '—', [save]);
-  const teamName = useCallback((id: string) => save?.teams[id]?.name ?? id, [save]);
-  const teamShort = useCallback((id: string) => save?.teams[id]?.shortName ?? id, [save]);
+  const teamName = useCallback((id: string) => save?.teams[id]?.name ?? 'Opposition', [save]);
+  const teamShort = useCallback(
+    (id: string) => save?.teams[id]?.shortName ?? save?.teams[id]?.name ?? 'OPP',
+    [save],
+  );
   const activeMatch = phase === 'prematch' || phase === 'live';
   const leaveMatch = useCallback(() => {
     leaveDialogOpen.current = false;
@@ -739,6 +791,19 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       const ev = step.event;
       const tone = toneFor(ev);
       const stepId = (feedId.current += 1);
+      fastRenderCountRef.current += 1;
+      const speed = speedMultRef.current;
+      const mustRender =
+        speed === 1 ||
+        step.overComplete ||
+        step.inningsBreak ||
+        step.matchComplete ||
+        step.event.isWicket ||
+        Boolean(step.milestone) ||
+        step.event.outcome === '4' ||
+        step.event.outcome === '6';
+      renderCurrentStepRef.current =
+        mustRender || fastRenderCountRef.current % Math.max(1, speed) === 0;
 
       // Track partnership runs/balls — reset on wicket
       if (ev.isWicket) {
@@ -772,16 +837,20 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         commentaryArchiveRef.current.splice(0, commentaryArchiveRef.current.length - 2400);
       }
 
-      setDisplay((prev) => {
-        let dots = prev.overDots;
-        if (clearDots.current) {
-          dots = [];
-          clearDots.current = false;
-        }
-        dots = [...dots, { sym: symbolFor(ev), tone }];
-        if (step.overComplete) clearDots.current = true;
-        return { ...prev, overDots: dots, feed: [item, ...prev.feed].slice(0, 12) };
-      });
+      if (renderCurrentStepRef.current) {
+        setDisplay((prev) => {
+          let dots = prev.overDots;
+          if (clearDots.current) {
+            dots = [];
+            clearDots.current = false;
+          }
+          dots = [...dots, { sym: symbolFor(ev), tone }];
+          if (step.overComplete) clearDots.current = true;
+          return { ...prev, overDots: dots, feed: [item, ...prev.feed].slice(0, 12) };
+        });
+      } else if (step.overComplete) {
+        clearDots.current = true;
+      }
 
       if (mode === 'career' && userPlayerId && step.wicketOf === userPlayerId) {
         userDismissedRef.current = true;
@@ -800,8 +869,9 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         setReviewableWicket(null);
       }
 
-      // Ball geography for the 2D field (skip extras that aren't off the bat).
-      if (speedMultRef.current === 1 && ev.outcome !== 'WD' && ev.outcome !== 'NB') {
+      // Keep the 2D field alive at every speed. Fast modes update only on their
+      // batched render step, so they remain readable without flooding the UI.
+      if (renderCurrentStepRef.current && ev.outcome !== 'WD' && ev.outcome !== 'NB') {
         setLastShot({
           key: stepId,
           angleDeg: shotAngle(ev),
@@ -809,19 +879,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           tone,
         });
       }
-      if (step.inningsBreak) {
-        liveShotsRef.current = [];
-        setLiveShots([]);
-      } else if (ev.outcome !== 'WD' && ev.outcome !== 'NB' && ev.runs > 0) {
-        liveShotsRef.current = [
-          ...liveShotsRef.current,
-          { angleDeg: shotAngle(ev), runs: ev.runs },
-        ].slice(-48);
-        if (speedMultRef.current === 1 || step.overComplete) {
-          setLiveShots([...liveShotsRef.current]);
-        }
-      }
-
       // Sound + haptic + celebration juice (milestone takes priority).
       const showCinematic = speedMultRef.current === 1;
       if (step.milestone) {
@@ -869,19 +926,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         }
       }
 
-      // FTUE coach tips — shown once each for first-time players
-      if (mode === 'career' && playedMatchesAllModes < 3 && speedMultRef.current === 1) {
-        const maybeShowTip = (tipId: CoachTipId) => {
-          if (!dismissedTips.includes(tipId) && !shownTipsRef.current.has(tipId)) {
-            shownTipsRef.current.add(tipId);
-            guidePauseRef.current = true;
-            setActiveTip(tipId);
-          }
-        };
-        if (ev.outcome === '4' || ev.outcome === '6') maybeShowTip('first_four');
-        if (ev.isWicket) maybeShowTip('first_wicket');
-      }
-
       if (!step.milestone && step.wicketOf) {
         flashBanner({
           text: `WICKET! ${nameOf(step.wicketOf)} ${dismissalText(ev.dismissal)}`,
@@ -903,14 +947,11 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       }
     },
     [
-      dismissedTips,
       drsEligible,
       fireCelebration,
       flashBanner,
       mode,
       nameOf,
-      playedMatchesAllModes,
-      setActiveTip,
       userPlayerId,
       wicketFlashOpacity,
       wicketShakeX,
@@ -965,6 +1006,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       if (res?.userWon) {
         moment('win');
         setCelebration((prev) => ({ trigger: prev.trigger + 1, kind: 'win' }));
+      } else if (res) {
+        moment('defeat');
       }
     },
     [commitInternational, commitLiveMatch, commitDailyChallengeMatch, intl, daily],
@@ -992,27 +1035,10 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       skipRestOfInningsRef.current = false;
       skipBusyRef.current = false;
       setSkipBusyLabel(null);
-      liveShotsRef.current = [];
-      setLiveShots([]);
       guidePauseRef.current = false;
       userDismissedRef.current = false;
       setUserDismissed(false);
       setReviewableWicket(null);
-      // Show first FTUE tip at match start
-      if (
-        mode === 'career' &&
-        playedMatchesAllModes > 0 &&
-        playedMatchesAllModes < 3 &&
-        !dismissedTips.includes('match_intro')
-      ) {
-        setTimeout(() => {
-          if (!shownTipsRef.current.has('match_intro')) {
-            shownTipsRef.current.add('match_intro');
-            guidePauseRef.current = true;
-            setActiveTip('match_intro');
-          }
-        }, 1200);
-      }
       updateCrease(lm);
 
       while (!lm.matchDone && !cancelled.current) {
@@ -1147,7 +1173,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         // Without this, applyStep + updateCrease each cause a separate render.
         unstable_batchedUpdates(() => {
           applyStep(step);
-          updateCrease(lm);
+          if (renderCurrentStepRef.current) updateCrease(lm);
         });
 
         // Last-over tension: auto-drop 4× to 2× once so the climax is readable.
@@ -1162,6 +1188,10 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           autoSlowedRef.current = true;
           changeSpeed(2);
         }
+        if (ballsLeft != null && ballsLeft <= 12 && ballsLeft > 0) {
+          music.setMusicScene('MATCH_TENSE');
+        }
+        if (step.inningsBreak) music.setMusicScene('MATCH_CALM');
 
         // A "key moment" worth lingering on: a boundary, wicket, milestone,
         // innings break, or a genuinely tense game state (death overs / tight
@@ -1278,13 +1308,29 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       return;
     }
     lmRef.current = started.live;
+    const activeSave = useCareer.getState().save;
+    const activeFixture = activeSave?.fixtures[started.live.id];
+    const initialToss = started.live.tossDecision;
     setSetup({
       homeTeamId: started.live.homeTeamId,
       awayTeamId: started.live.awayTeamId,
+      controlledTeamId: started.live.controlledTeamId,
+      venue: activeFixture?.venue ?? (daily ? 'Daily Challenge Ground' : 'Neutral Cricket Ground'),
       conditions: started.live.conditions,
       format: started.live.format,
       isTest: started.live.isTest,
+      tossWinnerTeamId: initialToss.winnerTeamId,
+      tossCoinFace: initialToss.coinFace,
+      userCanCallToss: initialToss.userCanCall,
+      tossChoice: initialToss.choice,
+      battingFirstTeamId: initialToss.battingFirstTeamId,
+      userMayChooseToss: initialToss.userMayChoose,
+      tossReason: initialToss.reason,
     });
+    setSelectedTossCall(null);
+    setCoinFlipping(false);
+    setTossRevealed(!initialToss.userCanCall);
+    coinFlipRotation.value = 0;
     updateCrease(started.live);
     setPhase('prematch');
     return () => {
@@ -1299,6 +1345,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       if (bannerTimer.current) clearTimeout(bannerTimer.current);
       if (overSummaryTimer.current) clearTimeout(overSummaryTimer.current);
       if (drsTimer.current) clearTimeout(drsTimer.current);
+      if (tossRevealTimer.current) clearTimeout(tossRevealTimer.current);
       // Unblock any pending bowling plan wait so the loop can exit.
       planResolver.current?.('CONTAIN');
       planResolver.current = null;
@@ -1306,7 +1353,15 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       reviewResolver.current?.();
       reviewResolver.current = null;
     };
-  }, [beginLiveMatch, beginInternational, beginDailyChallengeMatch, intl, daily, updateCrease]);
+  }, [
+    beginLiveMatch,
+    beginInternational,
+    beginDailyChallengeMatch,
+    coinFlipRotation,
+    intl,
+    daily,
+    updateCrease,
+  ]);
 
   const onPlan = (p: BowlerPlan) => {
     const resolve = planResolver.current;
@@ -1361,14 +1416,100 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     });
   };
 
+  const callToss = (call: TossCall) => {
+    const live = lmRef.current;
+    if (!live || coinFlipping || !live.setTossCall(call)) return;
+    if (tossRevealTimer.current) clearTimeout(tossRevealTimer.current);
+    setSelectedTossCall(call);
+    setCoinFlipping(true);
+    coinFlipRotation.value = 0;
+    coinFlipRotation.value = withTiming(1080, { duration: 720 });
+    tossRevealTimer.current = setTimeout(() => {
+      const toss = live.tossDecision;
+      setSetup((current) =>
+        current
+          ? {
+              ...current,
+              tossWinnerTeamId: toss.winnerTeamId,
+              tossCoinFace: toss.coinFace,
+              tossChoice: toss.choice,
+              battingFirstTeamId: toss.battingFirstTeamId,
+              userMayChooseToss: toss.userMayChoose,
+              tossReason: toss.reason,
+            }
+          : current,
+      );
+      setCoinFlipping(false);
+      setTossRevealed(true);
+      moment('coin');
+      updateCrease(live);
+    }, 740);
+  };
+
+  const chooseToss = (choice: TossChoice) => {
+    const live = lmRef.current;
+    if (!tossRevealed || !live || !live.setTossChoice(choice)) return;
+    const toss = live.tossDecision;
+    setSetup((current) =>
+      current
+        ? {
+            ...current,
+            tossChoice: toss.choice,
+            battingFirstTeamId: toss.battingFirstTeamId,
+            tossReason: toss.reason,
+          }
+        : current,
+    );
+    updateCrease(live);
+  };
+
   if (phase === 'prematch' && setup) {
     const user = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
     const homeName = teamName(setup.homeTeamId);
     const awayName = teamName(setup.awayTeamId);
     const homeShort = teamShort(setup.homeTeamId);
     const awayShort = teamShort(setup.awayTeamId);
-    const isHome = setup.homeTeamId === save.userTeamId;
+    const isHome = setup.homeTeamId === setup.controlledTeamId;
     const userObj = user ? matchObjective(user.role) : null;
+    const userSelected = Boolean(
+      user &&
+      setup.controlledTeamId &&
+      (save.teams[setup.controlledTeamId]?.xi?.includes(user.id) ??
+        save.teams[setup.controlledTeamId]?.playerIds.includes(user.id)),
+    );
+    const headToHead = Object.values(save.fixtures).filter(
+      (fixture) =>
+        fixture.played &&
+        ((fixture.homeTeamId === setup.homeTeamId && fixture.awayTeamId === setup.awayTeamId) ||
+          (fixture.homeTeamId === setup.awayTeamId && fixture.awayTeamId === setup.homeTeamId)),
+    );
+    const homeHeadToHeadWins = headToHead.filter(
+      (fixture) => fixture.winnerTeamId === setup.homeTeamId,
+    ).length;
+    const awayHeadToHeadWins = headToHead.filter(
+      (fixture) => fixture.winnerTeamId === setup.awayTeamId,
+    ).length;
+    const bestPlayer = (teamId: string) =>
+      save.teams[teamId]?.playerIds
+        .map((playerId) => save.players[playerId])
+        .filter(Boolean)
+        .sort((a, b) => b.overall - a.overall)[0];
+    const homeKeyPlayer = bestPlayer(setup.homeTeamId);
+    const awayKeyPlayer = bestPlayer(setup.awayTeamId);
+    const managerReport =
+      mode === 'manager' ? buildOppositionReport(save, lmRef.current?.id) : undefined;
+    const managerAnalysisUsed = mode === 'manager' && managerResourceUsed(save, 'MATCH_ANALYSIS');
+    const applyRecommendedPlan = () => {
+      if (!managerReport) return;
+      applyManagerTactics(managerReport.recommendedTactics);
+      setManagerAnalysisFlash(
+        `Recommended plan applied: ${managerReport.recommendedTactics.batting} batting, ${managerReport.recommendedTactics.bowling} bowling, ${managerReport.recommendedTactics.field} field.`,
+      );
+    };
+    const buyManagerAnalysis = () => {
+      const outcome = runManagerResource('MATCH_ANALYSIS');
+      setManagerAnalysisFlash(outcome.detail ?? outcome.reason ?? 'Analysis is unavailable.');
+    };
 
     return (
       <Screen scroll gradient={gradients.pitch}>
@@ -1412,6 +1553,12 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         <Animated.View entering={FadeInDown.duration(350).delay(400)}>
           <Card style={styles.vsCard}>
             <Text style={styles.vsSub}>{FORMATS[setup.format].label}</Text>
+            <View style={styles.venueRow}>
+              <Icon name="location-outline" size={15} color={colors.textMuted} />
+              <Text style={styles.venueText} numberOfLines={1}>
+                {setup.venue}
+              </Text>
+            </View>
             <View style={styles.condRow}>
               <View style={styles.condPill}>
                 <Text style={styles.condEmoji}>🏟️</Text>
@@ -1422,30 +1569,210 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                 <Text style={styles.condText}>{WEATHER_LABEL[setup.conditions.weather]}</Text>
               </View>
             </View>
+            <Text style={styles.surfaceBrief}>
+              {surfaceBriefing(setup.conditions, setup.format)}
+            </Text>
           </Card>
         </Animated.View>
 
-        {/* Personal mission for career mode */}
-        {mode === 'career' && user && userObj ? (
+        <Animated.View entering={FadeInDown.duration(350).delay(460)}>
+          <Card style={styles.tossCard}>
+            <View style={styles.tossHeader}>
+              <Text style={styles.tossTitle}>Toss</Text>
+              <Text style={styles.tossWinner}>
+                {tossRevealed
+                  ? `${teamName(setup.tossWinnerTeamId)} won`
+                  : coinFlipping
+                    ? 'Coin in the air'
+                    : 'Make the call'}
+              </Text>
+            </View>
+            {!tossRevealed && setup.userCanCallToss ? (
+              <>
+                <Animated.View style={[styles.coin, coinFlipStyle]}>
+                  <Text style={styles.coinText}>{coinFlipping ? '' : '?'}</Text>
+                </Animated.View>
+                <Text style={styles.tossPrompt}>
+                  {coinFlipping
+                    ? `You called ${selectedTossCall?.toLowerCase()}.`
+                    : 'Call the coin'}
+                </Text>
+                <View style={styles.tossChoices}>
+                  {(['HEADS', 'TAILS'] as TossCall[]).map((call) => {
+                    const selected = selectedTossCall === call;
+                    return (
+                      <Pressable
+                        key={call}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        disabled={coinFlipping}
+                        onPress={() => callToss(call)}
+                        style={[styles.tossChoice, selected && styles.tossChoiceActive]}
+                      >
+                        <Text
+                          style={[styles.tossChoiceText, selected && styles.tossChoiceTextActive]}
+                        >
+                          {call === 'HEADS' ? 'Heads' : 'Tails'}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            ) : tossRevealed ? (
+              <>
+                <View style={styles.coinResultRow}>
+                  <View style={styles.coinSmall}>
+                    <Text style={styles.coinSmallText}>
+                      {setup.tossCoinFace === 'HEADS' ? 'H' : 'T'}
+                    </Text>
+                  </View>
+                  <Text style={styles.tossPrompt}>
+                    {setup.userCanCallToss && selectedTossCall
+                      ? `You called ${selectedTossCall.toLowerCase()}. It landed ${setup.tossCoinFace.toLowerCase()}.`
+                      : `The coin landed ${setup.tossCoinFace.toLowerCase()}.`}
+                  </Text>
+                </View>
+                {setup.userMayChooseToss ? (
+                  <>
+                    <Text style={styles.tossPrompt}>
+                      You won. Choose what your team does first.
+                    </Text>
+                    <View style={styles.tossChoices}>
+                      {(['BAT', 'BOWL'] as TossChoice[]).map((choice) => {
+                        const selected = setup.tossChoice === choice;
+                        return (
+                          <Pressable
+                            key={choice}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected }}
+                            onPress={() => chooseToss(choice)}
+                            style={[styles.tossChoice, selected && styles.tossChoiceActive]}
+                          >
+                            <Text
+                              style={[
+                                styles.tossChoiceText,
+                                selected && styles.tossChoiceTextActive,
+                              ]}
+                            >
+                              {choice === 'BAT' ? 'Bat first' : 'Bowl first'}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : (
+                  <Text style={styles.tossPrompt}>
+                    {teamName(setup.tossWinnerTeamId)} chose to {setup.tossChoice.toLowerCase()}{' '}
+                    first.
+                  </Text>
+                )}
+                <Text style={styles.tossOutcome}>
+                  {teamName(setup.battingFirstTeamId)} will bat first. {setup.tossReason}
+                </Text>
+              </>
+            ) : null}
+          </Card>
+        </Animated.View>
+
+        {/* One pre-match briefing; no objective is shown to benched players. */}
+        {mode === 'career' ? (
           <Animated.View entering={FadeInDown.duration(350).delay(520)}>
             <Card style={styles.missionPreCard}>
-              <Text style={styles.missionPreTitle}>🎯 Your Mission</Text>
-              <Text style={styles.missionPreName}>You play as {user.name}</Text>
-              <Text style={styles.missionPreGoal}>{userObj.text}</Text>
-              <View style={styles.missionPreReward}>
-                <Text style={styles.missionPreRewardText}>
-                  Complete for +{userObj.reward} coins
+              <Text style={styles.missionPreTitle}>Match briefing</Text>
+              <Text style={styles.missionPreName}>
+                {userSelected && user ? `Selected: ${user.name}` : 'Bench / rest assignment'}
+              </Text>
+              {userSelected && userObj ? (
+                <>
+                  <Text style={styles.missionPreGoal}>Personal objective: {userObj.text}</Text>
+                  <View style={styles.missionPreReward}>
+                    <Text style={styles.missionPreRewardText}>
+                      Objective reward: +{userObj.reward} coins
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <Text style={styles.missionPreGoal}>
+                  No personal challenge is active because you are not in the XI.
                 </Text>
-              </View>
+              )}
             </Card>
           </Animated.View>
         ) : (
           <Animated.View entering={FadeInDown.duration(350).delay(520)}>
             <Card style={styles.missionPreCard}>
-              <Text style={styles.missionPreTitle}>📋 Manager Mode</Text>
+              <Text style={styles.missionPreTitle}>Match Preparation</Text>
               <Text style={styles.missionPreGoal}>
-                Set your tactics and guide your side to victory.
+                Review the opponent, choose a plan and confirm preparation before entering the
+                match.
               </Text>
+              <Text style={styles.fieldRestrictionText}>
+                Head-to-head: {homeShort} {homeHeadToHeadWins}-{awayHeadToHeadWins} {awayShort}
+              </Text>
+              {managerReport ? (
+                <>
+                  <Text style={styles.preparationScale}>
+                    Opposition unit ratings are out of 100. Red means an elite danger, amber means
+                    strong, and green means manageable.
+                  </Text>
+                  <View style={styles.preparationRatings}>
+                    <PreparationRating label="Batting" value={managerReport.battingRating} />
+                    <PreparationRating label="Bowling" value={managerReport.bowlingRating} />
+                    <PreparationRating label="Fielding" value={managerReport.fieldingRating} />
+                  </View>
+                  <Text style={styles.preparationLine}>
+                    Attack shape: {managerReport.attackShape}
+                  </Text>
+                  {managerAnalysisUsed ? (
+                    <View style={styles.analysisReport}>
+                      <Text style={styles.analysisReportTitle}>Full opposition report</Text>
+                      <Text style={styles.preparationLine}>
+                        Batting threat: {managerReport.topBatter.name} (
+                        {managerReport.topBatter.rating}). {managerReport.topBatter.detail}
+                      </Text>
+                      <Text style={styles.preparationLine}>
+                        Bowling threat: {managerReport.topBowler.name} (
+                        {managerReport.topBowler.rating}). {managerReport.topBowler.detail}
+                      </Text>
+                      <Text style={styles.preparationLine}>Weakness: {managerReport.weakness}</Text>
+                      <Text style={styles.preparationLine}>
+                        Recommendation: {managerReport.recommendation}
+                      </Text>
+                      <Button
+                        label="Apply Recommended Plan"
+                        variant="secondary"
+                        size="sm"
+                        onPress={applyRecommendedPlan}
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.analysisLocked}>
+                      <Text style={styles.preparationLine}>
+                        The basic review shows unit strength and attack shape. Full analysis reveals
+                        named threats, a technical weakness and recommended tactics.
+                      </Text>
+                      <Button
+                        label={`Unlock Full Analysis · ${MANAGER_MATCH_ANALYSIS_COINS}`}
+                        variant="secondary"
+                        size="sm"
+                        disabled={save.wallet.coins < MANAGER_MATCH_ANALYSIS_COINS}
+                        onPress={buyManagerAnalysis}
+                      />
+                    </View>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.fieldRestrictionText}>
+                  Pitch: {PITCH_LABEL[setup.conditions.pitch]} · Key matchup:{' '}
+                  {homeKeyPlayer?.name ?? homeShort} ({homeKeyPlayer?.overall ?? '-'}) v{' '}
+                  {awayKeyPlayer?.name ?? awayShort} ({awayKeyPlayer?.overall ?? '-'})
+                </Text>
+              )}
+              {managerAnalysisFlash ? (
+                <Text style={styles.analysisFlash}>{managerAnalysisFlash}</Text>
+              ) : null}
               <Text style={styles.tacticPreLabel}>Batting approach</Text>
               <View style={styles.tacticPreRow}>
                 {TEAM_APPROACH_OPTIONS.map((o) => {
@@ -1515,71 +1842,51 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               <Text style={styles.fieldRestrictionText}>
                 More defensive fields unlock after the powerplay.
               </Text>
+              <Button
+                label={
+                  managerPreparationConfirmed ? 'Preparation Confirmed' : 'Confirm Preparation'
+                }
+                variant={managerPreparationConfirmed ? 'secondary' : 'primary'}
+                disabled={managerPreparationConfirmed}
+                onPress={() => setManagerPreparationConfirmed(true)}
+                style={{ marginTop: spacing.md }}
+              />
             </Card>
           </Animated.View>
         )}
 
-        {/* Batting stance — only relevant in career mode when user will bat */}
-        {mode === 'career' && (
-          <Animated.View entering={FadeInDown.duration(300).delay(560)}>
-            <Card style={{ marginTop: spacing.sm }}>
-              <Text style={styles.stancePreLabel}>Batting approach</Text>
-              <View style={styles.stanceChips}>
-                {BATTING_STANCES.map((o) => {
-                  const sel = battingStance === o.value;
-                  return (
-                    <Pressable
-                      key={o.value}
-                      style={[styles.stanceChip, sel && styles.stanceChipActive]}
-                      onPress={() => {
-                        setBattingStance(o.value);
-                        stanceRef.current = o.value;
-                      }}
-                    >
-                      <Text style={styles.stanceChipEmoji}>{o.emoji}</Text>
-                      <Text style={[styles.stanceChipLabel, sel && styles.stanceChipLabelActive]}>
-                        {o.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={styles.stancePreDesc}>
-                {BATTING_STANCES.find((s) => s.value === battingStance)?.desc} · change anytime
-                during the match
-              </Text>
-            </Card>
-          </Animated.View>
-        )}
+        {tossRevealed && (mode !== 'manager' || managerPreparationConfirmed) ? (
+          <>
+            <Animated.View entering={FadeInDown.duration(300).delay(560)}>
+              <Text style={styles.pickLabel}>How do you want to play it?</Text>
+            </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(300).delay(600)}>
-          <Text style={styles.pickLabel}>How do you want to play it?</Text>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(300).delay(640)}>
-          <ModeButton
-            emoji="🎙️"
-            title="Watch ball-by-ball"
-            desc="Live commentary; you choose your shot every ball you face."
-            onPress={() => drive('WATCH')}
-          />
-        </Animated.View>
-        <Animated.View entering={FadeInDown.duration(300).delay(680)}>
-          <ModeButton
-            emoji="⏱️"
-            title="Key moments"
-            desc="Skim the match; decide only the big moments."
-            onPress={() => drive('KEY')}
-          />
-        </Animated.View>
-        <Animated.View entering={FadeInDown.duration(300).delay(720)}>
-          <ModeButton
-            emoji="⏭️"
-            title="Instant sim"
-            desc="Jump straight to the result."
-            onPress={() => drive('INSTANT')}
-          />
-        </Animated.View>
+            <Animated.View entering={FadeInDown.duration(300).delay(600)}>
+              <ModeButton
+                emoji="🎙️"
+                title="Watch ball-by-ball"
+                desc="Live commentary; you choose your shot every ball you face."
+                onPress={() => drive('WATCH')}
+              />
+            </Animated.View>
+            <Animated.View entering={FadeInDown.duration(300).delay(640)}>
+              <ModeButton
+                emoji="⏱️"
+                title="Key moments"
+                desc="Skim the match; decide only the big moments."
+                onPress={() => drive('KEY')}
+              />
+            </Animated.View>
+            <Animated.View entering={FadeInDown.duration(300).delay(720)}>
+              <ModeButton
+                emoji="⏭️"
+                title="Instant sim"
+                desc="Jump straight to the result."
+                onPress={() => drive('INSTANT')}
+              />
+            </Animated.View>
+          </>
+        ) : null}
       </Screen>
     );
   }
@@ -2134,7 +2441,18 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                 if (skipBusyRef.current) return;
                 skipBusyRef.current = true;
                 setSkipBusyLabel(skipAction.label);
-                if (skipAction.kind === 'SKIP_REST_OF_INNINGS') {
+                manualPauseRef.current = false;
+                setManualPaused(false);
+                stancePauseRef.current = false;
+                setShowStancePicker(false);
+                tacticsPauseRef.current = false;
+                setTacticsOpen(false);
+                commentaryPauseRef.current = false;
+                guidePauseRef.current = false;
+                if (
+                  skipAction.kind === 'SKIP_REST_OF_INNINGS' ||
+                  skipAction.kind === 'SKIP_BOWLING_INNINGS'
+                ) {
                   skipRestOfInningsRef.current = true;
                 } else {
                   skipToBatRef.current = true;
@@ -2145,6 +2463,13 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                   planResolver.current = null;
                   setAwaitingPlan(false);
                   r('CONTAIN');
+                }
+                if (reviewResolver.current) {
+                  const resolve = reviewResolver.current;
+                  reviewResolver.current = null;
+                  pendingReviewRef.current = false;
+                  setAwaitingReview(false);
+                  resolve();
                 }
               }}
             />
@@ -2182,7 +2507,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   }
 
   const fastMatchUi = speedMult > 1;
-  const liveViewVisible = fastMatchUi || matchView === 'live';
+  const recentFeed = [...display.feed.slice(0, fastMatchUi ? 3 : 4)].reverse();
 
   return (
     <>
@@ -2301,7 +2626,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             ) : null}
           </GlassSurface>
 
-          {!fastMatchUi && matchup && c ? (
+          {matchup && c ? (
             <View
               style={styles.matchupBand}
               accessible
@@ -2355,184 +2680,74 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             />
           ) : null}
 
-          {/* ── YOUR MISSION card (career mode only, always visible) ── */}
-          {mode === 'career' && save.userPlayerId
-            ? (() => {
-                const userPlayer = save.players[save.userPlayerId];
-                if (!userPlayer) return null;
-                const obj = matchObjective(userPlayer.role);
-                // Track live progress for the user
-                const userInBatting =
-                  display.crease?.strikerId === save.userPlayerId ||
-                  display.crease?.nonStrikerId === save.userPlayerId;
-                const userStriker = display.crease?.strikerId === save.userPlayerId;
-                const userNonStriker = display.crease?.nonStrikerId === save.userPlayerId;
-                const userRuns =
-                  display.crease && userStriker
-                    ? display.crease.strikerRuns
-                    : display.crease && userNonStriker
-                      ? display.crease.nonStrikerRuns
-                      : 0;
-                const progressPct =
-                  obj.kind === 'RUNS' && obj.runs ? Math.min(1, userRuns / obj.runs) : 0;
-                const met = obj.kind === 'RUNS' && obj.runs ? userRuns >= obj.runs : false;
-                if (fastMatchUi) return null;
-                if (!userInBatting && !met) return null;
-                return (
-                  <Animated.View
-                    entering={FadeIn.duration(400)}
-                    style={[
-                      styles.missionCard,
-                      { borderColor: met ? colors.success : colors.accent },
-                    ]}
-                  >
-                    <View style={styles.missionRow}>
-                      <Text style={styles.missionIcon}>{met ? '✅' : '🎯'}</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.missionLabel}>YOUR MISSION</Text>
-                        <Text
-                          style={[
-                            styles.missionText,
-                            { color: met ? colors.success : colors.text },
-                          ]}
-                        >
-                          {obj.text}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.missionRewardBadge,
-                          { backgroundColor: met ? colors.success : colors.surfaceAlt },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.missionRewardText,
-                            { color: met ? colors.white : colors.accent },
-                          ]}
-                        >
-                          +{obj.reward}
-                        </Text>
-                      </View>
-                    </View>
-                    {obj.kind === 'RUNS' && obj.runs && userInBatting ? (
-                      <View style={{ marginTop: 6 }}>
-                        <View style={styles.missionBarBg}>
-                          <Animated.View
-                            style={[
-                              styles.missionBarFill,
-                              {
-                                width: `${progressPct * 100}%`,
-                                backgroundColor: met ? colors.success : colors.accent,
-                              },
-                            ]}
-                          />
-                        </View>
-                        <Text style={styles.missionProgress}>
-                          {userRuns} / {obj.runs} runs
-                        </Text>
-                      </View>
-                    ) : null}
-                  </Animated.View>
-                );
-              })()
-            : null}
-
-          {display.feed[0] ? (
-            <Animated.View
-              entering={speedMult === 1 ? SlideInDown.duration(180) : FadeIn.duration(80)}
-              style={[
-                styles.liveCommentaryCard,
-                fastMatchUi && styles.liveCommentaryCardFast,
-                { borderColor: TONE_COLOR[display.feed[0].tone] },
-              ]}
-              accessible
-              accessibilityLabel={`Latest commentary ${display.feed[0].label}: ${display.feed[0].text}`}
-            >
-              <View style={styles.liveCommentaryTop}>
-                <Text style={styles.liveCommentaryLabel}>Commentary</Text>
-                <View style={styles.commentaryActions}>
-                  <Text style={styles.liveCommentaryOver}>{display.feed[0].label}</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Open ball-by-ball commentary"
-                    hitSlop={8}
-                    onPress={openCommentary}
-                    style={styles.commentaryLogButton}
-                  >
-                    <Icon name="list" size={16} color={colors.primaryLight} />
-                    <Text style={styles.commentaryLogText}>Ball log</Text>
-                  </Pressable>
-                </View>
-              </View>
-              {speedMult === 1 ? (
-                <TypewriterText
-                  text={display.feed[0].text}
-                  speed={1}
-                  style={[styles.liveCommentaryText, { color: TONE_COLOR[display.feed[0].tone] }]}
-                  numberOfLines={3}
-                  charDelay={12}
-                />
-              ) : (
-                <Text
-                  style={[styles.liveCommentaryText, { color: TONE_COLOR[display.feed[0].tone] }]}
-                  numberOfLines={fastMatchUi ? 1 : 3}
-                  ellipsizeMode="tail"
-                >
-                  {display.feed[0].text}
-                </Text>
-              )}
-            </Animated.View>
-          ) : null}
-
-          {!fastMatchUi ? (
-            <View style={styles.matchViewTabs} accessibilityRole="tablist">
-              {(['live', 'field', 'scorecard'] as const).map((view) => {
-                const active = matchView === view;
-                return (
-                  <Pressable
-                    key={view}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: active }}
-                    onPress={() => setMatchView(view)}
-                    style={[styles.matchViewTab, active && styles.matchViewTabActive]}
-                  >
-                    <Text
-                      style={[styles.matchViewTabText, active && styles.matchViewTabTextActive]}
-                    >
-                      {view === 'live' ? 'Live' : view === 'field' ? 'Wagon' : 'Scorecard'}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+          <View
+            style={[styles.feed, fastMatchUi && styles.feedFast]}
+            accessibilityLabel="Recent commentary"
+          >
+            <View style={styles.recentFeedHeader}>
+              <Text style={styles.recentFeedTitle}>Recent commentary</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open ball-by-ball commentary"
+                onPress={openCommentary}
+                style={styles.viewAllButton}
+              >
+                <Text style={styles.viewAllText}>View innings</Text>
+                <Icon name="chevron-forward" size={14} color={colors.primaryLight} />
+              </Pressable>
             </View>
-          ) : null}
+            {recentFeed.map((f, idx) => (
+              <Animated.View
+                key={f.id}
+                entering={speedMult === 1 ? SlideInDown.duration(180) : FadeIn.duration(80)}
+                style={styles.feedRow}
+              >
+                <Text style={styles.feedLabel}>{f.label}</Text>
+                {/* Only typewrite the most recent commentary entry at 1x speed */}
+                {idx === recentFeed.length - 1 && speedMult === 1 ? (
+                  <TypewriterText
+                    text={f.text}
+                    speed={1}
+                    style={[styles.feedText, { color: TONE_COLOR[f.tone] }]}
+                    numberOfLines={2}
+                    charDelay={14}
+                  />
+                ) : (
+                  <Text
+                    style={[styles.feedText, { color: TONE_COLOR[f.tone] }]}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                  >
+                    {f.text}
+                  </Text>
+                )}
+              </Animated.View>
+            ))}
+          </View>
 
-          {!fastMatchUi && matchView === 'field' ? (
-            <View style={styles.liveFieldPanel}>
-              <Text style={styles.liveFieldTitle}>Live wagon wheel</Text>
-              <Text style={styles.liveFieldHint}>
-                Current innings · {fieldRestriction(liveFormat, currentOver).label}
-              </Text>
-              <WagonWheel shots={liveShots} size={240} />
-              {liveShots.length === 0 ? (
-                <Text style={styles.liveFieldEmpty}>
-                  Scoring shots will appear here as they happen.
+          <>
+            {/* Partnership Tracker */}
+            {c && partnershipRuns > 0 ? (
+              <Animated.View
+                entering={FadeIn.duration(300)}
+                style={[
+                  styles.partnershipBar,
+                  { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+                ]}
+              >
+                <Text style={styles.partnershipLabel}>Partnership</Text>
+                <Text style={styles.partnershipRuns}>
+                  {partnershipRuns}{' '}
+                  <Text style={styles.partnershipBalls}>({partnershipBalls})</Text>
                 </Text>
-              ) : null}
-            </View>
-          ) : null}
+                <Text style={styles.partnershipNames} numberOfLines={1}>
+                  {nameOf(c.strikerId)} & {nameOf(c.nonStrikerId)}
+                </Text>
+              </Animated.View>
+            ) : null}
 
-          {!fastMatchUi && matchView === 'scorecard' && c ? (
-            <Card style={styles.liveScorecardPanel}>
-              <View style={styles.scorecardHeaderRow}>
-                <Text style={styles.scorecardTitle}>Scorecard</Text>
-                <Text style={styles.scorecardMeta}>
-                  {s ? `${s.oversText} ov - CRR ${s.crr.toFixed(2)}` : ''}
-                </Text>
-              </View>
-              <View style={styles.scorecardSection}>
-                <Text style={styles.scorecardSectionLabel}>Batters</Text>
+            {c ? (
+              <Card style={styles.creaseCard}>
                 <CreaseRow
                   name={nameOf(c.strikerId)}
                   onStrike
@@ -2546,20 +2761,28 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                   balls={c.nonStrikerBalls}
                   isUser={c.nonStrikerId === save.userPlayerId}
                 />
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.scorecardSection}>
-                <Text style={styles.scorecardSectionLabel}>Bowler</Text>
+                <View style={styles.divider} />
                 <View style={styles.bowlerRow}>
                   <Text style={styles.bowlerName} numberOfLines={1}>
-                    {nameOf(c.bowlerId)}
+                    🎯 {nameOf(c.bowlerId)}
                   </Text>
                   <Text style={styles.bowlerFig}>
                     {c.bowlerWickets}/{c.bowlerRuns} ({oversFromBalls(c.bowlerBalls)})
                   </Text>
                 </View>
+              </Card>
+            ) : null}
+
+            <View style={[styles.midRow, fastMatchUi && styles.midRowFast]}>
+              <View style={styles.fieldWrap}>
+                <FieldView
+                  size={150}
+                  lastShot={lastShot}
+                  stadiumTheme={save?.seasonPassExperience?.selectedStadiumTheme}
+                  animate={!fastMatchUi}
+                />
               </View>
-              <View style={styles.scorecardOverRow}>
+              <View style={styles.overCol}>
                 <Text style={styles.overLabel}>This over</Text>
                 <View style={styles.dots}>
                   {display.overDots.map((d, i) => (
@@ -2569,139 +2792,13 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                   ))}
                 </View>
               </View>
-            </Card>
-          ) : null}
-
-          {liveViewVisible ? (
-            <>
-              {/* Partnership Tracker */}
-              {!fastMatchUi && c && partnershipRuns > 0 ? (
-                <Animated.View
-                  entering={FadeIn.duration(300)}
-                  style={[
-                    styles.partnershipBar,
-                    { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-                  ]}
-                >
-                  <Text style={styles.partnershipLabel}>Partnership</Text>
-                  <Text style={styles.partnershipRuns}>
-                    {partnershipRuns}{' '}
-                    <Text style={styles.partnershipBalls}>({partnershipBalls})</Text>
-                  </Text>
-                  <Text style={styles.partnershipNames} numberOfLines={1}>
-                    {nameOf(c.strikerId)} & {nameOf(c.nonStrikerId)}
-                  </Text>
-                </Animated.View>
-              ) : null}
-
-              {!fastMatchUi && c ? (
-                <Card style={styles.creaseCard}>
-                  <CreaseRow
-                    name={nameOf(c.strikerId)}
-                    onStrike
-                    runs={c.strikerRuns}
-                    balls={c.strikerBalls}
-                    isUser={c.strikerId === save.userPlayerId}
-                  />
-                  <CreaseRow
-                    name={nameOf(c.nonStrikerId)}
-                    runs={c.nonStrikerRuns}
-                    balls={c.nonStrikerBalls}
-                    isUser={c.nonStrikerId === save.userPlayerId}
-                  />
-                  <View style={styles.divider} />
-                  <View style={styles.bowlerRow}>
-                    <Text style={styles.bowlerName} numberOfLines={1}>
-                      🎯 {nameOf(c.bowlerId)}
-                    </Text>
-                    <Text style={styles.bowlerFig}>
-                      {c.bowlerWickets}/{c.bowlerRuns} ({oversFromBalls(c.bowlerBalls)})
-                    </Text>
-                  </View>
-                </Card>
-              ) : null}
-
-              {!fastMatchUi && graphics === 'high' && !threeDUnavailable ? (
-                <View style={styles.stadiumScene}>
-                  <StadiumScene3D
-                    lastShot={lastShot}
-                    theme={
-                      save.seasonPassExperience?.selectedStadiumTheme === 'stadium_noir'
-                        ? 'noir'
-                        : 'classic'
-                    }
-                    onUnavailable={() => setThreeDUnavailable(true)}
-                  />
-                  <View style={styles.stadiumOverRail}>
-                    <Text style={styles.overLabel}>This over</Text>
-                    <View style={styles.dots}>
-                      {display.overDots.map((d, i) => (
-                        <View key={i} style={[styles.dot, { borderColor: TONE_COLOR[d.tone] }]}>
-                          <Text style={[styles.dotText, { color: TONE_COLOR[d.tone] }]}>
-                            {d.sym}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-              ) : !fastMatchUi ? (
-                <View style={styles.midRow}>
-                  <View style={styles.fieldWrap}>
-                    <FieldView size={150} lastShot={lastShot} />
-                  </View>
-                  <View style={styles.overCol}>
-                    <Text style={styles.overLabel}>This over</Text>
-                    <View style={styles.dots}>
-                      {display.overDots.map((d, i) => (
-                        <View key={i} style={[styles.dot, { borderColor: TONE_COLOR[d.tone] }]}>
-                          <Text style={[styles.dotText, { color: TONE_COLOR[d.tone] }]}>
-                            {d.sym}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-              ) : null}
-            </>
-          ) : null}
-
-          {false && display.feed[0] ? (
-            <Animated.View
-              entering={speedMult === 1 ? SlideInDown.duration(180) : FadeIn.duration(80)}
-              style={[styles.liveCommentaryCard, { borderColor: TONE_COLOR[display.feed[0].tone] }]}
-              accessible
-              accessibilityLabel={`Latest commentary ${display.feed[0].label}: ${display.feed[0].text}`}
-            >
-              <View style={styles.liveCommentaryTop}>
-                <Text style={styles.liveCommentaryLabel}>Commentary</Text>
-                <Text style={styles.liveCommentaryOver}>{display.feed[0].label}</Text>
-              </View>
-              {speedMult === 1 ? (
-                <TypewriterText
-                  text={display.feed[0].text}
-                  speed={1}
-                  style={[styles.liveCommentaryText, { color: TONE_COLOR[display.feed[0].tone] }]}
-                  numberOfLines={3}
-                  charDelay={12}
-                />
-              ) : (
-                <Text
-                  style={[styles.liveCommentaryText, { color: TONE_COLOR[display.feed[0].tone] }]}
-                  numberOfLines={3}
-                  ellipsizeMode="tail"
-                >
-                  {display.feed[0].text}
-                </Text>
-              )}
-            </Animated.View>
-          ) : null}
+            </View>
+          </>
 
           {/* DRS Review decision prompt — the match loop is paused here */}
           {awaitingReview && !showDRSResult ? (
             <Animated.View
-              entering={SlideInDown.springify().damping(18)}
+              entering={SlideInDown.duration(200)}
               style={[styles.drsPrompt, { borderColor: colors.danger }]}
             >
               <Text style={styles.drsPromptTitle}>🔴 You&apos;ve been given OUT</Text>
@@ -2732,7 +2829,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           {/* DRS Review Result Overlay */}
           {showDRSResult && drs.lastReviewResult ? (
             <Animated.View
-              entering={SlideInDown.springify().damping(18)}
+              entering={SlideInDown.duration(200)}
               exiting={FadeOut.duration(300)}
               style={[
                 styles.drsResult,
@@ -2758,49 +2855,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               </View>
             </Animated.View>
           ) : null}
-
-          {!fastMatchUi ? (
-            <View style={styles.feed} accessibilityLabel="Recent commentary">
-              <View style={styles.recentFeedHeader}>
-                <Text style={styles.recentFeedTitle}>Recent balls</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={openCommentary}
-                  style={styles.viewAllButton}
-                >
-                  <Text style={styles.viewAllText}>View innings</Text>
-                  <Icon name="chevron-forward" size={14} color={colors.primaryLight} />
-                </Pressable>
-              </View>
-              {display.feed.slice(0, 4).map((f, idx) => (
-                <Animated.View
-                  key={f.id}
-                  entering={speedMult === 1 ? SlideInDown.duration(180) : FadeIn.duration(80)}
-                  style={styles.feedRow}
-                >
-                  <Text style={styles.feedLabel}>{f.label}</Text>
-                  {/* Only typewrite the most recent commentary entry at 1× speed */}
-                  {idx === 0 && speedMult === 1 ? (
-                    <TypewriterText
-                      text={f.text}
-                      speed={1}
-                      style={[styles.feedText, { color: TONE_COLOR[f.tone] }]}
-                      numberOfLines={2}
-                      charDelay={14}
-                    />
-                  ) : (
-                    <Text
-                      style={[styles.feedText, { color: TONE_COLOR[f.tone] }]}
-                      numberOfLines={2}
-                      ellipsizeMode="tail"
-                    >
-                      {f.text}
-                    </Text>
-                  )}
-                </Animated.View>
-              ))}
-            </View>
-          ) : null}
         </Screen>
         <CelebrationOverlay
           trigger={celebration.trigger}
@@ -2825,14 +2879,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               setAchToastIdx(0);
               clearPendingAchievements();
             }
-          }}
-        />
-        <CoachTip
-          tipId={activeTip}
-          onDismiss={(tipId) => {
-            dismissTip(tipId);
-            setActiveTip(null);
-            guidePauseRef.current = false;
           }}
         />
         <FirstMatchGuide
@@ -2875,6 +2921,20 @@ function RRRBar({ rrr, colors }: { rrr: number; colors: ThemeColors }) {
           backgroundColor: fillColor,
         }}
       />
+    </View>
+  );
+}
+
+function PreparationRating({ label, value }: { label: string; value: number }) {
+  const styles = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
+  const color = value >= 72 ? colors.danger : value >= 62 ? colors.warning : colors.success;
+  const assessment = value >= 72 ? 'Elite danger' : value >= 62 ? 'Strong' : 'Manageable';
+  return (
+    <View style={styles.preparationRating}>
+      <Text style={[styles.preparationRatingValue, { color }]}>{value}</Text>
+      <Text style={styles.preparationRatingLabel}>{label}</Text>
+      <Text style={[styles.preparationRatingAssessment, { color }]}>{assessment}</Text>
     </View>
   );
 }
@@ -2991,7 +3051,21 @@ const makeStyles = (colors: ThemeColors) =>
       color: colors.accent,
       fontSize: fontSize.sm,
       fontWeight: fontWeight.bold,
-      marginBottom: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    venueRow: {
+      maxWidth: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+    },
+    venueText: {
+      minWidth: 0,
+      flexShrink: 1,
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.semibold,
     },
     condRow: {
       flexDirection: 'row',
@@ -3011,6 +3085,115 @@ const makeStyles = (colors: ThemeColors) =>
     },
     condEmoji: { fontSize: 14 },
     condText: { color: colors.textMuted, fontSize: fontSize.xs },
+    surfaceBrief: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 17,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+      maxWidth: 560,
+    },
+    tossCard: {
+      marginTop: spacing.sm,
+      borderColor: colors.primary + '66',
+      borderWidth: 1,
+    },
+    tossHeader: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.xs,
+    },
+    tossTitle: {
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.heavy,
+    },
+    tossWinner: {
+      color: colors.accent,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+    },
+    tossPrompt: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      marginTop: spacing.sm,
+      lineHeight: 20,
+    },
+    coin: {
+      width: 72,
+      height: 72,
+      alignSelf: 'center',
+      marginTop: spacing.md,
+      borderRadius: 36,
+      borderWidth: 2,
+      borderColor: colors.accentLight,
+      backgroundColor: colors.accentDark,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    coinText: {
+      color: colors.bg,
+      fontSize: fontSize.xxl,
+      fontWeight: fontWeight.black,
+      fontFamily: fonts.display,
+    },
+    coinResultRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    coinSmall: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      borderWidth: 1,
+      borderColor: colors.accentLight,
+      backgroundColor: colors.accentDark,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    coinSmallText: {
+      color: colors.bg,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+    },
+    tossChoices: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    tossChoice: {
+      flex: 1,
+      minHeight: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.sm,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceMuted,
+    },
+    tossChoiceActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryDark,
+    },
+    tossChoiceText: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.semibold,
+      textAlign: 'center',
+    },
+    tossChoiceTextActive: { color: colors.white },
+    tossOutcome: {
+      color: colors.text,
+      fontSize: fontSize.xs,
+      marginTop: spacing.sm,
+      lineHeight: 18,
+    },
     objective: {
       color: colors.accent,
       fontSize: fontSize.sm,
@@ -3040,6 +3223,79 @@ const makeStyles = (colors: ThemeColors) =>
       fontFamily: fonts.display,
     },
     missionPreGoal: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 4 },
+    preparationRatings: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    preparationScale: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 17,
+      marginTop: spacing.md,
+    },
+    preparationRating: {
+      flexGrow: 1,
+      flexBasis: 82,
+      minHeight: 72,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceMuted,
+    },
+    preparationRatingValue: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.black,
+      fontFamily: fonts.display,
+    },
+    preparationRatingLabel: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      marginTop: 1,
+    },
+    preparationRatingAssessment: {
+      fontSize: 10,
+      fontWeight: fontWeight.bold,
+      marginTop: 2,
+    },
+    preparationLine: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      lineHeight: 19,
+      marginTop: spacing.sm,
+    },
+    analysisReport: {
+      marginTop: spacing.md,
+      padding: spacing.md,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      backgroundColor: `${colors.accent}10`,
+      gap: spacing.xs,
+    },
+    analysisLocked: {
+      marginTop: spacing.md,
+      padding: spacing.md,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceMuted,
+      gap: spacing.sm,
+    },
+    analysisReportTitle: {
+      color: colors.accent,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+    },
+    analysisFlash: {
+      color: colors.primaryLight,
+      fontSize: fontSize.sm,
+      lineHeight: 18,
+      marginTop: spacing.sm,
+    },
     missionPreReward: {
       backgroundColor: colors.surfaceAlt,
       borderRadius: radius.pill,
@@ -3073,40 +3329,6 @@ const makeStyles = (colors: ThemeColors) =>
     modeDesc: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 2, lineHeight: 18 },
 
     // ── mission card ──
-    missionCard: {
-      borderWidth: 1.5,
-      borderRadius: radius.md,
-      backgroundColor: colors.surfaceAlt,
-      padding: spacing.sm,
-      marginBottom: spacing.sm,
-    },
-    missionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    missionIcon: { fontSize: 20 },
-    missionLabel: {
-      color: colors.textFaint,
-      fontSize: 9,
-      fontWeight: fontWeight.black,
-      letterSpacing: 1.5,
-      textTransform: 'uppercase',
-    },
-    missionText: { fontSize: fontSize.sm, fontWeight: fontWeight.bold, marginTop: 1 },
-    missionRewardBadge: {
-      borderRadius: radius.pill,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 3,
-      minWidth: 48,
-      alignItems: 'center',
-    },
-    missionRewardText: { fontSize: fontSize.xs, fontWeight: fontWeight.black },
-    missionBarBg: {
-      height: 4,
-      backgroundColor: colors.surfaceMuted,
-      borderRadius: radius.pill,
-      overflow: 'hidden',
-    },
-    missionBarFill: { height: '100%', borderRadius: radius.pill },
-    missionProgress: { color: colors.textFaint, fontSize: 10, marginTop: 3 },
-
     // banner
     banner: {
       borderWidth: 1.5,
@@ -3195,7 +3417,14 @@ const makeStyles = (colors: ThemeColors) =>
     bowlerFig: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
 
     // field + over dots
-    midRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.md },
+    midRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginTop: spacing.md,
+      minHeight: 150,
+    },
+    midRowFast: { minHeight: 112, marginTop: spacing.sm },
     stadiumScene: {
       marginTop: spacing.md,
       marginHorizontal: -spacing.md,
@@ -3239,143 +3468,9 @@ const makeStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surface,
     },
     dotText: { fontSize: fontSize.xs, fontWeight: fontWeight.bold },
-    liveCommentaryCard: {
-      marginTop: spacing.sm,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      backgroundColor: colors.surfaceAlt,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      minHeight: 78,
-    },
-    liveCommentaryCardFast: {
-      minHeight: 54,
-      paddingVertical: 7,
-    },
-    liveCommentaryTop: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 4,
-      gap: spacing.sm,
-    },
-    liveCommentaryLabel: {
-      color: colors.textFaint,
-      fontSize: 10,
-      fontWeight: fontWeight.black,
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
-    },
-    liveCommentaryOver: {
-      color: colors.textMuted,
-      fontSize: fontSize.xs,
-      fontWeight: fontWeight.bold,
-    },
-    commentaryActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    commentaryLogButton: {
-      minHeight: 32,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      borderRadius: radius.sm,
-      borderWidth: 1,
-      borderColor: colors.borderStrong,
-      backgroundColor: colors.surface,
-      paddingHorizontal: spacing.sm,
-    },
-    commentaryLogText: {
-      color: colors.primaryLight,
-      fontSize: fontSize.xs,
-      fontWeight: fontWeight.bold,
-    },
-    liveCommentaryText: {
-      fontSize: fontSize.sm,
-      lineHeight: 19,
-      fontWeight: fontWeight.semibold,
-    },
-    matchViewTabs: {
-      flexDirection: 'row',
-      gap: spacing.xs,
-      marginTop: spacing.sm,
-    },
-    matchViewTab: {
-      flex: 1,
-      borderRadius: radius.sm,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      minHeight: 36,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: spacing.sm,
-    },
-    matchViewTabActive: {
-      backgroundColor: colors.primaryDark,
-      borderColor: colors.primary,
-    },
-    matchViewTabText: {
-      color: colors.textMuted,
-      fontSize: fontSize.sm,
-      fontWeight: fontWeight.bold,
-    },
-    matchViewTabTextActive: { color: colors.white },
-    liveScorecardPanel: { marginTop: spacing.sm, gap: spacing.xs },
-    liveFieldPanel: {
-      alignItems: 'center',
-      marginTop: spacing.sm,
-      paddingVertical: spacing.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border,
-    },
-    liveFieldTitle: {
-      color: colors.text,
-      fontSize: fontSize.md,
-      fontWeight: fontWeight.black,
-    },
-    liveFieldHint: {
-      color: colors.textMuted,
-      fontSize: fontSize.xs,
-      marginTop: 2,
-      marginBottom: spacing.sm,
-      textAlign: 'center',
-    },
-    liveFieldEmpty: {
-      color: colors.textFaint,
-      fontSize: fontSize.xs,
-      marginTop: spacing.sm,
-      textAlign: 'center',
-    },
-    scorecardHeaderRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      gap: spacing.sm,
-    },
-    scorecardTitle: {
-      color: colors.text,
-      fontSize: fontSize.md,
-      fontWeight: fontWeight.black,
-    },
-    scorecardMeta: {
-      color: colors.textFaint,
-      fontSize: fontSize.xs,
-      fontWeight: fontWeight.semibold,
-      flexShrink: 1,
-      textAlign: 'right',
-    },
-    scorecardSection: { gap: 2 },
-    scorecardSectionLabel: {
-      color: colors.textFaint,
-      fontSize: 10,
-      fontWeight: fontWeight.black,
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
-    },
-    scorecardOverRow: { gap: spacing.xs, marginTop: spacing.xs },
-
     // feed
     feed: { marginTop: spacing.md, paddingBottom: spacing.md },
+    feedFast: { marginTop: spacing.sm, paddingBottom: spacing.xs },
     recentFeedHeader: {
       minHeight: 36,
       flexDirection: 'row',
@@ -3598,7 +3693,11 @@ const makeStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
     },
     footerBtn: { flexGrow: 1, flexShrink: 1, minWidth: 104, maxWidth: 190 },
-    pauseActive: { borderWidth: 1.5, borderColor: colors.accent },
+    pauseActive: {
+      borderWidth: 1.5,
+      borderColor: colors.warning,
+      backgroundColor: colors.surfaceAlt,
+    },
 
     // Batting stance (pre-match + in-match)
     stancePreLabel: {

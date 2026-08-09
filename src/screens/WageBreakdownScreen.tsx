@@ -4,7 +4,7 @@
  * Shows every player's weekly wage (annual / 52), contract years, and value
  * rating so the manager/player can make informed financial decisions.
  * Weekly framing makes costs feel concrete and creates natural IAP moments
- * ("I need to renew Smith — he's only on ₹3k/week but leaves next season").
+ * ("I need to renew Smith — he's only on $3k/week but leaves next season").
  */
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';

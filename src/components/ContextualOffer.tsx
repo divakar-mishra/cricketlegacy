@@ -12,7 +12,6 @@ import Animated, {
   useSharedValue,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
   ZoomIn,
 } from 'react-native-reanimated';
@@ -186,7 +185,7 @@ export function ContextualOffer({ kind, streakDays, onAccept, onDismiss }: Conte
 
   useEffect(() => {
     if (kind) {
-      scale.value = withSpring(1, { damping: 14, stiffness: 180 });
+      scale.value = withTiming(1, { duration: 200 });
       glow.value = withRepeat(
         withSequence(withTiming(1, { duration: 900 }), withTiming(0.3, { duration: 900 })),
         -1,
@@ -208,7 +207,7 @@ export function ContextualOffer({ kind, streakDays, onAccept, onDismiss }: Conte
     <Modal transparent visible animationType="fade" onRequestClose={onDismiss}>
       <Pressable style={styles.backdrop} onPress={onDismiss}>
         <Pressable onPress={(e) => e.stopPropagation()}>
-          <Animated.View entering={ZoomIn.duration(320)} style={[styles.card, cardStyle]}>
+          <Animated.View entering={ZoomIn.duration(200)} style={[styles.card, cardStyle]}>
             <LinearGradient colors={[colors.surface, colors.bgElevated]} style={styles.cardInner}>
               {/* Glow ring behind icon */}
               <View style={styles.iconWrap}>

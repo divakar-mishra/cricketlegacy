@@ -1,19 +1,23 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Circle, Ellipse, Line, Text as SvgText } from 'react-native-svg';
 import {
   AppText as Text,
   Button,
   Card,
   Icon,
+  MechanicInfoButton,
   PlayerStatusBadges,
   Screen,
   ScreenHeader,
 } from '../components';
 import type { IconName } from '../components';
-import { Player, Tactics } from '../domain/types';
+import { Tactics } from '../domain/types';
 import { BOWLER_PLAN_OPTIONS, FIELD_OPTIONS, TEAM_APPROACH_OPTIONS } from '../engine/intent';
 import { formatClubCurrency } from '../game/finance';
+import { managerControlledTeamId } from '../game/managerCalendar';
+import { matchDecisionAuthority } from '../game/matchAuthority';
+import { nextUserFixtureId } from '../game/season';
+import { careerPlayingTeamId } from '../game/youthFixtures';
 import { resolveXI, validateXI } from '../game/squad';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
@@ -75,14 +79,32 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
     );
   }
 
-  const team = save.teams[save.userTeamId];
+  const nextFixtureId = nextUserFixtureId(save);
+  const nextFixture = nextFixtureId ? save.fixtures[nextFixtureId] : undefined;
+  const authority = matchDecisionAuthority(save, nextFixture);
+  const canEdit = authority.canControlTeam;
+  const controlledTeamId =
+    save.mode === 'manager'
+      ? managerControlledTeamId(save)
+      : careerPlayingTeamId(save, nextFixtureId);
+  const team = controlledTeamId ? save.teams[controlledTeamId] : undefined;
+  if (!team) {
+    return (
+      <Screen>
+        <ScreenHeader title="Squad & Tactics" onBack={() => navigation.goBack()} />
+        <Text style={styles.msg}>No active squad for this calendar phase.</Text>
+        <Button label="Back" variant="secondary" onPress={() => navigation.goBack()} />
+      </Screen>
+    );
+  }
   const tactics = save.tactics ?? DEFAULT_TACTICS;
   const squad = team.playerIds.map((id) => save.players[id]).filter(Boolean);
-  const forceId = save.mode === 'career' ? save.userPlayerId : undefined;
+  const forceId = save.mode === 'career' && canEdit ? save.userPlayerId : undefined;
   const xiIds = resolveXI(squad, team.xi, forceId).map((p) => p.id);
   const benchIds = team.playerIds.filter((id) => !xiIds.includes(id));
 
   const move = (i: number, dir: -1 | 1) => {
+    if (!canEdit) return;
     const j = i + dir;
     if (j < 0 || j >= xiIds.length) return;
     const next = [...xiIds];
@@ -92,6 +114,7 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
   };
 
   const proposeSwap = (slot: number, benchId: string) => {
+    if (!canEdit) return;
     if (xiIds[slot] === save.userPlayerId) {
       setHint('You cannot drop yourself from the XI.');
       return;
@@ -108,7 +131,7 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
   };
 
   const confirmSwap = () => {
-    if (!pendingSwap) return;
+    if (!pendingSwap || !canEdit) return;
     setXI(pendingSwap.nextXi);
     setSelected(null);
     setSelectedBenchId(null);
@@ -121,6 +144,7 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
   };
 
   const swapIn = (benchId: string) => {
+    if (!canEdit) return;
     if (selected == null) {
       setHint('Tap a player in your XI first, then a bench player to swap.');
       return;
@@ -129,6 +153,7 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
   };
 
   const swapBenchIntoSlot = (slot: number) => {
+    if (!canEdit) return;
     if (!selectedBenchId) {
       setSelected((cur) => (cur === slot ? null : slot));
       setHint(null);
@@ -140,33 +165,54 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
   return (
     <Screen scroll>
       <ScreenHeader
-        title="Squad & Tactics"
+        title={save.mode === 'manager' ? 'Squad & Tactics' : 'Team & Selection'}
         subtitle={team.name}
         onBack={() => navigation.goBack()}
       />
 
-      <Card style={styles.finance}>
-        <View>
-          <Text style={styles.financeLabel}>Transfer budget</Text>
-          <Text style={styles.financeValue}>{fmtMoney(team.budget)}</Text>
+      {save.mode === 'manager' ? (
+        <Card style={styles.finance}>
+          <View>
+            <Text style={styles.financeLabel}>Transfer budget</Text>
+            <Text style={styles.financeValue}>{fmtMoney(team.budget)}</Text>
+          </View>
+          <Button
+            label="Transfers"
+            size="sm"
+            fullWidth={false}
+            onPress={() => navigation.navigate('Transfers')}
+          />
+        </Card>
+      ) : (
+        <View style={[styles.authorityBand, canEdit && styles.authorityBandActive]}>
+          <Icon
+            name={canEdit ? 'shield-checkmark' : 'shirt-outline'}
+            size={18}
+            color={canEdit ? colors.accent : colors.textMuted}
+          />
+          <View style={styles.authorityCopy}>
+            <Text style={[styles.authorityTitle, canEdit && { color: colors.accent }]}>
+              {authority.title}
+            </Text>
+            <Text style={styles.authorityDetail}>{authority.detail}</Text>
+          </View>
         </View>
-        <Button
-          label="Transfers"
-          size="sm"
-          fullWidth={false}
-          onPress={() => navigation.navigate('Transfers')}
-        />
-      </Card>
+      )}
 
-      <Text style={styles.section}>Batting approach</Text>
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionInline}>Batting approach</Text>
+        <MechanicInfoButton topicId="tactical-modifiers" />
+      </View>
       <View style={styles.chips}>
         {TEAM_APPROACH_OPTIONS.map((o) => {
           const sel = tactics.batting === o.value;
           return (
             <Pressable
               key={o.value}
+              disabled={!canEdit}
+              accessibilityState={{ selected: sel, disabled: !canEdit }}
               onPress={() => setTactics({ ...tactics, batting: o.value })}
-              style={[styles.chip, sel && styles.chipActive]}
+              style={[styles.chip, sel && styles.chipActive, !canEdit && styles.chipDisabled]}
             >
               <Text style={[styles.chipText, sel && styles.chipTextActive]}>{o.label}</Text>
             </Pressable>
@@ -181,8 +227,10 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
           return (
             <Pressable
               key={o.value}
+              disabled={!canEdit}
+              accessibilityState={{ selected: sel, disabled: !canEdit }}
               onPress={() => setTactics({ ...tactics, bowling: o.value })}
-              style={[styles.chip, sel && styles.chipActive]}
+              style={[styles.chip, sel && styles.chipActive, !canEdit && styles.chipDisabled]}
             >
               <Icon
                 name={BOWLER_ICONS[o.value] ?? 'ellipse'}
@@ -202,8 +250,10 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
           return (
             <Pressable
               key={o.value}
+              disabled={!canEdit}
+              accessibilityState={{ selected: sel, disabled: !canEdit }}
               onPress={() => setTactics({ ...tactics, field: o.value })}
-              style={[styles.chip, sel && styles.chipActive]}
+              style={[styles.chip, sel && styles.chipActive, !canEdit && styles.chipDisabled]}
             >
               <Icon
                 name={FIELD_ICONS[o.value] ?? 'ellipse'}
@@ -224,19 +274,14 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
       </Text>
 
       {/* ── Field Diagram ──────────────────────────────────────────── */}
-      <Text style={styles.section}>Batting Order Map</Text>
-      <Card style={{ alignItems: 'center', paddingVertical: spacing.md }}>
-        <FieldDiagram
-          xi={xiIds.map((id) => save.players[id]).filter(Boolean) as Player[]}
-          userPlayerId={save.userPlayerId}
-          secondaryColor={team?.secondaryColor ?? '#E9B23B'}
-        />
-        <Text style={styles.hint}>
-          Top order to tail · tap players in the list below to reorder
-        </Text>
-      </Card>
-
-      <Text style={styles.section}>Playing XI &amp; batting order</Text>
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionInline}>Playing XI &amp; batting order</Text>
+        {save.managerCalendar?.phase === 'FIRST_CLASS' ? (
+          <MechanicInfoButton topicId="first-class-over-rate" />
+        ) : save.mode === 'manager' ? (
+          <MechanicInfoButton topicId="condition-and-morale" />
+        ) : null}
+      </View>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
       {pendingSwap ? (
         <Card style={styles.confirmCard}>
@@ -267,6 +312,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
           return (
             <Pressable
               key={id}
+              disabled={!canEdit}
+              accessibilityState={{ selected: isSel, disabled: !canEdit }}
               onPress={() => swapBenchIntoSlot(i)}
               style={[styles.row, isSel && styles.rowSel]}
             >
@@ -275,29 +322,31 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
                 {p.name}
               </Text>
               <PlayerStatusBadges
-                captain={isUser && Boolean(save.captainClub)}
+                captain={isUser && canEdit}
                 injured={Boolean(p.injury)}
                 fitness={save.managerCalendar ? p.condition : p.meta.fitness}
                 mood={p.morale}
               />
               <Text style={styles.role}>{ROLE_ABBR[p.role] ?? p.role}</Text>
               <Text style={styles.ovr}>{p.overall}</Text>
-              <View style={styles.moveBtns}>
-                <Pressable
-                  onPress={() => move(i, -1)}
-                  style={[styles.moveBtn, i === 0 && styles.moveDisabled]}
-                  disabled={i === 0}
-                >
-                  <Icon name="chevron-up" size={16} color={colors.text} />
-                </Pressable>
-                <Pressable
-                  onPress={() => move(i, 1)}
-                  style={[styles.moveBtn, i === xiIds.length - 1 && styles.moveDisabled]}
-                  disabled={i === xiIds.length - 1}
-                >
-                  <Icon name="chevron-down" size={16} color={colors.text} />
-                </Pressable>
-              </View>
+              {canEdit ? (
+                <View style={styles.moveBtns}>
+                  <Pressable
+                    onPress={() => move(i, -1)}
+                    style={[styles.moveBtn, i === 0 && styles.moveDisabled]}
+                    disabled={i === 0}
+                  >
+                    <Icon name="chevron-up" size={16} color={colors.text} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => move(i, 1)}
+                    style={[styles.moveBtn, i === xiIds.length - 1 && styles.moveDisabled]}
+                    disabled={i === xiIds.length - 1}
+                  >
+                    <Icon name="chevron-down" size={16} color={colors.text} />
+                  </Pressable>
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
@@ -314,6 +363,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
               return (
                 <Pressable
                   key={id}
+                  disabled={!canEdit}
+                  accessibilityState={{ selected: isBenchSel, disabled: !canEdit }}
                   onPress={() => {
                     if (selected != null) swapIn(id);
                     else {
@@ -335,7 +386,9 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
                   />
                   <Text style={styles.role}>{ROLE_ABBR[p.role] ?? p.role}</Text>
                   <Text style={styles.ovr}>{p.overall}</Text>
-                  {selected != null || isBenchSel ? <Text style={styles.swapIn}>Swap</Text> : null}
+                  {canEdit && (selected != null || isBenchSel) ? (
+                    <Text style={styles.swapIn}>Swap</Text>
+                  ) : null}
                 </Pressable>
               );
             })}
@@ -344,125 +397,11 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
       ) : null}
 
       <Text style={styles.hint}>
-        Tactics, XI and batting order save automatically for your next match.
+        {canEdit
+          ? 'Tactics, XI and batting order save automatically for your next match.'
+          : 'This is the captain-selected XI. Your individual match approach remains under your control.'}
       </Text>
     </Screen>
-  );
-}
-
-// ── Morale pill (Feature 3) ──────────────────────────────────────────────────
-
-// ── Field Diagram — top-down cricket oval ────────────────────────────────────
-
-const ROLE_COLOR: Record<string, string> = {
-  BATTER: '#4C9AFF',
-  BOWLER: '#E5484D',
-  ALLROUNDER: '#E9B23B',
-  WK_BATTER: '#31A85A',
-};
-
-/** Positions for 11 players around/on a cricket field (normalized 0..1). */
-const FIELD_POSITIONS: { x: number; y: number }[] = [
-  { x: 0.5, y: 0.62 }, // 1. opener at crease
-  { x: 0.5, y: 0.38 }, // 2. non-striker
-  { x: 0.5, y: 0.82 }, // 3. no.3
-  { x: 0.28, y: 0.72 }, // 4. mid-wicket area
-  { x: 0.72, y: 0.72 }, // 5. cover area
-  { x: 0.22, y: 0.5 }, // 6. square leg
-  { x: 0.78, y: 0.5 }, // 7. cover point
-  { x: 0.35, y: 0.3 }, // 8. mid-on
-  { x: 0.65, y: 0.3 }, // 9. mid-off
-  { x: 0.2, y: 0.22 }, // 10. fine leg
-  { x: 0.8, y: 0.22 }, // 11. third man
-];
-
-function FieldDiagram({
-  xi,
-  userPlayerId,
-  secondaryColor,
-}: {
-  xi: Player[];
-  userPlayerId?: string;
-  secondaryColor: string;
-}) {
-  const W = 280;
-  const H = 200;
-  const cx = W / 2;
-  const cy = H / 2;
-  const rx = W * 0.46;
-  const ry = H * 0.46;
-
-  return (
-    <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      {/* Outer oval — pitch */}
-      <Ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="#0D2B1A" opacity={0.9} />
-      {/* Inner 30-yard circle */}
-      <Ellipse
-        cx={cx}
-        cy={cy}
-        rx={rx * 0.55}
-        ry={ry * 0.55}
-        fill="none"
-        stroke="#1A4A2A"
-        strokeWidth={1}
-        strokeDasharray="4 3"
-      />
-      {/* Pitch strip */}
-      <Ellipse cx={cx} cy={cy} rx={10} ry={ry * 0.35} fill="#3A2800" opacity={0.7} />
-      {/* Crease lines */}
-      <Line
-        x1={cx - 10}
-        y1={cy + ry * 0.2}
-        x2={cx + 10}
-        y2={cy + ry * 0.2}
-        stroke="#E9B23B"
-        strokeWidth={1.5}
-        opacity={0.8}
-      />
-      <Line
-        x1={cx - 10}
-        y1={cy - ry * 0.2}
-        x2={cx + 10}
-        y2={cy - ry * 0.2}
-        stroke="#E9B23B"
-        strokeWidth={1.5}
-        opacity={0.8}
-      />
-
-      {xi.slice(0, 11).map((p, i) => {
-        const pos = FIELD_POSITIONS[i];
-        const px = pos.x * W;
-        const py = pos.y * H;
-        const isUser = p.id === userPlayerId;
-        const color = isUser ? secondaryColor : (ROLE_COLOR[p.role] ?? '#4C9AFF');
-        return (
-          <React.Fragment key={p.id}>
-            <Circle cx={px} cy={py} r={isUser ? 13 : 11} fill={color} opacity={isUser ? 1 : 0.85} />
-            {isUser && (
-              <Circle
-                cx={px}
-                cy={py}
-                r={15}
-                fill="none"
-                stroke={secondaryColor}
-                strokeWidth={1.5}
-              />
-            )}
-            <SvgText
-              x={px}
-              y={py + 1}
-              textAnchor="middle"
-              alignmentBaseline="middle"
-              fontSize={isUser ? 7 : 6}
-              fontWeight="bold"
-              fill="#fff"
-            >
-              {i + 1}
-            </SvgText>
-          </React.Fragment>
-        );
-      })}
-    </Svg>
   );
 }
 
@@ -482,6 +421,34 @@ const makeStyles = (colors: ThemeColors) =>
       letterSpacing: 1,
     },
     financeValue: { color: colors.accent, fontSize: fontSize.xl, fontWeight: fontWeight.black },
+    authorityBand: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surfaceMuted,
+    },
+    authorityBandActive: {
+      borderColor: colors.accent + '66',
+      backgroundColor: colors.accent + '0D',
+    },
+    authorityCopy: { flex: 1, minWidth: 0 },
+    authorityTitle: {
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+    },
+    authorityDetail: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 16,
+      marginTop: 2,
+    },
     section: {
       color: colors.textMuted,
       fontSize: fontSize.sm,
@@ -490,6 +457,23 @@ const makeStyles = (colors: ThemeColors) =>
       letterSpacing: 1,
       marginTop: spacing.xl,
       marginBottom: spacing.sm,
+    },
+    sectionRow: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+      marginBottom: spacing.xs,
+    },
+    sectionInline: {
+      flex: 1,
+      minWidth: 0,
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
     },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     chip: {
@@ -504,6 +488,7 @@ const makeStyles = (colors: ThemeColors) =>
       borderColor: colors.border,
     },
     chipActive: { backgroundColor: colors.primaryDark, borderColor: colors.primary },
+    chipDisabled: { opacity: 0.62 },
     chipText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
     chipTextActive: { color: colors.white },
     hint: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: spacing.sm, lineHeight: 16 },

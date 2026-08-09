@@ -14,7 +14,6 @@ import Animated, {
   withDelay,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -119,7 +118,7 @@ export function InjuryReportScreen({ navigation, route }: ScreenProps<'InjuryRep
   useEffect(() => {
     if (!queueVisible) return;
     playHaptic('notify-warning');
-    iconScale.value = withDelay(200, withSpring(1, { damping: 10, stiffness: 140 }));
+    iconScale.value = withDelay(80, withTiming(1, { duration: 200 }));
     pulse.value = withDelay(
       600,
       withRepeat(

@@ -17,7 +17,6 @@ import Animated, {
   useSharedValue,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { playHaptic } from '../audio';
@@ -141,7 +140,7 @@ export function MilestoneCinematicScreen({ navigation, route }: ScreenProps<'Mil
     playHaptic('notify-success');
     setTimeout(() => playHaptic('impact-heavy'), 300);
 
-    heroScale.value = withSpring(1.0, { damping: 10, stiffness: 180 });
+    heroScale.value = withTiming(1, { duration: 200 });
     glow.value = withRepeat(
       withSequence(withTiming(1, { duration: 600 }), withTiming(0.3, { duration: 600 })),
       -1,

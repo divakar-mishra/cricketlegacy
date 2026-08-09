@@ -26,10 +26,10 @@ const IS_DEV: boolean = ((): boolean => {
   return typeof g.__DEV__ === 'boolean' ? g.__DEV__ : false;
 })();
 
-export type AnalyticsParamValue = string | number | boolean;
-export type AnalyticsParams = Record<string, AnalyticsParamValue>;
+type AnalyticsParamValue = string | number | boolean;
+type AnalyticsParams = Record<string, AnalyticsParamValue>;
 
-export interface AnalyticsEvent {
+interface AnalyticsEvent {
   name: string;
   params?: AnalyticsParams;
   ts: number;
@@ -41,36 +41,24 @@ export interface AnalyticsEvent {
  */
 export const EVT = {
   APP_OPEN: 'app_open',
-  SCREEN_VIEW: 'screen_view',
   ONBOARDING_COMPLETE: 'onboarding_complete',
   MATCH_START: 'match_start',
   MATCH_END: 'match_end',
   PURCHASE: 'purchase',
   PURCHASE_INITIATED: 'purchase_initiated',
   AD_WATCHED: 'ad_watched',
-  AD_SKIPPED: 'ad_skipped',
-  TRAIN: 'train',
   SIGN_PLAYER: 'sign_player',
   SEASON_ROLLOVER: 'season_rollover',
   DAILY_CLAIM: 'daily_claim',
   QUEST_COMPLETE: 'quest_complete',
-  ACHIEVEMENT_UNLOCKED: 'achievement_unlocked',
   CAREER_START: 'career_start',
-  NATIONAL_CALLUP: 'national_callup',
-  RETIREMENT: 'retirement',
-  HOF_ENTRY: 'hof_entry',
-  STREAK_BROKEN: 'streak_broken',
-  ENERGY_EMPTY: 'energy_empty',
   STARTER_PACK_SHOWN: 'starter_pack_shown',
   OFFER_SHOWN: 'offer_shown',
   OFFER_ACCEPTED: 'offer_accepted',
   OFFER_DISMISSED: 'offer_dismissed',
-  SHARE_ACHIEVEMENT: 'share_achievement',
   SHARE_NEWSPAPER: 'share_newspaper',
   LEGACY_CONTRIBUTION: 'legacy_contribution',
 } as const;
-
-export type EventName = (typeof EVT)[keyof typeof EVT];
 
 // ─── In-memory ring buffer (debug + offline queuing) ─────────────────────────
 const RING_CAPACITY = 200;
@@ -85,14 +73,11 @@ function record(event: AnalyticsEvent): void {
 type FirebaseAnalytics = {
   logEvent: (n: string, p?: object) => Promise<void>;
   setUserProperty: (k: string, v: string) => Promise<void>;
-  logScreenView: (p: object) => Promise<void>;
 };
 
 let _fb: FirebaseAnalytics | null | undefined;
-let _enabled = true;
 
 function getFirebase(): FirebaseAnalytics | null {
-  if (!_enabled) return null;
   if (_fb !== undefined) return _fb;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -104,17 +89,13 @@ function getFirebase(): FirebaseAnalytics | null {
   return _fb ?? null;
 }
 
-/** Opt out of (or back into) remote analytics, e.g. to honour a privacy toggle. */
-export function setAnalyticsEnabled(on: boolean): void {
-  _enabled = on;
-  if (!on) _fb = null;
-}
-
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /** Logs a single analytics event. Always buffers locally; forwards to Firebase when available. */
 export function logEvent(name: string, params?: AnalyticsParams): void {
-  const event: AnalyticsEvent = params ? { name, params, ts: Date.now() } : { name, ts: Date.now() };
+  const event: AnalyticsEvent = params
+    ? { name, params, ts: Date.now() }
+    : { name, ts: Date.now() };
   record(event);
   if (IS_DEV) {
     console.log(`[analytics] ${name}`, params ?? {});
@@ -134,21 +115,4 @@ export function setUserProperty(key: string, value: AnalyticsParamValue): void {
   if (fb) {
     fb.setUserProperty(key, String(value)).catch(() => {});
   }
-}
-
-/** Records a screen view. */
-export function screen(name: string): void {
-  logEvent(EVT.SCREEN_VIEW, { screen: name });
-  const fb = getFirebase();
-  if (fb) {
-    fb.logScreenView({ screen_name: name, screen_class: name }).catch(() => {});
-  }
-}
-
-export function getRecentEvents(): readonly AnalyticsEvent[] {
-  return ring.slice();
-}
-
-export function clearRecentEvents(): void {
-  ring.length = 0;
 }

@@ -4,6 +4,7 @@ import { buildUserPlayer, createCareerSave } from '../createGame';
 import {
   archiveNewspaperStory,
   buildNewspaperStory,
+  buildTournamentEliminationNewspaperStory,
   buildTrophyNewspaperStory,
   markNewspaperSeen,
 } from '../newspaper';
@@ -171,5 +172,32 @@ describe('player career newspaper', () => {
       trophyNames: ['Continental Cup'],
       result: 'WIN',
     });
+  });
+
+  it('keeps a tournament-exit headline pending when the final group match also earns a story', () => {
+    const save = makeSave();
+    const exit = buildTournamentEliminationNewspaperStory(save, {
+      competitionId: 't20-world-cup-2026',
+      tournamentName: 'T20 World Cup 2026',
+      format: 'T20',
+      year: 2026,
+      position: 4,
+      groupSize: 5,
+      now: 5000,
+    })!;
+    archiveNewspaperStory(save, exit);
+
+    const opponentId = Object.keys(save.teams).find((id) => id !== save.userTeamId)!;
+    const matchStory = buildNewspaperStory(
+      save,
+      chaseMatch(save.userTeamId!, opponentId),
+      { selected: true, runs: 104, balls: 90, wickets: 0 },
+      undefined,
+      5001,
+    )!;
+    archiveNewspaperStory(save, matchStory);
+
+    expect(save.experience?.mediaScrapbook).toHaveLength(2);
+    expect(save.experience?.pendingNewspaperId).toBe(exit.id);
   });
 });

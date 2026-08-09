@@ -11,7 +11,7 @@ import {
   Player,
 } from '../domain/types';
 import { clamp } from '../utils/math';
-import { battingAggression, selectBowler } from './ai';
+import { battingAggression, requiredAllRounderBowler, selectBowler } from './ai';
 import { BowlerPlan, FieldSetting } from './intent';
 import { canBowl } from './rating';
 import { chance, pick, Rng } from './rng';
@@ -42,6 +42,8 @@ export interface InningsInput {
   fieldSetting?: FieldSetting;
   /** Overs bowled in the whole match before this innings (Test pitch wear). */
   matchOversOffset?: number;
+  /** Career protagonist who must receive the all-rounder role's minimum spell. */
+  preferredAllRounderId?: string;
 }
 
 function computePressure(
@@ -116,18 +118,20 @@ export function simulateInnings(input: InningsInput, rng: Rng): Innings {
   overLoop: for (let over = 0; over < maxOvers; over++) {
     if (isAllOut() || chaseWon()) break;
 
-    const bowler = selectBowler(
-      effectiveBowlers,
-      {
-        format: input.format,
-        conditions: input.conditions,
-        lastBowlerId,
-        oversBowled,
-        over,
-        striker: input.battingOrder[strikerIdx],
-      },
-      rng,
-    );
+    const selectionContext = {
+      format: input.format,
+      conditions: input.conditions,
+      lastBowlerId,
+      oversBowled,
+      over,
+      striker: input.battingOrder[strikerIdx],
+      inningsOvers: maxOvers,
+      bowlingFigures: bowlerCards,
+      preferredPlayerId: input.preferredAllRounderId,
+    };
+    const bowler =
+      requiredAllRounderBowler(effectiveBowlers, selectionContext, input.preferredAllRounderId) ??
+      selectBowler(effectiveBowlers, selectionContext, rng);
     lastBowlerId = bowler.id;
     const bc = getBowlerCard(bowler.id);
     const staminaNow = clamp(bowler.bowling.stamina - (oversBowled[bowler.id] ?? 0) * 6, 20, 100);
@@ -213,7 +217,7 @@ export function simulateInnings(input: InningsInput, rng: Rng): Innings {
 
       if (ev.isWicket) {
         wickets++;
-        if (ev.dismissal?.type !== 'RUN_OUT') bc.wickets++; // run-outs are not the bowler's wicket
+        if (ev.dismissal?.type !== 'RUN_OUT') bc.wickets++;
         const d: Dismissal = ev.dismissal!;
         if (d.type === 'CAUGHT') d.fielderId = randomFielder(fielders, bowler, rng).id;
         else if (d.type === 'STUMPED') d.fielderId = keeper.id;
@@ -258,9 +262,4 @@ export function simulateInnings(input: InningsInput, rng: Rng): Innings {
     bowling: Object.values(bowlerCards),
     target: input.target,
   };
-}
-
-/** True when the batting side has lost all available wickets. */
-export function inningsAllOut(innings: Innings, squadSize: number): boolean {
-  return innings.wickets >= squadSize - 1;
 }

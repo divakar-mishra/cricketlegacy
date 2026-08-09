@@ -11,7 +11,8 @@ import { clamp } from '../utils/math';
 import { trainingAttributeCeiling } from './youthBalance';
 
 type GroupId = keyof typeof ATTR_META; // 'batting' | 'bowling' | 'fielding' | 'meta'
-export type TrainGroup = 'batting' | 'bowling' | 'fielding' | 'wicketkeeping' | 'fitness' | 'mental';
+export type TrainGroup =
+  'batting' | 'bowling' | 'fielding' | 'wicketkeeping' | 'fitness' | 'mental';
 export const TRAINING_GROUPS: GroupId[] = ['batting', 'bowling', 'fielding', 'meta'];
 
 export interface TrainingFocus {
@@ -67,15 +68,15 @@ function groupObj(player: Player, group: GroupId): Record<string, number> {
 export function trainingGroupsForRole(role: Role): TrainGroup[] {
   switch (role) {
     case 'BATTER':
-      return ['batting', 'fielding', 'fitness', 'mental'];
+      return ['batting', 'fitness', 'mental'];
     case 'BOWLER':
-      return ['bowling', 'fielding', 'fitness', 'mental'];
+      return ['bowling', 'fitness', 'mental'];
     case 'WK_BATTER':
-      return ['batting', 'wicketkeeping', 'fielding', 'fitness'];
+      return ['batting', 'wicketkeeping', 'fitness'];
     case 'ALLROUNDER':
-      return ['batting', 'bowling'];
+      return ['batting', 'bowling', 'fitness'];
     default:
-      return ['batting', 'fielding', 'fitness', 'mental'];
+      return ['batting', 'fitness', 'mental'];
   }
 }
 
@@ -96,7 +97,7 @@ export function canTrainGroup(player: Player, group: TrainGroup): boolean {
 /** Advance a player one season: age up, then grow (young) or decline (old). */
 export function developPlayer(player: Player, rng: Rng): void {
   player.age += 1;
-  const growthCap = Math.min(99, player.potential + 5);
+  const growthCap = player.isUserPlayer ? 99 : Math.min(99, player.potential + 5);
 
   let center: number;
   if (player.age <= 25) center = 2.6;
@@ -130,7 +131,10 @@ export function sessionsDone(player: Player, group?: TrainGroup): number {
 
 export function canTrain(player: Player, group?: TrainGroup): boolean {
   if (group && !canTrainGroup(player, group)) return false;
-  return sessionsDone(player, group) < TRAINING.maxSessionsPerSeason;
+  return (
+    sessionsDone(player) < TRAINING.maxSessionsPerSeason &&
+    (!group || sessionsDone(player, group) < Math.ceil(TRAINING.maxSessionsPerSeason / 2))
+  );
 }
 
 export interface TrainGain {
@@ -148,10 +152,12 @@ export function applyTraining(
   careerPathLevel?: CareerPathLevel,
   gainMultiplier = 1,
 ): TrainGain[] {
-  if (!canTrainGroup(player, group)) return [];
+  if (!canTrain(player, group)) return [];
   const focus = trainingFocusForGroup(group);
   const obj = groupObj(player, focus.sourceGroup);
-  const labels = new Map(ATTR_META[focus.sourceGroup].map(([key, label]) => [key as string, label]));
+  const labels = new Map(
+    ATTR_META[focus.sourceGroup].map(([key, label]) => [key as string, label]),
+  );
   const entries = focus.attributes.map((key) => ({
     key,
     label: labels.get(key) ?? key,
@@ -162,7 +168,8 @@ export function applyTraining(
 
   const gains: TrainGain[] = [];
   for (const e of entries.slice(0, TRAINING.attrsPerSession)) {
-    const baseGain = TRAINING.gainMin + Math.floor(rng() * (TRAINING.gainMax - TRAINING.gainMin + 1));
+    const baseGain =
+      TRAINING.gainMin + Math.floor(rng() * (TRAINING.gainMax - TRAINING.gainMin + 1));
     const gain = Math.max(1, Math.floor(baseGain * Math.max(1, gainMultiplier)));
     const to = clamp(e.val + gain, 1, ceiling);
     if (to <= e.val) continue;
@@ -260,33 +267,30 @@ export function updateFormAfterMatch(player: Player, perf: MatchPerformance): vo
  * Win: +2–5; Loss: −2–5; Thrashing (margin ≥ 100 runs or 8 wickets): −8.
  * A consistent winning streak builds a "team spirit" multiplier (capped 1.2×).
  */
-export function updateTeamMorale(save: SaveGame, userWon: boolean): void {
-  if (!save.userTeamId) return;
-  const team = save.teams[save.userTeamId];
+export function updateTeamMorale(save: SaveGame, userWon: boolean, teamId = save.userTeamId): void {
+  if (!teamId) return;
+  const team = save.teams[teamId];
 
   // Determine thrashing based on recent result in fixtures.
   const recentFixtures = Object.values(save.fixtures)
-    .filter((f) => f.played && (f.homeTeamId === save.userTeamId || f.awayTeamId === save.userTeamId))
+    .filter((f) => f.played && (f.homeTeamId === teamId || f.awayTeamId === teamId))
     .slice(-1);
   const lastFx = recentFixtures[0];
   const isThrashing =
-    lastFx &&
-    !userWon &&
-    lastFx.winnerTeamId !== undefined &&
-    lastFx.winnerTeamId !== save.userTeamId;
+    lastFx && !userWon && lastFx.winnerTeamId !== undefined && lastFx.winnerTeamId !== teamId;
 
   // Spirit multiplier: ratio of wins in last 5 matches.
   const last5 = Object.values(save.fixtures)
-    .filter((f) => f.played && (f.homeTeamId === save.userTeamId || f.awayTeamId === save.userTeamId))
+    .filter((f) => f.played && (f.homeTeamId === teamId || f.awayTeamId === teamId))
     .slice(-5);
-  const recentWins = last5.filter((f) => f.winnerTeamId === save.userTeamId).length;
+  const recentWins = last5.filter((f) => f.winnerTeamId === teamId).length;
   const spiritMultiplier = clamp(1 + (recentWins / 5) * 0.2, 1, 1.2);
 
   const delta = userWon
     ? Math.round((2 + Math.random() * 3) * spiritMultiplier)
     : isThrashing
-    ? -8
-    : -(2 + Math.round(Math.random() * 3));
+      ? -8
+      : -(2 + Math.round(Math.random() * 3));
 
   for (const id of team.playerIds) {
     const p = save.players[id];
@@ -302,11 +306,8 @@ export function updateTeamMorale(save: SaveGame, userWon: boolean): void {
  * separate from `matchRating` (the *rating* half, weighted 25%). A high rating
  * from a cameo cannot substitute for sustained output.
  */
-export function matchImpactScore(
-  perf: { runs: number; wickets: number },
-  role: Role,
-): number {
-  const batImpact = clamp(perf.runs / 55, 0, 1.15);   // ~55 runs = a top-class knock
+export function matchImpactScore(perf: { runs: number; wickets: number }, role: Role): number {
+  const batImpact = clamp(perf.runs / 55, 0, 1.15); // ~55 runs = a top-class knock
   const bowlImpact = clamp(perf.wickets / 3.2, 0, 1.15); // ~3+ wickets = a match-winning spell
   if (role === 'BOWLER') return clamp(bowlImpact, 0, 1);
   if (role === 'BATTER' || role === 'WK_BATTER') return clamp(batImpact, 0, 1);
@@ -346,7 +347,13 @@ export function matchObjective(role: Role): Objective {
     case 'BOWLER':
       return { text: 'Take 2+ wickets', kind: 'WICKETS', wickets: 2, reward: 150 };
     case 'ALLROUNDER':
-      return { text: 'Score 20+ or take 2 wickets', kind: 'EITHER', runs: 20, wickets: 2, reward: 150 };
+      return {
+        text: 'Score 20+ or take 2 wickets',
+        kind: 'EITHER',
+        runs: 20,
+        wickets: 2,
+        reward: 150,
+      };
     default:
       return { text: 'Score 30+ runs', kind: 'RUNS', runs: 30, reward: 150 };
   }

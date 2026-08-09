@@ -1,15 +1,4 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect } from 'react';
 import { ImageBackground, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, {
-  cancelAnimation,
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
-import { useSettings } from '../state/settingsStore';
 import { fonts, fontSize, fontWeight, spacing, ThemeColors, useThemedStyles } from '../theme';
 import { AppText as Text } from './AppText';
 
@@ -23,33 +12,12 @@ type Props = {
 
 export function CareerSpotlight({ mode, title, meta, accentColor, status }: Props) {
   const styles = useThemedStyles(makeStyles);
-  const graphics = useSettings((state) => state.graphics);
   const { width } = useWindowDimensions();
-  const sweepX = useSharedValue(-120);
-
-  useEffect(() => {
-    if (graphics !== 'high') {
-      cancelAnimation(sweepX);
-      sweepX.value = -120;
-      return;
-    }
-    sweepX.value = -120;
-    sweepX.value = withRepeat(
-      withTiming(Math.max(width, 360) + 120, { duration: 4600 }),
-      -1,
-      false,
-    );
-    return () => cancelAnimation(sweepX);
-  }, [graphics, sweepX, width]);
-
-  const sweepStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: sweepX.value }, { rotate: '12deg' }],
-  }));
+  const compact = width < 390;
 
   return (
-    <Animated.View
-      entering={FadeInDown.duration(420)}
-      style={styles.frame}
+    <View
+      style={[styles.frame, compact && styles.frameCompact]}
       accessibilityRole="header"
     >
       <ImageBackground
@@ -64,18 +32,8 @@ export function CareerSpotlight({ mode, title, meta, accentColor, status }: Prop
         }
       >
         <View style={styles.dim} />
-        {graphics === 'high' ? (
-          <Animated.View pointerEvents="none" style={[styles.sweep, sweepStyle]}>
-            <LinearGradient
-              colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.16)', 'rgba(255,255,255,0)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </Animated.View>
-        ) : null}
 
-        <View style={styles.topRow}>
+        <View style={[styles.topRow, compact && styles.topRowCompact]}>
           <View style={[styles.modeChip, { borderColor: accentColor }]}>
             <View style={[styles.liveDot, { backgroundColor: accentColor }]} />
             <Text style={[styles.modeText, { color: accentColor }]}>
@@ -83,7 +41,7 @@ export function CareerSpotlight({ mode, title, meta, accentColor, status }: Prop
             </Text>
           </View>
           {status ? (
-            <View style={styles.statusChip}>
+            <View style={[styles.statusChip, compact && styles.statusChipCompact]}>
               <Text style={styles.statusText} numberOfLines={1}>
                 {status}
               </Text>
@@ -101,7 +59,7 @@ export function CareerSpotlight({ mode, title, meta, accentColor, status }: Prop
           </Text>
         </View>
       </ImageBackground>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -113,6 +71,7 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: spacing.sm,
       overflow: 'hidden',
     },
+    frameCompact: { height: 214 },
     image: {
       flex: 1,
       justifyContent: 'space-between',
@@ -127,19 +86,15 @@ const makeStyles = (colors: ThemeColors) =>
       left: 0,
       backgroundColor: 'rgba(1,5,10,0.42)',
     },
-    sweep: {
-      position: 'absolute',
-      top: -45,
-      bottom: -45,
-      width: 72,
-    },
     topRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      flexWrap: 'wrap',
       gap: spacing.sm,
       padding: spacing.md,
     },
+    topRowCompact: { alignItems: 'flex-start' },
     modeChip: {
       minHeight: 28,
       flexDirection: 'row',
@@ -166,11 +121,16 @@ const makeStyles = (colors: ThemeColors) =>
       paddingHorizontal: spacing.sm,
       paddingVertical: 5,
     },
+    statusChipCompact: {
+      width: '100%',
+      maxWidth: '100%',
+      alignItems: 'flex-start',
+    },
     statusText: {
       color: 'rgba(255,255,255,0.88)',
       fontSize: 9,
       fontWeight: fontWeight.bold,
-      textAlign: 'right',
+      textAlign: 'left',
     },
     copy: {
       backgroundColor: 'rgba(2,5,9,0.78)',

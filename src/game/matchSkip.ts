@@ -2,6 +2,7 @@ export type MatchDriveMode = 'WATCH' | 'KEY' | 'INSTANT' | null;
 
 export type CareerSkipAction =
   | { kind: 'SKIP_TO_BATTING'; label: 'Skip to My Batting' }
+  | { kind: 'SKIP_BOWLING_INNINGS'; label: 'Skip Bowling Innings' }
   | { kind: 'SKIP_REST_OF_INNINGS'; label: 'Skip Rest of Innings' };
 
 export interface CareerSkipState {
@@ -25,9 +26,11 @@ export function careerSkipAction(state: CareerSkipState): CareerSkipAction | nul
   if (!state.hasCrease || state.skipToBatActive || state.skipRestActive) return null;
   if (state.userSelected === false || state.userCanStillBat === false) return null;
   if (state.userAtCrease) return null;
+  if (!state.userTeamBatting) {
+    return { kind: 'SKIP_BOWLING_INNINGS', label: 'Skip Bowling Innings' };
+  }
 
   if (state.userDismissed) {
-    if (!state.userTeamBatting) return null;
     return { kind: 'SKIP_REST_OF_INNINGS', label: 'Skip Rest of Innings' };
   }
 

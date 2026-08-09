@@ -57,7 +57,7 @@ export function rollMatchInjury(
   if (!isAvailable(player)) return undefined;
   const fitness = player.meta.fitness ?? 60;
   const base = clamp(0.05 + (100 - fitness) / 900, 0.03, 0.16);
-  const chance = base * clamp(loadFactor, 1, 1.75) * (1 - clamp(medicalReduction, 0, 0.75));
+  const chance = base * clamp(loadFactor, 0.3, 1.75) * (1 - clamp(medicalReduction, 0, 0.75));
   if (rng() > chance) return undefined;
 
   const total = INJURIES.reduce((s, i) => s + i.weight, 0);
@@ -89,5 +89,7 @@ export function tickInjuries(save: SaveGame): void {
 
 /** Currently injured players in a squad (for the UI). */
 export function injuredIn(save: SaveGame, playerIds: string[]): Player[] {
-  return playerIds.map((id) => save.players[id]).filter((p): p is Player => Boolean(p) && !isAvailable(p));
+  return playerIds
+    .map((id) => save.players[id])
+    .filter((p): p is Player => Boolean(p) && !isAvailable(p));
 }

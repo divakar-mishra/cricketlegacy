@@ -7,6 +7,7 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   moduleNameMapper: {
     '^expo/virtual/env$': '<rootDir>/src/test/expoVirtualEnv.js',
+    '\\.(png)$': '<rootDir>/src/test/assetMock.js',
   },
   // Engine/content tests are pure TS; allow transforming ESM-only deps if needed.
   transformIgnorePatterns: ['/node_modules/(?!(zod)/)'],

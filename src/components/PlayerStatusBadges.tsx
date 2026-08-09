@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { fonts, fontWeight, radius, useTheme } from '../theme';
 import { AppText as Text } from './AppText';
 
-export function CaptainBadge() {
+function CaptainBadge() {
   return (
     <View
       style={styles.captainBadge}
@@ -15,7 +15,7 @@ export function CaptainBadge() {
   );
 }
 
-export function InjuryBadge() {
+function InjuryBadge() {
   return (
     <View
       style={styles.injuryBadge}
@@ -29,7 +29,7 @@ export function InjuryBadge() {
   );
 }
 
-export function FitnessIndicator({ value }: { value?: number }) {
+function FitnessIndicator({ value }: { value?: number }) {
   const { colors } = useTheme();
   const fitness = Math.max(0, Math.min(100, Math.round(value ?? 100)));
   const color = fitness >= 70 ? colors.success : fitness >= 45 ? colors.warning : colors.danger;
@@ -47,7 +47,7 @@ export function FitnessIndicator({ value }: { value?: number }) {
   );
 }
 
-export function MoodIndicator({ score }: { score?: number }) {
+function MoodIndicator({ score }: { score?: number }) {
   const { colors } = useTheme();
   const trust = Math.max(0, Math.min(100, Math.round(score ?? 70)));
   const color = trust >= 70 ? colors.success : trust >= 40 ? colors.warning : colors.danger;

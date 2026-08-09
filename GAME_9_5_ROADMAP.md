@@ -1,5 +1,9 @@
 # Cricket Career Game: 9.5/10 Roadmap
 
+> Historical planning document from 13 July 2026. It is not a description of
+> the current source. Use `docs/APP_COMPLETE_REFERENCE.md` and
+> `docs/UI_UX_COMPLETE_SPEC.md` for the active implementation.
+
 ## Current Rating
 
 Current product rating: 6.8/10.

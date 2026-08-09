@@ -14,14 +14,6 @@ export interface CosmeticOption {
   passExclusive?: boolean;
 }
 
-export const AVATAR_OPTIONS: CosmeticOption[] = [
-  { id: 'avatar_default', label: 'Classic', preview: '🧑', gemCost: 0 },
-  { id: 'avatar_cap', label: 'Cap & Gloves', preview: '🧢', gemCost: 0 },
-  { id: 'avatar_helmet', label: 'Batting Helmet', preview: '⛑️', gemCost: 40 },
-  { id: 'avatar_star', label: 'Star Player', preview: '🌟', gemCost: 80 },
-  { id: 'avatar_legend', label: 'Legend', preview: '👑', gemCost: 120 },
-];
-
 export const KIT_COLORS: CosmeticOption[] = [
   { id: 'kit_white', label: 'Classic White', preview: '#F7F7F7', gemCost: 0 },
   { id: 'kit_blue', label: 'Navy Blue', preview: '#1A3A7C', gemCost: 0 },
@@ -70,7 +62,7 @@ export const CELEBRATIONS: CosmeticOption[] = [
   })),
 ];
 
-const ALL_COSMETICS: CosmeticOption[] = [...AVATAR_OPTIONS, ...KIT_COLORS, ...CELEBRATIONS];
+const ALL_COSMETICS: CosmeticOption[] = [...KIT_COLORS, ...CELEBRATIONS];
 
 /** Gem cost of a cosmetic id (0 for free/unknown). */
 export function cosmeticCost(id: string): number {
@@ -85,16 +77,4 @@ export function isPassExclusiveCosmetic(id: string): boolean {
 export function kitColorHex(id?: string): string | undefined {
   if (!id) return undefined;
   return KIT_COLORS.find((k) => k.id === id)?.preview;
-}
-
-/** Emoji preview for an equipped avatar id. */
-export function avatarEmoji(id?: string): string | undefined {
-  if (!id) return undefined;
-  return AVATAR_OPTIONS.find((a) => a.id === id)?.preview;
-}
-
-/** The equipped celebration option (emoji + label). */
-export function celebrationOption(id?: string): CosmeticOption | undefined {
-  if (!id) return undefined;
-  return CELEBRATIONS.find((c) => c.id === id);
 }

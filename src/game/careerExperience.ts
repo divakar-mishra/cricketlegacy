@@ -108,6 +108,20 @@ export interface ExperienceSnapshot {
   pathMatches?: number;
   boardConfidence?: number;
   teamMorale?: number;
+  leaguePosition?: number;
+}
+
+function currentLeaguePosition(save: SaveGame): number | undefined {
+  if (!save.userTeamId) return undefined;
+  const league = Object.values(save.leagues).find((item) =>
+    item.teamIds.includes(save.userTeamId!),
+  );
+  if (!league) return undefined;
+  const sorted = [...league.table].sort(
+    (a, b) => b.points - a.points || b.netRunRate - a.netRunRate,
+  );
+  const index = sorted.findIndex((row) => row.teamId === save.userTeamId);
+  return index >= 0 ? index + 1 : undefined;
 }
 
 export function squadMorale(save: SaveGame): number | undefined {
@@ -131,6 +145,7 @@ export function captureExperienceSnapshot(save: SaveGame): ExperienceSnapshot {
     pathMatches: save.careerPathMatches,
     boardConfidence: save.boardConfidence,
     teamMorale: squadMorale(save),
+    leaguePosition: currentLeaguePosition(save),
   };
 }
 
@@ -264,7 +279,7 @@ export function buildMatchImpactSummary(
   addChange(changes, 'Board confidence', before.boardConfidence, save.boardConfidence);
   addChange(changes, 'Squad morale', before.teamMorale, squadMorale(save));
 
-  const nameOf = (id: string) => save.players[id]?.name ?? id;
+  const nameOf = (id: string) => save.players[id]?.name ?? 'Player';
   const decisions = [...(match.decisionImpacts ?? [])];
   if (save.tactics && save.userTeamId) {
     for (const impact of tacticalDecisionImpacts(save.tactics, match, save.userTeamId)) {
@@ -314,6 +329,10 @@ export function buildMatchImpactSummary(
     changes,
     playerOfMatchReason: playerOfMatchExplanation(match, nameOf),
     decisions,
+    leaguePosition:
+      before.leaguePosition != null && currentLeaguePosition(save) != null
+        ? { before: before.leaguePosition, after: currentLeaguePosition(save)! }
+        : undefined,
   };
 }
 

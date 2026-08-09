@@ -63,7 +63,7 @@ const STREAK_BASE: readonly { coins: number; gems: number }[] = [
   { coins: 250, gems: 0 },
   { coins: 300, gems: 0 },
   { coins: 400, gems: 0 },
-  { coins: 600, gems: 20 }, // day 7 payoff: biggest coins + the only gems
+  { coins: 600, gems: 10 }, // day 7 payoff: biggest coins + the only gems
 ];
 
 /**
@@ -435,10 +435,10 @@ function buildPassTiers(): PassTier[] {
     tiers.push({
       tier: t,
       xpRequired: tierXpRequired(t),
-      freeReward: t % 5 === 0 ? { coins: 200 + t * 15, gems: 5 } : { coins: 100 + t * 10 },
+      freeReward: t % 5 === 0 ? { coins: 200 + t * 15, gems: 2 } : { coins: 100 + t * 10 },
       premiumReward: milestoneItem
-        ? { coins: 300 + t * 25, gems: 10, item: milestoneItem }
-        : { coins: 200 + t * 15, gems: 5 },
+        ? { coins: 300 + t * 25, gems: 8, item: milestoneItem }
+        : { coins: 200 + t * 15, gems: 3 },
     });
   }
   return tiers;

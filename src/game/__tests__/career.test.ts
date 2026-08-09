@@ -13,8 +13,6 @@ import {
   nationalState,
   prepareCareerFormat,
   prepareCareerPlayerForMatch,
-  projectedSelected,
-  rivalNation,
   selectCareerXI,
   setCareerRestRequest,
 } from '../career';
@@ -33,7 +31,12 @@ function makeCareer(overall = 60): SaveGame {
     fielding: { catching: v, throwing: v, agility: v, keeping: 30 },
     meta: { fitness: v, confidence: v, aggression: 55, discipline: v },
   });
-  return createCareerSave({ player, teamId: TEAM_BLUEPRINTS[0].id, difficulty: 'NORMAL', seed: 12345 });
+  return createCareerSave({
+    player,
+    teamId: TEAM_BLUEPRINTS[0].id,
+    difficulty: 'NORMAL',
+    seed: 12345,
+  });
 }
 
 describe('national selection', () => {
@@ -57,7 +60,8 @@ describe('national selection', () => {
     }
     expect(calledUp).toBe(true);
     expect(nationalState(save).capped).toBe(true);
-    expect(save.playerCareerResources?.cappedCountry).toBe('india');
+    expect(save.playerCareerResources?.declaredCountry).toBe('india');
+    expect(save.playerCareerResources?.cappedCountry).toBeUndefined();
   });
 
   it('does not call up an under-rated player no matter the form', () => {
@@ -77,20 +81,13 @@ describe('national selection', () => {
   });
 });
 
-describe('national XI + rivals', () => {
+describe('national XI', () => {
   it('builds a national XI that includes the user and a keeper', () => {
     const save = makeCareer(70);
     const xi = buildNationalXI(save, 'india', 'user');
     expect(xi).toHaveLength(11);
     expect(xi.some((p) => p.id === 'user')).toBe(true);
     expect(xi.some((p) => p.role === 'WK_BATTER')).toBe(true);
-  });
-
-  it('finds a rival nation different from the user', () => {
-    const save = makeCareer(70);
-    const rival = rivalNation(save, 'india', 3);
-    expect(rival).toBeDefined();
-    expect(rival).not.toBe('india');
   });
 });
 
@@ -102,7 +99,6 @@ describe('form-driven club selection', () => {
     expect(team.xi).toHaveLength(11);
     expect(typeof selected).toBe('boolean');
     expect(selected).toBe(team.xi!.includes('user'));
-    expect(projectedSelected(save)).toBe(selected);
   });
 
   it('benches an out-of-form U19 player and explains why', () => {

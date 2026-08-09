@@ -6,6 +6,8 @@
  * `SaveGame.schemaVersion` and add a migration (see src/storage).
  */
 
+import type { AvatarConfig } from '../avatar/types';
+
 // ---------- Core enums ----------
 export type Format = 'T20' | 'ODI' | 'TEST' | 'HUNDRED' | 'T10';
 export type Role = 'BATTER' | 'BOWLER' | 'ALLROUNDER' | 'WK_BATTER';
@@ -101,6 +103,9 @@ export interface Player {
   lastTalkDay?: number; // season-day index of most recent per-player talk (cooldown)
   // ---- Multi-format stats (Feature 4) ----
   formatStats?: Partial<Record<Format, PlayerStats>>; // per-format career stats
+  seasonFormatStats?: Partial<Record<Format, PlayerStats>>; // current-season format totals
+  domesticStats?: PlayerStats;
+  internationalStats?: PlayerStats;
   // ---- Manager transfer premium actions ----
   buyoutEligible?: boolean;
   buyNowClubPrice?: number;
@@ -151,9 +156,6 @@ export interface Team {
 export type Competition =
   'LEAGUE' | 'CUP' | 'PLAYOFF' | 'U19_WORLDCUP' | 'BILATERAL_SERIES' | 'INTL_TOURNAMENT';
 
-/** Typed alias kept for readability at call-sites that only check the original three. */
-export type CompetitionType = Competition;
-
 export interface Fixture {
   id: string;
   seasonId: string;
@@ -173,10 +175,16 @@ export interface Fixture {
   // ---- Multi-format domestic calendar (Feature 4) ----
   competitionId?: string; // links to SeasonCompetition.id ('t20-league', 'list-a', 'first-class')
   calendarMonth?: number; // 1-12 in-game month this match is played
+  calendarWeek?: number; // 1-4, used to resolve domestic/international clashes
   divisionTier?: DomesticTier;
   managerPhase?: ManagerCalendarPhase;
   homePointsPenalty?: number;
   awayPointsPenalty?: number;
+  /** Domestic players unavailable because an international fixture has priority. */
+  nationalDutyPlayerIds?: string[];
+  /** Rolling WTC cycle this Test contributes points to. */
+  wtcCycleId?: string;
+  wtcPointsRecorded?: boolean;
 }
 
 export interface League {
@@ -372,6 +380,11 @@ export interface PlayerCareerResources {
   consecutiveMatches: number;
   formatAppearances: Partial<Record<Format, number>>;
   requestedRestFixtureId?: string;
+  /** Match appearances guaranteed by exceptional recent performance. */
+  selectionGuaranteeMatches?: number;
+  /** Remaining fixtures receiving a temporary selection-score bonus. */
+  selectionBoostMatches?: number;
+  selectionBoostAmount?: number;
   lastSelection?: {
     fixtureId?: string;
     format: Format;
@@ -380,6 +393,17 @@ export interface PlayerCareerResources {
     rivalScore: number;
     reason: string;
   };
+  internationalSelections?: Record<string, InternationalSelectionDecision>;
+}
+
+export interface InternationalSelectionDecision {
+  assignmentId: string;
+  format: Format;
+  year: number;
+  selected: boolean;
+  userScore: number;
+  threshold: number;
+  reason: string;
 }
 
 export type PlayerCalendarEventKind =
@@ -425,6 +449,11 @@ export interface ManagerProgressionState {
   reputation: number;
   currentClubId: string;
   premiumAssistanceHistory: PremiumAssistanceRecord[];
+  /** Headline annual salary on the manager's current contract. */
+  contractSalary?: number;
+  /** Prevents duplicate salary grants when a rollover is retried. */
+  lastSalaryPaidYear?: number;
+  lastSalaryCoinPayout?: number;
 }
 
 export interface AuctionAssistantState {
@@ -566,6 +595,7 @@ export interface ManagerPhaseSummary {
   userMatches: number;
   userWins: number;
   walletCoins: number;
+  salaryCoins?: number;
   overRatePenalties: number;
 }
 
@@ -611,8 +641,8 @@ export interface ScoutReport {
   playerId: string;
   knownOverall: number; // observed (noisy) rating
   uncertainty: number; // 0..1 — shrinks as scouting progresses
-  potentialBand: string; // e.g. 'Fringe', 'Solid', 'Star', 'Generational'
   scoutedYear: number;
+  /** Recommendation based on current first-team value, never hidden potential. */
   recommended: boolean;
 }
 
@@ -711,6 +741,91 @@ export interface PersonalAcademy {
   foundedYear: number;
 }
 
+export type PersonalCoachDiscipline = 'BATTING' | 'BOWLING' | 'MENTAL';
+
+export interface PersonalCoachContract {
+  discipline: PersonalCoachDiscipline;
+  hiredYear: number;
+  seasonsRemaining: number;
+}
+
+export interface PlayerLifeMatch {
+  id: string;
+  year: number;
+  opponent: string;
+  competition: string;
+  format: Format;
+  runs: number;
+  wickets: number;
+  rating: number;
+  result: 'W' | 'L' | 'D';
+  international: boolean;
+}
+
+export interface PlayerSocialPost {
+  id: string;
+  year: number;
+  headline: string;
+  body: string;
+  reactions: number;
+  comments: string[];
+  followersDelta: number;
+}
+
+export interface PlayerCaptainIssue {
+  id: string;
+  title: string;
+  detail: string;
+  affectedPlayerIds: string[];
+  resolved?: boolean;
+  outcome?: string;
+}
+
+export interface PlayerPerformanceAnalysis {
+  fixtureId: string;
+  year: number;
+  opponentTeamId: string;
+  opponentName: string;
+  format: Format;
+  threatName: string;
+  threatDetail: string;
+  weakness: string;
+  matchAdvice: string;
+  recommendedTrainingGroup:
+    'batting' | 'bowling' | 'fielding' | 'wicketkeeping' | 'fitness' | 'mental';
+  trainingReason: string;
+}
+
+/**
+ * Player Career's consolidated off-field simulation. Catalog metadata lives
+ * in game/playerLife.ts; saves retain only ownership, balances and history.
+ */
+export interface PlayerLifeState {
+  followers: number;
+  bankCoins: number;
+  propertyIds: string[];
+  businessIds: string[];
+  legacyTokenUnits: number;
+  legacyTokenCostBasis: number;
+  personalCoaches: Partial<Record<PersonalCoachDiscipline, PersonalCoachContract>>;
+  equipmentIds: string[];
+  physioVisitsThisSeason: number;
+  analysedFixtureIds: string[];
+  recentMatches: PlayerLifeMatch[];
+  socialFeed: PlayerSocialPost[];
+  mediaPostsThisSeason: number;
+  sponsorNegotiatedYear?: number;
+  captainIssue?: PlayerCaptainIssue;
+  lastAnalysisReport?: PlayerPerformanceAnalysis;
+  lastSeasonIncome?: {
+    year: number;
+    bankInterest: number;
+    propertyIncome: number;
+    businessIncome: number;
+    total: number;
+  };
+}
+
 /** An event in the international cricket calendar (Feature 8). */
 export interface IntlCalendarEvent {
   id: string;
@@ -719,12 +834,74 @@ export interface IntlCalendarEvent {
   format: Format;
   months: number[]; // in-game months (1–12) the event spans
   teams: string[]; // participating team ids / country codes
+  selection?: 'SELECTED' | 'NOT_SELECTED' | 'QUALIFICATION_PENDING';
+  selectionReason?: string;
 }
 
 /** 4-year international cycle stored in the save (Feature 8). */
 export interface IntlCalendar {
   year: number; // base year of the current 4-year cycle
   events: IntlCalendarEvent[];
+}
+
+export interface WtcStanding {
+  countryId: string;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  points: number;
+}
+
+export interface WtcCycleState {
+  id: string;
+  startYear: number;
+  endYear: number;
+  standings: Record<string, WtcStanding>;
+  processedSeriesIds: string[];
+  recordedFixtureIds: string[];
+  finalTeamIds?: [string, string];
+  finalFixtureId?: string;
+  championCountryId?: string;
+}
+
+export interface InternationalTournamentStanding {
+  countryId: string;
+  played: number;
+  won: number;
+  tied: number;
+  lost: number;
+  points: number;
+  /** Stable tie-break value used when points and wins are level. */
+  tiebreak: number;
+}
+
+export type InternationalTournamentStage =
+  'GROUP' | 'SEMI_FINAL' | 'FINAL' | 'ELIMINATED' | 'COMPLETE';
+
+/**
+ * Durable state for an ICC event. Knockouts are staged only after their feeder
+ * matches finish, so a save can never enter a semifinal it did not qualify for.
+ */
+export interface InternationalTournamentState {
+  id: string;
+  year: number;
+  name: string;
+  format: Format;
+  controlledCountryId: string;
+  controlledTeamId: string;
+  participantCountryIds: string[];
+  groupCountryIds: string[];
+  groupFixtureIds: string[];
+  standings: Record<string, InternationalTournamentStanding>;
+  stage: InternationalTournamentStage;
+  position?: number;
+  semiFinalFixtureId?: string;
+  finalFixtureId?: string;
+  championCountryId?: string;
+  eliminatedAt?: 'GROUP' | 'SEMI_FINAL' | 'FINAL';
+  rewardKeys: string[];
+  managerPhase?: ManagerCalendarPhase;
 }
 
 /** A rival club headhunting a successful manager with a better-paid job. */
@@ -737,7 +914,7 @@ export interface ManagerJobOffer {
 }
 
 /** Current canonical save schema. Bump + add a migration on any shape change. */
-export const SAVE_SCHEMA_VERSION = 22;
+export const SAVE_SCHEMA_VERSION = 30;
 
 export type CareerArchetype = 'PRODIGY' | 'LATE_BLOOMER' | 'SPECIALIST' | 'COMEBACK';
 export type CoachPersonality = 'DEVELOPER' | 'TACTICIAN' | 'DISCIPLINARIAN' | 'MENTOR';
@@ -770,6 +947,7 @@ export interface MatchImpactSummary {
   changes: MatchImpactChange[];
   playerOfMatchReason?: string;
   decisions?: MatchDecisionImpact[];
+  leaguePosition?: { before: number; after: number };
 }
 
 /** A milestone article kept in the Player Career media scrapbook. */
@@ -778,7 +956,7 @@ export interface NewspaperStory {
   matchId: string;
   createdAt: number;
   season: number;
-  kind?: 'MATCH' | 'TROPHY';
+  kind?: 'MATCH' | 'TROPHY' | 'ELIMINATION';
   trophyNames?: string[];
   format: Format;
   edition: string;
@@ -870,6 +1048,8 @@ export interface PlayerCosmetics {
   stadiumTheme?: string;
   officeTheme?: string;
   avatarCustomization?: AvatarCustomization;
+  /** Schema 30 modular portrait. Only stable supplied-pack IDs are persisted. */
+  avatarConfig?: AvatarConfig;
 }
 
 export interface SeasonPassScenarioProgress {
@@ -895,7 +1075,8 @@ export interface SeasonPassExperienceState {
   selectedProfileFrame: string;
 }
 
-export type ManagerResourceAction = 'MATCH_ANALYSIS' | 'ELITE_STAFF_SEARCH';
+export type ManagerResourceAction =
+  'MATCH_ANALYSIS' | 'EMERGENCY_TEAM_TALK' | 'FAST_TRACK_SCOUT' | 'ELITE_STAFF_SEARCH';
 
 export interface ManagerResourceTransaction {
   id: string;
@@ -950,7 +1131,13 @@ export interface SaveGame {
   auctionAssistants?: Record<string, AuctionAssistantState>;
   entitlements: Entitlements;
   userPlayerId?: string;
+  /**
+   * The senior domestic club reserved for Player Career. During SCHOOL/U19
+   * this is a future destination and does not contain the user player.
+   */
   userTeamId?: string;
+  /** Active School/U19 XI. Cleared when the senior domestic contract begins. */
+  careerPathTeamId?: string;
   players: Record<string, Player>;
   teams: Record<string, Team>;
   seasons: Record<string, Season>;
@@ -984,6 +1171,7 @@ export interface SaveGame {
   // ---- Personal finance (career mode, all optional) ----
   stockInvestment?: StockInvestment;
   personalAcademy?: PersonalAcademy;
+  playerLife?: PlayerLifeState;
   /** Coin-sink "Legacy" prestige points funded from career earnings. Pure
    *  vanity/rank (no gameplay effect), so it never becomes a coin faucet. */
   legacyPoints?: number;
@@ -1046,6 +1234,14 @@ export interface SaveGame {
   managerWonTierOneFirstClass?: boolean;
   managerNationalTeamId?: string;
   managerJobOffer?: ManagerJobOffer; // a pending headhunt from a bigger club (offered at season start)
+  /** Board protection and onboarding state after accepting a new club job. */
+  managerGraceMatchesRemaining?: number;
+  managerMatchesAtCurrentClub?: number;
+  managerAppointmentPending?: {
+    teamId: string;
+    clubName: string;
+    appointedAt: number;
+  };
   // ---- Achievement counters (career mode) ----
   careerWins?: number; // total match wins accumulated this career
   careerLosses?: number; // total match losses accumulated this career
@@ -1074,6 +1270,10 @@ export interface SaveGame {
   currentMonth?: number; // 1–12 in-game calendar month
   // ---- International calendar (Feature 8) ----
   internationalCalendar?: IntlCalendar;
+  wtcCycles?: Record<string, WtcCycleState>;
+  internationalTournaments?: Record<string, InternationalTournamentState>;
   iccRankings?: Record<string, number>; // team id → ranking points
   lastMatchWon?: boolean; // result of most recent user match (for main-menu flavour text)
+  /** Timestamp from which domestic/international career totals are exact. */
+  statsScopeTrackingStartedAt?: number;
 }

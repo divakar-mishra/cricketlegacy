@@ -220,13 +220,22 @@ export function resolveBall(ctx: BallContext, rng: Rng): BallEvent {
   w['6'] *= 1 + edge * 1.0;
   w.DOT *= 1 - edge * 0.5;
   w.W *= 1 + Math.max(0, -edge) * 0.6 + ctx.pressure * 0.5;
+  w.W *= 1 - Math.max(0, edge) * 0.48;
 
   // AI target aggression (risk/reward)
   const agg = ctx.aggression - 0.5;
+  const shotControl = clamp(
+    (0.42 * striker.batting.technique +
+      0.34 * striker.batting.timing +
+      0.24 * striker.batting.temperament) /
+      100,
+    0,
+    1,
+  );
   w['4'] *= 1 + agg * 0.5;
   w['6'] *= 1 + agg * 0.75;
   w.DOT *= 1 - agg * 0.4;
-  w.W *= 1 + Math.max(0, agg) * 0.5;
+  w.W *= 1 + Math.max(0, agg) * 0.5 * (1 - shotControl * 0.62);
 
   // Mental/physical attributes matter under pressure: high temperament,
   // confidence and discipline protect the batter from panic shots, while low
@@ -333,7 +342,8 @@ export function resolveBall(ctx: BallContext, rng: Rng): BallEvent {
   // roughly mean-neutral (fewer boundaries early, more once set).
   if (ctx.strikerBallsFaced != null) {
     const settle = clamp(ctx.strikerBallsFaced / 22, 0, 1); // 0 = fresh .. 1 = set (>=22 balls)
-    w.W *= 0.9 + 0.44 * (1 - settle); // fresh ~1.34×, set 0.90×
+    const freshRisk = 0.44 * (1 - settle) * (1 - shotControl * 0.48);
+    w.W *= 0.9 + freshRisk;
     w['4'] *= 0.9 + 0.16 * settle; // fresh 0.90× → set 1.06×
     w['6'] *= 0.84 + 0.22 * settle;
     w.DOT *= 1 + 0.06 * (1 - settle);

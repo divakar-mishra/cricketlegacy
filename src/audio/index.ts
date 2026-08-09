@@ -6,13 +6,24 @@ import * as haptics from './haptics';
 import * as music from './music';
 import * as sfx from './sfx';
 
-export { sfx, haptics, music };
-export { setMusicEnabled, syncMusicWithSettings, isMusicPlaying } from './music';
+export { haptics, music };
+export { setMusicEnabled, syncMusicWithSettings } from './music';
 export { playHaptic } from './haptics';
-export type { HapticType } from './haptics';
-export type { SfxKey } from './sfx';
 
-export type Moment = 'tap' | 'four' | 'six' | 'wicket' | 'fifty' | 'hundred' | 'win' | 'crowd';
+type Moment =
+  | 'tap'
+  | 'four'
+  | 'six'
+  | 'wicket'
+  | 'fifty'
+  | 'hundred'
+  | 'win'
+  | 'crowd'
+  | 'coin'
+  | 'phone'
+  | 'trophy'
+  | 'defeat'
+  | 'reward';
 
 export function moment(kind: Moment): void {
   switch (kind) {
@@ -22,6 +33,7 @@ export function moment(kind: Moment): void {
       break;
     case 'six':
       sfx.play('six');
+      setTimeout(() => sfx.play('crowd'), 70);
       haptics.impact(haptics.ImpactStyle.Heavy);
       break;
     case 'wicket':
@@ -42,6 +54,31 @@ export function moment(kind: Moment): void {
       break;
     case 'crowd':
       sfx.play('crowd');
+      break;
+    case 'coin':
+      sfx.play('coin');
+      setTimeout(() => sfx.play('tap'), 85);
+      haptics.selection();
+      break;
+    case 'phone':
+      sfx.play('phone');
+      haptics.selection();
+      break;
+    case 'trophy':
+      sfx.play('trophy');
+      setTimeout(() => sfx.play('coin'), 90);
+      setTimeout(() => sfx.play('phone'), 190);
+      haptics.notify(haptics.NotifyType.Success);
+      break;
+    case 'defeat':
+      sfx.play('defeat');
+      setTimeout(() => sfx.play('tap'), 150);
+      haptics.notify(haptics.NotifyType.Warning);
+      break;
+    case 'reward':
+      sfx.play('coin');
+      setTimeout(() => sfx.play('phone'), 110);
+      haptics.notify(haptics.NotifyType.Success);
       break;
     case 'tap':
     default:

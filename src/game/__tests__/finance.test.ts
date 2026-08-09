@@ -28,11 +28,11 @@ describe('computeValue', () => {
 
 describe('formatClubCurrency', () => {
   it('formats manager club money separately from wallet coins and real-money prices', () => {
-    expect(formatClubCurrency(49)).toBe('₹49');
-    expect(formatClubCurrency(49_000)).toBe('₹49k');
-    expect(formatClubCurrency(500_000)).toBe('₹5.0L');
-    expect(formatClubCurrency(12_000_000)).toBe('₹1.20Cr');
-    expect(formatClubCurrency(-500_000)).toBe('-₹5.0L');
+    expect(formatClubCurrency(49)).toBe('$49');
+    expect(formatClubCurrency(49_000)).toBe('$49k');
+    expect(formatClubCurrency(500_000)).toBe('$500k');
+    expect(formatClubCurrency(12_000_000)).toBe('$12.00m');
+    expect(formatClubCurrency(-500_000)).toBe('-$500k');
   });
 });
 

@@ -17,7 +17,8 @@ export const MODAL_PRIORITY = {
   prompt: 3,
 } as const satisfies Record<string, ModalPriority>;
 
-const MODAL_GAP_MS = 3000;
+// Preserve modal ordering without making a successful claim look unresponsive.
+const MODAL_GAP_MS = 180;
 
 type QueueItem = {
   id: string;
@@ -119,5 +120,3 @@ export function useModalQueue(
   if (!wantsToShow) return false;
   return queue ? queue.activeId === id : true;
 }
-
-export const MODAL_QUEUE_GAP_MS = MODAL_GAP_MS;

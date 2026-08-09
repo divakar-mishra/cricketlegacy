@@ -1,7 +1,15 @@
 import type { ReactElement } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, G, Line, Rect } from 'react-native-svg';
-import { fontSize, fontWeight, radius as radii, spacing, ThemeColors, useColors, useThemedStyles } from '../../theme';
+import {
+  fontSize,
+  fontWeight,
+  radius as radii,
+  spacing,
+  ThemeColors,
+  useColors,
+  useThemedStyles,
+} from '../../theme';
 
 export interface WagonWheelShot {
   /** 0..360 degrees, clockwise from the top of the ground. */
@@ -40,8 +48,23 @@ export function WagonWheel({ shots, size = 260 }: WagonWheelProps): ReactElement
   return (
     <View style={[styles.wrap, { width: dim }]}>
       <Svg width={dim} height={dim} viewBox={`0 0 ${dim} ${dim}`}>
-        <Circle cx={cx} cy={cy} r={boundary} fill={colors.surfaceAlt} stroke={colors.primary} strokeWidth={2} />
-        <Circle cx={cx} cy={cy} r={inner} fill="none" stroke={colors.border} strokeWidth={1} strokeDasharray="4 5" />
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={boundary}
+          fill={colors.surfaceAlt}
+          stroke={colors.primary}
+          strokeWidth={2}
+        />
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={inner}
+          fill="none"
+          stroke={colors.border}
+          strokeWidth={1}
+          strokeDasharray="4 5"
+        />
 
         <Rect
           x={cx - pitchW / 2}
@@ -108,11 +131,9 @@ function LegendItem({ color, label }: { color: string; label: string }): ReactEl
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-  wrap: { alignItems: 'center' },
-  legend: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  swatch: { width: 10, height: 10, borderRadius: radii.pill },
-  legendText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.medium },
-});
-
-export default WagonWheel;
+    wrap: { alignItems: 'center' },
+    legend: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    swatch: { width: 10, height: 10, borderRadius: radii.pill },
+    legendText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.medium },
+  });

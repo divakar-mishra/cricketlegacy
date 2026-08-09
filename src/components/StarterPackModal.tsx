@@ -12,13 +12,14 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { BounceIn, FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { haptics } from '../audio';
 import { MODAL_PRIORITY, useModalQueue } from '../context/ModalQueueContext';
 import { fonts, fontSize, fontWeight, radius, shadow, spacing, useTheme } from '../theme';
 import { AppText as Text } from './AppText';
 import { Button } from './Button';
 import { Icon, type IconName } from './Icon';
+import { SMOOTH_CARD_ZOOM, SMOOTH_MODAL_ENTER, SMOOTH_MODAL_EXIT } from './Motion';
 
 interface Props {
   visible: boolean;
@@ -45,12 +46,12 @@ export function StarterPackModal({ visible, onPurchase, onDismiss }: Props) {
   return (
     <Modal transparent animationType="none" statusBarTranslucent visible={queueVisible}>
       <Animated.View
-        entering={FadeIn.duration(200)}
-        exiting={FadeOut.duration(200)}
+        entering={SMOOTH_MODAL_ENTER}
+        exiting={SMOOTH_MODAL_EXIT}
         style={styles.backdrop}
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />
-        <Animated.View entering={BounceIn.springify().damping(16)} style={styles.card}>
+        <Animated.View entering={SMOOTH_CARD_ZOOM} style={styles.card}>
           <LinearGradient
             colors={['#17211B', '#0B100D', '#17211B'] as [string, string, string]}
             start={{ x: 0, y: 0 }}

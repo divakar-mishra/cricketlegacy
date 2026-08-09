@@ -68,8 +68,6 @@ const SLIDES: Slide[] = [
   },
 ];
 
-export const ONBOARDING_SLIDE_COUNT = SLIDES.length;
-
 /** First-run coach-marks. Self-hides once completed (persisted in settings). */
 export function Onboarding() {
   const done = useSettings((s) => s.hasOnboarded);

@@ -84,11 +84,9 @@ export function CelebrationOverlay({ trigger, kind, theme = 'classic' }: Props) 
         ),
       ),
       Animated.sequence([
-        Animated.spring(centreAnim, {
+        Animated.timing(centreAnim, {
           toValue: 1,
-          damping: 11,
-          stiffness: 180,
-          mass: 0.75,
+          duration: 200,
           useNativeDriver: true,
         }),
         Animated.delay(kind === 'win' || kind === 'hundred' ? 950 : 620),
@@ -106,7 +104,7 @@ export function CelebrationOverlay({ trigger, kind, theme = 'classic' }: Props) 
   });
   const centreScale = centreAnim.interpolate({
     inputRange: [0, 1, 2],
-    outputRange: [0.55, 1, 1.08],
+    outputRange: [0.85, 1, 1.02],
   });
   const ringScale = centreAnim.interpolate({
     inputRange: [0, 1, 2],

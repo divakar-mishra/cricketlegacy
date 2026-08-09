@@ -51,16 +51,6 @@ export function revisedTarget(firstInningsRuns: number, r1Pct: number, r2Pct: nu
   return Math.floor(par) + 1;
 }
 
-/** Par score for the chasing side at a point in its innings (to judge who's ahead). */
-export function parScore(
-  firstInningsRuns: number,
-  r1Pct: number,
-  resourcesUsedByChaser: number,
-  g50 = G50,
-): number {
-  return revisedTarget(firstInningsRuns, r1Pct, resourcesUsedByChaser, g50) - 1;
-}
-
 export interface DlsScenario {
   firstInningsRuns: number;
   fullOvers: number;

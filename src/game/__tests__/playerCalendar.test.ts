@@ -1,5 +1,6 @@
 import { TEAM_BLUEPRINTS } from '../../content/teams';
 import { buildUserPlayer, createCareerSave } from '../createGame';
+import { currentPlayerCalendarEvent, resolvePlayerCalendarEvent } from '../playerCalendar';
 import { nextUserFixtureId, nextUserFixturesByCompetition } from '../season';
 import { generateYouthFixtures } from '../youthFixtures';
 
@@ -53,6 +54,11 @@ describe('player career calendar', () => {
         ?.filter((competition) => competition.fixtureIds.length > 0)
         .map((competition) => competition.id),
     ).toEqual(['t20-league', 'list-a', 'first-class']);
+    expect(currentPlayerCalendarEvent(save)?.kind).toBe('TRAINING');
+    expect(nextUserFixtureId(save)).toBeUndefined();
+    expect(resolvePlayerCalendarEvent(save, 'SKILL').ok).toBe(true);
+    expect(currentPlayerCalendarEvent(save)?.kind).toBe('SELECTION');
+    expect(resolvePlayerCalendarEvent(save).ok).toBe(true);
     expect(save.fixtures[nextUserFixtureId(save)!].competitionId).toBe('list-a');
     expect(save.fixtures[options[0].fixtureId].calendarMonth).toBe(9);
     expect(

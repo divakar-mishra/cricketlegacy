@@ -6,6 +6,7 @@ import {
   League,
   LeagueRow,
   MatchState,
+  Player,
   SaveGame,
 } from '../domain/types';
 import { pickStadium, Stadium } from '../data/stadiums';
@@ -13,11 +14,7 @@ import { approachBias } from '../engine/intent';
 import { LiveMatch } from '../engine/liveMatch';
 import { makeRng, weightedSample } from '../engine/rng';
 import { simulateMatch, TeamSide, TeamTactics } from '../engine/simulateMatch';
-import {
-  buildDoubleRoundRobin,
-  buildRoundRobin,
-  DIV1_LEAGUE_ID,
-} from '../generation/world';
+import { buildDoubleRoundRobin, buildRoundRobin, DIV1_LEAGUE_ID } from '../generation/world';
 import {
   applyPromotionRelegation,
   applyThreeTierPromotionRelegation,
@@ -37,6 +34,7 @@ import {
 import { refreshFreeAgents, rolloverSquads } from './lifecycle';
 import { recallLoan } from './manager';
 import {
+  careerPlayingTeamId,
   generateYouthFixtures,
   isYouthFixture,
   nextYouthFixtureId,
@@ -55,7 +53,9 @@ import { developPlayer } from './progression';
 import { recordTitle, updateRecords } from './records';
 import { resolveXI } from './squad';
 import { applyMatchToStats, resetSeasonStats } from './stats';
-import { prepareCareerPlayerForMatch, tickCareerResidency } from './career';
+import { prepareCareerPlayerForMatch, tickCareerResidency, validateAgeEligibility } from './career';
+import { synchronizeCareerPromotion } from './careerTransition';
+import { clamp } from '../utils/math';
 import {
   advanceManagerCalendar as advanceManagerCalendarEngine,
   applyManagerCalendarMatchEffects,
@@ -69,10 +69,12 @@ import {
   refreshManagerNationalTeams,
 } from './managerCalendar';
 import {
+  advanceInternationalTournament,
   generateInternationalWindowFixtures,
   internationalWindowFixtureIds,
   isInternationalFixture,
   nextInternationalFixtureId,
+  recordWtcFixtureResult,
 } from './intlCalendar';
 import {
   buildPlayerSeasonCalendar,
@@ -81,12 +83,12 @@ import {
   resolvePlayerCalendarEvent,
 } from './playerCalendar';
 import { applyPendingPlayerCountryMove } from './playerMigration';
+import { matchDecisionAuthority } from './matchAuthority';
 
 const DEFAULT_TACTICS = { batting: 'BALANCED', bowling: 'CONTAIN', field: 'BALANCED' } as const;
 const SF1_ID = 'po-SF1';
 const SF2_ID = 'po-SF2';
 const FINAL_ID = 'po-F';
-export const PLAYOFF_IDS = [SF1_ID, SF2_ID, FINAL_ID] as const;
 
 function hashSeed(str: string): number {
   let h = 2166136261 >>> 0;
@@ -97,16 +99,7 @@ function hashSeed(str: string): number {
   return h >>> 0;
 }
 
-const PITCHES: Conditions['pitch'][] = ['GREEN', 'DRY', 'DUSTY', 'FLAT', 'CRACKED'];
 const WEATHERS: Conditions['weather'][] = ['CLEAR', 'OVERCAST', 'HUMID'];
-
-export function pickConditions(seed: number): Conditions {
-  const r = makeRng((seed ^ 0x9e3779b9) >>> 0);
-  return {
-    pitch: PITCHES[Math.floor(r() * PITCHES.length)],
-    weather: WEATHERS[Math.floor(r() * WEATHERS.length)],
-  };
-}
 
 /** Conditions weighted by a venue's playing character (pace/spin/scoring bias). */
 export function conditionsForStadium(st: Stadium, seed: number): Conditions {
@@ -151,13 +144,6 @@ function userTactics(save: SaveGame): TeamTactics {
 /** AI rival-manager personalities — each club has a distinct tactical identity. */
 export type ManagerStyle = 'AGGRESSOR' | 'PRAGMATIST' | 'TACTICIAN' | 'DEFENDER';
 
-export const MANAGER_STYLE_LABEL: Record<ManagerStyle, string> = {
-  AGGRESSOR: 'Aggressor',
-  PRAGMATIST: 'Pragmatist',
-  TACTICIAN: 'Tactician',
-  DEFENDER: 'Defender',
-};
-
 const STYLES: ManagerStyle[] = ['AGGRESSOR', 'PRAGMATIST', 'TACTICIAN', 'DEFENDER'];
 
 /** Deterministic per-club manager personality (stable across the save). */
@@ -194,16 +180,65 @@ export function teamSide(
   teamId: string,
   controlledTeamId = save.userTeamId,
   format?: Format,
+  managerPrepared = false,
 ): TeamSide {
   const team = save.teams[teamId];
   const squad = team.playerIds.map((id) => save.players[id]).filter(Boolean);
   // No forced inclusion: the persisted XI (merit-selected in career, manual in
   // manager) decides who plays — so an out-of-form career player can be dropped.
-  const players = resolveXI(squad, team.xi).map((player) =>
-    format ? prepareCareerPlayerForMatch(save, player, format) : player,
-  );
+  const players = resolveXI(squad, team.xi).map((player) => {
+    const careerPlayer = format ? prepareCareerPlayerForMatch(save, player, format) : player;
+    return prepareManagerPlayerForMatch(
+      save,
+      careerPlayer,
+      teamId === controlledTeamId,
+      managerPrepared,
+    );
+  });
   const tactics = teamId === controlledTeamId ? userTactics(save) : aiTacticsFor(team);
   return { teamId, players, tactics };
+}
+
+function scaleMatchValue(value: number, multiplier: number): number {
+  return Math.round(clamp(value * multiplier, 1, 99));
+}
+
+/**
+ * Temporary manager match modifier. It makes condition and morale actionable
+ * without permanently rewriting player ratings in the save.
+ */
+export function prepareManagerPlayerForMatch(
+  save: SaveGame,
+  player: Player,
+  controlled: boolean,
+  managerPrepared: boolean,
+): Player {
+  if (save.mode !== 'manager' || !controlled) return player;
+  const ignoredWarning = (player.condition ?? 100) < 55 || (player.morale ?? 60) < 45;
+  const multiplier = (ignoredWarning ? 0.85 : 1) * (managerPrepared ? 1.1 : 1);
+  if (multiplier === 1) return player;
+  const scaleRecord = <T extends object>(values: T): T =>
+    Object.fromEntries(
+      Object.entries(values as Record<string, number>).map(([key, value]) => [
+        key,
+        scaleMatchValue(value, multiplier),
+      ]),
+    ) as T;
+  return {
+    ...player,
+    batting: scaleRecord(player.batting),
+    bowling: scaleRecord(player.bowling),
+    fielding: scaleRecord(player.fielding),
+    meta: scaleRecord(player.meta),
+    overall: scaleMatchValue(player.overall, multiplier),
+  };
+}
+
+function managerPreparedForFixture(save: SaveGame, fixtureId: string): boolean {
+  return Boolean(
+    save.mode === 'manager' &&
+    (save.flags?.[`teamTalk:${fixtureId}`] || save.flags?.[`tactics:${fixtureId}`]),
+  );
 }
 
 export function fixtureList(save: SaveGame): Fixture[] {
@@ -296,9 +331,10 @@ export function runFixture(save: SaveGame, fixtureId: string): MatchState {
     ? managerControlledTeamId(save, fx.managerPhase)
     : isInternationalFixture(fx)
       ? fx.homeTeamId
-      : save.userTeamId;
+      : careerPlayingTeamId(save, fixtureId);
   const seed = hashSeed(`${save.id}:${fixtureId}`);
   const { stadium, conditions } = venueForFixture(save, fx, seed);
+  const managerPrepared = managerPreparedForFixture(save, fixtureId);
   fx.stadiumId = stadium.id;
   fx.venue = stadium.name;
   return simulateMatch({
@@ -306,10 +342,11 @@ export function runFixture(save: SaveGame, fixtureId: string): MatchState {
     seed,
     format: fx.format,
     conditions,
-    home: teamSide(save, fx.homeTeamId, controlledTeamId, fx.format),
-    away: teamSide(save, fx.awayTeamId, controlledTeamId, fx.format),
+    home: teamSide(save, fx.homeTeamId, controlledTeamId, fx.format, managerPrepared),
+    away: teamSide(save, fx.awayTeamId, controlledTeamId, fx.format, managerPrepared),
     difficulty: save.difficulty,
     rain: true, // season auto-sim can be rain-affected (DLS)
+    focusPlayerId: save.mode === 'career' ? save.userPlayerId : undefined,
   });
 }
 
@@ -473,6 +510,8 @@ export function applyResult(save: SaveGame, match: MatchState): void {
     resolved.kind === 'HOME_WIN' || resolved.kind === 'AWAY_WIN'
       ? resolved.winnerTeamId
       : undefined;
+  recordWtcFixtureResult(save, fx);
+  advanceInternationalTournament(save, fx);
   if (managerCalendarEnabled(save)) applyManagerCalendarMatchEffects(save, fx);
   if (!fx.playoff && fx.competition !== 'CUP' && isLeagueTableFixture(fx)) {
     const league = leagueForFixture(save, fx);
@@ -510,19 +549,12 @@ export function nextUserFixtureId(save: SaveGame): string | undefined {
   if (save.mode === 'career') {
     ensureCompetitionFixtures(save, 'list-a');
     ensureCompetitionFixtures(save, 'first-class');
-    const season = save.currentSeasonId ? save.seasons[save.currentSeasonId] : undefined;
-    for (const competitionId of ['list-a', 'first-class', 't20-league']) {
-      const competition = season?.competitions?.find((item) => item.id === competitionId);
-      const next = competition?.fixtureIds
-        .map((id) => save.fixtures[id])
-        .find(
-          (fixture) =>
-            fixture &&
-            !fixture.played &&
-            (fixture.homeTeamId === t || fixture.awayTeamId === t),
-        );
-      if (next) return next.id;
+    if (save.capped) generateInternationalWindowFixtures(save);
+    const calendarEvent = currentPlayerCalendarEvent(save);
+    if (calendarEvent?.kind === 'MATCH' && calendarEvent.fixtureId) {
+      return calendarEvent.fixtureId;
     }
+    if (calendarEvent) return undefined;
   }
 
   // Legacy/manager saves without calendar metadata use the T20 circuit.
@@ -631,6 +663,19 @@ export function nextUserFixturesByCompetition(
   if (!season?.competitions?.length) return [];
 
   if (managerCalendarEnabled(save)) {
+    const fixtureId = nextManagerUserFixtureId(save);
+    if (save.managerCareerLevel === 'NATIONAL' && fixtureId) {
+      const fixture = save.fixtures[fixtureId];
+      const competition = season.competitions.find((item) => item.id === fixture.competitionId);
+      return [
+        {
+          competitionId: fixture.competitionId ?? 'international',
+          name: competition?.name ?? fixture.venue.split(' - ')[0],
+          format: fixture.format,
+          fixtureId,
+        },
+      ];
+    }
     const current = managerPhaseProgress(save);
     const competitionId =
       current.phase === 'LIST_A'
@@ -642,7 +687,6 @@ export function nextUserFixturesByCompetition(
             : undefined;
     if (!competitionId || !current.unlocked) return [];
     const competition = season.competitions.find((item) => item.id === competitionId);
-    const fixtureId = nextManagerUserFixtureId(save);
     return competition && fixtureId
       ? [
           {
@@ -764,10 +808,12 @@ export function createLiveMatch(
     ? managerControlledTeamId(save, fx.managerPhase)
     : isInternationalFixture(fx)
       ? fx.homeTeamId
-      : save.userTeamId;
+      : careerPlayingTeamId(save, fixtureId);
   const seed = hashSeed(`${save.id}:${fixtureId}:live`);
   const t = save.tactics ?? DEFAULT_TACTICS;
+  const authority = matchDecisionAuthority(save, fx);
   const { stadium, conditions } = venueForFixture(save, fx, seed);
+  const managerPrepared = managerPreparedForFixture(save, fixtureId);
   fx.stadiumId = stadium.id;
   fx.venue = stadium.name;
   return new LiveMatch({
@@ -775,12 +821,15 @@ export function createLiveMatch(
     seed,
     format: fx.format,
     conditions,
-    home: teamSide(save, fx.homeTeamId, controlledTeamId, fx.format),
-    away: teamSide(save, fx.awayTeamId, controlledTeamId, fx.format),
+    home: teamSide(save, fx.homeTeamId, controlledTeamId, fx.format, managerPrepared),
+    away: teamSide(save, fx.awayTeamId, controlledTeamId, fx.format, managerPrepared),
     difficulty: save.difficulty,
     userTeamId: controlledTeamId,
+    tossControllerTeamId: authority.canControlTeam ? controlledTeamId : null,
     interactiveBatterId,
-    tactics: { battingBias: approachBias(t.batting), bowlingPlan: t.bowling, field: t.field },
+    tactics: authority.canControlTeam
+      ? { battingBias: approachBias(t.batting), bowlingPlan: t.bowling, field: t.field }
+      : undefined,
   });
 }
 
@@ -794,27 +843,34 @@ export function createDailyChallengeMatch(
   save: SaveGame,
   challenge: DailyChallenge,
 ): LiveMatch | null {
-  if (!save.userTeamId) return null;
+  const controlledTeamId = careerPlayingTeamId(save);
+  if (!controlledTeamId) return null;
   const seed = hashSeed(`${save.id}:daily:${challenge.dateKey}`);
   const rng = makeRng(seed);
-  const others = Object.keys(save.teams).filter((id) => id !== save.userTeamId);
-  const oppId = others.length ? others[Math.floor(rng() * others.length)] : save.userTeamId;
+  const others = Object.keys(save.teams).filter(
+    (id) => id !== controlledTeamId && !id.startsWith('career-path-'),
+  );
+  const oppId = others.length ? others[Math.floor(rng() * others.length)] : controlledTeamId;
   const conditions: Conditions = {
     pitch: challenge.pitchCondition,
     weather: WEATHERS[Math.floor(rng() * WEATHERS.length)],
   };
   const t = save.tactics ?? DEFAULT_TACTICS;
+  const authority = matchDecisionAuthority(save);
   return new LiveMatch({
     id: `daily-${challenge.dateKey}`,
     seed,
     format: challenge.format,
     conditions,
-    home: teamSide(save, save.userTeamId, save.userTeamId, challenge.format),
-    away: teamSide(save, oppId, save.userTeamId, challenge.format),
+    home: teamSide(save, controlledTeamId, controlledTeamId, challenge.format),
+    away: teamSide(save, oppId, controlledTeamId, challenge.format),
     difficulty: save.difficulty,
-    userTeamId: save.userTeamId,
+    userTeamId: controlledTeamId,
+    tossControllerTeamId: authority.canControlTeam ? controlledTeamId : null,
     interactiveBatterId: save.userPlayerId,
-    tactics: { battingBias: approachBias(t.batting), bowlingPlan: t.bowling, field: t.field },
+    tactics: authority.canControlTeam
+      ? { battingBias: approachBias(t.batting), bowlingPlan: t.bowling, field: t.field }
+      : undefined,
   });
 }
 
@@ -873,6 +929,133 @@ export function simulateUnplayedBefore(save: SaveGame, fixtureId: string): void 
     if (!isLeagueTableFixture(fx)) continue;
     if (isYouthFixture(fx)) continue; // youth fixtures are player-controlled only
     if (!fx.played) applyResult(save, runFixture(save, fx.id));
+  }
+}
+
+function fixtureCalendarWeek(fixture: Fixture): number {
+  return fixture.calendarWeek ?? ((fixture.round - 1) % 4) + 1;
+}
+
+function fixtureMonthOrder(month?: number): number {
+  if (!month) return 99;
+  return month >= 9 ? month - 9 : month + 3;
+}
+
+function simulateFixtureWithoutCareerPlayer(save: SaveGame, fixture: Fixture): void {
+  if (!save.userPlayerId) {
+    applyResult(save, runFixture(save, fixture.id));
+    return;
+  }
+  const fixtureRosterIds = new Set(
+    [fixture.homeTeamId, fixture.awayTeamId].flatMap(
+      (teamId) => save.teams[teamId]?.playerIds ?? [],
+    ),
+  );
+  const touchedTeamIds = [fixture.homeTeamId, fixture.awayTeamId].filter((teamId) =>
+    save.teams[teamId]?.playerIds.includes(save.userPlayerId!),
+  );
+  const snapshots = touchedTeamIds.map((teamId) => {
+    const team = save.teams[teamId];
+    const playerIds = [...team.playerIds];
+    const xi = team.xi ? [...team.xi] : undefined;
+    const contracted = playerIds
+      .filter((playerId) => playerId !== save.userPlayerId)
+      .map((playerId) => save.players[playerId])
+      .filter((player): player is Player => Boolean(player && !player.retired));
+    const replacements = Object.values(save.players).filter(
+      (player) =>
+        player.id !== save.userPlayerId &&
+        !player.retired &&
+        player.nationality === team.country &&
+        !fixtureRosterIds.has(player.id),
+    );
+    const eligible = [...contracted, ...replacements].slice(0, 16);
+    team.playerIds = eligible.map((player) => player.id);
+    team.xi = resolveXI(eligible).map((player) => player.id);
+    return { teamId, playerIds, xi };
+  });
+  try {
+    applyResult(save, runFixture(save, fixture.id));
+  } finally {
+    for (const snapshot of snapshots) {
+      const team = save.teams[snapshot.teamId];
+      team.playerIds = snapshot.playerIds;
+      team.xi = snapshot.xi;
+    }
+  }
+}
+
+/**
+ * National duty wins a same-week clash. The domestic club still plays, with
+ * the user's scorecard status persisted as away on national duty.
+ */
+export function resolveNationalDutyConflict(
+  save: SaveGame,
+  internationalFixtureId: string,
+): string | undefined {
+  const international = save.fixtures[internationalFixtureId];
+  if (
+    save.mode !== 'career' ||
+    !save.userPlayerId ||
+    !save.userTeamId ||
+    !international ||
+    !isInternationalFixture(international)
+  ) {
+    return undefined;
+  }
+  const conflict = fixtureList(save).find(
+    (fixture) =>
+      !fixture.played &&
+      !isInternationalFixture(fixture) &&
+      fixture.competition !== 'CUP' &&
+      ['list-a', 'first-class', 't20-league'].includes(fixture.competitionId ?? '') &&
+      (fixture.homeTeamId === save.userTeamId || fixture.awayTeamId === save.userTeamId) &&
+      fixture.calendarMonth === international.calendarMonth &&
+      fixtureCalendarWeek(fixture) === fixtureCalendarWeek(international),
+  );
+  if (!conflict) return undefined;
+  conflict.nationalDutyPlayerIds = [
+    ...new Set([...(conflict.nationalDutyPlayerIds ?? []), save.userPlayerId]),
+  ];
+  simulateFixtureWithoutCareerPlayer(save, conflict);
+  const calendarItem = save.playerCalendar?.events.find((item) => item.fixtureId === conflict.id);
+  if (calendarItem) {
+    calendarItem.completed = true;
+    calendarItem.outcome = 'Away on National Duty. Your domestic club played without you.';
+  }
+  const messageId = `national-duty-${international.id}-${conflict.id}`;
+  const inbox = save.inbox ?? [];
+  if (!inbox.some((message) => message.id === messageId)) {
+    save.inbox = [
+      {
+        id: messageId,
+        kind: 'GENERAL' as const,
+        title: 'Away on National Duty',
+        body: `${save.teams[save.userTeamId]?.name ?? 'Your domestic club'} played its scheduled match while you represented your country.`,
+        timestamp: Date.now(),
+        read: false,
+      },
+      ...inbox,
+    ].slice(0, 100);
+  }
+  return conflict.id;
+}
+
+/** AI-complete the rest of an international assignment after a selection drop. */
+export function simulateInternationalFixturesWithoutUser(
+  save: SaveGame,
+  fixtureIds: string[],
+): void {
+  for (const fixture of fixtureIds
+    .map((fixtureId) => save.fixtures[fixtureId])
+    .filter((fixture): fixture is Fixture => Boolean(fixture && !fixture.played))
+    .sort(
+      (left, right) =>
+        fixtureMonthOrder(left.calendarMonth) - fixtureMonthOrder(right.calendarMonth) ||
+        fixtureCalendarWeek(left) - fixtureCalendarWeek(right) ||
+        left.round - right.round,
+    )) {
+    simulateFixtureWithoutCareerPlayer(save, fixture);
   }
 }
 
@@ -1023,16 +1206,6 @@ function playoffWinner(save: SaveGame, fxId: string, table: LeagueRow[]): string
   return seed(fx.homeTeamId) <= seed(fx.awayTeamId) ? fx.homeTeamId : fx.awayTeamId;
 }
 
-/** True while the user's team still has a knockout match to come this season. */
-export function userInPlayoffs(save: SaveGame): boolean {
-  const t = save.userTeamId;
-  if (!t) return false;
-  return PLAYOFF_IDS.some((id) => {
-    const fx = save.fixtures[id];
-    return fx && !fx.played && (fx.homeTeamId === t || fx.awayTeamId === t);
-  });
-}
-
 /**
  * Auto-play knockout matches that DON'T involve the user so the bracket
  * progresses to the user's next live fixture (e.g. sim the other semi so the
@@ -1089,8 +1262,7 @@ export function catchUpLeague(save: SaveGame): void {
 /** Play every remaining domestic fixture and playoff (the Cup finishes separately). */
 export function finishSeason(save: SaveGame): void {
   const level = save.careerPathLevel ?? 'DOMESTIC';
-  const fullCareerCalendar =
-    save.mode === 'career' && level !== 'SCHOOL' && level !== 'U19';
+  const fullCareerCalendar = save.mode === 'career' && level !== 'SCHOOL' && level !== 'U19';
   if (save.mode === 'career' && save.capped) generateInternationalWindowFixtures(save);
   if (fullCareerCalendar) {
     ensureCompetitionFixtures(save, 'list-a');
@@ -1151,16 +1323,17 @@ export function startNewSeason(save: SaveGame): void {
   let continentalPrize = 0;
   let seasonSponsorIncome = 0;
   let playerWages = 0;
+  const trophyEligible = save.mode === 'manager' || careerTrophyParticipationRate(save) >= 0.4;
 
   // Settle the finished season: record the champion and award prize money.
   if (save.currentSeasonId) {
     const champ = seasonChampionId(save);
-    if (champ && champ === save.userTeamId) {
+    if (champ && champ === save.userTeamId && trophyEligible) {
       recordTitle(save, save.teams[champ]?.name ?? 'Champions', finishedYear);
     }
     // Cross-career Hall of Fame: count a completed season, and a league title.
     save.careerSeasons = (save.careerSeasons ?? 0) + 1;
-    if (champ && champ === save.userTeamId) {
+    if (champ && champ === save.userTeamId && trophyEligible) {
       save.leagueTitles = (save.leagueTitles ?? 0) + 1;
       // Record a title for manager career progression too.
       if (save.mode === 'manager') recordManagerTitle(save);
@@ -1169,8 +1342,8 @@ export function startNewSeason(save: SaveGame): void {
     // Continental Cup — the top four contest a second trophy.
     const contQuals = finalTable.slice(0, 4).map((r) => r.teamId);
     const contRng = makeRng(hashSeed(`${save.id}:cont:${finishedYear}`));
-    const cont = resolveContinental(save, contQuals, contRng);
-    if (cont.championId && cont.userWon) {
+    const cont = resolveContinental(save, contQuals, contRng, trophyEligible);
+    if (cont.championId && cont.userWon && trophyEligible) {
       recordTitle(
         save,
         `${save.teams[cont.championId]?.name ?? 'Champions'} (Continental)`,
@@ -1197,7 +1370,7 @@ export function startNewSeason(save: SaveGame): void {
     const outcome = evaluateBoardObjective(pos, save.boardObjective);
     if (save.boardObjective) save.boardObjective.met = outcome.met;
     team.reputation = Math.max(40, Math.min(95, team.reputation + (outcome.met ? 1 : -1)));
-    save.flags.sacked = outcome.sacked;
+    save.flags.sacked = outcome.sacked && Math.max(0, save.managerGraceMatchesRemaining ?? 0) === 0;
 
     // Season finances: sponsor/broadcast income minus the wage bill.
     const squad = team.playerIds.map((id) => save.players[id]).filter(Boolean);
@@ -1346,6 +1519,13 @@ export function startNewSeason(save: SaveGame): void {
     developPlayer(p, devRng);
     p.trainingSessionsThisSeason = 0;
   }
+  if (save.mode === 'career') {
+    const before = save.careerPathLevel;
+    const after = validateAgeEligibility(save);
+    if (before && after && before !== after) {
+      synchronizeCareerPromotion(save, { promoted: true, from: before, to: after });
+    }
+  }
 
   // Retire veterans, promote youth, and refresh the transfer market.
   rolloverSquads(save, year, devRng);
@@ -1385,4 +1565,18 @@ export function startNewSeason(save: SaveGame): void {
     tickManagerCareerSeason(save);
     if (!save.managerCalendar) ensureIccFixtures(save);
   }
+}
+
+/** Share of the user's club matches in which the career player actually appeared. */
+export function careerTrophyParticipationRate(save: SaveGame): number {
+  if (save.mode !== 'career' || !save.userPlayerId || !save.userTeamId) return 0;
+  if (save.careerPathLevel === 'SCHOOL' || save.careerPathLevel === 'U19') return 0;
+  const clubMatches = Object.values(save.fixtures).filter(
+    (fixture) =>
+      fixture.played &&
+      (fixture.homeTeamId === save.userTeamId || fixture.awayTeamId === save.userTeamId),
+  ).length;
+  if (clubMatches === 0) return 0;
+  const appearances = save.players[save.userPlayerId]?.seasonStats?.matches ?? 0;
+  return Math.min(1, appearances / clubMatches);
 }

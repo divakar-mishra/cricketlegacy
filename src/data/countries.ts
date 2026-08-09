@@ -148,14 +148,22 @@ export const COUNTRIES: Country[] = [
     name: 'Scotland',
     flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
     strength: 2,
-    cities: [city('edinburgh', 'Edinburgh'), city('glasgow', 'Glasgow'), city('aberdeen', 'Aberdeen')],
+    cities: [
+      city('edinburgh', 'Edinburgh'),
+      city('glasgow', 'Glasgow'),
+      city('aberdeen', 'Aberdeen'),
+    ],
   },
   {
     id: 'netherlands',
     name: 'Netherlands',
     flag: '🇳🇱',
     strength: 2,
-    cities: [city('amsterdam', 'Amsterdam'), city('rotterdam', 'Rotterdam'), city('the_hague', 'The Hague')],
+    cities: [
+      city('amsterdam', 'Amsterdam'),
+      city('rotterdam', 'Rotterdam'),
+      city('the_hague', 'The Hague'),
+    ],
   },
   {
     id: 'uae',
@@ -169,7 +177,12 @@ export const COUNTRIES: Country[] = [
     name: 'USA',
     flag: '🇺🇸',
     strength: 2,
-    cities: [city('new_york', 'New York'), city('los_angeles', 'Los Angeles'), city('dallas', 'Dallas'), city('houston', 'Houston')],
+    cities: [
+      city('new_york', 'New York'),
+      city('los_angeles', 'Los Angeles'),
+      city('dallas', 'Dallas'),
+      city('houston', 'Houston'),
+    ],
   },
   {
     id: 'namibia',
@@ -187,15 +200,14 @@ export const COUNTRIES: Country[] = [
   },
 ];
 
-export const COUNTRIES_BY_ID: Record<string, Country> = COUNTRIES.reduce((acc, c) => {
-  acc[c.id] = c;
-  return acc;
-}, {} as Record<string, Country>);
+export const COUNTRIES_BY_ID: Record<string, Country> = COUNTRIES.reduce(
+  (acc, c) => {
+    acc[c.id] = c;
+    return acc;
+  },
+  {} as Record<string, Country>,
+);
 
 export function getCountry(id: string): Country | undefined {
   return COUNTRIES_BY_ID[id];
-}
-
-export function getCity(countryId: string, cityId: string): City | undefined {
-  return getCountry(countryId)?.cities.find((c) => c.id === cityId);
 }

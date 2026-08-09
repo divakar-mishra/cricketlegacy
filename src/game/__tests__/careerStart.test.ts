@@ -18,9 +18,9 @@ const ATTRS = {
 
 // Legacy/manual starting ages still need to map consistently even though the UI exposes only U14.
 const STARTS = [
-  { value: 'u14', age: 14, attrScale: 0.52, potentialBonus: 26, level: 'SCHOOL', stock: false },
-  { value: 'u19', age: 17, attrScale: 0.74, potentialBonus: 14, level: 'U19', stock: false },
-  { value: 'domestic', age: 20, attrScale: 1.0, potentialBonus: 4, level: 'DOMESTIC', stock: true },
+  { value: 'u14', age: 14, attrScale: 0.52, level: 'SCHOOL', stock: false },
+  { value: 'u19', age: 17, attrScale: 0.74, level: 'U19', stock: false },
+  { value: 'domestic', age: 20, attrScale: 1.0, level: 'DOMESTIC', stock: true },
 ] as const;
 
 const ROLES: Role[] = ['BATTER', 'BOWLER', 'ALLROUNDER', 'WK_BATTER'];
@@ -35,11 +35,49 @@ function build(role: Role, s: (typeof STARTS)[number]) {
     ...ATTRS,
     age: s.age,
     attrScale: s.attrScale,
-    potentialBonus: s.potentialBonus,
   });
 }
 
 describe('player creation is consistent across every start level', () => {
+  it('keeps a School player out of the reserved Tier 3 senior roster', () => {
+    const player = build('BATTER', STARTS[0]);
+    const save = createCareerSave({
+      player,
+      teamId: 'mumbai_sharks',
+      difficulty: 'NORMAL',
+      seed: 41,
+      format: 'T20',
+    });
+
+    expect(save.careerPathLevel).toBe('SCHOOL');
+    expect(save.careerPathTeamId).toBeDefined();
+    expect(save.careerPathTeamId).not.toBe(save.userTeamId);
+    expect(save.teams[save.userTeamId!].playerIds).not.toContain(player.id);
+    expect(save.teams[save.careerPathTeamId!].playerIds).toContain(player.id);
+    expect(save.players[player.id].contract).toBeUndefined();
+    expect(
+      save.teams[save.careerPathTeamId!].playerIds
+        .filter((id) => id !== player.id)
+        .every((id) => save.players[id].age >= 14 && save.players[id].age <= 15),
+    ).toBe(true);
+    const youthFixtures = Object.values(save.fixtures).filter(
+      (fixture) => fixture.competitionId === 'youth-u14',
+    );
+    expect(youthFixtures).toHaveLength(6);
+    expect(
+      youthFixtures.every(
+        (fixture) =>
+          fixture.homeTeamId === save.careerPathTeamId ||
+          fixture.awayTeamId === save.careerPathTeamId,
+      ),
+    ).toBe(true);
+    expect(
+      save.playerCalendar?.events.filter(
+        (event) => event.kind === 'MATCH' && event.fixtureId?.startsWith('youth-fx-'),
+      ),
+    ).toHaveLength(6);
+  });
+
   it('buildUserPlayer is pure — identical inputs give identical OVR & potential', () => {
     for (const role of ROLES) {
       for (const s of STARTS) {

@@ -20,7 +20,7 @@ export function CupCard({ save, canPlay, onPlay }: Props) {
 
   const tie = userCupTieInfo(save);
   const champId = cupChampionId(save);
-  const teamName = (id?: string) => (id ? (save.teams[id]?.name ?? id) : '');
+  const teamName = (id?: string) => (id ? (save.teams[id]?.name ?? 'Team pending') : '');
 
   return (
     <>

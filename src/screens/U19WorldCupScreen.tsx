@@ -35,7 +35,7 @@ export function U19WorldCupScreen({ navigation }: ScreenProps<'U19WorldCup'>) {
   }
 
   const userCountry = save.userPlayerId ? save.players[save.userPlayerId]?.nationality : undefined;
-  const userCountryName = userCountry ? (getCountry(userCountry)?.name ?? userCountry) : '—';
+  const userCountryName = userCountry ? (getCountry(userCountry)?.name ?? 'Your country') : '—';
   const qualifies = u19Qualifies(save);
   const shouldRun = shouldRunU19WorldCup(save);
 
@@ -178,8 +178,8 @@ function BracketMatch({
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
 
-  const homeName = getCountry(homeId)?.name ?? homeId;
-  const awayName = getCountry(awayId)?.name ?? awayId;
+  const homeName = getCountry(homeId)?.name ?? 'Team pending';
+  const awayName = getCountry(awayId)?.name ?? 'Team pending';
   const isUserHome = homeId === userCountry;
   const isUserAway = awayId === userCountry;
   const userWon = played && winnerTeamId === userCountry;
@@ -204,7 +204,7 @@ function BracketMatch({
           {userWon
             ? '🏅 Your country advances'
             : winnerTeamId
-              ? `${getCountry(winnerTeamId)?.name ?? winnerTeamId} wins`
+              ? `${getCountry(winnerTeamId)?.name ?? 'Winning team'} wins`
               : ''}
         </Text>
       )}

@@ -1,8 +1,8 @@
 /**
- * Local leaderboards — rank the user against the whole world of players on a
- * chosen metric (runs, wickets, or overall rating), for this season or the whole
- * career. Pure functions over the save; a natural hook for a future online board
- * (the same shape can be filled from a backend). Unit-tested.
+ * Save-local leaderboards for runs, wickets, and overall rating.
+ *
+ * This is also the offline shape used while the public Supabase leaderboard is
+ * unavailable.
  */
 import { Player, SaveGame } from '../domain/types';
 import { emptyStats } from './stats';
@@ -25,17 +25,17 @@ export const METRIC_LABEL: Record<LeaderMetric, string> = {
   overall: 'Top Rated',
 };
 
-function metricValue(p: Player, metric: LeaderMetric, scope: LeaderScope): number {
-  if (metric === 'overall') return p.overall;
-  const s = (scope === 'season' ? p.seasonStats : p.careerStats) ?? emptyStats();
-  return metric === 'runs' ? s.runs : s.wickets;
+function metricValue(player: Player, metric: LeaderMetric, scope: LeaderScope): number {
+  if (metric === 'overall') return player.overall;
+  const stats = (scope === 'season' ? player.seasonStats : player.careerStats) ?? emptyStats();
+  return metric === 'runs' ? stats.runs : stats.wickets;
 }
 
 function teamNameOf(save: SaveGame, playerId: string): string {
-  for (const t of Object.values(save.teams)) {
-    if (t.playerIds.includes(playerId)) return t.shortName;
+  for (const team of Object.values(save.teams)) {
+    if (team.playerIds.includes(playerId)) return team.shortName;
   }
-  return '—';
+  return '-';
 }
 
 /** Ranked leaderboard (best first). Hidden youth prospects are excluded. */
@@ -46,16 +46,16 @@ export function leaderboard(
   limit = 10,
 ): LeaderRow[] {
   const rows = Object.values(save.players)
-    .filter((p) => !p.hidden)
-    .map((p) => ({
-      playerId: p.id,
-      name: p.name,
-      teamName: teamNameOf(save, p.id),
-      value: metricValue(p, metric, scope),
-      isUser: p.id === save.userPlayerId,
+    .filter((player) => !player.hidden)
+    .map((player) => ({
+      playerId: player.id,
+      name: player.name,
+      teamName: teamNameOf(save, player.id),
+      value: metricValue(player, metric, scope),
+      isUser: player.id === save.userPlayerId,
     }))
     .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
-    .map((r, i) => ({ rank: i + 1, ...r }));
+    .map((row, index) => ({ rank: index + 1, ...row }));
   return rows.slice(0, limit);
 }
 
@@ -63,5 +63,5 @@ export function leaderboard(
 export function userRank(save: SaveGame, metric: LeaderMetric, scope: LeaderScope): number {
   if (!save.userPlayerId) return 0;
   const full = leaderboard(save, metric, scope, Number.MAX_SAFE_INTEGER);
-  return full.find((r) => r.isUser)?.rank ?? 0;
+  return full.find((row) => row.isUser)?.rank ?? 0;
 }

@@ -58,7 +58,7 @@ describe('streakReward', () => {
     expect(streakReward(2).coins).toBeGreaterThan(streakReward(1).coins);
     expect(streakReward(7).coins).toBeGreaterThan(streakReward(6).coins);
     expect(streakReward(1).gems).toBe(0);
-    expect(streakReward(7).gems).toBeGreaterThan(0);
+    expect(streakReward(7).gems).toBe(10);
   });
 
   it('keeps rising across weeks but caps the multiplier', () => {
@@ -168,6 +168,14 @@ describe('battle pass', () => {
     }
     expect(xpForTier(1)).toBe(PASS_TIERS[0].xpRequired);
     expect(xpForTier(999)).toBe(0); // out of range
+  });
+
+  it('keeps the 30-day pass gem faucet bounded', () => {
+    const freeGems = PASS_TIERS.reduce((sum, tier) => sum + (tier.freeReward.gems ?? 0), 0);
+    const premiumGems = PASS_TIERS.reduce((sum, tier) => sum + (tier.premiumReward.gems ?? 0), 0);
+    expect(freeGems).toBe(8);
+    expect(premiumGems).toBe(85);
+    expect(freeGems + premiumGems).toBe(93);
   });
 
   it('addPassXp is pure, accumulates, and ignores negative xp', () => {

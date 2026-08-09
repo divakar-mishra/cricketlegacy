@@ -48,12 +48,8 @@ describe('Android purchase screen copy', () => {
       careerStore.indexOf("if (productId === 'bundle_legend')"),
       careerStore.indexOf("if (productId === 'transfer_budget_sm'"),
     );
-    const legendStatusBranch = careerStore.slice(
-      careerStore.indexOf("if (productId === 'legend_status')"),
-      careerStore.indexOf("!save.flags?.['promo:first_gem_pack_bonus']"),
-    );
     expect(bundleBranch).not.toContain('applyManagerLegendBacking(save)');
-    expect(legendStatusBranch).not.toContain('applyManagerLegendBacking(save)');
+    expect(careerStore).toContain("'bundle_legend',");
   });
 
   it('shows stable, useful tool sections for the active career mode', () => {

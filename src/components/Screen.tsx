@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +13,7 @@ type Props = {
   padded?: boolean;
   gradient?: GradientColors;
   contentStyle?: ViewStyle;
-  /** Sticky content pinned to the bottom (respecting safe area). */
+  /** Sticky content pinned below the screen body, respecting the safe area. */
   footer?: React.ReactNode;
 };
 
@@ -34,7 +34,6 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const { gradients, colors } = useTheme();
   const { width } = useWindowDimensions();
-  const [footerHeight, setFooterHeight] = useState(0);
   const bg = gradient ?? gradients.night;
 
   // Responsive horizontal padding: ~4% of width, bounded between md and xl.
@@ -55,23 +54,23 @@ export function Screen({
     () => ({
       paddingTop: insets.top + (padded ? spacing.lg : 0),
       paddingHorizontal: hPad,
-      paddingBottom: (padded ? spacing.lg : 0) + (footer ? footerHeight : 0),
+      paddingBottom: padded ? spacing.lg : 0,
     }),
-    [insets.top, padded, hPad, footer, footerHeight],
+    [insets.top, padded, hPad],
   );
 
   const footerStyle: ViewStyle = useMemo(
     () => ({
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
+      width: '100%',
+      flexShrink: 0,
       paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.md,
       paddingHorizontal: hPad,
       paddingTop: spacing.md,
-      zIndex: 10,
+      backgroundColor: colors.bgElevated,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
     }),
-    [insets.bottom, hPad],
+    [colors.bgElevated, colors.border, insets.bottom, hPad],
   );
 
   const inner = scroll ? (
@@ -80,7 +79,6 @@ export function Screen({
       contentContainerStyle={[paddingStyle, { flexGrow: 1 }, contentWidthStyle, contentStyle]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
-      removeClippedSubviews
       overScrollMode="never"
     >
       {children}
@@ -95,14 +93,7 @@ export function Screen({
       target={<LinearGradient colors={bg} style={styles.fill} />}
     >
       {inner}
-      {footer ? (
-        <View
-          style={footerStyle}
-          onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
-        >
-          {footer}
-        </View>
-      ) : null}
+      {footer ? <View style={footerStyle}>{footer}</View> : null}
     </GlassBlurProvider>
   );
 }

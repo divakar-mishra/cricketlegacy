@@ -16,6 +16,7 @@ import {
   Button,
   Card,
   Icon,
+  MechanicInfoButton,
   PlayerStatusBadges,
   Screen,
   ScreenHeader,
@@ -23,6 +24,7 @@ import {
 import { Player } from '../domain/types';
 import { computeValue, formatClubCurrency, MAX_SQUAD, MIN_SQUAD, WAGE_RATE } from '../game/finance';
 import { SCOUT_FEE, superstarPrefersClub } from '../game/manager';
+import { MANAGER_FAST_TRACK_SCOUT_COINS } from '../game/managerResources';
 import {
   isTransferWindowOpen,
   rivalInterestCount,
@@ -253,6 +255,7 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
   const releasePlayer = useCareer((s) => s.releasePlayer);
   const removeFreeAgent = useCareer((s) => s.removeFreeAgent);
   const scout = useCareer((s) => s.scout);
+  const runManagerResource = useCareer((s) => s.useManagerResource);
   const revealFullScout = useCareer((s) => s.useFullScoutReveal);
   const loanPlayer = useCareer((s) => s.loanPlayer);
   const recallLoan = useCareer((s) => s.recallLoan);
@@ -455,8 +458,50 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
   };
 
   const onScoutChoice = (p: Player) => {
-    if (scoutRevealTokens <= 0) {
+    const report = save.scoutReports?.find((entry) => entry.playerId === p.id);
+    if (!report && scoutRevealTokens <= 0) {
       onScout(p.id);
+      return;
+    }
+    if (report) {
+      const fastTrack = () => {
+        const result = runTransferAction(`fast-track-scout:${p.id}`, () =>
+          runManagerResource('FAST_TRACK_SCOUT', p.id),
+        );
+        if (!result) return;
+        showFlash(
+          result.ok
+            ? (result.detail ?? `${p.name}'s report was fast-tracked.`)
+            : (result.reason ?? 'Fast-track scouting is unavailable.'),
+          result.ok,
+        );
+      };
+      const fullReveal = () => {
+        const result = runTransferAction(`full-scout:${p.id}`, () =>
+          revealFullScout(p.id, 'token'),
+        );
+        if (!result) return;
+        showFlash(
+          result.ok
+            ? `Full report ready: ${p.name} is ${result.report?.knownOverall ?? p.overall} OVR. Fitness, form, injury status and valuation are now confirmed.`
+            : (result.reason ?? 'Full report unavailable.'),
+          result.ok,
+        );
+      };
+      Alert.alert(
+        'Scouting options',
+        `${p.name} is currently at ${Math.round((1 - report.uncertainty) * 100)}% Scout Confidence. Fast-track adds 25 percentage points once per season.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          scoutRevealTokens > 0
+            ? { text: 'Use full-reveal token', onPress: fullReveal }
+            : { text: 'Scout normally', onPress: () => onScout(p.id) },
+          {
+            text: `Fast-track · ${MANAGER_FAST_TRACK_SCOUT_COINS.toLocaleString()}`,
+            onPress: fastTrack,
+          },
+        ],
+      );
       return;
     }
     Alert.alert(
@@ -837,11 +882,14 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
       </View>
 
       {tab === 'market' && isManager && (
-        <Text style={styles.marketHint}>
-          {scoutRevealTokens > 0
-            ? `Full Scout Intelligence ready: ${scoutRevealTokens} instant reveal${scoutRevealTokens === 1 ? '' : 's'} available.`
-            : `Full reveals cost ${SCOUT_FULL_REVEAL_GEMS} gems or a Store token. Rival interest can trigger bid wars.`}
-        </Text>
+        <View style={styles.marketHintRow}>
+          <Text style={[styles.marketHint, { flex: 1 }]}>
+            {scoutRevealTokens > 0
+              ? `Full Scout Intelligence ready: ${scoutRevealTokens} instant reveal${scoutRevealTokens === 1 ? '' : 's'} available.`
+              : `Full reveals cost ${SCOUT_FULL_REVEAL_GEMS} gems or a Store token. Rival interest can trigger bid wars.`}
+          </Text>
+          <MechanicInfoButton topicId="scout-confidence" size={40} />
+        </View>
       )}
 
       {/* ── Search & Filter Bar ──────────────────────────────────────── */}
@@ -1108,6 +1156,11 @@ const makeStyles = (colors: ThemeColors) =>
     listWrap: { flex: 1 },
 
     // Scout confidence bar
+    marketHintRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
     scoutRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
     scoutBarBg: {
       flex: 1,

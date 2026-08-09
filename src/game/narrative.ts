@@ -116,7 +116,12 @@ function seedRelationships(save: SaveGame, user: Player): Record<string, Relatio
   const rng = makeRng((hash(save.id) ^ 0x5eed) >>> 0);
   const rels: Record<string, Relationship> = {};
   for (const c of CHARACTER_ROLES) {
-    rels[c.id] = { id: c.id, name: personName(user.nationality, rng), role: c.role, level: c.id === 'rival' ? -10 : 15 };
+    rels[c.id] = {
+      id: c.id,
+      name: personName(user.nationality, rng),
+      role: c.role,
+      level: c.id === 'rival' ? -10 : 15,
+    };
   }
   return rels;
 }
@@ -166,6 +171,18 @@ export function characterName(save: SaveGame, id: string): string {
   return save.relationships?.[id]?.name ?? 'the coach';
 }
 
+export function sanitizeNarrativeText(
+  text: string,
+  fallback = 'A new career moment awaits.',
+): string {
+  const sanitized = text
+    .replace(/\b(?:undefined|null|NaN)\b/gi, '')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return sanitized || fallback;
+}
+
 /** Replace {tokens} in narrative copy with live save values. */
 export function renderText(text: string, save: SaveGame): string {
   const user = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
@@ -175,7 +192,7 @@ export function renderText(text: string, save: SaveGame): string {
     first: (user?.name ?? 'you').split(' ')[0],
     team: team?.name ?? 'your club',
     teamShort: team?.shortName ?? 'your club',
-    country: user ? getCountry(user.nationality)?.name ?? user.nationality : 'your country',
+    country: user ? (getCountry(user.nationality)?.name ?? 'your country') : 'your country',
     coach: characterName(save, 'coach'),
     captain: characterName(save, 'captain'),
     mentor: characterName(save, 'mentor'),
@@ -183,7 +200,9 @@ export function renderText(text: string, save: SaveGame): string {
     rival: characterName(save, 'rival'),
     selector: characterName(save, 'selector'),
   };
-  return text.replace(/\{(\w+)\}/g, (_, k: string) => tokens[k] ?? 'the moment');
+  return sanitizeNarrativeText(
+    text.replace(/\{(\w+)\}/g, (_, k: string) => tokens[k] ?? 'the moment'),
+  );
 }
 
 /* ---------------- Effect application ---------------- */
@@ -195,7 +214,10 @@ export interface AppliedEffect {
 
 function fmtDelta(label: string, delta: number): AppliedEffect {
   const sign = delta > 0 ? '+' : '';
-  return { label: `${label} ${sign}${delta}`, tone: delta > 0 ? 'good' : delta < 0 ? 'bad' : 'neutral' };
+  return {
+    label: `${label} ${sign}${delta}`,
+    tone: delta > 0 ? 'good' : delta < 0 ? 'bad' : 'neutral',
+  };
 }
 
 export function adjustRelationship(save: SaveGame, id: string, delta: number): void {
@@ -210,7 +232,12 @@ export function addTimeline(save: SaveGame, entry: TimelineEntry): void {
 }
 
 /** Apply a choice's effects to the save (mutating). Returns a UI-friendly summary. */
-export function applyEffects(save: SaveGame, effects: EffectSpec, year: number, rng: Rng): AppliedEffect[] {
+export function applyEffects(
+  save: SaveGame,
+  effects: EffectSpec,
+  year: number,
+  rng: Rng,
+): AppliedEffect[] {
   const out: AppliedEffect[] = [];
   const user = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
 
@@ -249,17 +276,26 @@ export function applyEffects(save: SaveGame, effects: EffectSpec, year: number, 
   }
   if (effects.coins) {
     save.wallet = addCoins(save.wallet, effects.coins);
-    out.push({ label: `${effects.coins > 0 ? '+' : ''}${effects.coins} coins`, tone: effects.coins > 0 ? 'good' : 'bad' });
+    out.push({
+      label: `${effects.coins > 0 ? '+' : ''}${effects.coins} coins`,
+      tone: effects.coins > 0 ? 'good' : 'bad',
+    });
   }
   if (effects.gems) {
     save.wallet = addGems(save.wallet, effects.gems);
-    out.push({ label: `${effects.gems > 0 ? '+' : ''}${effects.gems} gems`, tone: effects.gems > 0 ? 'good' : 'bad' });
+    out.push({
+      label: `${effects.gems > 0 ? '+' : ''}${effects.gems} gems`,
+      tone: effects.gems > 0 ? 'good' : 'bad',
+    });
   }
   if (effects.relationship) {
     for (const r of effects.relationship) {
       adjustRelationship(save, r.id, r.delta);
       const nm = save.relationships?.[r.id]?.role ?? r.id;
-      out.push({ label: `${nm} ${r.delta > 0 ? 'closer' : 'strained'}`, tone: r.delta > 0 ? 'good' : 'bad' });
+      out.push({
+        label: `${nm} ${r.delta > 0 ? 'closer' : 'strained'}`,
+        tone: r.delta > 0 ? 'good' : 'bad',
+      });
     }
   }
   if (effects.flags) {
@@ -277,7 +313,11 @@ export function applyEffects(save: SaveGame, effects: EffectSpec, year: number, 
   }
   if (effects.captainClub) {
     save.captainClub = true;
-    addTimeline(save, { year, kind: 'CAPTAINCY', text: `Named captain of ${save.userTeamId ? save.teams[save.userTeamId]?.name : 'the club'}.` });
+    addTimeline(save, {
+      year,
+      kind: 'CAPTAINCY',
+      text: `Named captain of ${save.userTeamId ? save.teams[save.userTeamId]?.name : 'the club'}.`,
+    });
     out.push({ label: 'Named captain', tone: 'good' });
   }
   if (effects.unlockAchievement) unlockAchievement(save, effects.unlockAchievement);
@@ -288,7 +328,11 @@ export function applyEffects(save: SaveGame, effects: EffectSpec, year: number, 
       text: renderText(effects.timeline.text, save),
     });
   }
-  if (effects.queueEvent && save.story && !save.story.pendingEventIds.includes(effects.queueEvent)) {
+  if (
+    effects.queueEvent &&
+    save.story &&
+    !save.story.pendingEventIds.includes(effects.queueEvent)
+  ) {
     save.story.pendingEventIds.push(effects.queueEvent);
   }
   return out;
@@ -332,7 +376,11 @@ export function eligibleEvents(events: StoryEvent[], ctx: StoryContext): StoryEv
 }
 
 /** Pick one eligible event (priority first, then weighted-random). */
-export function pickEvent(events: StoryEvent[], ctx: StoryContext, rng: Rng): StoryEvent | undefined {
+export function pickEvent(
+  events: StoryEvent[],
+  ctx: StoryContext,
+  rng: Rng,
+): StoryEvent | undefined {
   const pool = eligibleEvents(events, ctx);
   if (!pool.length) return undefined;
   const maxPriority = Math.max(...pool.map((e) => e.priority ?? 0));

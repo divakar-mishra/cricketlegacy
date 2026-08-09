@@ -5,7 +5,6 @@ const onboardingSource = fs.readFileSync(path.join(__dirname, '..', 'Onboarding.
 
 describe('first-launch onboarding', () => {
   it('keeps a full introduction flow with explicit navigation and skip controls', () => {
-    expect(onboardingSource).toContain('export const ONBOARDING_SLIDE_COUNT = SLIDES.length');
     expect(onboardingSource.match(/title: '/g)).toHaveLength(5);
     expect(onboardingSource).toContain('<ScrollView');
     expect(onboardingSource).toContain('onTouchStart={handleTouchStart}');

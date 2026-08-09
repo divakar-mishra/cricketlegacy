@@ -192,16 +192,6 @@ export function userCupStatus(save: SaveGame): CupStatus {
   return 'ELIMINATED';
 }
 
-/** Human label for where the cup currently stands for the user. */
-export function cupRoundLabel(save: SaveGame): string {
-  const nextId = nextUserCupTie(save);
-  if (nextId) return save.fixtures[nextId].cupRound ?? 'Cup';
-  const ties = cupFixtures(save);
-  if (!ties.length) return 'Cup';
-  const maxRound = Math.max(...ties.map((f) => f.round));
-  return ties.find((f) => f.round === maxRound)?.cupRound ?? 'Cup';
-}
-
 /** The user's next cup opponent + round, for the hub card. */
 export function userCupTieInfo(
   save: SaveGame,

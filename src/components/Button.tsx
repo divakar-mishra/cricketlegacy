@@ -8,18 +8,13 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { moment } from '../audio';
 import { fonts, fontSize, fontWeight, radius, shadow, spacing, useTheme } from '../theme';
 
 export type ButtonVariant = 'primary' | 'gold' | 'secondary' | 'ghost' | 'danger';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+type ButtonSize = 'sm' | 'md' | 'lg';
 
 type Props = {
   label: string;
@@ -34,8 +29,6 @@ type Props = {
 };
 
 const HEIGHTS: Record<ButtonSize, number> = { sm: 40, md: 52, lg: 60 };
-const SPRING_CFG = { damping: 14, stiffness: 300, mass: 0.7 };
-
 export const Button = React.memo(function Button({
   label,
   onPress,
@@ -57,12 +50,12 @@ export const Button = React.memo(function Button({
   }));
 
   const handlePressIn = useCallback(() => {
-    scale.value = withSpring(0.96, SPRING_CFG);
+    scale.value = withTiming(0.96, { duration: 80 });
     opacity.value = withTiming(0.88, { duration: 80 });
   }, [scale, opacity]);
 
   const handlePressOut = useCallback(() => {
-    scale.value = withSpring(1, SPRING_CFG);
+    scale.value = withTiming(1, { duration: 120 });
     opacity.value = withTiming(1, { duration: 120 });
   }, [scale, opacity]);
 
@@ -140,7 +133,7 @@ export const Button = React.memo(function Button({
             colors={gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[styles.base, { height: HEIGHTS[size] }, shadow.soft]}
+            style={[styles.base, { minHeight: HEIGHTS[size] }, shadow.soft]}
           >
             {inner}
           </LinearGradient>
@@ -148,7 +141,7 @@ export const Button = React.memo(function Button({
           <View
             style={[
               styles.base,
-              { height: HEIGHTS[size] },
+              { minHeight: HEIGHTS[size] },
               isSolid && {
                 backgroundColor: colors.surfaceAlt,
                 borderWidth: 1,
@@ -171,6 +164,7 @@ export const Button = React.memo(function Button({
 
 const styles = StyleSheet.create({
   base: {
+    width: '100%',
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -180,8 +174,8 @@ const styles = StyleSheet.create({
     // renders outside the borderRadius, creating the "misaligned background" bug.
     overflow: 'hidden',
   },
-  pressable: { alignSelf: 'stretch' },
-  labelWrap: { alignItems: 'center' },
+  pressable: { alignSelf: 'stretch', width: '100%' },
+  labelWrap: { alignItems: 'center', minWidth: 0 },
   label: {
     fontSize: fontSize.md,
     fontWeight: fontWeight.bold,

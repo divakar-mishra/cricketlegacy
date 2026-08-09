@@ -23,7 +23,7 @@ export function SplashScreen({ navigation }: ScreenProps<'Splash'>) {
   useEffect(() => {
     Animated.parallel([
       Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, friction: 7, tension: 70, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 220, useNativeDriver: true }),
     ]).start();
 
     let alive = true;

@@ -10,7 +10,6 @@ import { clamp } from '../utils/math';
 export const SEASON_PASS_PRODUCT_ID = 'season_pass';
 export const SEASON_PASS_DAYS = 30;
 export const SEASON_PASS_PERIOD_MS = SEASON_PASS_DAYS * 24 * 60 * 60 * 1000;
-export const SEASON_PASS_REFERENCE_PRICE_INR = 299;
 const PASS_PERIOD_ANCHOR = Date.UTC(2026, 0, 1);
 
 export const SEASON_PASS_BENEFITS = {
@@ -134,7 +133,10 @@ export function activateSeasonPass(
     willRenew?: boolean;
   },
 ): void {
-  const expiresAt = Math.max(input.now + 60_000, input.expiresAt ?? input.now + SEASON_PASS_PERIOD_MS);
+  const expiresAt = Math.max(
+    input.now + 60_000,
+    input.expiresAt ?? input.now + SEASON_PASS_PERIOD_MS,
+  );
   save.entitlements.seasonPass = {
     productId: SEASON_PASS_PRODUCT_ID,
     premium: true,
@@ -156,11 +158,6 @@ export function monthlyBundleForSave(save: SaveGame): MonthlyPassContent {
   return monthlyBundleForCycle(save.pass?.seasonId ?? seasonPassPeriod(Date.now()).id);
 }
 
-/** Compatibility helper retained for older callers; returns the bundle's kit. */
-export function monthlyDropForCycle(cycleId: string): string {
-  return monthlyBundleForCycle(cycleId).kit.id;
-}
-
 export function claimMonthlyCosmeticDrop(
   save: SaveGame,
   now: number = Date.now(),
@@ -169,7 +166,7 @@ export function claimMonthlyCosmeticDrop(
   if (!isSeasonPassActive(save, now)) return { ok: false, reason: 'Premium Pass is not active.' };
   const cycleId = save.pass!.seasonId;
   if (save.seasonPassExperience!.monthlyDropCycleId === cycleId) {
-    return { ok: false, reason: 'This cycle\'s cosmetic drop is already claimed.' };
+    return { ok: false, reason: "This cycle's cosmetic drop is already claimed." };
   }
   const bundle = monthlyBundleForCycle(cycleId);
   const items = [bundle.kit.id, bundle.celebration.id, bundle.office.inventoryId];
@@ -258,7 +255,11 @@ export function passTrainingMultiplier(save: SaveGame, now: number = Date.now())
   return isSeasonPassActive(save, now) ? SEASON_PASS_BENEFITS.trainingGrowthMultiplier : 1;
 }
 
-export function passSelectionMultiplier(save: SaveGame, delta: number, now: number = Date.now()): number {
+export function passSelectionMultiplier(
+  save: SaveGame,
+  delta: number,
+  now: number = Date.now(),
+): number {
   if (delta <= 0 || !isSeasonPassActive(save, now)) return 1;
   return SEASON_PASS_BENEFITS.positiveSelectionRepMultiplier;
 }

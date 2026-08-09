@@ -13,7 +13,14 @@ export interface LastShot {
 interface Props {
   size?: number;
   lastShot?: LastShot | null;
+  stadiumTheme?: string;
+  animate?: boolean;
 }
+
+const FIELD_PALETTES = {
+  STANDARD: { outfield: '#0E2A1A', pitch: '#B9915A', ring: '#176536' },
+  NOIR: { outfield: '#050806', pitch: '#233D22', ring: '#B9F23D' },
+} as const;
 
 // Fielders in polar coords: [angleDeg clockwise from top, radiusFraction].
 const FIELDERS: [number, number][] = [
@@ -28,8 +35,9 @@ const FIELDERS: [number, number][] = [
   [180, 0.34],
 ];
 
-export function FieldView({ size = 240, lastShot }: Props) {
+export function FieldView({ size = 240, lastShot, stadiumTheme, animate = true }: Props) {
   const colors = useColors();
+  const palette = stadiumTheme === 'stadium_noir' ? FIELD_PALETTES.NOIR : FIELD_PALETTES.STANDARD;
   const TONE: Record<LastShot['tone'], string> = {
     normal: colors.textMuted,
     four: colors.primaryLight,
@@ -52,13 +60,14 @@ export function FieldView({ size = 240, lastShot }: Props) {
 
   useEffect(() => {
     if (!lastShot) return;
-    t.setValue(0);
+    t.setValue(animate ? 0 : 1);
+    if (!animate) return;
     Animated.timing(t, {
       toValue: 1,
       duration: lastShot.tone === 'six' ? 620 : 460,
       useNativeDriver: true,
     }).start();
-  }, [lastShot?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [animate, lastShot?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ballColor = lastShot ? TONE[lastShot.tone] : colors.text;
   const translateX = t.interpolate({ inputRange: [0, 1], outputRange: [cx - 6, end.x - 6] });
@@ -66,17 +75,27 @@ export function FieldView({ size = 240, lastShot }: Props) {
   const scale = t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.6, 1.15, 0.9] });
 
   return (
-    <View style={{ width: size, height: size }} accessibilityLabel="Top-down field view">
+    <View
+      style={{ width: size, height: size }}
+      accessibilityLabel={`${stadiumTheme === 'stadium_noir' ? 'Stadium Noir' : 'Standard'} top-down field view`}
+    >
       <Svg width={size} height={size}>
         {/* outfield */}
-        <Circle cx={cx} cy={cy} r={groundR} fill="#0E2A1A" stroke={colors.border} strokeWidth={2} />
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={groundR}
+          fill={palette.outfield}
+          stroke={palette.ring}
+          strokeWidth={2}
+        />
         {/* 30-yard ring */}
         <Circle
           cx={cx}
           cy={cy}
           r={innerR}
           fill="none"
-          stroke={colors.borderStrong}
+          stroke={palette.ring}
           strokeWidth={1}
           strokeDasharray="4 5"
         />
@@ -87,7 +106,7 @@ export function FieldView({ size = 240, lastShot }: Props) {
           width={size * 0.07}
           height={size * 0.26}
           rx={2}
-          fill="#B9915A"
+          fill={palette.pitch}
           opacity={0.85}
         />
         {/* trajectory */}

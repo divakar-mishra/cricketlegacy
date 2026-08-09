@@ -30,8 +30,11 @@ describe('career match skip actions', () => {
     });
   });
 
-  it('does not show a batting skip after dismissal once the opponent is batting', () => {
-    expect(careerSkipAction({ ...base, userDismissed: true, userTeamBatting: false })).toBeNull();
+  it('shows an innings-only skip while the opponent is batting', () => {
+    expect(careerSkipAction({ ...base, userDismissed: true, userTeamBatting: false })).toEqual({
+      kind: 'SKIP_BOWLING_INNINGS',
+      label: 'Skip Bowling Innings',
+    });
   });
 
   it('hides skip actions in key-moment or manager modes', () => {

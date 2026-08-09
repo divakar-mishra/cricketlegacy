@@ -203,7 +203,7 @@ export function DailyChallengeScreen({ navigation }: ScreenProps<'DailyChallenge
 
       {/* Completion / CTA */}
       {alreadyCompleted ? (
-        <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.completedCard}>
+        <Animated.View entering={ZoomIn.duration(200)} style={styles.completedCard}>
           <LinearGradient colors={[tierMeta.bg, colors.bg]} style={styles.completedGrad}>
             <Text style={styles.completedIcon}>{tierMeta.icon}</Text>
             <Text style={[styles.completedTitle, { color: tierMeta.color }]}>
@@ -238,13 +238,12 @@ export function DailyChallengeScreen({ navigation }: ScreenProps<'DailyChallenge
         </Animated.View>
       )}
 
-      {/* Leaderboard teaser */}
+      {/* Community share prompt */}
       <Animated.View entering={FadeInDown.duration(380).delay(320)}>
         <Card style={styles.lbTeaser}>
-          <Text style={styles.lbTeaserTitle}>🌍 How does your world compare?</Text>
+          <Text style={styles.lbTeaserTitle}>🌍 Put your score out there</Text>
           <Text style={styles.lbTeaserText}>
-            Challenge your rivals — screenshot your score and share it with #CricketLegacy to climb
-            the community leaderboard.
+            Challenge your rivals — share your result with #CricketLegacy and see who can beat it.
           </Text>
         </Card>
       </Animated.View>

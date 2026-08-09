@@ -133,7 +133,7 @@ export function LoginScreen({ navigation, route }: ScreenProps<'Login'>) {
           <Card style={styles.account}>
             <Text style={styles.accountLabel}>Signed in</Text>
             <Text style={styles.accountId} numberOfLines={1}>
-              {user.provider === 'guest' ? 'Guest' : user.provider} - {user.id}
+              {user.provider === 'guest' ? 'Guest profile' : `${user.provider} account`}
             </Text>
             <Text style={styles.syncNote}>Local-only progress on this device.</Text>
           </Card>

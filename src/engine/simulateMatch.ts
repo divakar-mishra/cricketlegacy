@@ -1,9 +1,18 @@
 import { FORMATS } from '../data/gameConfig';
-import { Conditions, Difficulty, Format, Innings, MatchResult, MatchState, Player } from '../domain/types';
+import {
+  Conditions,
+  Difficulty,
+  Format,
+  Innings,
+  MatchResult,
+  MatchState,
+  Player,
+} from '../domain/types';
 import { BowlerPlan, FieldSetting } from './intent';
 import { planRain } from './rain';
 import { simulateInnings } from './simulateInnings';
 import { makeRng, Rng } from './rng';
+import { resolveToss, TossCall, TossChoice } from './toss';
 
 export interface TeamTactics {
   battingBias: number;
@@ -27,6 +36,11 @@ export interface MatchInput {
   difficulty?: Difficulty;
   /** Allow rain (DLS) to shorten the chase — opt-in for the season auto-sim. */
   rain?: boolean;
+  /** Career protagonist used for role-fair all-rounder bowling allocation. */
+  focusPlayerId?: string;
+  userTeamId?: string;
+  tossCall?: TossCall;
+  tossChoice?: TossChoice;
 }
 
 export function pickPlayerOfMatch(innings: Innings[], winnerTeamId?: string): string | undefined {
@@ -45,7 +59,7 @@ export function pickPlayerOfMatch(innings: Innings[], winnerTeamId?: string): st
       const tempoBonus = b.balls >= 10 ? Math.max(-8, Math.min(16, (strikeRate - 90) / 8)) : 0;
       const notOutBonus = !b.out && b.runs >= 35 ? 8 : 0;
       const milestoneBonus =
-        (b.runs >= 150 ? 50 : b.runs >= 100 ? 32 : b.runs >= 75 ? 18 : b.runs >= 50 ? 10 : 0);
+        b.runs >= 150 ? 50 : b.runs >= 100 ? 32 : b.runs >= 75 ? 18 : b.runs >= 50 ? 10 : 0;
       add(
         b.playerId,
         inn.battingTeamId,
@@ -62,17 +76,23 @@ export function pickPlayerOfMatch(innings: Innings[], winnerTeamId?: string): st
       add(
         bw.playerId,
         inn.bowlingTeamId,
-        Math.max(0, bw.wickets * 30 + bw.maidens * 6 + wicketHaulBonus + economyBonus - bw.runs * 0.12),
+        Math.max(
+          0,
+          bw.wickets * 30 + bw.maidens * 6 + wicketHaulBonus + economyBonus - bw.runs * 0.12,
+        ),
       );
     }
 
     for (const ev of inn.events) {
       if (!ev.isWicket || !ev.dismissal?.fielderId) continue;
       const fieldingPoints =
-        ev.dismissal.type === 'STUMPED' ? 14 :
-        ev.dismissal.type === 'RUN_OUT' ? 12 :
-        ev.dismissal.type === 'CAUGHT' ? 8 :
-        0;
+        ev.dismissal.type === 'STUMPED'
+          ? 14
+          : ev.dismissal.type === 'RUN_OUT'
+            ? 12
+            : ev.dismissal.type === 'CAUGHT'
+              ? 8
+              : 0;
       add(ev.dismissal.fielderId, inn.bowlingTeamId, fieldingPoints);
     }
   }
@@ -88,7 +108,12 @@ export function pickPlayerOfMatch(innings: Innings[], winnerTeamId?: string): st
   return bestId;
 }
 
-export function decideLimited(first: TeamSide, second: TeamSide, inn1: Innings, inn2: Innings): MatchResult {
+export function decideLimited(
+  first: TeamSide,
+  second: TeamSide,
+  inn1: Innings,
+  inn2: Innings,
+): MatchResult {
   if (inn2.runs > inn1.runs) {
     const wktsLeft = second.players.length - 1 - inn2.wickets;
     return { winnerTeamId: second.teamId, margin: `${Math.max(1, wktsLeft)} wickets` };
@@ -112,7 +137,12 @@ export function decideLimitedDLS(
   return { winnerTeamId: first.teamId, margin: `${target - 1 - inn2.runs} runs (D/L)` };
 }
 
-function simulateLimited(input: MatchInput, first: TeamSide, second: TeamSide, rng: Rng): MatchState {
+function simulateLimited(
+  input: MatchInput,
+  first: TeamSide,
+  second: TeamSide,
+  rng: Rng,
+): MatchState {
   const difficulty = input.difficulty ?? 'NORMAL';
   const inn1 = simulateInnings(
     {
@@ -126,13 +156,18 @@ function simulateLimited(input: MatchInput, first: TeamSide, second: TeamSide, r
       battingBias: first.tactics?.battingBias,
       bowlerPlan: second.tactics?.bowlerPlan,
       fieldSetting: second.tactics?.field,
+      preferredAllRounderId: second.players.some((p) => p.id === input.focusPlayerId)
+        ? input.focusPlayerId
+        : undefined,
     },
     rng,
   );
   // Rain (DLS) can shorten the chase in the season auto-sim (never in the
   // determinism/live tests, which always play under clear skies).
   const fmt = FORMATS[input.format];
-  const rain = input.rain ? planRain(input.seed, input.conditions.weather, fmt.overs, inn1.runs) : null;
+  const rain = input.rain
+    ? planRain(input.seed, input.conditions.weather, fmt.overs, inn1.runs)
+    : null;
   const inn2 = simulateInnings(
     {
       battingTeamId: second.teamId,
@@ -147,6 +182,9 @@ function simulateLimited(input: MatchInput, first: TeamSide, second: TeamSide, r
       battingBias: second.tactics?.battingBias,
       bowlerPlan: first.tactics?.bowlerPlan,
       fieldSetting: first.tactics?.field,
+      preferredAllRounderId: first.players.some((p) => p.id === input.focusPlayerId)
+        ? input.focusPlayerId
+        : undefined,
     },
     rng,
   );
@@ -221,7 +259,12 @@ export function decideTest(first: TeamSide, second: TeamSide, innings: Innings[]
 function simulateTest(input: MatchInput, first: TeamSide, second: TeamSide, rng: Rng): MatchState {
   const difficulty = input.difficulty ?? 'NORMAL';
   let oversUsed = 0;
-  const sim = (bat: TeamSide, field: TeamSide, target: number | undefined, cap: number): Innings => {
+  const sim = (
+    bat: TeamSide,
+    field: TeamSide,
+    target: number | undefined,
+    cap: number,
+  ): Innings => {
     const inn = simulateInnings(
       {
         battingTeamId: bat.teamId,
@@ -237,6 +280,9 @@ function simulateTest(input: MatchInput, first: TeamSide, second: TeamSide, rng:
         bowlerPlan: field.tactics?.bowlerPlan,
         fieldSetting: field.tactics?.field,
         matchOversOffset: oversUsed,
+        preferredAllRounderId: field.players.some((p) => p.id === input.focusPlayerId)
+          ? input.focusPlayerId
+          : undefined,
       },
       rng,
     );
@@ -246,9 +292,19 @@ function simulateTest(input: MatchInput, first: TeamSide, second: TeamSide, rng:
 
   const a1 = sim(first, second, undefined, Math.min(TEST_INNINGS_CAP, testRemaining(oversUsed)));
   const b1 = sim(second, first, undefined, Math.min(TEST_INNINGS_CAP, testRemaining(oversUsed)));
-  const a2 = sim(first, second, undefined, declarationCap(a1.runs - b1.runs, testRemaining(oversUsed)));
+  const a2 = sim(
+    first,
+    second,
+    undefined,
+    declarationCap(a1.runs - b1.runs, testRemaining(oversUsed)),
+  );
   const target = a1.runs + a2.runs - b1.runs + 1;
-  const b2 = sim(second, first, target > 0 ? target : undefined, Math.min(TEST_INNINGS_CAP, testRemaining(oversUsed)));
+  const b2 = sim(
+    second,
+    first,
+    target > 0 ? target : undefined,
+    Math.min(TEST_INNINGS_CAP, testRemaining(oversUsed)),
+  );
 
   const innings = [a1, b1, a2, b2];
   const result = decideTest(first, second, innings);
@@ -269,10 +325,18 @@ export function simulateMatch(input: MatchInput): MatchState {
   const rng = makeRng(input.seed);
   const fmt = FORMATS[input.format];
 
-  // Toss: winner elects to bat first (kept simple + deterministic via seed).
-  const homeWonToss = rng() < 0.5;
-  const first = homeWonToss ? input.home : input.away;
-  const second = homeWonToss ? input.away : input.home;
+  const toss = resolveToss({
+    rng,
+    format: input.format,
+    conditions: input.conditions,
+    homeTeamId: input.home.teamId,
+    awayTeamId: input.away.teamId,
+    userTeamId: input.userTeamId,
+    userCall: input.tossCall,
+    userChoice: input.tossChoice,
+  });
+  const first = toss.battingFirstTeamId === input.home.teamId ? input.home : input.away;
+  const second = first.teamId === input.home.teamId ? input.away : input.home;
 
   return fmt.inningsPerSide === 2
     ? simulateTest(input, first, second, rng)

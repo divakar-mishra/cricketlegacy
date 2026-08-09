@@ -127,6 +127,11 @@ export function NewspaperModal({ story, onClose }: Props) {
                       {trophy.toUpperCase()}
                     </Text>
                   ))
+                ) : story.kind === 'ELIMINATION' ? (
+                  <>
+                    <Text style={styles.trophy}>TOURNAMENT EXIT</Text>
+                    <Text style={styles.score}>{story.format}</Text>
+                  </>
                 ) : (
                   <>
                     <Text style={styles.score}>
@@ -143,7 +148,9 @@ export function NewspaperModal({ story, onClose }: Props) {
               <Text style={styles.footer}>
                 {story.kind === 'TROPHY'
                   ? `CHAMPIONS | SEASON ${story.season}`
-                  : `${story.opponentName.toUpperCase()} | ${story.result} | SEASON ${story.season}`}
+                  : story.kind === 'ELIMINATION'
+                    ? `${story.opponentName.toUpperCase()} | GROUP STAGE | SEASON ${story.season}`
+                    : `${story.opponentName.toUpperCase()} | ${story.result} | SEASON ${story.season}`}
               </Text>
               <Text style={styles.brand}>CRICKET LEGACY</Text>
             </View>

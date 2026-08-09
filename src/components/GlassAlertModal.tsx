@@ -8,12 +8,13 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { MODAL_PRIORITY, useModalQueue } from '../context/ModalQueueContext';
 import { fonts, fontSize, fontWeight, radius, spacing } from '../theme';
 import { AppText as Text } from './AppText';
 import { Button, type ButtonVariant } from './Button';
 import { GlassSurface } from './GlassSurface';
+import { SMOOTH_CARD_ZOOM, SMOOTH_MODAL_ENTER, SMOOTH_MODAL_EXIT } from './Motion';
 
 type GlassAlertRequest = {
   id: number;
@@ -93,8 +94,8 @@ export function GlassAlertHost() {
   return (
     <Modal transparent visible statusBarTranslucent animationType="none" onRequestClose={dismiss}>
       <Animated.View
-        entering={FadeIn.duration(180)}
-        exiting={FadeOut.duration(140)}
+        entering={SMOOTH_MODAL_ENTER}
+        exiting={SMOOTH_MODAL_EXIT}
         style={styles.backdrop}
       >
         {request.options?.cancelable !== false ? (
@@ -105,7 +106,7 @@ export function GlassAlertHost() {
             accessibilityLabel="Dismiss dialog"
           />
         ) : null}
-        <Animated.View entering={ZoomIn.springify().duration(300).damping(18)} style={styles.frame}>
+        <Animated.View entering={SMOOTH_CARD_ZOOM} style={styles.frame}>
           <GlassSurface intensity={0.72} rounded={radius.lg} style={styles.card}>
             <Text style={styles.title}>{request.title}</Text>
             {request.message ? (

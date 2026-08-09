@@ -38,10 +38,11 @@ import {
 
 const fmtMoney = formatClubCurrency;
 
-const FACILITY_LABEL: Record<keyof Facilities, string> = {
+const OFFICE_FACILITIES = ['training', 'medical'] as const satisfies readonly (keyof Facilities)[];
+
+const FACILITY_LABEL: Record<(typeof OFFICE_FACILITIES)[number], string> = {
   training: 'Training Ground',
   medical: 'Medical Centre',
-  academy: 'Youth Academy',
 };
 
 export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
@@ -366,7 +367,7 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
 
       <Text style={styles.section}>Facilities</Text>
       <Card>
-        {(Object.keys(FACILITY_LABEL) as (keyof Facilities)[]).map((kind, i) => {
+        {OFFICE_FACILITIES.map((kind, i) => {
           const level = facilities[kind];
           const maxed = level >= MAX_FACILITY;
           const cost = facilityUpgradeCost(level + 1);
@@ -476,17 +477,11 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
         </>
       ) : null}
 
-      <Button
-        label="🎓 Youth Academy"
-        variant="secondary"
-        style={{ marginTop: spacing.xl }}
-        onPress={() => navigation.navigate('Academy')}
-      />
     </Screen>
   );
 }
 
-const FACILITY_ROI: Record<string, string[]> = {
+const FACILITY_ROI: Record<(typeof OFFICE_FACILITIES)[number], string[]> = {
   training: [
     '+8% attribute growth per session',
     '+12% attribute growth · coaches more effective',
@@ -500,13 +495,6 @@ const FACILITY_ROI: Record<string, string[]> = {
     '+30% recovery · fitness preserved mid-season',
     '+40% recovery · major injuries cut by half',
     'MAX: near-instant recovery, fitness stays peak',
-  ],
-  academy: [
-    '+1 prospect per intake',
-    '+2 prospects · stronger development staff',
-    '+3 prospects · one high-readiness recruit guaranteed',
-    '+4 prospects · elite network access',
-    'MAX: 5 prospects, international scouting enabled',
   ],
 };
 

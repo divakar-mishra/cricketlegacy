@@ -23,6 +23,7 @@ import { computeValue, WAGE_RATE } from './finance';
 import { matchImpactScore } from './progression';
 import { passSelectionMultiplier } from './seasonPass';
 import { autoXI, XI_SIZE } from './squad';
+import { careerPlayingTeamId } from './youthFixtures';
 
 export type CareerTier = 'ACADEMY' | 'DOMESTIC' | 'FRANCHISE' | 'INTERNATIONAL' | 'LEGEND';
 
@@ -115,8 +116,6 @@ export function accrueNationalRep(
   save.nationalRep = Math.round(rep);
   if (!save.capped && user.overall >= CALLUP_OVERALL && rep >= CALLUP_REP) {
     save.capped = true;
-    const resources = ensurePlayerCareerResources(save);
-    if (resources) resources.cappedCountry = resources.declaredCountry;
     return { calledUp: true, rep: save.nationalRep };
   }
   return { calledUp: false, rep: save.nationalRep };
@@ -147,13 +146,6 @@ export function buildNationalXI(save: SaveGame, country: string, mustIncludeId?:
   }
   // autoXI guarantees a keeper + bowling balance and a sensible order.
   return autoXI(picked, forced?.id);
-}
-
-/** Pick a rival nation for an international (deterministic-ish via seed). */
-export function rivalNation(save: SaveGame, exclude: string, seed: number): string | undefined {
-  const options = nationsWithPool(save).filter((c) => c !== exclude);
-  if (!options.length) return undefined;
-  return options[seed % options.length];
 }
 
 /**
@@ -198,7 +190,8 @@ function inferredCareerResources(save: SaveGame, user: Player): PlayerCareerReso
     specialization: current?.specialization ?? 'ALL_FORMATS',
     birthCountry,
     domesticCountry,
-    cappedCountry: current?.cappedCountry ?? (save.capped ? declaredCountry : undefined),
+    cappedCountry:
+      current?.cappedCountry ?? ((save.userCaps ?? 0) > 0 ? declaredCountry : undefined),
     declaredCountry,
     eligibleCountries,
     residencySeasons: { ...(current?.residencySeasons ?? { [domesticCountry]: 0 }) },
@@ -206,7 +199,11 @@ function inferredCareerResources(save: SaveGame, user: Player): PlayerCareerReso
     consecutiveMatches: Math.max(0, Math.floor(current?.consecutiveMatches ?? 0)),
     formatAppearances: { ...(current?.formatAppearances ?? {}) },
     requestedRestFixtureId: current?.requestedRestFixtureId,
+    selectionGuaranteeMatches: Math.max(0, Math.floor(current?.selectionGuaranteeMatches ?? 0)),
+    selectionBoostMatches: Math.max(0, Math.floor(current?.selectionBoostMatches ?? 0)),
+    selectionBoostAmount: Math.max(0, current?.selectionBoostAmount ?? 0),
     lastSelection: current?.lastSelection,
+    internationalSelections: { ...(current?.internationalSelections ?? {}) },
   };
 }
 
@@ -217,8 +214,11 @@ export function declareInternationalCountry(
 ): { ok: boolean; reason?: string } {
   const resources = ensurePlayerCareerResources(save);
   if (!resources) return { ok: false, reason: 'Player career data is unavailable.' };
-  if (resources.cappedCountry || save.capped) {
-    return { ok: false, reason: `International allegiance is locked to ${resources.cappedCountry}.` };
+  if (resources.cappedCountry || (save.userCaps ?? 0) > 0) {
+    return {
+      ok: false,
+      reason: `International allegiance is locked to ${resources.cappedCountry ?? resources.declaredCountry}.`,
+    };
   }
   if (!resources.eligibleCountries.includes(countryId)) {
     return { ok: false, reason: 'That country is not yet available through birth or residency.' };
@@ -233,10 +233,7 @@ export function tickCareerResidency(save: SaveGame): string | undefined {
   if (!resources) return undefined;
   const country = resources.domesticCountry;
   resources.residencySeasons[country] = (resources.residencySeasons[country] ?? 0) + 1;
-  if (
-    resources.residencySeasons[country] >= 3 &&
-    !resources.eligibleCountries.includes(country)
-  ) {
+  if (resources.residencySeasons[country] >= 3 && !resources.eligibleCountries.includes(country)) {
     resources.eligibleCountries.push(country);
     return country;
   }
@@ -281,9 +278,7 @@ export function careerFormatModifier(save: SaveGame, format: Format): number {
   const user = save.players[save.userPlayerId];
   if (!user) return 0;
   const resources = inferredCareerResources(save, user);
-  const readiness = whiteBallFormat(format)
-    ? resources.whiteBallTempo
-    : resources.redBallMemory;
+  const readiness = whiteBallFormat(format) ? resources.whiteBallTempo : resources.redBallMemory;
   const currentBucket = whiteBallFormat(format) ? 'WHITE' : 'RED';
   const previousBucket = resources.lastFormat
     ? whiteBallFormat(resources.lastFormat)
@@ -352,7 +347,7 @@ export interface CareerSelectionDecision {
 }
 
 /**
- * Compare same-role players using 50% ability, 30% form and 20% coach trust.
+ * Compare same-role players using 40% ability, 35% form and 25% coach trust.
  * Format readiness and current condition refine the result.
  */
 export function careerSelectionDecision(
@@ -360,36 +355,39 @@ export function careerSelectionDecision(
   format: Format = 'T20',
   fixtureId?: string,
 ): CareerSelectionDecision {
-  if (!save.userTeamId || !save.userPlayerId) {
+  const activeTeamId = careerPlayingTeamId(save, fixtureId);
+  if (!activeTeamId || !save.userPlayerId) {
     return { selected: false, userScore: 0, rivalScore: 0, reason: 'No active player squad.' };
   }
   const user = save.players[save.userPlayerId];
-  const team = save.teams[save.userTeamId];
+  const team = save.teams[activeTeamId];
   if (!user || !team) {
     return { selected: false, userScore: 0, rivalScore: 0, reason: 'Player squad unavailable.' };
   }
   const resources = inferredCareerResources(save, user);
+  const selectionBoost =
+    (resources.selectionBoostMatches ?? 0) > 0 ? (resources.selectionBoostAmount ?? 25) : 0;
   const userScore =
-    user.overall * 0.5 +
-    user.meta.form * 0.3 +
-    resources.coachTrust * 0.2 +
-    careerFormatModifier(save, format);
+    user.overall * 0.4 +
+    user.meta.form * 0.35 +
+    resources.coachTrust * 0.25 +
+    careerFormatModifier(save, format) +
+    selectionBoost;
   const rivals = team.playerIds
     .map((id) => save.players[id])
-    .filter(
-      (player): player is Player =>
-        Boolean(
-          player &&
-            player.id !== user.id &&
-            player.role === user.role &&
-            !player.retired &&
-            !player.injury,
-        ),
+    .filter((player): player is Player =>
+      Boolean(
+        player &&
+        player.id !== user.id &&
+        player.role === user.role &&
+        !player.retired &&
+        !player.injury,
+      ),
     );
   const rivalScore = rivals.reduce((best, player) => {
     const trust = clamp(45 + player.meta.confidence * 0.1, 45, 55);
     const fit = (rivalFormatScore(player, format) - 50) * 0.08;
-    return Math.max(best, player.overall * 0.5 + player.meta.form * 0.3 + trust * 0.2 + fit);
+    return Math.max(best, player.overall * 0.4 + player.meta.form * 0.35 + trust * 0.25 + fit);
   }, 0);
 
   if (user.injury) {
@@ -400,6 +398,14 @@ export function careerSelectionDecision(
   }
   if (resources.playerCondition < 18) {
     return { selected: false, userScore, rivalScore, reason: 'Rested: condition is too low.' };
+  }
+  if ((resources.selectionGuaranteeMatches ?? 0) > 0) {
+    return {
+      selected: true,
+      userScore,
+      rivalScore,
+      reason: 'Selected: your last exceptional performance guarantees this appearance.',
+    };
   }
 
   const level = save.careerPathLevel ?? 'DOMESTIC';
@@ -453,15 +459,15 @@ export function selectCareerXI(
   format: Format = 'T20',
   fixtureId?: string,
 ): boolean {
-  if (!save.userTeamId || !save.userPlayerId) return false;
-  const team = save.teams[save.userTeamId];
+  const activeTeamId = careerPlayingTeamId(save, fixtureId);
+  if (!activeTeamId || !save.userPlayerId) return false;
+  const team = save.teams[activeTeamId];
   const resources = ensurePlayerCareerResources(save);
   const decision = careerSelectionDecision(save, format, fixtureId);
   const squad = team.playerIds
     .map((id) => save.players[id])
-    .filter(
-      (player): player is Player =>
-        Boolean(player && (decision.selected || player.id !== save.userPlayerId)),
+    .filter((player): player is Player =>
+      Boolean(player && (decision.selected || player.id !== save.userPlayerId)),
     );
   const forceId = decision.selected ? save.userPlayerId : undefined;
   team.xi = autoXI(squad, forceId).map((player) => player.id);
@@ -476,15 +482,6 @@ export function selectCareerXI(
     };
   }
   return decision.selected;
-}
-
-/** Non-mutating projection of whether the user would be selected right now. */
-export function projectedSelected(
-  save: SaveGame,
-  format: Format = 'T20',
-  fixtureId?: string,
-): boolean {
-  return careerSelectionDecision(save, format, fixtureId).selected;
 }
 
 /** Mark or clear a deliberate rest for the next fixture. */
@@ -526,13 +523,7 @@ export function applyCareerMatchReadiness(
   const ageRecovery = user.age <= 22 ? 6 : user.age <= 29 ? 4 : user.age <= 32 ? 2 : 0;
   if (input.selected) {
     const baseLoad =
-      input.format === 'TEST'
-        ? 25
-        : input.format === 'ODI'
-          ? 16
-          : input.format === 'T20'
-            ? 9
-            : 7;
+      input.format === 'TEST' ? 25 : input.format === 'ODI' ? 16 : input.format === 'T20' ? 9 : 7;
     const workload = Math.min(
       10,
       Math.round((input.ballsFaced ?? 0) / 24 + (input.ballsBowled ?? 0) / 18),
@@ -546,9 +537,27 @@ export function applyCareerMatchReadiness(
     resources.formatAppearances[input.format] =
       (resources.formatAppearances[input.format] ?? 0) + 1;
     const rating = input.rating ?? 5;
-    const trustDelta =
-      rating >= 8 ? 5 : rating >= 7 ? 3 : rating >= 6 ? 1 : rating < 4 ? -4 : -1;
-    resources.coachTrust = clamp(resources.coachTrust + trustDelta, 0, 100);
+    if ((resources.selectionGuaranteeMatches ?? 0) > 0) {
+      resources.selectionGuaranteeMatches = Math.max(
+        0,
+        (resources.selectionGuaranteeMatches ?? 0) - 1,
+      );
+    }
+    if ((resources.selectionBoostMatches ?? 0) > 0) {
+      resources.selectionBoostMatches = Math.max(0, (resources.selectionBoostMatches ?? 0) - 1);
+      if (resources.selectionBoostMatches === 0) resources.selectionBoostAmount = 0;
+    }
+    if (rating >= 9.95) {
+      user.meta.form = clamp(user.meta.form + 20, 0, 100);
+      user.meta.confidence = clamp(user.meta.confidence + 15, 0, 100);
+      resources.form = user.meta.form;
+      resources.confidence = user.meta.confidence;
+      resources.coachTrust = clamp(resources.coachTrust + 15, 0, 100);
+      resources.selectionGuaranteeMatches = Math.max(1, resources.selectionGuaranteeMatches ?? 0);
+    } else {
+      const trustDelta = rating >= 8 ? 5 : rating >= 7 ? 3 : rating >= 6 ? 1 : rating < 4 ? -4 : -1;
+      resources.coachTrust = clamp(resources.coachTrust + trustDelta, 0, 100);
+    }
   } else {
     const recovery = user.age <= 22 ? 28 : user.age <= 29 ? 24 : user.age <= 32 ? 20 : 16;
     resources.playerCondition = clamp(resources.playerCondition + recovery, 0, 100);
@@ -586,6 +595,26 @@ export function applyCareerMatchReadiness(
   }
 }
 
+/**
+ * A player who comes within one wicket or ten runs of an established record
+ * receives a visible, bounded selection advantage for the next three fixtures.
+ */
+export function applyNearRecordSelectionBoost(
+  save: SaveGame,
+  performance: { runs: number; wickets: number },
+): boolean {
+  const resources = ensurePlayerCareerResources(save);
+  if (!resources) return false;
+  const battingRecord = save.records?.highestScore?.runs ?? 0;
+  const bowlingRecord = save.records?.bestBowling?.wickets ?? 0;
+  const nearBattingRecord = battingRecord >= 100 && performance.runs >= battingRecord - 10;
+  const nearBowlingRecord = bowlingRecord >= 5 && performance.wickets >= bowlingRecord - 1;
+  if (!nearBattingRecord && !nearBowlingRecord) return false;
+  resources.selectionBoostMatches = 3;
+  resources.selectionBoostAmount = 25;
+  return true;
+}
+
 /** Full off-season recovery; permanent fitness and age decline remain separate. */
 export function recoverCareerOffSeason(save: SaveGame): void {
   const resources = ensurePlayerCareerResources(save);
@@ -603,6 +632,7 @@ const CAPTAINCY_CAPS = 10; // caps before the armband is on the table
 /** Give the user a starting contract if they don't have one (idempotent). */
 export function ensureUserContract(save: SaveGame): void {
   if (save.mode !== 'career' || !save.userPlayerId) return;
+  if (save.careerPathLevel === 'SCHOOL' || save.careerPathLevel === 'U19') return;
   const user = save.players[save.userPlayerId];
   if (!user || user.contract) return;
   user.contract = { wage: Math.round(computeValue(user) * WAGE_RATE), yearsLeft: 2 };
@@ -814,10 +844,17 @@ export function resolveCareerStageForAge(
   capped = false,
 ): CareerPathLevel {
   if (capped && age >= 20) return 'INTERNATIONAL';
-  if (age <= 15) return 'SCHOOL';
-  if (age <= 19) return 'U19';
-  if (current === 'INTERNATIONAL') return 'INTERNATIONAL';
-  return 'DOMESTIC';
+  const ageFloor: CareerPathLevel = age <= 15 ? 'SCHOOL' : age <= 19 ? 'U19' : 'DOMESTIC';
+  if (!current) return ageFloor;
+  const rank: Record<CareerPathLevel, number> = {
+    SCHOOL: 0,
+    U19: 1,
+    DOMESTIC: 2,
+    INTERNATIONAL: 3,
+  };
+  // Age can move a stale player forward, but it must never undo a promotion
+  // already earned through performance or a prodigy fast-track.
+  return rank[current] > rank[ageFloor] ? current : ageFloor;
 }
 
 export function validateAgeEligibility(save: SaveGame): CareerPathLevel | undefined {

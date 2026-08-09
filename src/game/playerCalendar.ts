@@ -1,16 +1,12 @@
-import {
-  PlayerCalendarEvent,
-  PlayerCalendarState,
-  SaveGame,
-} from '../domain/types';
+import { PlayerCalendarEvent, PlayerCalendarState, SaveGame } from '../domain/types';
 import { clamp } from '../utils/math';
 import {
   careerSelectionDecision,
   ensurePlayerCareerResources,
   prepareCareerFormat,
 } from './career';
-import { isYouthFixture } from './youthFixtures';
-import { isInternationalFixture } from './intlCalendar';
+import { careerPlayingTeamId, isYouthFixture } from './youthFixtures';
+import { generateInternationalWindowFixtures, isInternationalFixture } from './intlCalendar';
 
 export type PlayerCalendarChoice = 'SKILL' | 'FITNESS' | 'STUDY' | 'TRAIN' | 'ATTEND' | 'REST';
 
@@ -24,14 +20,15 @@ function monthOrder(month?: number): number {
 }
 
 function userFixtures(save: SaveGame, predicate: (fixtureId: string) => boolean): string[] {
-  const userTeamId = save.userTeamId;
-  if (!userTeamId) return [];
+  if (!save.userTeamId) return [];
   return Object.values(save.fixtures ?? {})
-    .filter(
-      (fixture) =>
-        predicate(fixture.id) &&
-        (fixture.homeTeamId === userTeamId || fixture.awayTeamId === userTeamId),
-    )
+    .filter((fixture) => {
+      if (!predicate(fixture.id)) return false;
+      const controlledTeamId = isYouthFixture(fixture)
+        ? careerPlayingTeamId(save, fixture.id)
+        : save.userTeamId;
+      return fixture.homeTeamId === controlledTeamId || fixture.awayTeamId === controlledTeamId;
+    })
     .sort(
       (a, b) =>
         monthOrder(a.calendarMonth) - monthOrder(b.calendarMonth) ||
@@ -64,6 +61,22 @@ function event(
   };
 }
 
+function domesticFixtureWeek(save: SaveGame, fixtureId: string): number {
+  const fixture = save.fixtures[fixtureId];
+  if (fixture.calendarWeek) return fixture.calendarWeek;
+  const roundIndex = Math.max(0, fixture.round - 1);
+  if (fixture.competitionId === 'list-a') {
+    return [2, 3, 4][roundIndex % 3];
+  }
+  if (fixture.competitionId === 'first-class') {
+    return [3, 1, 3, 1, 3, 1, 2][Math.min(roundIndex, 6)];
+  }
+  if (fixture.competitionId === 't20-league') {
+    return [2, 3, 4, 4, 4][roundIndex % 5];
+  }
+  return (roundIndex % 4) + 1;
+}
+
 function matchEvents(
   save: SaveGame,
   year: number,
@@ -72,43 +85,35 @@ function matchEvents(
 ): PlayerCalendarEvent[] {
   return fixtureIds.map((fixtureId, index) => {
     const fixture = save.fixtures[fixtureId];
+    fixture.calendarWeek ??= domesticFixtureWeek(save, fixtureId);
     return event(
       year,
       `${idPrefix}-match-${index + 1}`,
       fixture.calendarMonth ?? 3,
-      ((fixture.round - 1) % 4) + 1,
+      fixture.calendarWeek,
       'MATCH',
       `${fixture.format} matchday`,
-      `Selection is confirmed. Play ${save.teams[fixture.homeTeamId]?.shortName ?? fixture.homeTeamId} v ${save.teams[fixture.awayTeamId]?.shortName ?? fixture.awayTeamId}.`,
+      `Selection is confirmed. Play ${save.teams[fixture.homeTeamId]?.shortName ?? 'Home XI'} v ${save.teams[fixture.awayTeamId]?.shortName ?? 'Away XI'}.`,
       { fixtureId, format: fixture.format },
     );
   });
 }
 
 function seniorCalendar(save: SaveGame, year: number): PlayerCalendarEvent[] {
-  const listA = userFixtures(
-    save,
-    (id) => save.fixtures[id].competitionId === 'list-a',
-  );
-  const firstClass = userFixtures(
-    save,
-    (id) => save.fixtures[id].competitionId === 'first-class',
-  );
+  if (save.capped) generateInternationalWindowFixtures(save);
+  const listA = userFixtures(save, (id) => save.fixtures[id].competitionId === 'list-a');
+  const firstClass = userFixtures(save, (id) => save.fixtures[id].competitionId === 'first-class');
   const t20 = userFixtures(
     save,
-    (id) =>
-      save.fixtures[id].competitionId === 't20-league' &&
-      !save.fixtures[id].playoff,
+    (id) => save.fixtures[id].competitionId === 't20-league' && !save.fixtures[id].playoff,
   );
   const playoffs = userFixtures(
     save,
-    (id) => Boolean(save.fixtures[id].playoff),
+    (id) => Boolean(save.fixtures[id].playoff) && !isInternationalFixture(save.fixtures[id]),
   );
   const international = Object.values(save.fixtures ?? {})
     .filter(
-      (fixture) =>
-        fixture.seasonId === save.currentSeasonId &&
-        isInternationalFixture(fixture),
+      (fixture) => fixture.seasonId === save.currentSeasonId && isInternationalFixture(fixture),
     )
     .sort(
       (a, b) =>
@@ -117,8 +122,38 @@ function seniorCalendar(save: SaveGame, year: number): PlayerCalendarEvent[] {
         a.id.localeCompare(b.id),
     )
     .map((fixture) => fixture.id);
+  const internationalByAssignment = new Map<string, string[]>();
+  for (const fixtureId of international) {
+    const fixture = save.fixtures[fixtureId];
+    const assignmentId = fixture.competitionId ?? `international-${fixture.format}`;
+    internationalByAssignment.set(assignmentId, [
+      ...(internationalByAssignment.get(assignmentId) ?? []),
+      fixtureId,
+    ]);
+  }
+  const internationalEvents = [...internationalByAssignment.entries()].flatMap(
+    ([assignmentId, fixtureIds]) => {
+      const firstFixture = save.fixtures[fixtureIds[0]];
+      const displayEvent = save.internationalCalendar?.events.find(
+        (item) => item.id === assignmentId,
+      );
+      return [
+        event(
+          year,
+          `${assignmentId}-camp`,
+          firstFixture.calendarMonth ?? 6,
+          Math.max(1, (firstFixture.calendarWeek ?? 1) - 1),
+          'INTERNATIONAL',
+          `${firstFixture.format} national camp`,
+          `Join the national squad for ${displayEvent?.name ?? 'the upcoming international assignment'}. Domestic cricket continues while you are away.`,
+          { format: firstFixture.format },
+        ),
+        ...matchEvents(save, year, fixtureIds, assignmentId),
+      ];
+    },
+  );
 
-  return [
+  const events = [
     event(
       year,
       'list-a-prep',
@@ -183,21 +218,7 @@ function seniorCalendar(save: SaveGame, year: number): PlayerCalendarEvent[] {
     ),
     ...matchEvents(save, year, t20, 't20'),
     ...matchEvents(save, year, playoffs, 'playoff'),
-    ...(international.length
-      ? [
-          event(
-            year,
-            'international-prep',
-            6,
-            1,
-            'INTERNATIONAL',
-            'National camp',
-            'Join the national squad for the locked June-August international window.',
-            { format: save.fixtures[international[0]]?.format },
-          ),
-          ...matchEvents(save, year, international, 'international'),
-        ]
-      : []),
+    ...internationalEvents,
     event(
       year,
       'transfer-window',
@@ -208,6 +229,28 @@ function seniorCalendar(save: SaveGame, year: number): PlayerCalendarEvent[] {
       'Review offers, domestic-country moves and training plans before September.',
     ),
   ];
+  return events.sort((left, right) => {
+    const leftInternational =
+      left.kind === 'MATCH' && left.fixtureId
+        ? isInternationalFixture(save.fixtures[left.fixtureId])
+        : false;
+    const rightInternational =
+      right.kind === 'MATCH' && right.fixtureId
+        ? isInternationalFixture(save.fixtures[right.fixtureId])
+        : false;
+    const priority = (item: PlayerCalendarEvent, internationalMatch: boolean): number => {
+      if (item.kind === 'INTERNATIONAL') return 0;
+      if (internationalMatch) return 1;
+      if (item.kind === 'MATCH') return 2;
+      return 0;
+    };
+    return (
+      monthOrder(left.month) - monthOrder(right.month) ||
+      left.week - right.week ||
+      priority(left, leftInternational) - priority(right, rightInternational) ||
+      left.id.localeCompare(right.id)
+    );
+  });
 }
 
 function youthCalendar(save: SaveGame, year: number): PlayerCalendarEvent[] {
@@ -220,12 +263,22 @@ function youthCalendar(save: SaveGame, year: number): PlayerCalendarEvent[] {
     return [
       event(
         year,
-        'school-training-1',
+        'school-tactics-workshop',
         9,
         1,
         'TRAINING',
-        'School training week',
-        'Balance skill work and fitness before the academic term.',
+        'Tactics workshop',
+        'Read the field, plan scoring zones, or complete a conditioning block.',
+        { format: 'T20' },
+      ),
+      event(
+        year,
+        'school-team-strategy',
+        10,
+        2,
+        'TRAINING',
+        'Team strategy session',
+        'Build coach trust through match planning or restore condition with team fitness.',
         { format: 'T20' },
       ),
       event(
@@ -239,13 +292,12 @@ function youthCalendar(save: SaveGame, year: number): PlayerCalendarEvent[] {
       ),
       event(
         year,
-        'school-training-2',
+        'school-fitness-recovery',
         1,
         2,
-        'TRAINING',
-        'District trial preparation',
-        'Prepare for the district selection block.',
-        { format: 'T20' },
+        'RECOVERY',
+        'Fitness recovery week',
+        'A managed recovery block restores condition before district trials.',
       ),
       event(
         year,
@@ -353,9 +405,7 @@ export function buildPlayerSeasonCalendar(save: SaveGame): PlayerCalendarState |
   const previous = new Map(existing?.events.map((item) => [item.id, item]) ?? []);
   const level = save.careerPathLevel ?? 'DOMESTIC';
   const events =
-    level === 'SCHOOL' || level === 'U19'
-      ? youthCalendar(save, year)
-      : seniorCalendar(save, year);
+    level === 'SCHOOL' || level === 'U19' ? youthCalendar(save, year) : seniorCalendar(save, year);
 
   for (const item of events) {
     const old = previous.get(item.id);
@@ -398,10 +448,25 @@ export function resolvePlayerCalendarEvent(
 
   let outcome = 'Completed';
   if (item.kind === 'TRAINING') {
-    if (choice === 'FITNESS') {
+    if (item.id.includes('tactics-workshop') && choice !== 'FITNESS') {
+      resources.adaptability = clamp(resources.adaptability + 3, 1, 100);
+      resources.confidence = clamp(resources.confidence + 2, 0, 100);
+      resources.playerCondition = clamp(resources.playerCondition - 2, 0, 100);
+      outcome =
+        'The tactics workshop improved adaptability and confidence at a small physical cost.';
+    } else if (item.id.includes('team-strategy') && choice !== 'FITNESS') {
+      resources.coachTrust = clamp(resources.coachTrust + 3, 0, 100);
+      resources.confidence = clamp(resources.confidence + 1, 0, 100);
+      outcome = 'Team strategy work improved coach trust and match confidence.';
+    } else if (choice === 'FITNESS') {
       resources.playerCondition = clamp(resources.playerCondition + 10, 0, 100);
       resources.confidence = clamp(resources.confidence + 1, 0, 100);
-      outcome = 'Fitness work restored condition.';
+      if (item.id.includes('team-strategy')) {
+        user.meta.form = clamp(user.meta.form + 2, 0, 100);
+        outcome = 'Team conditioning restored condition and sharpened form.';
+      } else {
+        outcome = 'Fitness work restored condition.';
+      }
     } else {
       prepareCareerFormat(save, item.format ?? 'T20');
       resources.coachTrust = clamp(resources.coachTrust + 1, 0, 100);
@@ -435,7 +500,7 @@ export function resolvePlayerCalendarEvent(
     resources.playerCondition = clamp(resources.playerCondition + 18, 0, 100);
     outcome = 'Recovery week restored condition.';
   } else if (item.kind === 'INTERNATIONAL') {
-    outcome = 'Joined the national squad for the international window.';
+    outcome = 'Joined the national squad. National duty now takes priority over date clashes.';
   } else if (item.kind === 'TRANSFER_WINDOW') {
     outcome = 'Transfer and contract window opened.';
   }

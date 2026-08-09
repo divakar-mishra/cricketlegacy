@@ -5,15 +5,11 @@
  * and **squad morale/form**. State lives in `save.managerStory`.
  */
 import { SaveGame } from '../domain/types';
-import { AppliedEffect } from './narrative';
+import { AppliedEffect, sanitizeNarrativeText } from './narrative';
 import { Rng } from '../engine/rng';
 import { clamp } from '../utils/math';
 import { MONTHLY_PASS_CONTENT } from '../data/seasonPassContent';
-import {
-  ensureSeasonPassExperience,
-  isSeasonPassActive,
-  monthlyBundleForSave,
-} from './seasonPass';
+import { ensureSeasonPassExperience, isSeasonPassActive, monthlyBundleForSave } from './seasonPass';
 
 export type MgrTrigger = 'PRE_SEASON' | 'POST_WIN' | 'POST_LOSS' | 'SEASON_END' | 'MEDIA';
 
@@ -124,11 +120,29 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     title: 'The Unveiling',
     speaker: 'Press Room',
     once: true,
-    body: "Your first press conference at {team}. Cameras flash. \u201CManager \u2014 what should the fans expect from you this season?\u201D",
+    body: 'Your first press conference at {team}. Cameras flash. \u201CManager \u2014 what should the fans expect from you this season?\u201D',
     choices: [
-      { id: 'promise', label: 'Promise silverware', desc: 'Raise expectations', effects: { boardConfidence: 8, reputation: 1, squadMorale: -3 }, resultText: 'Bold headlines. The board loves it \u2014 now you have to deliver.' },
-      { id: 'process', label: 'Preach patience', desc: 'Play the long game', effects: { squadMorale: 5, boardConfidence: -2 }, resultText: 'Measured. The dressing room exhales; the board raises an eyebrow.' },
-      { id: 'players', label: 'Credit the players', desc: 'Deflect to the squad', effects: { squadMorale: 8, boardConfidence: 2 }, resultText: 'The squad hears it loud and clear. Trust banked.' },
+      {
+        id: 'promise',
+        label: 'Promise silverware',
+        desc: 'Raise expectations',
+        effects: { boardConfidence: 8, reputation: 1, squadMorale: -3 },
+        resultText: 'Bold headlines. The board loves it \u2014 now you have to deliver.',
+      },
+      {
+        id: 'process',
+        label: 'Preach patience',
+        desc: 'Play the long game',
+        effects: { squadMorale: 5, boardConfidence: -2 },
+        resultText: 'Measured. The dressing room exhales; the board raises an eyebrow.',
+      },
+      {
+        id: 'players',
+        label: 'Credit the players',
+        desc: 'Deflect to the squad',
+        effects: { squadMorale: 8, boardConfidence: 2 },
+        resultText: 'The squad hears it loud and clear. Trust banked.',
+      },
     ],
   },
   {
@@ -137,11 +151,30 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     title: 'Under the Microscope',
     speaker: 'Press Room',
     weight: 2,
-    body: "Another defeat. A reporter leans in: \u201CThree losses on the bounce. Are you the right man for {team}?\u201D",
+    body: 'Another defeat. A reporter leans in: \u201CThree losses on the bounce. Are you the right man for {team}?\u201D',
     choices: [
-      { id: 'defiant', label: 'Defend your record', desc: 'Show backbone', effects: { boardConfidence: 4, squadMorale: -2 }, resultText: 'You stare them down. The board respects the fight \u2014 for now.' },
-      { id: 'blame_self', label: 'Take the blame', desc: 'Shield the players', effects: { squadMorale: 9, boardConfidence: -4 }, resultText: '\u201CThat\u2019s on me.\u201D The players would run through a wall for you now.' },
-      { id: 'blame_players', label: 'Question the effort', desc: 'Light a fire', effects: { squadForm: 4, squadMorale: -8, boardConfidence: 2 }, resultText: 'It stings the dressing room. Some sharpen up; some resent it.' },
+      {
+        id: 'defiant',
+        label: 'Defend your record',
+        desc: 'Show backbone',
+        effects: { boardConfidence: 4, squadMorale: -2 },
+        resultText: 'You stare them down. The board respects the fight \u2014 for now.',
+      },
+      {
+        id: 'blame_self',
+        label: 'Take the blame',
+        desc: 'Shield the players',
+        effects: { squadMorale: 9, boardConfidence: -4 },
+        resultText:
+          '\u201CThat\u2019s on me.\u201D The players would run through a wall for you now.',
+      },
+      {
+        id: 'blame_players',
+        label: 'Question the effort',
+        desc: 'Light a fire',
+        effects: { squadForm: 4, squadMorale: -8, boardConfidence: 2 },
+        resultText: 'It stings the dressing room. Some sharpen up; some resent it.',
+      },
     ],
   },
   {
@@ -151,10 +184,22 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     speaker: 'Press Room',
     weight: 2,
     condition: (s) => (s.boardConfidence ?? 60) >= 55,
-    body: "A commanding win. \u201CThe fans are dreaming now \u2014 do you dare to dream with them?\u201D",
+    body: 'A commanding win. \u201CThe fans are dreaming now \u2014 do you dare to dream with them?\u201D',
     choices: [
-      { id: 'humble', label: 'Stay grounded', desc: 'One game at a time', effects: { squadForm: 2, boardConfidence: 2 }, resultText: 'Classic manager-speak. Keeps everyone honest.' },
-      { id: 'title', label: 'Declare a title tilt', desc: 'Embrace the pressure', effects: { boardConfidence: 6, reputation: 1, squadMorale: -2 }, resultText: 'The headline writes itself. Now the pressure is real.' },
+      {
+        id: 'humble',
+        label: 'Stay grounded',
+        desc: 'One game at a time',
+        effects: { squadForm: 2, boardConfidence: 2 },
+        resultText: 'Classic manager-speak. Keeps everyone honest.',
+      },
+      {
+        id: 'title',
+        label: 'Declare a title tilt',
+        desc: 'Embrace the pressure',
+        effects: { boardConfidence: 6, reputation: 1, squadMorale: -2 },
+        resultText: 'The headline writes itself. Now the pressure is real.',
+      },
     ],
   },
   {
@@ -163,11 +208,29 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     title: 'Transfer Speculation',
     speaker: 'Agent',
     weight: 1,
-    body: "A bigger club is sniffing around your best player. The agent hints they \u201Cwant to test themselves.\u201D The board would bank the fee.",
+    body: 'A bigger club is sniffing around your best player. The agent hints they \u201Cwant to test themselves.\u201D The board would bank the fee.',
     choices: [
-      { id: 'keep', label: 'Refuse to sell', desc: 'Send a message', effects: { squadMorale: 6, boardConfidence: -3 }, resultText: 'The squad sees you back your best. The board grumbles about the lost fee.' },
-      { id: 'sell', label: 'Cash in', desc: 'Reinvest the money', effects: { budget: 900_000, squadMorale: -6, boardConfidence: 5 }, resultText: 'A war chest arrives \u2014 and a hole in the dressing room to fill.' },
-      { id: 'promise_review', label: 'Promise to review in summer', desc: 'Buy time', effects: { squadMorale: 1 }, resultText: 'A politician\u2019s answer. It holds the line, barely.' },
+      {
+        id: 'keep',
+        label: 'Refuse to sell',
+        desc: 'Send a message',
+        effects: { squadMorale: 6, boardConfidence: -3 },
+        resultText: 'The squad sees you back your best. The board grumbles about the lost fee.',
+      },
+      {
+        id: 'sell',
+        label: 'Cash in',
+        desc: 'Reinvest the money',
+        effects: { budget: 900_000, squadMorale: -6, boardConfidence: 5 },
+        resultText: 'A war chest arrives \u2014 and a hole in the dressing room to fill.',
+      },
+      {
+        id: 'promise_review',
+        label: 'Promise to review in summer',
+        desc: 'Buy time',
+        effects: { squadMorale: 1 },
+        resultText: 'A politician\u2019s answer. It holds the line, barely.',
+      },
     ],
   },
   {
@@ -176,10 +239,22 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     title: 'The Kid or the Veteran',
     speaker: 'Press Room',
     weight: 1,
-    body: "The academy graduate is turning heads, but a senior pro is stewing on the bench. The media wants to know who you trust.",
+    body: 'The academy graduate is turning heads, but a senior pro is stewing on the bench. The media wants to know who you trust.',
     choices: [
-      { id: 'youth', label: 'Back the youngster', desc: 'Trust youth development', effects: { reputation: 1, squadForm: 3, boardConfidence: 2 }, resultText: 'A statement of intent. The academy takes note.' },
-      { id: 'experience', label: 'Trust experience', desc: 'Reward loyalty', effects: { squadMorale: 4 }, resultText: 'The old pro stands taller. Continuity over risk.' },
+      {
+        id: 'youth',
+        label: 'Back the youngster',
+        desc: 'Trust youth development',
+        effects: { reputation: 1, squadForm: 3, boardConfidence: 2 },
+        resultText: 'A statement of intent. The academy takes note.',
+      },
+      {
+        id: 'experience',
+        label: 'Trust experience',
+        desc: 'Reward loyalty',
+        effects: { squadMorale: 4 },
+        resultText: 'The old pro stands taller. Continuity over risk.',
+      },
     ],
   },
   {
@@ -188,11 +263,29 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     title: 'The Boardroom',
     speaker: 'Chairman',
     weight: 2,
-    body: "Season review with the board of {team}. The chairman folds his hands. \u201CWhere do we go from here?\u201D",
+    body: 'Season review with the board of {team}. The chairman folds his hands. \u201CWhere do we go from here?\u201D',
     choices: [
-      { id: 'ambition', label: 'Demand backing to push on', desc: 'Ask for funds', effects: { budget: 700_000, boardConfidence: -3 }, resultText: 'They open the cheque book \u2014 but expectations climb with it.' },
-      { id: 'stability', label: 'Preach stability', desc: 'Protect the project', effects: { boardConfidence: 6, squadMorale: 3 }, resultText: 'The board is reassured. A calm summer ahead.' },
-      { id: 'overachieve', label: 'Promise to overachieve on a shoestring', desc: 'Win them over', effects: { boardConfidence: 9, reputation: 1, budget: -200_000 }, resultText: 'They\u2019re delighted \u2014 and hold you to every word.' },
+      {
+        id: 'ambition',
+        label: 'Demand backing to push on',
+        desc: 'Ask for funds',
+        effects: { budget: 700_000, boardConfidence: -3 },
+        resultText: 'They open the cheque book \u2014 but expectations climb with it.',
+      },
+      {
+        id: 'stability',
+        label: 'Preach stability',
+        desc: 'Protect the project',
+        effects: { boardConfidence: 6, squadMorale: 3 },
+        resultText: 'The board is reassured. A calm summer ahead.',
+      },
+      {
+        id: 'overachieve',
+        label: 'Promise to overachieve on a shoestring',
+        desc: 'Win them over',
+        effects: { boardConfidence: 9, reputation: 1, budget: -200_000 },
+        resultText: 'They\u2019re delighted \u2014 and hold you to every word.',
+      },
     ],
   },
   {
@@ -201,10 +294,22 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     title: 'Fan Forum',
     speaker: 'Supporters',
     weight: 1,
-    body: "The supporters\u2019 club invites you to a forum. They\u2019re passionate, loyal, and not shy about their opinions on your tactics.",
+    body: 'The supporters\u2019 club invites you to a forum. They\u2019re passionate, loyal, and not shy about their opinions on your tactics.',
     choices: [
-      { id: 'engage', label: 'Win them over', desc: 'Charm the crowd', effects: { reputation: 1, boardConfidence: 3 }, resultText: 'You leave to applause. Goodwill in the bank.' },
-      { id: 'honest', label: 'Be brutally honest', desc: 'Respect their intelligence', effects: { squadMorale: 2, boardConfidence: 1 }, resultText: 'No spin. They respect the candour.' },
+      {
+        id: 'engage',
+        label: 'Win them over',
+        desc: 'Charm the crowd',
+        effects: { reputation: 1, boardConfidence: 3 },
+        resultText: 'You leave to applause. Goodwill in the bank.',
+      },
+      {
+        id: 'honest',
+        label: 'Be brutally honest',
+        desc: 'Respect their intelligence',
+        effects: { squadMorale: 2, boardConfidence: 1 },
+        resultText: 'No spin. They respect the candour.',
+      },
     ],
   },
   {
@@ -213,10 +318,22 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     title: 'Tactics on Trial',
     speaker: 'Press Room',
     weight: 1,
-    body: "\u201CYour setup looked toothless today. Will you change your approach?\u201D",
+    body: '\u201CYour setup looked toothless today. Will you change your approach?\u201D',
     choices: [
-      { id: 'stick', label: 'Trust the plan', desc: 'Consistency', effects: { boardConfidence: 2, squadForm: 2 }, resultText: 'You back your ideas. Conviction can be contagious.' },
-      { id: 'adapt', label: 'Admit you got it wrong', desc: 'Show flexibility', effects: { squadMorale: 5, boardConfidence: -1 }, resultText: 'Humility disarms the room. The players appreciate the honesty.' },
+      {
+        id: 'stick',
+        label: 'Trust the plan',
+        desc: 'Consistency',
+        effects: { boardConfidence: 2, squadForm: 2 },
+        resultText: 'You back your ideas. Conviction can be contagious.',
+      },
+      {
+        id: 'adapt',
+        label: 'Admit you got it wrong',
+        desc: 'Show flexibility',
+        effects: { squadMorale: 5, boardConfidence: -1 },
+        resultText: 'Humility disarms the room. The players appreciate the honesty.',
+      },
     ],
   },
   // ── Dressing Room events (Feature 3) ──────────────────────────────────────
@@ -227,7 +344,7 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     speaker: 'Dressing Room',
     weight: 1,
     condition: (s) => (s.teams[s.userTeamId ?? '']?.playerIds.length ?? 0) >= 10,
-    body: "A trusted senior player quietly mentions that a small group has been going off on their own — separate lunches, separate practice. It\u2019s early, but cliques kill team culture.",
+    body: 'A trusted senior player quietly mentions that a small group has been going off on their own — separate lunches, separate practice. It\u2019s early, but cliques kill team culture.',
     choices: [
       {
         id: 'address_all',
@@ -258,14 +375,15 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     title: 'Star Player Unhappy',
     speaker: 'Agent',
     weight: 1,
-    body: "Your star player\u2019s agent is on the phone. \u201CHe\u2019s not feeling the love. Either his role changes or we\u2019re talking to other clubs in January.\u201D",
+    body: 'Your star player\u2019s agent is on the phone. \u201CHe\u2019s not feeling the love. Either his role changes or we\u2019re talking to other clubs in January.\u201D',
     choices: [
       {
         id: 'central_role',
         label: 'Promise a more central role',
         desc: 'Lean into his ego',
         effects: { squadMorale: 4, squadForm: 4, boardConfidence: -2 },
-        resultText: 'He\u2019s pacified. For now. The rest of the squad notices the special treatment.',
+        resultText:
+          'He\u2019s pacified. For now. The rest of the squad notices the special treatment.',
       },
       {
         id: 'hold_firm',
@@ -279,7 +397,8 @@ export const MANAGER_EVENTS: MgrEvent[] = [
         label: 'Put him on the market',
         desc: 'Cash in and move on',
         effects: { budget: 1_000_000, squadMorale: -4, boardConfidence: 3 },
-        resultText: 'A handsome fee arrives — and the dressing room waits to see who fills the void.',
+        resultText:
+          'A handsome fee arrives — and the dressing room waits to see who fills the void.',
       },
     ],
   },
@@ -290,7 +409,7 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     speaker: 'Dressing Room',
     weight: 1,
     condition: (s) => (s.boardConfidence ?? 60) >= 50,
-    body: "The senior players have quietly organised a team dinner and a trip to the nets. The mood is electric. You\u2019re invited — how do you respond?",
+    body: 'The senior players have quietly organised a team dinner and a trip to the nets. The mood is electric. You\u2019re invited — how do you respond?',
     choices: [
       {
         id: 'join_fully',
@@ -324,9 +443,27 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     condition: (save) => isSeasonPassActive(save),
     body: 'Your staff debate the next edge for {team}: a marquee signing, deeper coaching, or investing trust in the current squad.',
     choices: [
-      { id: 'marquee', label: 'Build the shortlist', desc: 'Raise expectations', effects: { reputation: 2, boardConfidence: -2 }, resultText: 'Scouts widen the search. The board now expects a convincing target.' },
-      { id: 'coaching', label: 'Back the coaches', desc: 'Improve the environment', effects: { squadForm: 3, boardConfidence: 3 }, resultText: 'The staff leave with clearer ownership and a little more authority.' },
-      { id: 'trust', label: 'Trust this squad', desc: 'Protect morale', effects: { squadMorale: 7, reputation: -1 }, resultText: 'The players hear the message. The outside world calls it cautious.' },
+      {
+        id: 'marquee',
+        label: 'Build the shortlist',
+        desc: 'Raise expectations',
+        effects: { reputation: 2, boardConfidence: -2 },
+        resultText: 'Scouts widen the search. The board now expects a convincing target.',
+      },
+      {
+        id: 'coaching',
+        label: 'Back the coaches',
+        desc: 'Improve the environment',
+        effects: { squadForm: 3, boardConfidence: 3 },
+        resultText: 'The staff leave with clearer ownership and a little more authority.',
+      },
+      {
+        id: 'trust',
+        label: 'Trust this squad',
+        desc: 'Protect morale',
+        effects: { squadMorale: 7, reputation: -1 },
+        resultText: 'The players hear the message. The outside world calls it cautious.',
+      },
     ],
   },
   {
@@ -338,9 +475,24 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     condition: (save) => isSeasonPassActive(save),
     body: 'The board offers one private priority for the new campaign: identity, youth, or immediate results.',
     choices: [
-      { id: 'identity', label: 'Define our cricket', effects: { squadForm: 2, reputation: 2 }, resultText: 'The club leaves pre-season with a clearer tactical identity.' },
-      { id: 'youth', label: 'Create a pathway', effects: { squadMorale: 3, boardConfidence: 2 }, resultText: 'Academy prospects see a route. Senior players know competition is coming.' },
-      { id: 'results', label: 'Demand results now', effects: { boardConfidence: 5, squadMorale: -3 }, resultText: 'The target is unmistakable. So is the pressure.' },
+      {
+        id: 'identity',
+        label: 'Define our cricket',
+        effects: { squadForm: 2, reputation: 2 },
+        resultText: 'The club leaves pre-season with a clearer tactical identity.',
+      },
+      {
+        id: 'youth',
+        label: 'Create a pathway',
+        effects: { squadMorale: 3, boardConfidence: 2 },
+        resultText: 'Academy prospects see a route. Senior players know competition is coming.',
+      },
+      {
+        id: 'results',
+        label: 'Demand results now',
+        effects: { boardConfidence: 5, squadMorale: -3 },
+        resultText: 'The target is unmistakable. So is the pressure.',
+      },
     ],
   },
 ];
@@ -349,20 +501,30 @@ export const MANAGER_EVENTS: MgrEvent[] = [
 
 export function renderMgr(text: string, save: SaveGame): string {
   const team = save.userTeamId ? save.teams[save.userTeamId] : undefined;
-  return text.replace(/\{(\w+)\}/g, (_, k: string) => (k === 'team' ? team?.name ?? 'the club' : 'the club'));
+  return sanitizeNarrativeText(
+    text.replace(/\{(\w+)\}/g, (_, k: string) =>
+      k === 'team' ? (team?.name ?? 'the club') : 'the club',
+    ),
+    'The club faces a new decision.',
+  );
 }
 
 function fmt(label: string, delta: number, goodWhenPositive = true): AppliedEffect {
   const good = delta > 0 === goodWhenPositive;
-  return { label: `${label} ${delta > 0 ? '+' : ''}${delta}`, tone: delta === 0 ? 'neutral' : good ? 'good' : 'bad' };
+  return {
+    label: `${label} ${delta > 0 ? '+' : ''}${delta}`,
+    tone: delta === 0 ? 'neutral' : good ? 'good' : 'bad',
+  };
 }
 
 export function applyMgrEffects(save: SaveGame, e: MgrEffect): AppliedEffect[] {
   const out: AppliedEffect[] = [];
   const team = save.userTeamId ? save.teams[save.userTeamId] : undefined;
   if (e.boardConfidence != null) {
-    save.boardConfidence = clamp((save.boardConfidence ?? 60) + e.boardConfidence, 0, 100);
-    out.push(fmt('Board confidence', e.boardConfidence));
+    const protectedDelta =
+      (save.managerGraceMatchesRemaining ?? 0) > 0 && e.boardConfidence < 0 ? 0 : e.boardConfidence;
+    save.boardConfidence = clamp((save.boardConfidence ?? 60) + protectedDelta, 0, 100);
+    out.push(fmt('Board confidence', protectedDelta));
   }
   if (team && e.reputation != null) {
     team.reputation = clamp(team.reputation + e.reputation, 40, 95);
@@ -370,7 +532,10 @@ export function applyMgrEffects(save: SaveGame, e: MgrEffect): AppliedEffect[] {
   }
   if (team && e.budget) {
     team.budget = Math.max(0, team.budget + e.budget);
-    out.push({ label: `${e.budget > 0 ? '+' : ''}${Math.round(e.budget / 1000)}k budget`, tone: e.budget > 0 ? 'good' : 'bad' });
+    out.push({
+      label: `${e.budget > 0 ? '+' : ''}${Math.round(e.budget / 1000)}k budget`,
+      tone: e.budget > 0 ? 'good' : 'bad',
+    });
   }
   if (team && (e.squadMorale != null || e.squadForm != null)) {
     for (const id of team.playerIds) {
@@ -386,7 +551,8 @@ export function applyMgrEffects(save: SaveGame, e: MgrEffect): AppliedEffect[] {
 }
 
 function ensureMgrStory(save: SaveGame): void {
-  if (!save.managerStory) save.managerStory = { flags: {}, strings: {}, seenEventIds: [], pendingEventIds: [] };
+  if (!save.managerStory)
+    save.managerStory = { flags: {}, strings: {}, seenEventIds: [], pendingEventIds: [] };
 }
 
 export function queueManagerEvent(save: SaveGame, trigger: MgrTrigger, rng: Rng): boolean {
@@ -397,6 +563,13 @@ export function queueManagerEvent(save: SaveGame, trigger: MgrTrigger, rng: Rng)
     const triggers = Array.isArray(ev.trigger) ? ev.trigger : [ev.trigger];
     if (!triggers.includes(trigger)) return false;
     if (ev.once && seen.has(ev.id)) return false;
+    const lastAskedAt = save.managerStory!.flags[`lastAskedMatch:${ev.id}`];
+    if (
+      typeof lastAskedAt === 'number' &&
+      (save.managerMatchesAtCurrentClub ?? 0) - lastAskedAt < 5
+    ) {
+      return false;
+    }
     if (ev.condition && !ev.condition(save)) return false;
     return true;
   });
@@ -413,7 +586,9 @@ export function queueManagerEvent(save: SaveGame, trigger: MgrTrigger, rng: Rng)
       break;
     }
   }
-  if (!save.managerStory!.pendingEventIds.includes(chosen.id)) save.managerStory!.pendingEventIds.push(chosen.id);
+  if (!save.managerStory!.pendingEventIds.includes(chosen.id))
+    save.managerStory!.pendingEventIds.push(chosen.id);
+  save.managerStory!.flags[`lastAskedMatch:${chosen.id}`] = save.managerMatchesAtCurrentClub ?? 0;
   if (chosen.id.startsWith('pass_monthly_manager_') && chosen.id.endsWith('_opening')) {
     ensureSeasonPassExperience(save, save.pass?.seasonId);
     save.seasonPassExperience!.managerStoryCycleId = save.pass!.seasonId;
@@ -434,7 +609,8 @@ export function nextManagerEvent(save: SaveGame): RenderedMgrEvent | null {
   if (!id) return null;
   const ev = MANAGER_EVENTS.find((e) => e.id === id);
   if (!ev) {
-    if (save.managerStory) save.managerStory.pendingEventIds = save.managerStory.pendingEventIds.filter((x) => x !== id);
+    if (save.managerStory)
+      save.managerStory.pendingEventIds = save.managerStory.pendingEventIds.filter((x) => x !== id);
     return null;
   }
   return {
@@ -456,14 +632,21 @@ export interface MgrChoiceResult {
   applied?: AppliedEffect[];
 }
 
-export function resolveManagerChoice(save: SaveGame, eventId: string, choiceId: string): MgrChoiceResult {
+export function resolveManagerChoice(
+  save: SaveGame,
+  eventId: string,
+  choiceId: string,
+): MgrChoiceResult {
   const ev = MANAGER_EVENTS.find((e) => e.id === eventId);
   const choice = ev?.choices.find((c) => c.id === choiceId);
   if (!ev || !choice) return { ok: false };
   const applied = applyMgrEffects(save, choice.effects);
   ensureMgrStory(save);
-  if (!save.managerStory!.seenEventIds.includes(eventId)) save.managerStory!.seenEventIds.push(eventId);
-  save.managerStory!.pendingEventIds = save.managerStory!.pendingEventIds.filter((x) => x !== eventId);
+  if (!save.managerStory!.seenEventIds.includes(eventId))
+    save.managerStory!.seenEventIds.push(eventId);
+  save.managerStory!.pendingEventIds = save.managerStory!.pendingEventIds.filter(
+    (x) => x !== eventId,
+  );
   if (choice.nextEventId && !save.managerStory!.pendingEventIds.includes(choice.nextEventId)) {
     save.managerStory!.pendingEventIds.push(choice.nextEventId);
   }

@@ -1,6 +1,14 @@
 import { StyleSheet, Switch, View } from 'react-native';
 import { setMusicEnabled } from '../audio';
-import { Button, Card, Screen, ScreenHeader, SelectableCard, AppText as Text } from '../components';
+import {
+  AppText as Text,
+  Button,
+  Card,
+  Icon,
+  Screen,
+  ScreenHeader,
+  SelectableCard,
+} from '../components';
 import { BUILD_INFO } from '../config/buildInfo';
 import { LANGUAGE_OPTIONS, useT } from '../i18n';
 import { ScreenProps } from '../navigation';
@@ -90,6 +98,22 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
         ))}
       </View>
 
+      <Text style={styles.section}>Guidance</Text>
+      <Card
+        onPress={() => navigation.navigate('CricketAcademy')}
+        accessibilityLabel="Open Cricket Academy handbook"
+      >
+        <View style={styles.academyRow}>
+          <View style={styles.academyIcon}>
+            <Icon name="school-outline" size={22} />
+          </View>
+          <View style={styles.academyCopy}>
+            <Text style={styles.academyTitle}>Cricket Academy</Text>
+            <Text style={styles.academySubtitle}>Career, match, club and physicality rules</Text>
+          </View>
+          <Icon name="chevron-forward" size={20} />
+        </View>
+      </Card>
       <Button
         label="Replay game guides"
         variant="secondary"
@@ -222,4 +246,31 @@ const makeStyles = (colors: ThemeColors) =>
       textAlign: 'right',
     },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+    academyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      minHeight: 48,
+    },
+    academyIcon: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 8,
+      backgroundColor: colors.surfaceAlt,
+      flexShrink: 0,
+    },
+    academyCopy: { flex: 1, minWidth: 0 },
+    academyTitle: {
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.bold,
+    },
+    academySubtitle: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      lineHeight: 18,
+      marginTop: 2,
+    },
   });

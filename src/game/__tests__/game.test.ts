@@ -4,15 +4,13 @@ import { SAVE_SCHEMA_VERSION, SaveGame } from '../../domain/types';
 import { runMigrations } from '../../storage/migrate';
 import {
   addCoins,
-  canSpendEnergy,
   fixtureEnergyCost,
   matchEnergyCost,
   regenEnergy,
-  simulateFirstWeekNoSpendLoop,
-  simulateNoSpendLoop,
   spendEnergy,
   startingWallet,
 } from '../economy';
+import { simulateFirstWeekNoSpendLoop, simulateNoSpendLoop } from './_economyHarness';
 import { buildUserPlayer, createCareerSave } from '../createGame';
 import {
   finishSeason,
@@ -23,6 +21,7 @@ import {
   standings,
   startNewSeason,
 } from '../season';
+import { currentPlayerCalendarEvent, resolvePlayerCalendarEvent } from '../playerCalendar';
 
 function makeCareer(): SaveGame {
   const player = buildUserPlayer({
@@ -60,9 +59,7 @@ describe('createGame', () => {
       24,
     );
     expect(
-      Object.values(save.fixtures).filter(
-        (fixture) => fixture.competitionId === 't20-league',
-      ),
+      Object.values(save.fixtures).filter((fixture) => fixture.competitionId === 't20-league'),
     ).toHaveLength(168);
     expect(save.userDivision).toBe(3);
     expect(save.divisions?.tier1).toHaveLength(8);
@@ -106,9 +103,6 @@ describe('economy', () => {
 
   it('prevents negative-energy and negative-cost exploits', () => {
     const wallet = { coins: 0, gems: 0, energy: 4, energyUpdatedAt: 0 };
-    expect(canSpendEnergy(wallet, 0)).toBe(false);
-    expect(canSpendEnergy(wallet, -5)).toBe(false);
-    expect(canSpendEnergy(wallet, 5)).toBe(false);
     expect(spendEnergy(wallet, -5).energy).toBe(4);
     expect(spendEnergy(wallet, 999).energy).toBe(0);
   });
@@ -161,6 +155,9 @@ describe('economy', () => {
 describe('season flow', () => {
   it('plays the user fixture, completes the season and keeps the table consistent', () => {
     const save = makeCareer();
+    while (currentPlayerCalendarEvent(save)?.kind !== 'MATCH') {
+      expect(resolvePlayerCalendarEvent(save, 'SKILL').ok).toBe(true);
+    }
     const fixtureId = nextUserFixtureId(save);
     expect(fixtureId).toBeDefined();
     const fx = save.fixtures[fixtureId!];

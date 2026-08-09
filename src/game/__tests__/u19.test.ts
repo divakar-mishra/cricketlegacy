@@ -1,6 +1,5 @@
 import { createCareerSave, buildUserPlayer } from '../createGame';
-import { generateU19WorldCup, simulateU19WorldCup, u19Qualifies, shouldRunU19WorldCup } from '../u19';
-import { makeRng } from '../../engine/rng';
+import { shouldRunU19WorldCup, u19Qualifies } from '../u19';
 
 function makeU19Save() {
   const player = buildUserPlayer({
@@ -14,7 +13,12 @@ function makeU19Save() {
     meta: { fitness: 70, confidence: 60, aggression: 50, discipline: 60 },
     age: 17,
   });
-  const save = createCareerSave({ player, teamId: 'mumbai_sharks', difficulty: 'NORMAL', seed: 42 });
+  const save = createCareerSave({
+    player,
+    teamId: 'mumbai_sharks',
+    difficulty: 'NORMAL',
+    seed: 42,
+  });
   save.careerPathLevel = 'U19';
   save.careerPathMatches = 5;
   save.nationalRep = 80; // enough for avg rating >= 6.5
@@ -52,32 +56,5 @@ describe('shouldRunU19WorldCup', () => {
     const yearId = save.currentSeasonId!;
     save.seasons[yearId].year = 2027;
     expect(shouldRunU19WorldCup(save)).toBe(false);
-  });
-});
-
-describe('generateU19WorldCup', () => {
-  it('generates bracket fixtures', () => {
-    const save = makeU19Save();
-    const rng = makeRng(42);
-    const wc = generateU19WorldCup(save, rng);
-    expect(wc).not.toBeNull();
-    expect(wc!.teams).toHaveLength(6);
-    expect(wc!.fixtures.length).toBeGreaterThan(0);
-    // Fixtures should be in save.fixtures
-    for (const fx of wc!.fixtures) {
-      expect(save.fixtures[fx.fixtureId]).toBeTruthy();
-    }
-  });
-});
-
-describe('simulateU19WorldCup', () => {
-  it('produces a champion', () => {
-    const save = makeU19Save();
-    const rng = makeRng(42);
-    const wc = generateU19WorldCup(save, rng);
-    expect(wc).not.toBeNull();
-    const result = simulateU19WorldCup(save, wc!);
-    expect(result.champion).toBeTruthy();
-    expect(['QF', 'SF', 'F', 'WINNER', 'OUT']).toContain(result.userReached);
   });
 });

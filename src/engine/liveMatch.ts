@@ -18,6 +18,7 @@ import {
   testRemaining,
 } from './simulateMatch';
 import { difficultyOutcomeBalance } from './difficulty';
+import { resolveToss, TossCall, TossChoice, TossDecision } from './toss';
 
 export interface LiveMatchInput {
   id: string;
@@ -28,10 +29,20 @@ export interface LiveMatchInput {
   away: TeamSide;
   difficulty?: Difficulty;
   userTeamId?: string;
+  /**
+   * Team allowed to make captain-level toss decisions. `null` explicitly
+   * disables user toss control while preserving `userTeamId` for interactive
+   * player moments and score presentation.
+   */
+  tossControllerTeamId?: string | null;
   /** The user's player id — interactive only while their team bats. */
   interactiveBatterId?: string;
   /** Manager tactics applied to the user's team only. */
   tactics?: { battingBias: number; bowlingPlan: BowlerPlan; field?: FieldSetting };
+  /** Used only when the controlled team wins the toss. */
+  tossChoice?: TossChoice;
+  /** Heads/tails call made by the captain-controlled team. */
+  tossCall?: TossCall;
 }
 
 export interface MatchBallStep extends BallStep {
@@ -50,16 +61,18 @@ export class LiveMatch {
   readonly conditions: Conditions;
   readonly homeTeamId: string;
   readonly awayTeamId: string;
+  readonly controlledTeamId?: string;
   readonly isTest: boolean;
 
   private readonly input: LiveMatchInput;
-  private readonly rng: Rng;
+  private rng: Rng;
   private readonly difficulty: Difficulty;
-  private readonly first: TeamSide;
-  private readonly second: TeamSide;
+  private first: TeamSide;
+  private second: TeamSide;
   private readonly completed: Innings[] = [];
 
   private current: LiveInnings;
+  private tossState: TossDecision;
   private index = 0;
   private done = false;
   /** Test only: overs bowled across the match so far (feeds the draw/over budget). */
@@ -73,17 +86,97 @@ export class LiveMatch {
     this.conditions = input.conditions;
     this.homeTeamId = input.home.teamId;
     this.awayTeamId = input.away.teamId;
+    this.controlledTeamId = input.userTeamId;
     this.difficulty = input.difficulty ?? 'NORMAL';
     this.rng = makeRng(input.seed);
     this.isTest = input.format === 'TEST';
 
-    // Deterministic toss: winner elects to bat first.
-    const homeWonToss = this.rng() < 0.5;
-    this.first = homeWonToss ? input.home : input.away;
-    this.second = homeWonToss ? input.away : input.home;
+    this.tossState = resolveToss({
+      rng: this.rng,
+      format: input.format,
+      conditions: input.conditions,
+      homeTeamId: input.home.teamId,
+      awayTeamId: input.away.teamId,
+      userTeamId:
+        input.tossControllerTeamId === undefined
+          ? input.userTeamId
+          : (input.tossControllerTeamId ?? undefined),
+      userCall: input.tossCall,
+      userChoice: input.tossChoice,
+    });
+    this.first = this.tossState.battingFirstTeamId === input.home.teamId ? input.home : input.away;
+    this.second = this.first.teamId === input.home.teamId ? input.away : input.home;
 
     // Test innings are over-capped (min of the per-innings cap and the budget).
-    const firstCap = this.isTest ? testCap(Math.min(TEST_INNINGS_CAP, testRemaining(0))) : undefined;
+    const firstCap = this.isTest
+      ? testCap(Math.min(TEST_INNINGS_CAP, testRemaining(0)))
+      : undefined;
+    this.current = this.makeInnings(this.first, this.second, undefined, firstCap);
+  }
+
+  get tossDecision(): TossDecision {
+    return this.tossState;
+  }
+
+  /** Resolve a captain's Heads/Tails call before the first delivery. */
+  setTossCall(call: TossCall): boolean {
+    if (
+      !this.tossState.userCanCall ||
+      this.done ||
+      this.index !== 0 ||
+      this.completed.length > 0 ||
+      this.current.scoreState.legalBalls > 0
+    ) {
+      return false;
+    }
+    this.input.tossCall = call;
+    this.rebuildOpeningInnings();
+    return true;
+  }
+
+  /**
+   * Change the controlled team's election before the first delivery. The match
+   * is rebuilt from its seed, so no hidden RNG drift is introduced.
+   */
+  setTossChoice(choice: TossChoice): boolean {
+    if (
+      !this.tossState.userMayChoose ||
+      this.done ||
+      this.index !== 0 ||
+      this.completed.length > 0 ||
+      this.current.scoreState.legalBalls > 0
+    ) {
+      return false;
+    }
+    this.input.tossChoice = choice;
+    this.rebuildOpeningInnings();
+    return true;
+  }
+
+  private rebuildOpeningInnings(): void {
+    this.rng = makeRng(this.seed);
+    this.tossState = resolveToss({
+      rng: this.rng,
+      format: this.input.format,
+      conditions: this.input.conditions,
+      homeTeamId: this.input.home.teamId,
+      awayTeamId: this.input.away.teamId,
+      userTeamId:
+        this.input.tossControllerTeamId === undefined
+          ? this.input.userTeamId
+          : (this.input.tossControllerTeamId ?? undefined),
+      userCall: this.input.tossCall,
+      userChoice: this.input.tossChoice,
+    });
+    this.first =
+      this.tossState.battingFirstTeamId === this.input.home.teamId
+        ? this.input.home
+        : this.input.away;
+    this.second = this.first.teamId === this.input.home.teamId ? this.input.away : this.input.home;
+    this.oversUsed = 0;
+    const firstCap = this.isTest
+      ? testCap(Math.min(TEST_INNINGS_CAP, testRemaining(0)))
+      : undefined;
     this.current = this.makeInnings(this.first, this.second, undefined, firstCap);
   }
 
@@ -92,7 +185,12 @@ export class LiveMatch {
     return side.teamId === this.input.userTeamId ? this.input.interactiveBatterId : undefined;
   }
 
-  private makeInnings(bat: TeamSide, field: TeamSide, target?: number, oversCap?: number): LiveInnings {
+  private makeInnings(
+    bat: TeamSide,
+    field: TeamSide,
+    target?: number,
+    oversCap?: number,
+  ): LiveInnings {
     return new LiveInnings(
       {
         battingTeamId: bat.teamId,
@@ -106,10 +204,12 @@ export class LiveMatch {
         oversCap,
         interactiveBatterId: this.interactiveFor(bat),
         interactiveBowlerId: this.interactiveFor(field),
-        battingBias: bat.teamId === this.input.userTeamId ? this.input.tactics?.battingBias : undefined,
+        battingBias:
+          bat.teamId === this.input.userTeamId ? this.input.tactics?.battingBias : undefined,
         defaultBowlerPlan:
           field.teamId === this.input.userTeamId ? this.input.tactics?.bowlingPlan : undefined,
-        fieldSetting: field.teamId === this.input.userTeamId ? this.input.tactics?.field : undefined,
+        fieldSetting:
+          field.teamId === this.input.userTeamId ? this.input.tactics?.field : undefined,
         matchOversOffset: this.isTest ? this.oversUsed : undefined,
         outcomeBalance: this.input.userTeamId
           ? difficultyOutcomeBalance(this.difficulty, bat.teamId === this.input.userTeamId)
@@ -140,17 +240,32 @@ export class LiveMatch {
 
     if (this.index === 0) {
       // B1: second side's first innings.
-      return this.makeInnings(this.second, this.first, undefined, testCap(Math.min(TEST_INNINGS_CAP, rem)));
+      return this.makeInnings(
+        this.second,
+        this.first,
+        undefined,
+        testCap(Math.min(TEST_INNINGS_CAP, rem)),
+      );
     }
     if (this.index === 1) {
       // A2: first side bats again, declaring per the lead.
       const leadBefore = this.completed[0].runs - this.completed[1].runs;
-      return this.makeInnings(this.first, this.second, undefined, testCap(declarationCap(leadBefore, rem)));
+      return this.makeInnings(
+        this.first,
+        this.second,
+        undefined,
+        testCap(declarationCap(leadBefore, rem)),
+      );
     }
     if (this.index === 2) {
       // B2: chase the target.
       const target = this.completed[0].runs + this.completed[2].runs - this.completed[1].runs + 1;
-      return this.makeInnings(this.second, this.first, target > 0 ? target : undefined, testCap(Math.min(TEST_INNINGS_CAP, rem)));
+      return this.makeInnings(
+        this.second,
+        this.first,
+        target > 0 ? target : undefined,
+        testCap(Math.min(TEST_INNINGS_CAP, rem)),
+      );
     }
     return null;
   }

@@ -1,12 +1,12 @@
 /**
- * Rewarded / interstitial ad abstraction (AdMob-shaped) with NO hard dependency.
+ * Rewarded/interstitial boundary with a lazily loaded AdMob native module.
  *
  * Rewarded ads only resolve `{ completed: true }` after the real provider emits
  * an earned-reward callback. Local/dev builds without an ad SDK return
  * `{ completed: false }` so gameplay never grants fake rewards.
  *
  * ---------------------------------------------------------------------------
- * TODO(provider): wire `react-native-google-mobile-ads` behind this interface.
+ * The live provider is implemented below and kept behind this interface.
  * Keep all SDK usage inside this module and flip {@link MOCK_MODE} to `false`.
  *
  *   import mobileAds, { RewardedAd, InterstitialAd, RewardedAdEventType,
@@ -191,14 +191,6 @@ function delay(ms: number): Promise<void> {
 /** Whether an ad of the given kind is loaded and ready to show. */
 export function isReady(kind: AdKind): boolean {
   return loaded[kind] === true;
-}
-
-/**
- * Frequency-cap helper: returns true when at least `minGapMs` has elapsed since
- * the last interstitial was shown. Uses an in-memory timestamp.
- */
-export function canShowInterstitial(minGapMs: number): boolean {
-  return Date.now() - lastInterstitialAt >= minGapMs;
 }
 
 /**

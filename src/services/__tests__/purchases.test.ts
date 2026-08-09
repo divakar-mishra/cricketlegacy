@@ -4,7 +4,7 @@ jest.mock('react-native', () => ({
 
 (global as typeof globalThis & { __DEV__?: boolean }).__DEV__ = true;
 const {
-  getStarterPack,
+  getProducts,
   groupProductIdsByCategory,
   isProductAvailable,
   MAX_TRAINING_ACCELERATOR_CHARGES,
@@ -14,9 +14,12 @@ const {
 } = jest.requireActual<typeof import('../purchases')>('../purchases');
 
 describe('purchase catalog', () => {
-  it('keeps the starter pack on the 24-hour launch window', () => {
+  it('keeps the starter pack on the 24-hour launch window', async () => {
     expect(STARTER_PACK_OFFER_HOURS).toBe(24);
-    expect(getStarterPack().offerHours).toBe(24);
+    const starterPack = (await getProducts()).find(
+      (product: { id: string }) => product.id === 'starter_pack',
+    );
+    expect(starterPack?.offerHours).toBe(24);
   });
 
   it('accepts only the provider store transaction identifier for fulfillment', () => {

@@ -10,6 +10,14 @@ import { synchronizeSchema19State } from './schema19';
 import { synchronizeSchema20State } from './schema20';
 import { synchronizeSchema21State } from './schema21';
 import { synchronizeSchema22State } from './schema22';
+import { synchronizeSchema23State } from './schema23';
+import { synchronizeSchema24State } from './schema24';
+import { synchronizeSchema25State } from './schema25';
+import { synchronizeSchema26State } from './schema26';
+import { synchronizeSchema27State } from './schema27';
+import { synchronizeSchema28State } from './schema28';
+import { synchronizeSchema29State } from './schema29';
+import { synchronizeSchema30State } from './schema30';
 
 type AnySave = Record<string, unknown> & { schemaVersion?: number };
 type Migration = (save: AnySave) => AnySave;
@@ -179,6 +187,58 @@ const MIGRATIONS: Record<number, Migration> = {
   // lifetime appearances for appearances in the current year.
   21: (save) => {
     synchronizeSchema22State(save as unknown as SaveGame);
+    return save;
+  },
+  // v22 -> v23: persist bounded player-selection rewards and new-manager
+  // appointment protection. Existing saves start with no active guarantees.
+  22: (save) => {
+    synchronizeSchema23State(save as unknown as SaveGame);
+    return save;
+  },
+  // v23 -> v24: initialize durable manager contract salary and year-round
+  // international assignment/WTC state without changing existing balances.
+  23: (save) => {
+    synchronizeSchema24State(save as unknown as SaveGame);
+    return save;
+  },
+  // v24 -> v25: replace eager ICC semifinal/final placeholders with durable
+  // tournament state. Played history remains intact; only unplayed placeholders
+  // are removed and reconstructed after actual qualification.
+  24: (save) => {
+    synchronizeSchema25State(save as unknown as SaveGame);
+    return save;
+  },
+  // v25 -> v26: separate School/U19 teams from the reserved senior club and
+  // remove hidden-potential labels from manager scouting data.
+  25: (save) => {
+    synchronizeSchema26State(save as unknown as SaveGame);
+    return save;
+  },
+  // v26 -> v27: exact domestic/international ledgers and XI-based
+  // appearances. Mixed historical careers keep their verified all-career
+  // total and start scoped tracking without fabricated allocations.
+  26: (save) => {
+    synchronizeSchema27State(save as unknown as SaveGame);
+    return save;
+  },
+  // v27 -> v28: consolidated Player Life state for personal development,
+  // finance, media and captaincy. Existing wallet and investment balances are
+  // retained exactly; the new bank and ownership ledgers begin empty.
+  27: (save) => {
+    synchronizeSchema28State(save as unknown as SaveGame);
+    return save;
+  },
+  // v28 -> v29: exact current-season, per-format player statistics and
+  // actionable Player Performance Analysis reports. Mixed historical season
+  // totals are retained but never guessed into a format.
+  28: (save) => {
+    synchronizeSchema29State(save as unknown as SaveGame);
+    return save;
+  },
+  // v29 -> v30: persist stable IDs for the supplied modular avatar pack. The
+  // former SVG fields remain untouched as a rollback/fallback source.
+  29: (save) => {
+    synchronizeSchema30State(save as unknown as SaveGame);
     return save;
   },
 };

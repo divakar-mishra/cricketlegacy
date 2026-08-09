@@ -11,7 +11,11 @@ import {
   ScreenHeader,
 } from '../components';
 import { Player } from '../domain/types';
-import { academyProspects } from '../game/manager';
+import {
+  academyProspects,
+  facilityUpgradeCost,
+  MAX_FACILITY,
+} from '../game/manager';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import { fontSize, fontWeight, spacing, ThemeColors, useTheme, useThemedStyles } from '../theme';
@@ -27,6 +31,7 @@ export function AcademyScreen({ navigation }: ScreenProps<'Academy'>) {
   const save = useCareer((s) => s.save);
   const promoteYouth = useCareer((s) => s.promoteYouth);
   const releaseYouth = useCareer((s) => s.releaseYouth);
+  const upgradeFacilityLevel = useCareer((s) => s.upgradeFacilityLevel);
   const refreshEnergy = useCareer((s) => s.refreshEnergy);
   const { gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -46,6 +51,8 @@ export function AcademyScreen({ navigation }: ScreenProps<'Academy'>) {
   const prospects = academyProspects(save);
   const level = save.facilities?.academy ?? 1;
   const nextIntake = save.academy?.nextIntakeYear;
+  const academyMaxed = level >= MAX_FACILITY;
+  const upgradeCost = facilityUpgradeCost(level + 1);
 
   const onPromote = (p: Player) => {
     const res = promoteYouth(p.id);
@@ -80,6 +87,31 @@ export function AcademyScreen({ navigation }: ScreenProps<'Academy'>) {
           and better — prospects. Promote the ones you rate into your senior squad, or release them
           to make room.
         </Text>
+      </Card>
+
+      <Card style={styles.development}>
+        <View style={styles.developmentRow}>
+          <View style={styles.developmentCopy}>
+            <Text style={styles.developmentTitle}>Academy development</Text>
+            <Text style={styles.infoText}>
+              Level {level}/{MAX_FACILITY} · stronger levels improve each annual intake.
+            </Text>
+          </View>
+          <Button
+            label={academyMaxed ? 'Max level' : `Upgrade · ${upgradeCost.toLocaleString()}`}
+            size="sm"
+            variant={academyMaxed ? 'ghost' : 'secondary'}
+            fullWidth={false}
+            disabled={academyMaxed}
+            onPress={() => {
+              const result = upgradeFacilityLevel('academy');
+              if (!result.ok) {
+                Alert.alert('Cannot upgrade academy', result.reason ?? 'Unavailable.');
+              }
+              force((value) => value + 1);
+            }}
+          />
+        </View>
       </Card>
 
       {prospects.length === 0 ? (
@@ -143,6 +175,20 @@ const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     msg: { color: colors.textMuted, fontSize: fontSize.md },
     info: { marginTop: spacing.md },
+    development: { marginTop: spacing.md },
+    developmentRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    developmentCopy: { flex: 1, minWidth: 190 },
+    developmentTitle: {
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.bold,
+      marginBottom: 3,
+    },
     infoText: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
     empty: { color: colors.textMuted, fontSize: fontSize.sm },
     card: { marginTop: spacing.md },

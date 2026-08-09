@@ -7,13 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "coverdrive",
-    "newArchEnabled": true,
-    "jsEngine": "hermes",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0A1912"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.coverdrive.cricket",
@@ -73,18 +66,8 @@
         {
           "android": {
             "enabled": true,
-            "singleShareMimeTypes": [
-              "image/*",
-              "text/plain"
-            ]
+            "singleShareMimeTypes": ["image/*", "text/plain"]
           }
-        }
-      ],
-      [
-        "@sentry/react-native/expo",
-        {
-          "organization": "cricketlegacy",
-          "project": "cricket-legacy"
         }
       ],
       [
@@ -94,13 +77,6 @@
         }
       ],
       "expo-asset"
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "00000000-0000-0000-0000-000000000000"
-      },
-      "supabaseUrl": "https://placeholder.supabase.co",
-      "supabaseAnonKey": "placeholder-anon-key"
-    }
+    ]
   }
 }

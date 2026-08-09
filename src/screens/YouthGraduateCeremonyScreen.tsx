@@ -14,7 +14,6 @@ import Animated, {
   withDelay,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
   ZoomIn,
 } from 'react-native-reanimated';
@@ -79,7 +78,7 @@ function StarBurst({ color, x, y, delay }: { color: string; x: number; y: number
       delay,
       withSequence(withTiming(1, { duration: 300 }), withTiming(0, { duration: 600 })),
     );
-    scale.value = withDelay(delay, withSpring(1.2, { damping: 6 }));
+    scale.value = withDelay(delay, withTiming(1, { duration: 200 }));
   }, [delay, opacity, scale]);
 
   const style = useAnimatedStyle(() => ({
@@ -154,8 +153,8 @@ export function YouthGraduateCeremonyScreen({
     playHaptic('notify-success');
     setTimeout(() => playHaptic('impact-heavy'), 400);
 
-    jerseyScale.value = withDelay(200, withSpring(1, { damping: 8, stiffness: 120 }));
-    nameY.value = withDelay(600, withSpring(0, { damping: 14 }));
+    jerseyScale.value = withDelay(120, withTiming(1, { duration: 200 }));
+    nameY.value = withDelay(360, withTiming(0, { duration: 220 }));
     nameOpacity.value = withDelay(600, withTiming(1, { duration: 400 }));
     pulse.value = withDelay(
       800,

@@ -95,6 +95,55 @@ export interface BowlerSelectionCtx {
   over?: number;
   /** The batter on strike at the top of the over — drives matchup targeting. */
   striker?: Player;
+  /** Innings over limit after rain/Test caps. */
+  inningsOvers?: number;
+  /** Live figures let a captain reward a bowler who is taking wickets now. */
+  bowlingFigures?: Record<string, { balls: number; runs: number; wickets: number }>;
+  /** Career protagonist, considered on merit after their guaranteed spell. */
+  preferredPlayerId?: string;
+}
+
+export function minimumAllRounderOvers(format: Format): number {
+  switch (format) {
+    case 'TEST':
+      return 8;
+    case 'ODI':
+      return 4;
+    case 'T20':
+    case 'HUNDRED':
+      return 2;
+    case 'T10':
+      return 1;
+  }
+}
+
+/**
+ * Guarantees a selected career all-rounder a meaningful spell. The spell is
+ * scheduled early enough to survive short chases, while still respecting the
+ * consecutive-over and per-format bowling limits.
+ */
+export function requiredAllRounderBowler(
+  bowlers: Player[],
+  ctx: BowlerSelectionCtx,
+  preferredPlayerId?: string,
+): Player | undefined {
+  if (!preferredPlayerId) return undefined;
+  const player = bowlers.find(
+    (bowler) => bowler.id === preferredPlayerId && bowler.role === 'ALLROUNDER',
+  );
+  if (!player || player.id === ctx.lastBowlerId) return undefined;
+
+  const format = FORMATS[ctx.format];
+  const minimum = Math.min(minimumAllRounderOvers(ctx.format), format.maxOversPerBowler);
+  const bowled = ctx.oversBowled[player.id] ?? 0;
+  if (bowled >= minimum || bowled >= format.maxOversPerBowler) return undefined;
+
+  const over = ctx.over ?? 0;
+  const inningsOvers = Math.max(1, ctx.inningsOvers ?? format.overs);
+  const dueByNow = Math.min(minimum, Math.floor((over + 1) / 2));
+  const oversRemaining = Math.max(0, inningsOvers - over);
+  const needsCatchUp = oversRemaining <= (minimum - bowled) * 2;
+  return bowled < dueByNow || needsCatchUp ? player : undefined;
 }
 
 /**
@@ -149,7 +198,22 @@ export function selectBowler(bowlers: Player[], ctx: BowlerSelectionCtx, rng: Rn
       else score += clamp(55 - ctx.striker.batting.technique, 0, 40) * 0.12;
     }
 
-    score -= (ctx.oversBowled[b.id] ?? 0) * 2.5; // spread the load
+    const figures = ctx.bowlingFigures?.[b.id];
+    if (figures) {
+      const overs = Math.max(1 / 6, figures.balls / 6);
+      const economy = figures.runs / overs;
+      score += figures.wickets * 8;
+      score += clamp(PAR_RUN_RATE[ctx.format] - economy, -5, 5) * 1.4;
+    }
+
+    // After the guaranteed spell, the controlled all-rounder stays on merit.
+    // Elite skill, form and live wickets can earn the legal maximum.
+    if (b.id === ctx.preferredPlayerId) {
+      score += clamp(mean - 55, 0, 40) * 0.18;
+      score += clamp(b.meta.form - 50, -30, 40) * 0.08;
+    }
+
+    score -= (ctx.oversBowled[b.id] ?? 0) * 2.1; // spread the load
     score += rng() * 5; // a little unpredictability
     if (score > bestScore) {
       bestScore = score;

@@ -98,6 +98,9 @@ export function synchronizeSchema14State(save: SaveGame, now = Date.now()): void
       premiumAssistanceHistory: [
         ...(save.managerProgression?.premiumAssistanceHistory ?? []),
       ],
+      contractSalary: save.managerProgression?.contractSalary,
+      lastSalaryPaidYear: save.managerProgression?.lastSalaryPaidYear,
+      lastSalaryCoinPayout: save.managerProgression?.lastSalaryCoinPayout,
     };
     save.auctionAssistants = { ...(save.auctionAssistants ?? {}) };
   }

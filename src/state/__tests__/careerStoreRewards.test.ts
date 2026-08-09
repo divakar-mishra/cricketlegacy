@@ -25,7 +25,7 @@ const { makeManagerSave } = jest.requireActual<typeof import('../../game/__tests
 );
 const { PASS_TIERS } =
   jest.requireActual<typeof import('../../game/liveops')>('../../game/liveops');
-const { contractOffer, isLegend } =
+const { contractOffer } =
   jest.requireActual<typeof import('../../game/career')>('../../game/career');
 const { ffpBlockReason } =
   jest.requireActual<typeof import('../../game/finance')>('../../game/finance');
@@ -241,7 +241,7 @@ describe('career reward integrity', () => {
     useCareer.getState().setActive(save, 'career', 1);
     jest.spyOn(purchases, 'purchase').mockResolvedValue({
       ok: true,
-      productId: 'coins_small',
+      productId: 'gems_medium',
       purchaseToken: 'tok-wrong-product',
       purchaseState: 'PURCHASED',
       verificationState: 'VERIFIED',
@@ -310,6 +310,24 @@ describe('career reward integrity', () => {
     expect(useCareer.getState().save?.premiumInventory?.trainingAcceleratorCharges).toBe(2);
   });
 
+  it('does not grant free training when the career wallet is empty', async () => {
+    const save = makeCareerSave();
+    save.wallet.coins = 0;
+    const player = save.players[save.userPlayerId!];
+    const techniqueBefore = player.batting.technique;
+    useCareer.getState().setActive(save, 'career', 1);
+
+    const result = await useCareer.getState().train('batting');
+
+    expect(result.ok).toBe(false);
+    expect(result.cost).toBeGreaterThan(0);
+    expect(result.reason).toContain('coins');
+    expect(result.gains).toHaveLength(0);
+    expect(useCareer.getState().save?.players[player.id].batting.technique).toBe(techniqueBefore);
+    expect(useCareer.getState().save?.players[player.id].trainingSessionsThisSeason ?? 0).toBe(0);
+    expect(useCareer.getState().save?.wallet.coins).toBe(0);
+  });
+
   it('refuses an accelerator purchase before checkout when stored charges would exceed the cap', async () => {
     const save = makeCareerSave();
     save.inventory = { ...(save.inventory ?? {}), training_accelerator: 4 };
@@ -356,8 +374,8 @@ describe('career reward integrity', () => {
     });
     purchase.mockResolvedValueOnce({
       ok: true,
-      productId: 'gems_small',
-      purchaseToken: 'tok-gems-small',
+      productId: 'gems_large',
+      purchaseToken: 'tok-gems-large',
       purchaseState: 'PURCHASED',
       verificationState: 'LOCAL_MOCK',
     });
@@ -370,8 +388,8 @@ describe('career reward integrity', () => {
     expect(useCareer.getState().save?.wallet.gems).toBe(650);
     expect(useCareer.getState().save?.flags['promo:first_gem_pack_bonus']).toBe(true);
 
-    await useCareer.getState().purchaseProduct('gems_small');
-    expect(useCareer.getState().save?.wallet.gems).toBe(730);
+    await useCareer.getState().purchaseProduct('gems_large');
+    expect(useCareer.getState().save?.wallet.gems).toBe(1_850);
 
     const secondCareer = makeCareerSave();
     secondCareer.experience = {
@@ -606,25 +624,6 @@ describe('career reward integrity', () => {
     expect(purchase).not.toHaveBeenCalled();
   });
 
-  it('Living Legend Edition does not grant earned legend status', async () => {
-    const save = makeCareerSave();
-    useCareer.getState().setActive(save, 'career', 1);
-    jest.spyOn(purchases, 'purchase').mockResolvedValue({
-      ok: true,
-      productId: 'legend_status',
-      purchaseToken: 'tok-legend-edition',
-      purchaseState: 'PURCHASED',
-      verificationState: 'LOCAL_MOCK',
-    });
-
-    await useCareer.getState().purchaseProduct('legend_status');
-
-    const after = useCareer.getState().save!;
-    expect(after.legendGranted).toBeFalsy();
-    expect(after.inventory?.legend_edition_owned).toBe(1);
-    expect(isLegend(after, after.players[after.userPlayerId!])).toBe(false);
-  });
-
   it('Manager Legacy Edition grants only its useful manager starter resources', async () => {
     const save = makeManagerSave();
     const team = save.teams[save.userTeamId!];
@@ -704,21 +703,4 @@ describe('career reward integrity', () => {
     expect(second.managerProgression?.premiumAssistanceHistory.length ?? 0).toBe(firstHistoryCount);
   });
 
-  it('allows only one manager team talk per upcoming fixture', () => {
-    const save = makeManagerSave();
-    save.managerCalendar!.phase = 'T20';
-    save.currentMonth = 3;
-    useCareer.getState().setActive(save, 'manager', 1);
-
-    const first = useCareer.getState().giveTeamTalk('CALM');
-    const second = useCareer.getState().giveTeamTalk('FIRE_UP');
-
-    expect(first.ok).toBe(true);
-    expect(second.ok).toBe(false);
-    expect(second.text).toContain('already given');
-    const flagKeys = Object.keys(useCareer.getState().save?.flags ?? {}).filter((key) =>
-      key.startsWith('teamTalk:'),
-    );
-    expect(flagKeys).toHaveLength(1);
-  });
 });
