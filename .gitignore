@@ -51,4 +51,12 @@ __pycache__/
 
 # generated native folders
 /ios
-/android
+
+# Android build outputs and local signing/material
+/android/.gradle/
+/android/.kotlin/
+/android/build/
+/android/app/build/
+/android/app/.cxx/
+/android/app/debug.keystore
+/android/local.properties

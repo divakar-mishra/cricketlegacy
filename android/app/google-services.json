@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "956451115822",
+    "project_id": "test-e7934",
+    "storage_bucket": "test-e7934.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:956451115822:android:8036ceb2d44e525d83a0bf",
+        "android_client_info": {
+          "package_name": "com.coverdrive.cricket"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnAoZqFt_5kQkCEN2IzYQCm2ydkQwN1sE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
