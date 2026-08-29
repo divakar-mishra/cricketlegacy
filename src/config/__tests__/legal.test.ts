@@ -121,7 +121,7 @@ describe('store legal resource configuration', () => {
     expect(settings).toContain('Legal & Support');
     expect(settings).toContain('PUBLIC_RESOURCE_LABELS');
     expect(settings).toContain('Linking.openURL(url)');
-    expect(pass).toContain('Renews automatically unless canceled');
+    expect(pass).toContain('Auto-renews until canceled');
     expect(pass).toContain('Manage subscription');
     expect(pass).toContain('SubscriptionPolicyLinks');
   });
