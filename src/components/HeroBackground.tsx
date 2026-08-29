@@ -136,12 +136,22 @@ export function HeroBackground({ variant = 'menu', style, children }: HeroBackgr
   );
 }
 
-/** Lightweight version used as a victory/result banner */
-export function VictoryHero({ won, style }: { won?: boolean; style?: ViewStyle }) {
+/** Lightweight version used as a victory/result banner. */
+export function VictoryHero({
+  won,
+  neutral,
+  style,
+}: {
+  won?: boolean;
+  neutral?: boolean;
+  style?: ViewStyle;
+}) {
   const { isDark } = useTheme();
   const gc: readonly [string, string, ...string[]] = won
     ? ['#1C4A25', '#1F7A3A', '#0A1912']
-    : ['#3A1515', '#5A2020', '#1A0A0A'];
+    : neutral
+      ? ['#2D2818', '#51451F', '#17140B']
+      : ['#3A1515', '#5A2020', '#1A0A0A'];
 
   return (
     <View style={[styles.container, { height: 160 }, style]}>
@@ -157,6 +167,15 @@ export function VictoryHero({ won, style }: { won?: boolean; style?: ViewStyle }
               <Rect x="20" y="54" width="24" height="4" rx="2" fill="#C6902A" />
               <Path d="M20 12c-8 0-12 4-12 10s6 12 16 14" fill="none" stroke="#F7D06E" strokeWidth="3" strokeLinecap="round" />
               <Path d="M44 12c8 0 12 4 12 10s-6 12-16 14" fill="none" stroke="#F7D06E" strokeWidth="3" strokeLinecap="round" />
+            </>
+          ) : neutral ? (
+            <>
+              <Rect x="24" y="18" width="4" height="30" rx="2" fill="#F7E7BA" />
+              <Rect x="30" y="18" width="4" height="30" rx="2" fill="#F7E7BA" />
+              <Rect x="36" y="18" width="4" height="30" rx="2" fill="#F7E7BA" />
+              <Rect x="23" y="15" width="9" height="3" rx="1.5" fill="#E9B23B" />
+              <Rect x="33" y="15" width="9" height="3" rx="1.5" fill="#E9B23B" />
+              <Circle cx="32" cy="54" r="4" fill="#B8322A" />
             </>
           ) : (
             <>

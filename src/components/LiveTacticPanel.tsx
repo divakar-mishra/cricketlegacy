@@ -92,10 +92,6 @@ export function LiveTacticPanel({
             <View style={styles.aiRow}>
               <Text style={styles.aiLabel}>MATCH READ</Text>
               <Text style={styles.aiText}>{aiResponse}</Text>
-              <Text style={styles.aiBasis}>
-                Based on score, wickets and required rate. This explains the visible match state; it
-                does not apply a hidden rating boost.
-              </Text>
             </View>
           ) : null}
         </Animated.View>

@@ -11,6 +11,7 @@ import {
   CALLUP_OVERALL,
   ensurePlayerCareerResources,
   nationalState,
+  playerRetirementAssessment,
   prepareCareerFormat,
   prepareCareerPlayerForMatch,
   selectCareerXI,
@@ -53,6 +54,7 @@ describe('national selection', () => {
   it('calls the user up once they are good enough and in form', () => {
     const save = makeCareer(75); // overall >= CALLUP_OVERALL
     const user = save.players.user;
+    user.age = 22;
     expect(user.overall).toBeGreaterThanOrEqual(CALLUP_OVERALL);
     let calledUp = false;
     for (let i = 0; i < 30 && !calledUp; i++) {
@@ -69,6 +71,22 @@ describe('national selection', () => {
     const user = save.players.user;
     for (let i = 0; i < 40; i++) accrueNationalRep(save, user, 10);
     expect(save.capped).toBeFalsy();
+  });
+
+  it('permits an exceptional early debut but holds a late bloomer until after 26', () => {
+    const exceptional = makeCareer(65);
+    exceptional.players.user.age = 20;
+    exceptional.players.user.overall = 65;
+    exceptional.nationalRep = 95;
+    expect(accrueNationalRep(exceptional, exceptional.players.user, 10).calledUp).toBe(true);
+
+    const late = makeCareer(80);
+    late.experience!.playerArchetype = 'LATE_BLOOMER';
+    late.nationalRep = 100;
+    late.players.user.age = 26;
+    expect(accrueNationalRep(late, late.players.user, 10).calledUp).toBe(false);
+    late.players.user.age = 27;
+    expect(accrueNationalRep(late, late.players.user, 10).calledUp).toBe(true);
   });
 
   it('reflects tiers by overall and caps', () => {
@@ -105,12 +123,12 @@ describe('form-driven club selection', () => {
     const save = makeCareer(64);
     save.careerPathLevel = 'U19';
     save.players.user.age = 18;
-    save.players.user.meta.form = 39;
+    save.players.user.meta.form = 34;
 
     const decision = careerSelectionDecision(save, 'ODI', 'u19-next');
 
     expect(decision.selected).toBe(false);
-    expect(decision.reason).toContain('below the selector target of 40');
+    expect(decision.reason).toContain('below the selector target of 35');
     expect(selectCareerXI(save, 'ODI', 'u19-next')).toBe(false);
     expect(save.teams[save.userTeamId!].xi).not.toContain('user');
   });
@@ -134,6 +152,27 @@ describe('form-driven club selection', () => {
     expect(resources.requestedRestFixtureId).toBeUndefined();
   });
 
+  it('lets a benched U19 player rebuild form instead of trapping them outside the XI', () => {
+    const save = makeCareer(64);
+    save.careerPathLevel = 'U19';
+    save.players.user.age = 18;
+    save.players.user.meta.form = 34;
+    const resources = ensurePlayerCareerResources(save)!;
+    resources.form = 34;
+
+    applyCareerMatchReadiness(save, {
+      fixtureId: 'u19-benched-1',
+      format: 'ODI',
+      selected: false,
+    });
+
+    expect(save.players.user.meta.form).toBe(40);
+    expect(resources.form).toBe(40);
+    expect(careerSelectionDecision(save, 'ODI', 'u19-next').reason).not.toContain(
+      'below the selector target of 35',
+    );
+  });
+
   it('uses training and adaptability to reduce a format-switch penalty', () => {
     const save = makeCareer(70);
     const resources = ensurePlayerCareerResources(save)!;
@@ -151,10 +190,13 @@ describe('form-driven club selection', () => {
 });
 
 describe('late-career international retirement nudge', () => {
-  it('uses caps earned in each season instead of lifetime caps', () => {
+  it('combines selection, form and fitness instead of forcing retirement at 33', () => {
     const save = makeCareer(75);
     save.capped = true;
     save.players.user.age = 34;
+    save.players.user.meta.form = 35;
+    save.players.user.condition = 20;
+    save.playerCareerResources!.playerCondition = 20;
     save.userCaps = 50;
     save.userCapsAtSeasonStart = 50;
 
@@ -166,5 +208,19 @@ describe('late-career international retirement nudge', () => {
     save.userCaps = 51;
     expect(checkAgeRetirement(save, closeInternationalCapSeason(save))).toBe(false);
     expect(save.intlDroppedSeasons).toBe(0);
+  });
+
+  it('recommends a normal retirement by 38 and enforces the age-40 maximum', () => {
+    const save = makeCareer(90);
+    save.players.user.age = 38;
+    expect(playerRetirementAssessment(save)).toMatchObject({
+      recommended: true,
+      mandatory: false,
+    });
+    save.players.user.age = 40;
+    expect(playerRetirementAssessment(save)).toMatchObject({
+      recommended: true,
+      mandatory: true,
+    });
   });
 });

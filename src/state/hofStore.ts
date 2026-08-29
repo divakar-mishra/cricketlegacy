@@ -11,6 +11,7 @@ interface HofState {
   board: HallOfFame;
   loaded: boolean;
   load: () => Promise<void>;
+  reset: () => void;
 }
 
 export const useHallOfFame = create<HofState>((set) => ({
@@ -20,4 +21,5 @@ export const useHallOfFame = create<HofState>((set) => ({
     const board = await loadHallOfFame();
     set({ board, loaded: true });
   },
+  reset: () => set({ board: emptyHallOfFame(), loaded: true }),
 }));

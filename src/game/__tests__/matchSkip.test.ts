@@ -1,4 +1,6 @@
 import { careerSkipAction, continueSkipAfterInningsBreak } from '../matchSkip';
+import { buildUserPlayer, createCareerSave } from '../createGame';
+import { createLiveMatch, nextUserFixtureId } from '../season';
 
 const base = {
   mode: 'career' as const,
@@ -12,10 +14,10 @@ const base = {
 };
 
 describe('career match skip actions', () => {
-  it('shows Skip to My Batting before the user reaches the crease', () => {
+  it('shows Skip to my batting before the user reaches the crease', () => {
     expect(careerSkipAction(base)).toEqual({
       kind: 'SKIP_TO_BATTING',
-      label: 'Skip to My Batting',
+      label: 'Skip to my batting',
     });
   });
 
@@ -30,10 +32,10 @@ describe('career match skip actions', () => {
     });
   });
 
-  it('shows an innings-only skip while the opponent is batting', () => {
+  it('keeps skip-to-batting active while the opponent is batting first', () => {
     expect(careerSkipAction({ ...base, userDismissed: true, userTeamBatting: false })).toEqual({
-      kind: 'SKIP_BOWLING_INNINGS',
-      label: 'Skip Bowling Innings',
+      kind: 'SKIP_TO_BATTING',
+      label: 'Skip to my batting',
     });
   });
 
@@ -51,5 +53,48 @@ describe('career match skip actions', () => {
     expect(continueSkipAfterInningsBreak(false, 'user-team', 'user-team')).toBe(true);
     expect(continueSkipAfterInningsBreak(false, 'opponent', 'user-team')).toBe(false);
     expect(continueSkipAfterInningsBreak(true, 'opponent', 'user-team')).toBe(true);
+  });
+
+  it('offers the batting skip for a pure batter in a School pathway XI', () => {
+    const player = buildUserPlayer({
+      name: 'School Batter',
+      nationality: 'india',
+      age: 15,
+      role: 'BATTER',
+      battingStyle: 'RHB',
+      bowlingStyle: 'PACE',
+      batting: {
+        technique: 70,
+        timing: 70,
+        power: 65,
+        footwork: 68,
+        temperament: 65,
+        running: 65,
+      },
+      bowling: { paceOrSpin: 25, accuracy: 25, movement: 25, variations: 25, stamina: 40 },
+      fielding: { catching: 55, throwing: 50, agility: 55, keeping: 20 },
+      meta: { fitness: 60, confidence: 60, aggression: 55, discipline: 65 },
+    });
+    const save = createCareerSave({
+      player,
+      teamId: 'mumbai_sharks',
+      difficulty: 'NORMAL',
+      seed: 17,
+      format: 'T20',
+    });
+    const fixtureId = nextUserFixtureId(save);
+    expect(fixtureId).toBeDefined();
+    const live = createLiveMatch(save, fixtureId!, player.id);
+
+    expect(live.controlledTeamId).toBe(save.careerPathTeamId);
+    expect(live.controlledTeamId).not.toBe(save.userTeamId);
+    expect(save.teams[live.controlledTeamId!].xi).toContain(player.id);
+    expect(
+      careerSkipAction({
+        ...base,
+        userTeamBatting: false,
+        userSelected: save.teams[live.controlledTeamId!].xi?.includes(player.id),
+      }),
+    ).toEqual({ kind: 'SKIP_TO_BATTING', label: 'Skip to my batting' });
   });
 });

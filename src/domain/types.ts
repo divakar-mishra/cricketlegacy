@@ -106,6 +106,8 @@ export interface Player {
   seasonFormatStats?: Partial<Record<Format, PlayerStats>>; // current-season format totals
   domesticStats?: PlayerStats;
   internationalStats?: PlayerStats;
+  /** Exact cricket-level/format records (separate from legacy combined Format totals). */
+  competitionStats?: Partial<Record<CareerCompetitionStatScope, PlayerStats>>;
   // ---- Manager transfer premium actions ----
   buyoutEligible?: boolean;
   buyNowClubPrice?: number;
@@ -118,6 +120,19 @@ export interface Player {
   /** Current match-readiness, separate from the permanent fitness attribute. */
   condition?: number; // 0..100; manager off-season restores this to 100
 }
+
+export type CareerCompetitionStatScope =
+  | 'GRADE_A'
+  | 'U19'
+  | 'U19_WORLD_CUP'
+  | 'DOMESTIC_T20'
+  | 'LIST_A'
+  | 'FIRST_CLASS'
+  | 'HUNDRED'
+  | 'T10'
+  | 'T20I'
+  | 'ODI'
+  | 'TEST';
 
 export interface PlayerStats {
   matches: number;
@@ -302,6 +317,9 @@ export interface MatchState {
   conditions: Conditions;
   homeTeamId: string;
   awayTeamId: string;
+  /** Actual resolved XIs used by the engine; optional for legacy match states. */
+  homePlayerIds?: string[];
+  awayPlayerIds?: string[];
   innings: Innings[];
   result?: MatchResult;
   /** User-decision evidence captured by the interactive match UI. */
@@ -406,6 +424,29 @@ export interface InternationalSelectionDecision {
   reason: string;
 }
 
+export type InternationalRankingFormat = 'TEST' | 'ODI' | 'T20';
+export type InternationalPlayerRankingKind = 'BATTING' | 'BOWLING' | 'ALL_ROUNDER';
+
+export interface InternationalPlayerRankingPeak {
+  bestRank: number;
+  ratingAtBestRank: number;
+  bestRankSeasonId: string;
+  bestRankYear: number;
+  bestRankAge: number;
+  bestRating: number;
+  rankAtBestRating: number;
+  bestRatingSeasonId: string;
+  bestRatingYear: number;
+  bestRatingAge: number;
+}
+
+export type InternationalPlayerRankingPeaks = Partial<
+  Record<
+    InternationalRankingFormat,
+    Partial<Record<InternationalPlayerRankingKind, InternationalPlayerRankingPeak>>
+  >
+>;
+
 export type PlayerCalendarEventKind =
   | 'TRAINING'
   | 'EXAM'
@@ -426,6 +467,8 @@ export interface PlayerCalendarEvent {
   detail: string;
   format?: Format;
   fixtureId?: string;
+  /** National tour/tournament reviewed when an INTERNATIONAL event is reached. */
+  assignmentId?: string;
   completed: boolean;
   outcome?: string;
 }
@@ -537,6 +580,102 @@ export interface Sponsor {
   seasonsLeft: number;
   minForm?: number; // must stay above this form or risk the deal
   requiresIntegrity?: boolean; // dropped if the player's image is tarnished
+  /** Fixture ledger for this separate off-shirt campaign. */
+  paidFixtureIds?: string[];
+  /** Lifetime Wallet Coins paid by this campaign. */
+  totalPaid?: number;
+}
+
+export type SponsorFormatScope = 'ALL_FORMATS' | 'WHITE_BALL' | 'RED_BALL' | 'T20_ONLY' | 'RESULTS';
+export type SponsorPaymentDestination = 'WALLET_COINS' | 'CLUB_BALANCE';
+export type PlayerSponsorStature = 'DOMESTIC' | 'FRANCHISE' | 'INTERNATIONAL' | 'ICON';
+export type ManagerSponsorStature = 'CLUB' | 'STATE' | 'ELITE';
+export type CanonicalSponsorBrandId = 'boundary_works' | 'pulse_xi' | 'longform' | 'legacy_crown';
+
+/** One of the three guaranteed kit-partner choices offered to a career. */
+export interface SponsorshipOffer {
+  id: string;
+  mode: GameMode;
+  /** Brand content is supplied separately from the economy contract. */
+  brandId?: string;
+  brandName?: string;
+  label: string;
+  scope: SponsorFormatScope;
+  fixtureQuota: number;
+  appearancePayout: number;
+  winBonus: number;
+  signingBonus: number;
+  termSeasonRollovers: number;
+  paymentDestination: SponsorPaymentDestination;
+  /** The accepted rate remains fixed even if stature changes later. */
+  signedStature: PlayerSponsorStature | ManagerSponsorStature;
+}
+
+export interface SponsorshipContract extends SponsorshipOffer {
+  acceptedSeasonId: string;
+  acceptedAt: number;
+  paidFixtureIds: string[];
+  paidFixtures: number;
+  paidWins: number;
+  seasonRollovers: number;
+  totalPaid: number;
+  status: 'ACTIVE' | 'QUOTA_REACHED' | 'TERM_ENDED';
+  /** Manager deal owner. The contract stays with this club after a job switch. */
+  boundTeamId?: string;
+  /** Existing saves keep one highest-paying legacy deal until its old expiry. */
+  legacySponsorId?: string;
+}
+
+/** Permanent stipend purchase deliberately belongs to one save, never an account. */
+export interface PremiumSponsorGrant {
+  productId: 'player_save_sponsor' | 'manager_save_sponsor';
+  /** Code-native presentation identity; never baked into a portrait asset. */
+  brandId?: CanonicalSponsorBrandId;
+  brandName?: string;
+  boundSaveId: string;
+  grantedAt: number;
+  purchaseToken: string;
+  paidUtcWeekIds: string[];
+  paidFixtureIds: string[];
+  totalPaid: number;
+}
+
+/** Save-owned Player sponsorship plus the one-save permanent sponsor grant. */
+export interface SponsorshipState {
+  /** First verified selected-XI senior domestic appearance; gates Player offers. */
+  seniorDomesticDebutFixtureId?: string;
+  offerSeasonId?: string;
+  offers: SponsorshipOffer[];
+  activeEarned?: SponsorshipContract;
+  history: SponsorshipContract[];
+  acceptedOfferSeasonIds: string[];
+  /** Earned-contract cash credited during the current in-game season. */
+  earnedThisSeason: number;
+  earnedSeasonId?: string;
+  /** Premium stipend cash credited during the same season (Manager reporting only). */
+  premiumThisSeason?: number;
+  /** Snapshot retained across rollover so season accounts can reconcile fixture income. */
+  lastKitSponsorIncome?: number;
+  lastKitSponsorSeasonId?: string;
+  premium?: PremiumSponsorGrant;
+  legacySponsorMigrationComplete: boolean;
+}
+
+/** Earned Manager kit partnerships belong to a club, not to the manager/save. */
+export interface ManagerClubSponsorshipState {
+  offerSeasonId?: string;
+  offers: SponsorshipOffer[];
+  activeEarned?: SponsorshipContract;
+  history: SponsorshipContract[];
+  acceptedOfferSeasonIds: string[];
+  /** Earned-contract cash credited to this club during the current season. */
+  earnedThisSeason: number;
+  /** Save-owned premium stipend cash credited to this club during the current season. */
+  premiumThisSeason: number;
+  earnedSeasonId?: string;
+  /** Snapshot retained across rollover for this club's season accounts. */
+  lastKitSponsorIncome?: number;
+  lastKitSponsorSeasonId?: string;
 }
 
 /** A single entry in the career journal / timeline. */
@@ -556,12 +695,12 @@ export interface TimelineEntry {
   text: string;
 }
 
-/** An IPL-style franchise bid on the user player, presented at season start. */
+/** A club bid on the user player, used by separate domestic and T20 offer lists. */
 export interface AuctionOffer {
   teamId: string;
   fee: number; // headline franchise fee (prestige signal)
   signingBonus: number; // coins paid to the player on accepting
-  wagePromise: number; // seasonal wage (flavour/display)
+  wagePromise: number; // seasonal wage written into the accepted contract
 }
 
 /** Narrative engine state (seen/queued events + arbitrary numeric/string flags). */
@@ -662,6 +801,67 @@ export interface ClubFinances {
   lastWageBill?: number;
 }
 
+export type TicketPreset = 'LOW' | 'STANDARD' | 'PREMIUM';
+export type ManagerTrainingFocus =
+  'BALANCED' | 'BATTING' | 'BOWLING' | 'FIELDING' | 'FITNESS' | 'RECOVERY';
+export type ManagerTrainingIntensity = 'LIGHT' | 'NORMAL' | 'HIGH';
+
+export interface ManagerTrainingPlan {
+  teamFocus: ManagerTrainingFocus;
+  intensity: ManagerTrainingIntensity;
+  playerOverrides: Record<string, ManagerTrainingFocus>;
+  /** Exact fixture ids already settled, preventing replay/reload gains. */
+  processedFixtureIds: string[];
+  /** Fractional per-attribute development carried until a full point is earned. */
+  developmentProgress: Record<string, Record<string, number>>;
+  /** Regular-season development blocks used this club season (max 28). */
+  developmentBlocks: number;
+  seasonYear: number;
+}
+
+export interface StadiumAttendanceEntry {
+  fixtureId: string;
+  attendance: number;
+  capacity: number;
+  ticketPreset: TicketPreset;
+  ticketPrice: number;
+  grossReceipts: number;
+  netReceipts: number;
+  settledAt: number;
+}
+
+export interface ClubStadiumState {
+  name: string;
+  capacityLevel: number;
+  experienceLevel: number;
+  fanBase: number;
+  /** Baseline used to enforce the per-season fan-growth cap. */
+  fanSeasonStart?: number;
+  /** Calendar season associated with fanSeasonStart. */
+  fanSeasonYear?: number;
+  ticketPresets: Record<Format, TicketPreset>;
+  attendanceHistory: StadiumAttendanceEntry[];
+  /** Fixture-ledger ids already credited to the club budget. */
+  settledFixtureIds: string[];
+}
+
+/** Club assets persist by team id and never travel with a manager appointment. */
+export interface ManagerClubState {
+  teamId: string;
+  staff: StaffMember[];
+  staffCandidates: StaffMember[];
+  facilities: Facilities;
+  academy: AcademyState;
+  scoutReports: ScoutReport[];
+  finances: ClubFinances;
+  trainingPlan: ManagerTrainingPlan;
+  stadium: ClubStadiumState;
+  /** Club-owned earned sponsor contract, offers and income ledger. */
+  sponsorship: ManagerClubSponsorshipState;
+  captainId?: string;
+  viceCaptainId?: string;
+}
+
 // ---------- In-game notification inbox ----------
 
 export type InboxMessageKind =
@@ -709,18 +909,59 @@ export interface DailyChallenge {
 
 /**
  * The player's active level in the career pathway.
- * SCHOOL  = U14 school/district cricket (age 14–16, before U19 notice)
+ * SCHOOL  = persisted key for Grade A cricket (career begins at age 16)
  * U19     = Under-19 state/national youth (before domestic contract)
  * DOMESTIC = Domestic professional (before international call-up)
  * INTERNATIONAL = Capped player (can be dropped back to DOMESTIC)
  */
 export type CareerPathLevel = 'SCHOOL' | 'U19' | 'DOMESTIC' | 'INTERNATIONAL';
 
-/** A personal stock/investment position. */
+export type StockSector =
+  | 'TECHNOLOGY'
+  | 'INFRASTRUCTURE'
+  | 'MINING'
+  | 'ENERGY'
+  | 'CONSUMER'
+  | 'MANUFACTURING'
+  | 'LOGISTICS'
+  | 'HEALTHCARE';
+
+export type StockRisk = 'STABLE' | 'BALANCED' | 'VOLATILE';
+
+export interface StockCompany {
+  id: string;
+  name: string;
+  sector: StockSector;
+  risk: StockRisk;
+}
+
+export interface StockHolding {
+  companyId: string;
+  /** Coins paid for the portion still held. */
+  costBasis: number;
+  currentValue: number;
+  totalWithdrawn: number;
+  history: number[];
+  lastReturnPct?: number;
+  /** Legacy anonymous market positions are preserved but cannot receive new money. */
+  sellOnly?: boolean;
+}
+
+export interface StockPortfolio {
+  holdings: Record<string, StockHolding>;
+  totalWithdrawn: number;
+  lastReturns: Partial<Record<string, number>>;
+  lastUpdatedYear?: number;
+  /** One-time protective refund paid during removal of the fictional token market. */
+  legacyTokenRefundCoins?: number;
+  legacyTokenRefunded: boolean;
+}
+
+/** @deprecated Schema-41 anonymous investment migrated to StockPortfolio. */
 export interface StockInvestment {
-  /** Coins currently invested in the market. */
+  /** Legacy coins originally invested in the anonymous market. */
   invested: number;
-  /** Current market value (fluctuates ±10% each season). */
+  /** Final anonymous-market value preserved during migration. */
   currentValue: number;
   /** Total dividends/withdrawals taken out so far. */
   totalWithdrawn: number;
@@ -805,8 +1046,10 @@ export interface PlayerLifeState {
   bankCoins: number;
   propertyIds: string[];
   businessIds: string[];
-  legacyTokenUnits: number;
-  legacyTokenCostBasis: number;
+  /** @deprecated Refunded and removed by schema 42. Retained only for migration input. */
+  legacyTokenUnits?: number;
+  /** @deprecated Refunded and removed by schema 42. Retained only for migration input. */
+  legacyTokenCostBasis?: number;
   personalCoaches: Partial<Record<PersonalCoachDiscipline, PersonalCoachContract>>;
   equipmentIds: string[];
   physioVisitsThisSeason: number;
@@ -904,6 +1147,43 @@ export interface InternationalTournamentState {
   managerPhase?: ManagerCalendarPhase;
 }
 
+export type U19WorldCupStatus =
+  'TRACKING' | 'SELECTED' | 'NOT_SELECTED' | 'ELIMINATED' | 'RUNNER_UP' | 'CHAMPION';
+
+/**
+ * Exact, fixture-backed merit retained for the protagonist's single U19 World
+ * Cup selection opportunity. It remains valid if an early domestic promotion
+ * resets the ordinary career-path counters.
+ */
+export interface U19WorldCupMeritSnapshot {
+  appearanceFixtureIds: string[];
+  appearances: number;
+  runs: number;
+  wickets: number;
+  ratingSum: number;
+  averageRating: number;
+  readiness: number;
+  qualified: boolean;
+}
+
+/** Durable six-country knockout state, wholly separate from senior caps. */
+export interface U19WorldCupState {
+  id: string;
+  opportunityAge: 18;
+  opportunityYear?: number;
+  status: U19WorldCupStatus;
+  merit: U19WorldCupMeritSnapshot;
+  controlledCountryId?: string;
+  controlledTeamId?: string;
+  participantCountryIds: string[];
+  teamIds: string[];
+  quarterFinalFixtureIds: string[];
+  semiFinalFixtureIds: string[];
+  finalFixtureId?: string;
+  championTeamId?: string;
+  eliminatedAt?: 'QUARTER_FINAL' | 'SEMI_FINAL' | 'FINAL';
+}
+
 /** A rival club headhunting a successful manager with a better-paid job. */
 export interface ManagerJobOffer {
   teamId: string; // the club making the approach
@@ -914,7 +1194,7 @@ export interface ManagerJobOffer {
 }
 
 /** Current canonical save schema. Bump + add a migration on any shape change. */
-export const SAVE_SCHEMA_VERSION = 30;
+export const SAVE_SCHEMA_VERSION = 43;
 
 export type CareerArchetype = 'PRODIGY' | 'LATE_BLOOMER' | 'SPECIALIST' | 'COMEBACK';
 export type CoachPersonality = 'DEVELOPER' | 'TACTICIAN' | 'DISCIPLINARIAN' | 'MENTOR';
@@ -956,8 +1236,36 @@ export interface NewspaperStory {
   matchId: string;
   createdAt: number;
   season: number;
-  kind?: 'MATCH' | 'TROPHY' | 'ELIMINATION';
+  kind?: 'MATCH' | 'TROPHY' | 'ELIMINATION' | 'PROMOTION' | 'MILESTONE';
+  /** Immutable copy selection metadata added in schema 34. Absent on legacy clippings. */
+  templateId?: string;
+  newspaperCategory?:
+    | 'CENTURY_STANDARD'
+    | 'CENTURY_CHASE'
+    | 'FIFTY_WIN'
+    | 'FIFTY_LOSS'
+    | 'WICKET_SPELL'
+    | 'FIVE_WICKET'
+    | 'ALL_ROUND'
+    | 'CLOSE_WIN'
+    | 'CLOSE_LOSS'
+    | 'PLAYER_OF_MATCH'
+    | 'TROPHY'
+    | 'PROMOTION'
+    | 'ELIMINATION'
+    | 'MILESTONE_RECORD';
+  headlineFamily?:
+    | 'PLAYER_PERFORMANCE'
+    | 'PLAYER_RECOGNITION'
+    | 'PLAYER_JOURNEY'
+    | 'TEAM_RESULT'
+    | 'OPPOSITION_RESULT'
+    | 'EVENT_RESULT'
+    | 'TROPHY_FOCUS'
+    | 'RECORD_FOCUS';
   trophyNames?: string[];
+  promotionFrom?: CareerPathLevel;
+  promotionTo?: CareerPathLevel;
   format: Format;
   edition: string;
   kicker: string;
@@ -966,10 +1274,17 @@ export interface NewspaperStory {
   body: string;
   playerName: string;
   opponentName: string;
-  result: 'WIN' | 'LOSS' | 'TIE';
+  result: 'WIN' | 'LOSS' | 'TIE' | 'NEUTRAL';
   runs: number;
   balls: number;
   wickets: number;
+  /** Verified completed-match facts used by the score panel. */
+  teamName?: string;
+  teamScore?: string;
+  opponentScore?: string;
+  resultLine?: string;
+  competitionName?: string;
+  venueName?: string;
 }
 
 export interface RelationshipMemory {
@@ -1022,33 +1337,19 @@ export interface CareerExperienceState {
   };
 }
 
-export type AvatarFaceShape = 'oval' | 'round' | 'angular';
-export type AvatarHairStyle = 'short' | 'crop' | 'swept' | 'curly' | 'fade' | 'bald';
-export type AvatarFacialHair = 'none' | 'stubble' | 'short_beard' | 'full_beard';
-export type AvatarMoustache = 'none' | 'classic' | 'handlebar';
-
-/** Layered illustrated avatar choices. All core identity options are free. */
-export interface AvatarCustomization {
-  skinTone: string;
-  faceShape: AvatarFaceShape;
-  hairStyle: AvatarHairStyle;
-  hairColor: string;
-  facialHair: AvatarFacialHair;
-  moustache: AvatarMoustache;
-  eyeColor: string;
-  browStyle: 'soft' | 'straight' | 'bold';
-}
-
 /** Equipped player cosmetics (career mode). Ids come from PlayerCosmeticsScreen. */
 export interface PlayerCosmetics {
   avatar: string;
   kit: string;
   celebration: string;
+  /** User-selected lettering printed across the back of the playing shirt. */
+  shirtName?: string;
+  /** User-selected playing number, restricted to 1-99. */
+  shirtNumber?: number;
   profileFrame?: string;
   stadiumTheme?: string;
   officeTheme?: string;
-  avatarCustomization?: AvatarCustomization;
-  /** Schema 30 modular portrait. Only stable supplied-pack IDs are persisted. */
+  /** Schema 32 fixed portrait. Only a stable portrait ID and optional frame are persisted. */
   avatarConfig?: AvatarConfig;
 }
 
@@ -1100,7 +1401,11 @@ export interface LastSeasonSettlement {
   leaguePosition: number;
   leaguePrize: number;
   continentalPrize: number;
+  /** @deprecated Legacy name; new settlements expose the same amount as broadcastIncome. */
   sponsorIncome: number;
+  broadcastIncome?: number;
+  /** Earned and permanent kit-partner payments already credited fixture by fixture. */
+  kitSponsorIncome?: number;
   playerWages: number;
   gateReceipts: number;
   staffWages: number;
@@ -1136,7 +1441,13 @@ export interface SaveGame {
    * this is a future destination and does not contain the user player.
    */
   userTeamId?: string;
-  /** Active School/U19 XI. Cleared when the senior domestic contract begins. */
+  /** Player Career's separate T20 affiliation. `userTeamId` remains the
+   *  domestic First-Class/List A club; Manager saves do not use this field. */
+  franchiseTeamId?: string;
+  /** Separate seasonal T20 terms. The player's ordinary `contract` remains
+   *  their domestic First-Class/List A agreement. */
+  franchiseContract?: Contract;
+  /** Active Grade A/U19 XI. Cleared when the senior domestic contract begins. */
   careerPathTeamId?: string;
   players: Record<string, Player>;
   teams: Record<string, Team>;
@@ -1169,6 +1480,8 @@ export interface SaveGame {
   intlDroppedSeasons?: number; // consecutive seasons without an international appearance (for age-triggered retirement)
   careerToManagerEligible?: boolean; // true once career stats qualify for a management transition
   // ---- Personal finance (career mode, all optional) ----
+  stockPortfolio?: StockPortfolio;
+  /** @deprecated Migrated to stockPortfolio by schema 42. */
   stockInvestment?: StockInvestment;
   personalAcademy?: PersonalAcademy;
   playerLife?: PlayerLifeState;
@@ -1183,12 +1496,19 @@ export interface SaveGame {
   // ---- Live-ops (all optional; default at runtime) ----
   dailyStreak?: number;
   quests?: { day: number; items: { id: string; progress: number; claimed: boolean }[] };
-  weeklyQuests?: { week: number; items: { id: string; progress: number; claimed: boolean }[] };
+  weeklyQuests?: {
+    week: number;
+    /** UTC pass cycle in which this progress was earned. */
+    passCycleId?: string;
+    items: { id: string; progress: number; claimed: boolean }[];
+  };
   pass?: {
-    /** 30-day live-ops cycle id, independent from the in-game career season. */
+    /** UTC calendar-month cycle id, independent from the in-game career season. */
     seasonId: string;
     periodStartedAt?: number;
     periodEndsAt?: number;
+    /** Reward-curve revision used to migrate XP without losing earned tiers. */
+    balanceVersion?: number;
     xp: number;
     premium: boolean;
     claimedFree: number[];
@@ -1205,6 +1525,7 @@ export interface SaveGame {
   timeline?: TimelineEntry[];
   relationships?: Record<string, Relationship>;
   sponsors?: Sponsor[];
+  sponsorship?: SponsorshipState;
   brand?: number; // 0..100 marketability
   integrity?: number; // 0..100 clean image / trust
   captainClub?: boolean;
@@ -1212,6 +1533,8 @@ export interface SaveGame {
   rivalPlayerId?: string;
   seasonRatings?: number[]; // per-match ratings this season
   auctionOffers?: AuctionOffer[]; // franchise bids on the user, offered at season start
+  /** Rival domestic-club approaches for First-Class and List A cricket. */
+  domesticClubOffers?: AuctionOffer[];
   newGamePlus?: number; // legacy generation counter
   // ---- Manager depth (manager mode, all optional) ----
   staff?: StaffMember[];
@@ -1220,6 +1543,9 @@ export interface SaveGame {
   academy?: AcademyState;
   scoutReports?: ScoutReport[];
   finances?: ClubFinances;
+  /** Canonical per-club Manager assets. Legacy fields above remain synchronized
+   *  temporarily while older screens are migrated onto this record. */
+  managerClubs?: Record<string, ManagerClubState>;
   managerStory?: StoryState;
   cupWins?: number;
   /** Per-player season training focus (playerId -> attribute group). */
@@ -1227,6 +1553,9 @@ export interface SaveGame {
   boardConfidence?: number; // 0..100 job security signal
   // ---- Manager career progression (manager mode, all optional) ----
   managerCareerLevel?: ManagerCareerLevel; // current level; defaults CLUB
+  /** Manager Career begins at 35 and ends after the season that reaches age 60. */
+  managerAge?: number;
+  managerRetired?: boolean;
   managerCareerSeasons?: number; // seasons completed at current level
   managerTitlesAtLevel?: number; // league titles won at current level (used for promotion)
   managerTopFinishes?: number; // top-2 league finishes at current level (promotion route without a title)
@@ -1272,8 +1601,14 @@ export interface SaveGame {
   internationalCalendar?: IntlCalendar;
   wtcCycles?: Record<string, WtcCycleState>;
   internationalTournaments?: Record<string, InternationalTournamentState>;
-  iccRankings?: Record<string, number>; // team id → ranking points
+  /** Career-best international player position and rating, tracked prospectively. */
+  internationalPlayerRankingPeaks?: InternationalPlayerRankingPeaks;
+  /** One merit-based age-18 U19 World Cup opportunity per Player Career. */
+  u19WorldCup?: U19WorldCupState;
+  iccRankings?: Record<string, number>; // Encoded format/team rating and match-count state.
   lastMatchWon?: boolean; // result of most recent user match (for main-menu flavour text)
   /** Timestamp from which domestic/international career totals are exact. */
   statsScopeTrackingStartedAt?: number;
+  /** Timestamp from which competition-and-format career totals are exact. */
+  competitionStatsTrackingStartedAt?: number;
 }

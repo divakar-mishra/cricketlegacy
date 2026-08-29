@@ -5,8 +5,9 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import {
   Button,
   Card,
@@ -15,17 +16,18 @@ import {
   RewardModalData,
   Screen,
   ScreenHeader,
-  WalletBar,
 } from '../components';
 import { AppText as Text } from '../components/AppText';
+import { PUBLIC_RESOURCES, SUBSCRIPTION_MANAGEMENT_URLS } from '../config/legal';
 import {
   claimablePassRewards,
   PASS_ITEM_LABELS,
   PASS_TIERS,
   passLevel,
+  passTiersForMode,
   xpForTier,
 } from '../game/liveops';
-import { daysRemaining, isSeasonPassActive, SEASON_PASS_DAYS } from '../game/seasonPass';
+import { isSeasonPassActive, monthlyBundleForSave, SEASON_PASS_BENEFITS } from '../game/seasonPass';
 import { ScreenProps } from '../navigation';
 import { purchases } from '../services';
 import { useCareer } from '../state/careerStore';
@@ -50,12 +52,53 @@ function fmtCountdown(secs: number): string {
   return `${m}m`;
 }
 
-function rewardLabel(r: { coins?: number; gems?: number; item?: string }): string {
+function rewardLabel(r: { coins?: number; item?: string }): string {
   const parts: string[] = [];
   if (r.coins) parts.push(`🪙 ${r.coins} Coins`);
-  if (r.gems) parts.push(`💎 ${r.gems} Gems`);
   if (r.item) parts.push(`🎁 1x ${PASS_ITEM_LABELS[r.item] ?? 'Pass item'}`);
   return parts.join(' + ');
+}
+
+async function openExternalLink(url: string, label: string): Promise<void> {
+  try {
+    await Linking.openURL(url);
+  } catch {
+    Alert.alert(`Cannot open ${label}`, 'Check your connection and try again.');
+  }
+}
+
+function SubscriptionPolicyLinks() {
+  const styles = useThemedStyles(makeStyles);
+  const nonReleaseBuild = typeof __DEV__ !== 'undefined' && __DEV__;
+  const links = [
+    { label: 'Privacy Policy', url: PUBLIC_RESOURCES.privacyPolicy },
+    { label: 'Terms & Conditions', url: PUBLIC_RESOURCES.terms },
+  ].filter((link) => link.url || nonReleaseBuild);
+
+  if (links.length === 0) return null;
+  return (
+    <View style={styles.policyLinks}>
+      {links.map(({ label, url }) => (
+        <Pressable
+          key={label}
+          accessibilityRole="link"
+          accessibilityLabel={label}
+          accessibilityState={{ disabled: !url }}
+          disabled={!url}
+          onPress={() => url && void openExternalLink(url, label)}
+          style={({ pressed }) => [
+            styles.policyLink,
+            !url && styles.policyLinkDisabled,
+            pressed && styles.policyLinkPressed,
+          ]}
+        >
+          <Text style={[styles.policyLinkText, !url && styles.policyLinkTextDisabled]}>
+            {url ? label : `${label} · not configured`}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
 }
 
 export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
@@ -66,11 +109,13 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [countdown, setCountdown] = useState(0);
-  const [localizedPrice, setLocalizedPrice] = useState('Google Play price');
+  const [localizedPrice, setLocalizedPrice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [claimBusy, setClaimBusy] = useState(false);
   const [claimFlash, setClaimFlash] = useState<string | null>(null);
   const [rewardModal, setRewardModal] = useState<RewardModalData | null>(null);
+  const [showFullTrack, setShowFullTrack] = useState(false);
+  const [showPassInfo, setShowPassInfo] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -79,13 +124,15 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
   );
 
   useEffect(() => {
-    const update = () =>
-      setCountdown(
-        Math.max(0, Math.floor(((save?.pass?.periodEndsAt ?? Date.now()) - Date.now()) / 1000)),
-      );
+    const update = () => {
+      const remainingMs = (save?.pass?.periodEndsAt ?? Date.now()) - Date.now();
+      setCountdown(Math.max(0, Math.floor(remainingMs / 1000)));
+    };
     update();
     const id = setInterval(update, 15_000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+    };
   }, [save?.pass?.periodEndsAt]);
 
   useEffect(() => {
@@ -112,27 +159,37 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
 
   const pass = save.pass;
   const premiumActive = isSeasonPassActive(save);
+  const modeTiers = passTiersForMode(save.mode);
+  const monthlyBundle = monthlyBundleForSave(save);
   const level = passLevel(pass.xp);
-  const nextTier = PASS_TIERS.find((t) => t.tier === level + 1);
+  const nextTier = modeTiers.find((t) => t.tier === level + 1);
   const xpProgress = nextTier ? pass.xp - xpForTier(level) : 0;
   const xpNeeded = nextTier ? nextTier.xpRequired - xpForTier(level) : 1;
   const claimable = claimablePassRewards(pass);
   const hasClaimable = claimable.length > 0;
+  const freeClaimedSet = new Set(pass.claimedFree);
+  const premiumClaimedSet = new Set(pass.claimedPremium);
+  const modeLabel = save.mode === 'manager' ? 'Manager' : 'Player';
+  const compactTrackStart = Math.max(0, Math.min(level - 1, PASS_TIERS.length - 3));
+  const visibleTiers = showFullTrack
+    ? modeTiers
+    : modeTiers.slice(compactTrackStart, compactTrackStart + 3);
+  const monthlyRewardLine =
+    save.mode === 'manager'
+      ? `${monthlyBundle.office.label} · ${monthlyBundle.scenario.title}`
+      : `${monthlyBundle.kit.label} · ${monthlyBundle.celebration.label}`;
 
   const onClaim = () => {
     if (claimBusy) return;
     setClaimBusy(true);
     const r = claimPass();
     if (r.count > 0) {
-      setClaimFlash(`+${r.coins} coins${r.gems ? ` +${r.gems} gems` : ''} claimed!`);
+      setClaimFlash(`${r.count} track reward${r.count === 1 ? '' : 's'} claimed`);
       setRewardModal({
         title: 'Season Pass reward claimed',
-        subtitle: `${r.count} reward${r.count === 1 ? '' : 's'} added`,
+        subtitle: `${r.count} track reward${r.count === 1 ? '' : 's'} added`,
         items: r.items,
-        balances: [
-          `Coins: ${r.previousCoins.toLocaleString()} -> ${r.newCoins.toLocaleString()}`,
-          `Gems: ${r.previousGems.toLocaleString()} -> ${r.newGems.toLocaleString()}`,
-        ],
+        balances: [`Coins: ${r.previousCoins.toLocaleString()} -> ${r.newCoins.toLocaleString()}`],
         icon: 'trophy',
       });
       setTimeout(() => setClaimFlash(null), 3000);
@@ -141,57 +198,24 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
   };
 
   const onUpgrade = async () => {
+    if (!localizedPrice) return;
     setBusy(true);
     await purchaseProduct('season_pass');
     setBusy(false);
   };
+
+  const subscriptionManagementUrl =
+    Platform.OS === 'ios' ? SUBSCRIPTION_MANAGEMENT_URLS.ios : SUBSCRIPTION_MANAGEMENT_URLS.android;
+  const storeName = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
 
   return (
     <>
       <Screen scroll gradient={gradients.pitch}>
         <ScreenHeader
           title="Season Pass"
-          subtitle="Earn rewards every match"
+          subtitle={`${modeLabel} Career · separate save progress`}
           onBack={() => navigation.goBack()}
         />
-
-        <WalletBar wallet={save.wallet} />
-
-        <View style={styles.editorBand}>
-          <View style={styles.editorCopy}>
-            <Text style={styles.editorTitle}>Your domestic cricket world</Text>
-            <Text style={styles.editorText}>
-              Rename leagues and clubs across this save while Premium Pass is active.
-              {save.mode === 'manager'
-                ? ' Manager matches and transfer quests also earn pass XP.'
-                : ' Match, training and story progress all feed the same reward track.'}
-            </Text>
-          </View>
-          <Button
-            label="Open Editor"
-            variant={premiumActive ? 'secondary' : 'ghost'}
-            size="sm"
-            fullWidth={false}
-            onPress={() => navigation.navigate('LeagueEditor')}
-          />
-        </View>
-
-        <View style={styles.editorBand}>
-          <View style={styles.editorCopy}>
-            <Text style={styles.editorTitle}>Premium Clubhouse</Text>
-            <Text style={styles.editorText}>
-              Three new monthly cosmetics, a unique collectible, rotating scenarios, two-part Player
-              and Manager stories, presentation themes and analytics.
-            </Text>
-          </View>
-          <Button
-            label="Open"
-            variant="secondary"
-            size="sm"
-            fullWidth={false}
-            onPress={() => navigation.navigate('PremiumClubhouse')}
-          />
-        </View>
 
         {/* Header card */}
         <Animated.View entering={FadeInDown.duration(350)}>
@@ -207,7 +231,7 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
               <Text
                 style={[styles.heroTitle, { color: premiumActive ? colors.black : colors.text }]}
               >
-                {premiumActive ? 'Premium Pass' : 'Free Pass'}
+                {premiumActive ? `Premium ${modeLabel} Pass` : `${modeLabel} Pass`}
               </Text>
               <Text
                 style={[
@@ -215,37 +239,29 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
                   { color: premiumActive ? 'rgba(0,0,0,0.65)' : colors.textMuted },
                 ]}
               >
-                Season resets in {fmtCountdown(countdown)} · 30-day reward cycle
+                Tier {level} of {PASS_TIERS.length} · resets in {fmtCountdown(countdown)}
               </Text>
-              <Text
-                style={[styles.heroLevel, { color: premiumActive ? colors.black : colors.accent }]}
-              >
-                Tier {level} / {PASS_TIERS.length}
-              </Text>
-              {premiumActive && (
-                <Text style={[styles.heroSub, { color: 'rgba(0,0,0,0.65)' }]}>
-                  Subscription access: {daysRemaining(save)} day(s) remaining
-                </Text>
-              )}
             </View>
-            {!premiumActive && (
-              <Button
-                label={busy ? 'Upgrading…' : `${localizedPrice} / month`}
-                variant="gold"
-                size="sm"
-                fullWidth={false}
-                loading={busy}
-                onPress={() => void onUpgrade()}
-              />
-            )}
           </LinearGradient>
         </Animated.View>
+
+        {premiumActive ? (
+          <Button
+            label="Manage subscription"
+            variant="secondary"
+            size="sm"
+            style={{ marginTop: spacing.sm }}
+            onPress={() =>
+              void openExternalLink(subscriptionManagementUrl, `${storeName} subscriptions`)
+            }
+          />
+        ) : null}
 
         {/* XP Progress */}
         {nextTier && (
           <Animated.View entering={FadeInDown.duration(380).delay(60)} style={styles.xpBox}>
             <View style={styles.xpRow}>
-              <Text style={styles.xpLabel}>Progress to Tier {level + 1}</Text>
+              <Text style={styles.xpLabel}>Next · Tier {level + 1}</Text>
               <Text style={styles.xpValue}>
                 {pass.xp} / {nextTier.xpRequired} XP
               </Text>
@@ -257,6 +273,25 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
             />
           </Animated.View>
         )}
+
+        <Animated.View entering={FadeInDown.duration(360).delay(70)}>
+          <Card
+            style={styles.monthCard}
+            onPress={() => navigation.navigate('PremiumClubhouse')}
+            accessibilityLabel={`${monthlyBundle.title} monthly Season Pass collection. Open Clubhouse.`}
+          >
+            <View style={styles.monthCardRow}>
+              <View style={styles.monthCardCopy}>
+                <Text style={styles.monthEyebrow}>THIS MONTH</Text>
+                <Text style={styles.monthTitle}>{monthlyBundle.title}</Text>
+                <Text style={styles.monthReward} numberOfLines={1}>
+                  {monthlyRewardLine}
+                </Text>
+              </View>
+              <Text style={styles.monthAction}>CLUBHOUSE →</Text>
+            </View>
+          </Card>
+        </Animated.View>
 
         {/* Claim button */}
         {hasClaimable && (
@@ -278,40 +313,98 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
         )}
 
         {/* Tier ladder */}
-        <Text style={styles.section}>Reward Track</Text>
-        <Text style={styles.trackHint}>
-          Play matches, complete quests and win titles to earn XP.
-        </Text>
+        <Text style={styles.section}>Rewards</Text>
 
         {/* Premium unlock prompt */}
         {!premiumActive && (
           <Animated.View entering={FadeInDown.duration(320).delay(100)}>
             <Card style={styles.upgradeCard}>
-              <Text style={styles.upgradeTitle}>Unlock Premium</Text>
-              <Text style={styles.upgradeSub}>
-                {SEASON_PASS_DAYS} days of premium tier rewards, permanent earned cosmetics, a
-                monthly collectible, rotating scenarios, fresh story chains, Manager services,
-                naming tools and ad-free play. Existing tier progress unlocks immediately.
+              <View style={styles.upgradeTitleRow}>
+                <Text style={styles.upgradeTitle}>Premium Track</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    showPassInfo ? 'Hide Season Pass details' : 'Show Season Pass details'
+                  }
+                  onPress={() => setShowPassInfo((shown) => !shown)}
+                  hitSlop={10}
+                  style={styles.infoButton}
+                >
+                  <Text style={styles.infoButtonText}>i</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.subscriptionDisclosure}>
+                {localizedPrice ? `${localizedPrice}/month · 30 days` : 'Monthly price unavailable'}
+                {' · '}Auto-renews until canceled.
               </Text>
+              {showPassInfo ? (
+                <View style={styles.passInfoPanel}>
+                  <Text style={styles.passInfoLine}>
+                    • One subscription unlocks Premium across every save
+                  </Text>
+                  <Text style={styles.passInfoLine}>
+                    • Premium rewards for tiers earned in this save
+                  </Text>
+                  <Text style={styles.passInfoLine}>• Ads removed while the pass is active</Text>
+                  <Text style={styles.passInfoLine}>• League and club naming editor</Text>
+                  {save.mode === 'manager' ? (
+                    <>
+                      <Text style={styles.passInfoLine}>
+                        • {Math.round(SEASON_PASS_BENEFITS.staffSigningDiscount * 100)}% staff
+                        signing discount
+                      </Text>
+                      <Text style={styles.passInfoLine}>
+                        • +{Math.round(SEASON_PASS_BENEFITS.superstarInterestBonus * 100)}%
+                        superstar interest
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.passInfoLine}>
+                        • +{Math.round((SEASON_PASS_BENEFITS.trainingGrowthMultiplier - 1) * 100)}%
+                        paid training growth
+                      </Text>
+                      <Text style={styles.passInfoLine}>
+                        • +
+                        {Math.round(
+                          (SEASON_PASS_BENEFITS.positiveSelectionRepMultiplier - 1) * 100,
+                        )}
+                        % positive selection reputation
+                      </Text>
+                    </>
+                  )}
+                  <Text style={styles.passInfoFine}>
+                    Does not grant wins, selection or trophies.
+                  </Text>
+                </View>
+              ) : null}
               <Button
-                label={busy ? 'Processing…' : `Subscribe · ${localizedPrice}`}
+                label={busy ? 'Processing…' : `Subscribe · ${localizedPrice ?? 'Unavailable'}`}
                 variant="gold"
                 loading={busy}
+                disabled={!localizedPrice}
                 style={{ marginTop: spacing.md }}
                 onPress={() => void onUpgrade()}
               />
+              <SubscriptionPolicyLinks />
             </Card>
           </Animated.View>
         )}
 
+        <Button
+          label={showFullTrack ? 'Show nearby tiers' : 'View all 20 tiers'}
+          variant="secondary"
+          size="sm"
+          style={{ marginTop: spacing.md }}
+          onPress={() => setShowFullTrack((shown) => !shown)}
+        />
+
         <View style={styles.ladder}>
-          {PASS_TIERS.map((tier, idx) => {
+          {visibleTiers.map((tier, idx) => {
             const reached = level >= tier.tier;
             const current = level + 1 === tier.tier;
-            const freeClaimedSet = new Set(pass.claimedFree);
-            const premClaimedSet = new Set(pass.claimedPremium);
             const freeClaimed = freeClaimedSet.has(tier.tier);
-            const premClaimed = premClaimedSet.has(tier.tier);
+            const premClaimed = premiumClaimedSet.has(tier.tier);
             const isMilestone = Boolean(tier.premiumReward.item);
 
             return (
@@ -331,30 +424,35 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
                       current && styles.tierBadgeCurrent,
                     ]}
                   >
-                    {reached ? (
-                      <Text style={styles.tierBadgeCheck}>✓</Text>
-                    ) : (
-                      <Text
-                        style={[
-                          styles.tierBadgeNum,
-                          { color: current ? colors.accent : colors.textFaint },
-                        ]}
-                      >
-                        {tier.tier}
-                      </Text>
-                    )}
+                    <Text
+                      style={[
+                        styles.tierBadgeNum,
+                        { color: reached || current ? colors.white : colors.textFaint },
+                      ]}
+                    >
+                      {tier.tier}
+                    </Text>
                   </View>
 
                   <View style={styles.tierContent}>
-                    {isMilestone && <Text style={styles.milestoneLabel}>Milestone</Text>}
-
                     {/* Free track */}
                     <View style={[styles.rewardRow, freeClaimed && styles.rewardClaimed]}>
                       <Text style={styles.rewardTrackLabel}>Free</Text>
                       <Text style={[styles.rewardText, freeClaimed && styles.rewardTextClaimed]}>
                         {rewardLabel(tier.freeReward)}
                       </Text>
-                      {freeClaimed && <Text style={styles.rewardDone}>✓</Text>}
+                      <Text
+                        style={[
+                          styles.rewardStatus,
+                          freeClaimed
+                            ? { color: colors.success }
+                            : reached
+                              ? { color: colors.accent }
+                              : undefined,
+                        ]}
+                      >
+                        {freeClaimed ? '✓' : reached ? 'Claim' : `${tier.xpRequired} XP`}
+                      </Text>
                     </View>
 
                     {/* Premium track */}
@@ -383,8 +481,24 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
                       >
                         {rewardLabel(tier.premiumReward)}
                       </Text>
-                      {premiumActive && premClaimed && <Text style={styles.rewardDone}>✓</Text>}
-                      {!premiumActive && <Text style={styles.lockIcon}>Locked</Text>}
+                      <Text
+                        style={[
+                          styles.rewardStatus,
+                          premiumActive && premClaimed
+                            ? { color: colors.success }
+                            : premiumActive && reached
+                              ? { color: colors.accent }
+                              : undefined,
+                        ]}
+                      >
+                        {!premiumActive
+                          ? '🔒'
+                          : premClaimed
+                            ? '✓'
+                            : reached
+                              ? 'Claim'
+                              : `${tier.xpRequired} XP`}
+                      </Text>
                     </View>
                   </View>
                 </View>
@@ -392,10 +506,6 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
             );
           })}
         </View>
-
-        <Text style={styles.footNote}>
-          XP sources: +50 per match · +40 per win · +100 per daily quest · +300 per weekly quest
-        </Text>
       </Screen>
       <RewardModal data={rewardModal} onClose={() => setRewardModal(null)} />
     </>
@@ -421,7 +531,6 @@ const makeStyles = (colors: ThemeColors) =>
     heroLeft: { flex: 1 },
     heroTitle: { fontSize: fontSize.xl, fontWeight: fontWeight.black, fontFamily: fonts.display },
     heroSub: { fontSize: fontSize.xs, marginTop: 2 },
-    heroLevel: { fontSize: fontSize.md, fontWeight: fontWeight.bold, marginTop: spacing.sm },
     xpBox: {
       marginTop: spacing.md,
       backgroundColor: colors.surface,
@@ -429,6 +538,28 @@ const makeStyles = (colors: ThemeColors) =>
       borderWidth: 1,
       borderColor: colors.border,
       padding: spacing.md,
+    },
+    monthCard: { marginTop: spacing.md, borderColor: colors.primary },
+    monthCardRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+    monthCardCopy: { flex: 1, minWidth: 0 },
+    monthEyebrow: {
+      color: colors.primary,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+      letterSpacing: 1,
+    },
+    monthTitle: {
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.heavy,
+      marginTop: 2,
+    },
+    monthReward: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+    monthAction: {
+      color: colors.accent,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+      marginLeft: spacing.sm,
     },
     editorBand: {
       marginTop: spacing.md,
@@ -446,6 +577,7 @@ const makeStyles = (colors: ThemeColors) =>
     xpRow: { flexDirection: 'row', justifyContent: 'space-between' },
     xpLabel: { color: colors.textMuted, fontSize: fontSize.sm },
     xpValue: { color: colors.accent, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+    xpHint: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: spacing.xs },
     section: {
       color: colors.textMuted,
       fontSize: fontSize.sm,
@@ -457,13 +589,59 @@ const makeStyles = (colors: ThemeColors) =>
     },
     trackHint: { color: colors.textFaint, fontSize: fontSize.xs, marginBottom: spacing.md },
     upgradeCard: { borderColor: colors.accent, borderWidth: 1.5 },
-    upgradeTitle: { color: colors.accent, fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
-    upgradeSub: {
-      color: colors.textMuted,
-      fontSize: fontSize.sm,
-      marginTop: spacing.xs,
-      lineHeight: 18,
+    upgradeTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
+    upgradeTitle: { color: colors.accent, fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
+    infoButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    infoButtonText: {
+      color: colors.accent,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+      fontFamily: fonts.display,
+    },
+    subscriptionDisclosure: {
+      color: colors.text,
+      fontSize: fontSize.xs,
+      lineHeight: 17,
+      marginTop: spacing.sm,
+    },
+    passInfoPanel: {
+      marginTop: spacing.sm,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: spacing.sm,
+      gap: 3,
+    },
+    passInfoLine: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 17 },
+    passInfoFine: { color: colors.textFaint, fontSize: 10, marginTop: 2 },
+    policyLinks: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: spacing.md,
+      marginTop: spacing.md,
+    },
+    policyLink: { paddingVertical: spacing.xs },
+    policyLinkDisabled: { opacity: 0.55 },
+    policyLinkPressed: { opacity: 0.72 },
+    policyLinkText: {
+      color: colors.info,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.semibold,
+      textDecorationLine: 'underline',
+    },
+    policyLinkTextDisabled: { color: colors.textFaint, textDecorationLine: 'none' },
     flashRow: { marginTop: spacing.sm, alignItems: 'center' },
     flashText: { color: colors.success, fontSize: fontSize.md, fontWeight: fontWeight.bold },
     ladder: { gap: 2 },
@@ -492,16 +670,8 @@ const makeStyles = (colors: ThemeColors) =>
     tierBadgeReached: { backgroundColor: colors.primaryDark, borderColor: colors.primary },
     tierBadgeLocked: { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
     tierBadgeCurrent: { borderColor: colors.accent },
-    tierBadgeCheck: { color: colors.white, fontSize: fontSize.sm, fontWeight: fontWeight.black },
     tierBadgeNum: { fontSize: fontSize.xs, fontWeight: fontWeight.bold },
     tierContent: { flex: 1, gap: 3 },
-    milestoneLabel: {
-      color: colors.primary,
-      fontSize: 9,
-      fontWeight: fontWeight.bold,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-    },
     rewardRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -520,14 +690,10 @@ const makeStyles = (colors: ThemeColors) =>
     },
     rewardText: { color: colors.text, fontSize: fontSize.xs, flex: 1 },
     rewardTextClaimed: { textDecorationLine: 'line-through', color: colors.textFaint },
-    rewardDone: { color: colors.success, fontSize: fontSize.xs },
-    lockIcon: { fontSize: 10 },
-    footNote: {
+    rewardStatus: {
       color: colors.textFaint,
-      fontSize: fontSize.xs,
-      textAlign: 'center',
-      marginTop: spacing.xl,
-      lineHeight: 16,
-      paddingHorizontal: spacing.md,
+      fontSize: 9,
+      fontWeight: fontWeight.semibold,
+      textAlign: 'right',
     },
   });

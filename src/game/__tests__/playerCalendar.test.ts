@@ -1,6 +1,10 @@
 import { TEAM_BLUEPRINTS } from '../../content/teams';
 import { buildUserPlayer, createCareerSave } from '../createGame';
-import { currentPlayerCalendarEvent, resolvePlayerCalendarEvent } from '../playerCalendar';
+import {
+  buildPlayerSeasonCalendar,
+  currentPlayerCalendarEvent,
+  resolvePlayerCalendarEvent,
+} from '../playerCalendar';
 import { nextUserFixtureId, nextUserFixturesByCompetition } from '../season';
 import { generateYouthFixtures } from '../youthFixtures';
 
@@ -36,6 +40,46 @@ describe('player career calendar', () => {
     expect(fixtures.slice(4).every((fixture) => fixture.format === 'T20')).toBe(true);
     expect(fixtures[0].calendarMonth).toBe(9);
     expect(fixtures[4].calendarMonth).toBe(3);
+
+    const calendar = buildPlayerSeasonCalendar(save)!;
+    expect(calendar.events).toHaveLength(8);
+    expect(calendar.events.every((item) => item.kind === 'MATCH')).toBe(true);
+    expect(currentPlayerCalendarEvent(save)?.fixtureId).toBe(fixtures[0].id);
+  });
+
+  it('repairs a legacy youth cursor so removed filler cannot skip an unplayed match', () => {
+    const save = createCareerSave({
+      player: player(14),
+      teamId: TEAM_BLUEPRINTS[0].id,
+      difficulty: 'NORMAL',
+      seed: 93,
+    });
+    const firstFixtureId = generateYouthFixtures(save)[0];
+    const year = save.seasons[save.currentSeasonId!].year;
+    save.playerCalendar = {
+      year,
+      cursor: 1,
+      events: [
+        {
+          id: `player-calendar-${year}-school-exam-1`,
+          year,
+          month: 11,
+          week: 2,
+          kind: 'EXAM',
+          title: 'Mid-year examinations',
+          detail: 'Legacy filler event',
+          completed: true,
+        },
+      ],
+    };
+
+    const calendar = buildPlayerSeasonCalendar(save)!;
+
+    expect(calendar.cursor).toBe(0);
+    expect(currentPlayerCalendarEvent(save)).toMatchObject({
+      kind: 'MATCH',
+      fixtureId: firstFixtureId,
+    });
   });
 
   it('gives senior domestic players List A, First-Class and T20 fixtures', () => {

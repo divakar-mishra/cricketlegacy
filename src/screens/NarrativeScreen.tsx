@@ -99,10 +99,7 @@ export function NarrativeScreen({ navigation }: ScreenProps<'Narrative'>) {
         <ScreenHeader title="Your Story" onBack={() => navigation.goBack()} />
         <GlassSurface style={styles.bodyCard}>
           <Text style={styles.emptyTitle}>Nothing on your mind right now.</Text>
-          <Text style={styles.emptyBody}>
-            Play matches, hit milestones and live your career — the moments that define you will
-            land here.
-          </Text>
+          <Text style={styles.emptyBody}>No story moments yet.</Text>
         </GlassSurface>
       </Screen>
     );

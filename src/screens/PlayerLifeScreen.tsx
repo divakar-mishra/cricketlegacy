@@ -1,26 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
 import { moment } from '../audio';
-import { Button, Card, Icon, IconName, ProgressBar, Screen, ScreenHeader } from '../components';
+import {
+  Button,
+  Card,
+  Icon,
+  IconName,
+  ProgressBar,
+  Screen,
+  ScreenHeader,
+  SponsorLogo,
+  SponsorMark,
+} from '../components';
 import { AppText as Text } from '../components/AppText';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
-import type { PersonalCoachDiscipline, PlayerLifeMatch, SaveGame } from '../domain/types';
+import type { PlayerLifeMatch, SaveGame } from '../domain/types';
 import { getAchievement } from '../game/achievements';
 import { careerSelectionDecision } from '../game/career';
 import { careerLegacyScore } from '../game/careerEvents';
 import {
   ensurePlayerLifeState,
-  legacyTokenPrice,
-  PERSONAL_COACHES,
   PLAYER_BUSINESSES,
-  PLAYER_EQUIPMENT,
   PLAYER_LIFE_COSTS,
   PLAYER_PROPERTIES,
-  playerLifeYear,
-  sponsorNegotiationPreview,
 } from '../game/playerLife';
 import { nextUserFixtureId } from '../game/season';
+import { stockPortfolioTotals } from '../game/stockMarket';
+import {
+  premiumSponsorStoreUnlocked,
+  premiumSponsorWeeklyRate,
+  sponsorshipOffers,
+} from '../game/sponsorship';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import {
@@ -34,12 +45,11 @@ import {
   useThemedStyles,
 } from '../theme';
 
-type LifeTab = 'overview' | 'development' | 'finance' | 'media' | 'legacy';
+type LifeTab = 'overview' | 'finance' | 'media' | 'legacy';
 type PhoneApp = 'feed' | 'messages' | 'news' | 'wallet';
 
 const LIFE_TABS: readonly { id: LifeTab; label: string; icon: IconName }[] = [
   { id: 'overview', label: 'Overview', icon: 'speedometer-outline' },
-  { id: 'development', label: 'Development', icon: 'fitness-outline' },
   { id: 'finance', label: 'Finance', icon: 'wallet-outline' },
   { id: 'media', label: 'Media', icon: 'phone-portrait-outline' },
   { id: 'legacy', label: 'Legacy', icon: 'trophy-outline' },
@@ -75,30 +85,16 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
     save,
     transferPlayerBank,
     buyPlayerAsset,
-    tradeLegacyToken,
-    hirePersonalCoach,
-    buyPlayerEquipment,
-    bookPersonalPhysio,
-    buyPerformanceAnalysis,
-    negotiatePlayerSponsor,
+    acceptEarnedSponsorOffer,
     publishPlayerSocialPost,
-    prepareCaptainIssue,
-    resolveCaptainIssue,
     importCareerBackup,
   } = useCareer(
     useShallow((state) => ({
       save: state.save,
       transferPlayerBank: state.transferPlayerBank,
       buyPlayerAsset: state.buyPlayerAsset,
-      tradeLegacyToken: state.tradeLegacyToken,
-      hirePersonalCoach: state.hirePersonalCoach,
-      buyPlayerEquipment: state.buyPlayerEquipment,
-      bookPersonalPhysio: state.bookPersonalPhysio,
-      buyPerformanceAnalysis: state.buyPerformanceAnalysis,
-      negotiatePlayerSponsor: state.negotiatePlayerSponsor,
+      acceptEarnedSponsorOffer: state.acceptEarnedSponsorOffer,
       publishPlayerSocialPost: state.publishPlayerSocialPost,
-      prepareCaptainIssue: state.prepareCaptainIssue,
-      resolveCaptainIssue: state.resolveCaptainIssue,
       importCareerBackup: state.importCareerBackup,
     })),
   );
@@ -107,14 +103,9 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
   const [tab, setTab] = useState<LifeTab>(route.params?.initialTab ?? 'overview');
   const [phoneApp, setPhoneApp] = useState<PhoneApp>('feed');
   const [bankAmount, setBankAmount] = useState('');
-  const [tokenUnits, setTokenUnits] = useState('1');
   const [importOpen, setImportOpen] = useState(false);
   const [backupText, setBackupText] = useState('');
   const [importing, setImporting] = useState(false);
-
-  useEffect(() => {
-    if (save?.captainClub || save?.captainCountry) prepareCaptainIssue();
-  }, [prepareCaptainIssue, save?.captainClub, save?.captainCountry]);
 
   if (!save || save.mode !== 'career') {
     return (
@@ -138,10 +129,6 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
   const life = ensurePlayerLifeState(save);
   const fixtureId = nextUserFixtureId(save);
   const fixture = fixtureId ? save.fixtures[fixtureId] : undefined;
-  const activeAnalysis =
-    fixtureId && life.lastAnalysisReport?.fixtureId === fixtureId
-      ? life.lastAnalysisReport
-      : undefined;
   const selection = careerSelectionDecision(save, fixture?.format ?? 'T20', fixtureId);
   const selectionMargin = selection.userScore - selection.rivalScore;
   const selectionStatus = selection.selected
@@ -157,6 +144,20 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
   const financeUnlocked =
     player.age >= 18 &&
     (save.careerPathLevel === 'DOMESTIC' || save.careerPathLevel === 'INTERNATIONAL');
+  const earnedSponsorOffers = sponsorshipOffers(save);
+  const activeEarnedSponsor = save.sponsorship?.activeEarned;
+  const activeEndorsements = (save.sponsors ?? []).filter((sponsor) => sponsor.seasonsLeft > 0);
+  const permanentSponsorUnlocked = premiumSponsorStoreUnlocked(save);
+  const permanentSponsorRate = premiumSponsorWeeklyRate(save);
+  const sponsorSummary = [
+    activeEarnedSponsor?.brandName ?? activeEarnedSponsor?.label,
+    save.sponsorship?.premium ? 'Legacy Crown' : undefined,
+    activeEndorsements.length
+      ? `${activeEndorsements.length} off-shirt endorsement${activeEndorsements.length === 1 ? '' : 's'}`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(' + ');
 
   const resultAlert = (
     title: string,
@@ -184,6 +185,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
       premiumWallet: undefined,
       premiumInventory: undefined,
       firstPurchaseDone: false,
+      sponsorship: save.sponsorship ? { ...save.sponsorship, premium: undefined } : undefined,
     };
     try {
       await Share.share({
@@ -218,7 +220,6 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
         <View style={styles.selectionTop}>
           <View style={styles.flexText}>
             <Text style={styles.panelTitle}>{selectionStatus}</Text>
-            <Text style={styles.bodyText}>{selection.reason}</Text>
           </View>
           <Text style={[styles.selectionScore, { color: selectionColor }]}>
             {Math.round(selection.userScore)}
@@ -229,17 +230,37 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           color={selectionColor}
           style={styles.progress}
         />
-        <View style={styles.inlineStats}>
-          <InlineStat label="Your score" value={Math.round(selection.userScore).toString()} />
-          <InlineStat label="Role rival" value={Math.round(selection.rivalScore).toString()} />
-          <InlineStat
-            label="Coach trust"
-            value={Math.round(save.playerCareerResources?.coachTrust ?? 50).toString()}
-          />
-        </View>
       </Card>
 
-      {renderSectionTitle('Last 10 Matches', 'Your appearances only')}
+      {renderSectionTitle(
+        'Off-field Ventures',
+        financeUnlocked ? undefined : 'Portfolio unlocks at 18',
+      )}
+      <View style={styles.twoButtons}>
+        <Button
+          label="Stock Portfolio"
+          variant="secondary"
+          fullWidth={false}
+          style={styles.halfButton}
+          onPress={() => navigation.navigate('InvestmentScreen')}
+        />
+        <Button
+          label="My Cricket Academy"
+          variant="secondary"
+          fullWidth={false}
+          style={styles.halfButton}
+          onPress={() => navigation.navigate('AcademyManagement')}
+        />
+      </View>
+      <Button
+        label={financeUnlocked ? 'Finance' : 'Finance · Unlocks at 18'}
+        variant="ghost"
+        size="sm"
+        style={styles.sectionButton}
+        onPress={() => setTab('finance')}
+      />
+
+      {renderSectionTitle('Last 10 Matches')}
       <Card style={styles.tablePanel}>
         {life.recentMatches.length ? (
           life.recentMatches.map((match) => (
@@ -263,9 +284,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
             </View>
           ))
         ) : (
-          <Text style={styles.emptyPanelText}>
-            Your next official appearance will begin this rolling report.
-          </Text>
+          <Text style={styles.emptyPanelText}>No appearances yet.</Text>
         )}
       </Card>
 
@@ -277,160 +296,30 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           value={`${save.teams[save.userTeamId ?? '']?.name ?? 'No club'} | ${player.contract?.yearsLeft ?? 0} year(s)`}
         />
         <SummaryRow
+          icon="flash-outline"
+          label="T20 franchise"
+          value={`${save.teams[save.franchiseTeamId ?? save.userTeamId ?? '']?.name ?? 'No franchise'} | ${save.franchiseContract ? `${save.franchiseContract.yearsLeft} year(s)` : 'affiliated'}`}
+        />
+        <SummaryRow
           icon="flag-outline"
           label="National"
           value={
             save.capped
-              ? `${save.userCaps ?? 0} caps | format selection remains independent`
+              ? `${save.userCaps ?? 0} caps`
               : `${save.nationalRep ?? 0}/100 national reputation`
           }
         />
         <SummaryRow
           icon="megaphone-outline"
           label="Sponsors"
-          value={
-            (save.sponsors ?? []).length
-              ? (save.sponsors ?? []).map((sponsor) => sponsor.brand).join(', ')
-              : 'No active endorsement'
-          }
+          value={sponsorSummary || 'No active endorsement'}
           last
         />
       </Card>
     </>
   );
 
-  const renderDevelopment = () => (
-    <>
-      {renderSectionTitle('Personal Support', 'Paid services have seasonal limits')}
-      <View style={styles.actionGrid}>
-        <ServiceTile
-          icon="medkit-outline"
-          title="Personal Physio"
-          detail={`+25 condition, -1 injury match | ${life.physioVisitsThisSeason}/${PLAYER_LIFE_COSTS.maxPhysioVisits} used`}
-          price={PLAYER_LIFE_COSTS.physio}
-          disabled={
-            life.physioVisitsThisSeason >= PLAYER_LIFE_COSTS.maxPhysioVisits ||
-            (!player.injury && (save.playerCareerResources?.playerCondition ?? 100) >= 95)
-          }
-          onPress={() => resultAlert('Physio complete', bookPersonalPhysio())}
-        />
-        <ServiceTile
-          icon="analytics-outline"
-          title="Performance Analyst"
-          detail={
-            fixture
-              ? activeAnalysis
-                ? `${activeAnalysis.opponentName} report ready`
-                : `Full ${fixture.format} matchup report | +3 confidence, +2 trust`
-              : 'No upcoming match to analyse'
-          }
-          price={PLAYER_LIFE_COSTS.analyst}
-          disabled={!fixtureId || life.analysedFixtureIds.includes(fixtureId)}
-          onPress={() => resultAlert('Report ready', buyPerformanceAnalysis())}
-        />
-      </View>
-
-      {activeAnalysis ? (
-        <Card style={styles.analysisReport}>
-          <View style={styles.analysisHeader}>
-            <View style={styles.analysisIcon}>
-              <Icon name="analytics" size={22} color={colors.accent} />
-            </View>
-            <View style={styles.flexText}>
-              <Text style={styles.panelTitle}>
-                {activeAnalysis.opponentName} | {activeAnalysis.format} report
-              </Text>
-              <Text style={styles.analysisMeta}>Prepared for the next fixture only</Text>
-            </View>
-          </View>
-          <ReportLine label="Primary threat" value={activeAnalysis.threatName} />
-          <ReportLine label="Threat profile" value={activeAnalysis.threatDetail} />
-          <ReportLine label="Weakness to target" value={activeAnalysis.weakness} />
-          <ReportLine label="Match plan" value={activeAnalysis.matchAdvice} />
-          <View style={styles.trainingRecommendation}>
-            <Text style={styles.trainingRecommendationTitle}>
-              Recommended training: {formatCompetition(activeAnalysis.recommendedTrainingGroup)}
-            </Text>
-            <Text style={styles.trainingRecommendationText}>{activeAnalysis.trainingReason}</Text>
-            <Button
-              label="Open Training"
-              size="sm"
-              fullWidth={false}
-              style={styles.reportButton}
-              onPress={() => navigation.navigate('Training')}
-            />
-          </View>
-        </Card>
-      ) : null}
-
-      {renderSectionTitle('Personal Coaches', 'One-season specialist contracts')}
-      <Card style={styles.listPanel}>
-        {PERSONAL_COACHES.map((coach, index) => {
-          const active = (life.personalCoaches[coach.discipline]?.seasonsRemaining ?? 0) > 0;
-          return (
-            <ActionRow
-              key={coach.discipline}
-              icon={
-                coach.discipline === 'BATTING'
-                  ? 'baseball-outline'
-                  : coach.discipline === 'BOWLING'
-                    ? 'disc-outline'
-                    : 'sparkles-outline'
-              }
-              title={coach.name}
-              detail={coach.specialty}
-              action={active ? 'Active' : coach.cost.toLocaleString()}
-              disabled={active || save.wallet.coins < coach.cost}
-              last={index === PERSONAL_COACHES.length - 1}
-              onPress={() =>
-                resultAlert(
-                  'Coach hired',
-                  hirePersonalCoach(coach.discipline as PersonalCoachDiscipline),
-                )
-              }
-            />
-          );
-        })}
-      </Card>
-
-      {renderSectionTitle('Equipment', 'Small permanent boosts, applied once')}
-      <Card style={styles.listPanel}>
-        {PLAYER_EQUIPMENT.map((equipment, index) => {
-          const owned = life.equipmentIds.includes(equipment.id);
-          return (
-            <ActionRow
-              key={equipment.id}
-              icon={
-                equipment.id === 'balanced-bat'
-                  ? 'baseball-outline'
-                  : equipment.id === 'keeper-gloves'
-                    ? 'hand-left-outline'
-                    : equipment.id === 'performance-shoes'
-                      ? 'footsteps-outline'
-                      : 'shield-checkmark-outline'
-              }
-              title={equipment.name}
-              detail={equipment.description}
-              action={owned ? 'Owned' : equipment.cost.toLocaleString()}
-              disabled={owned || save.wallet.coins < equipment.cost}
-              last={index === PLAYER_EQUIPMENT.length - 1}
-              onPress={() => resultAlert('Equipment ready', buyPlayerEquipment(equipment.id))}
-            />
-          );
-        })}
-      </Card>
-      <Button
-        label="Open Training"
-        variant="secondary"
-        style={styles.sectionButton}
-        onPress={() => navigation.navigate('Training')}
-      />
-    </>
-  );
-
   const renderFinance = () => {
-    const tokenPrice = legacyTokenPrice(save);
-    const tokenValue = tokenPrice * life.legacyTokenUnits;
     const income = life.lastSeasonIncome;
     return (
       <>
@@ -440,14 +329,10 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
               <Icon name="lock-closed-outline" size={20} color={colors.warning} />
               <Text style={styles.panelTitle}>Finance unlocks at 18</Text>
             </View>
-            <Text style={styles.bodyText}>
-              Reach senior domestic cricket before opening bank, property, business and exchange
-              accounts.
-            </Text>
           </Card>
         ) : null}
 
-        {renderSectionTitle('Personal Bank', '2% interest at season end')}
+        {renderSectionTitle('Personal Bank')}
         <Card style={styles.panel}>
           <View style={styles.balanceBand}>
             <BalanceValue label="Wallet" value={save.wallet.coins} />
@@ -496,14 +381,14 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           </View>
         </Card>
 
-        {renderSectionTitle('Property', 'Income is deposited into the bank')}
+        {renderSectionTitle('Property')}
         <Card style={styles.listPanel}>
           {PLAYER_PROPERTIES.map((asset, index) => (
             <ActionRow
               key={asset.id}
               icon="home-outline"
               title={asset.name}
-              detail={`${asset.description} +${asset.seasonalIncome.toLocaleString()}/season`}
+              detail={`+${asset.seasonalIncome.toLocaleString()} / season`}
               action={life.propertyIds.includes(asset.id) ? 'Owned' : asset.cost.toLocaleString()}
               disabled={
                 !financeUnlocked ||
@@ -518,14 +403,14 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           ))}
         </Card>
 
-        {renderSectionTitle('Businesses', 'Separate ventures with seasonal profit')}
+        {renderSectionTitle('Businesses')}
         <Card style={styles.listPanel}>
           {PLAYER_BUSINESSES.map((asset, index) => (
             <ActionRow
               key={asset.id}
               icon="briefcase-outline"
               title={asset.name}
-              detail={`${asset.description} +${asset.seasonalIncome.toLocaleString()}/season`}
+              detail={`+${asset.seasonalIncome.toLocaleString()} / season`}
               action={life.businessIds.includes(asset.id) ? 'Owned' : asset.cost.toLocaleString()}
               disabled={
                 !financeUnlocked ||
@@ -540,67 +425,6 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           ))}
         </Card>
 
-        {renderSectionTitle('Legacy Exchange', 'Fictional in-game asset, no real-world value')}
-        <Card style={styles.panel}>
-          <View style={styles.exchangeTop}>
-            <View>
-              <Text style={styles.panelTitle}>{tokenPrice.toLocaleString()} coins per token</Text>
-              <Text style={styles.bodyText}>
-                Holding {life.legacyTokenUnits} | Value {tokenValue.toLocaleString()} | Cost basis{' '}
-                {life.legacyTokenCostBasis.toLocaleString()}
-              </Text>
-            </View>
-          </View>
-          <TextInput
-            style={styles.input}
-            value={tokenUnits}
-            onChangeText={setTokenUnits}
-            keyboardType="number-pad"
-            placeholder="Units"
-            placeholderTextColor={colors.textFaint}
-            editable={financeUnlocked}
-          />
-          <View style={styles.twoButtons}>
-            <Button
-              label="Buy"
-              size="sm"
-              fullWidth={false}
-              style={styles.halfButton}
-              disabled={!financeUnlocked}
-              onPress={() =>
-                resultAlert('Trade complete', tradeLegacyToken('BUY', parseAmount(tokenUnits)))
-              }
-            />
-            <Button
-              label="Sell"
-              size="sm"
-              variant="secondary"
-              fullWidth={false}
-              style={styles.halfButton}
-              disabled={!financeUnlocked || life.legacyTokenUnits === 0}
-              onPress={() =>
-                resultAlert('Trade complete', tradeLegacyToken('SELL', parseAmount(tokenUnits)))
-              }
-            />
-          </View>
-        </Card>
-
-        <View style={styles.twoButtons}>
-          <Button
-            label="Stock Portfolio"
-            variant="secondary"
-            fullWidth={false}
-            style={styles.halfButton}
-            onPress={() => navigation.navigate('InvestmentScreen')}
-          />
-          <Button
-            label="Cricket Academy"
-            variant="secondary"
-            fullWidth={false}
-            style={styles.halfButton}
-            onPress={() => navigation.navigate('AcademyManagement')}
-          />
-        </View>
       </>
     );
   };
@@ -619,7 +443,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           </View>
         ))
       ) : (
-        <Text style={styles.phoneEmpty}>Match milestones and your posts will appear here.</Text>
+        <Text style={styles.phoneEmpty}>No posts yet.</Text>
       );
     }
     if (phoneApp === 'messages') {
@@ -658,9 +482,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
             </View>
           ))
       ) : (
-        <Text style={styles.phoneEmpty}>
-          Your first newspaper clipping has not been published yet.
-        </Text>
+        <Text style={styles.phoneEmpty}>No clippings yet.</Text>
       );
     }
     return (
@@ -670,7 +492,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
         <SummaryRow
           icon="trending-up-outline"
           label="Stocks"
-          value={`${save.stockInvestment?.currentValue ?? 0} coins`}
+          value={`${stockPortfolioTotals(save.stockPortfolio).currentValue} coins`}
         />
         <SummaryRow
           icon="home-outline"
@@ -727,12 +549,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
         <View style={styles.phoneContent}>{renderPhoneContent()}</View>
       </View>
 
-      {renderSectionTitle('Player Press Room', 'Three meaningful posts per season')}
-      <Text style={styles.mediaGuidance}>
-        Humble gives the lowest reach, Team first gives balanced reach, and Confident gives the
-        highest reach plus the largest Brand gain. Every choice consumes one of the three seasonal
-        posts.
-      </Text>
+      {renderSectionTitle('Player Press Room')}
       <View style={styles.threeButtons}>
         <Button
           label="Humble"
@@ -763,40 +580,98 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
         />
       </View>
 
-      {renderSectionTitle('Sponsor Negotiation', 'One completed negotiation per season')}
+      {renderSectionTitle('Kit Partnership')}
       <Card style={styles.panel}>
-        <Text style={styles.bodyText}>
-          Current slots: {(save.sponsors ?? []).length}/2. A safer ask pays less; a bold ask can be
-          rejected.
-        </Text>
-        <View style={styles.negotiationGrid}>
-          {(['SAFE', 'BALANCED', 'BOLD'] as const).map((approach) => {
-            const preview = sponsorNegotiationPreview(save, approach);
-            const disabled =
-              life.sponsorNegotiatedYear === playerLifeYear(save) ||
-              (save.sponsors ?? []).length >= 2;
-            return (
+        {activeEarnedSponsor ? (
+          <View>
+            <SponsorMark
+              name={activeEarnedSponsor.brandName ?? activeEarnedSponsor.label}
+              brandId={activeEarnedSponsor.brandId}
+              compact
+            />
+            <Text style={styles.negotiationTitle}>
+              {activeEarnedSponsor.brandName ?? activeEarnedSponsor.label}
+            </Text>
+            <Text style={styles.negotiationPayout}>
+              {activeEarnedSponsor.appearancePayout.toLocaleString()} coins per eligible appearance
+            </Text>
+            <Text style={styles.negotiationMeta}>
+              {activeEarnedSponsor.label} · {activeEarnedSponsor.paidFixtures}/
+              {activeEarnedSponsor.fixtureQuota} paid · Wallet Coins
+            </Text>
+          </View>
+        ) : earnedSponsorOffers.length ? (
+          <View style={styles.negotiationGrid}>
+            {earnedSponsorOffers.map((offer) => (
               <Pressable
-                key={approach}
+                key={offer.id}
                 accessibilityRole="button"
-                accessibilityState={{ disabled }}
-                disabled={disabled}
-                style={[styles.negotiationOption, disabled && styles.disabledTile]}
-                onPress={() => resultAlert('Sponsor signed', negotiatePlayerSponsor(approach))}
+                style={styles.negotiationOption}
+                onPress={() => {
+                  const result = acceptEarnedSponsorOffer(offer.id);
+                  resultAlert('Sponsor signed', {
+                    ...result,
+                    detail: result.ok
+                      ? `${offer.signingBonus.toLocaleString()} coins now · ${offer.appearancePayout.toLocaleString()} per eligible appearance · ${offer.fixtureQuota} total appearances.`
+                      : undefined,
+                  });
+                }}
               >
-                <Text style={styles.negotiationTitle}>{approach}</Text>
-                <Text style={styles.negotiationChance}>{preview.chance}% acceptance</Text>
+                <SponsorLogo brand={offer} variant="badge" size={30} />
+                <Text style={styles.negotiationTitle}>{offer.brandName ?? offer.label}</Text>
                 <Text style={styles.negotiationPayout}>
-                  {preview.signingBonus.toLocaleString()} now
+                  {offer.appearancePayout.toLocaleString()} / appearance
                 </Text>
                 <Text style={styles.negotiationMeta}>
-                  +{preview.perMatchCoins}/match | {preview.seasons} seasons | Form{' '}
-                  {preview.minForm}+
+                  {offer.signingBonus.toLocaleString()} signing · {offer.fixtureQuota} total
                 </Text>
               </Pressable>
-            );
-          })}
-        </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.bodyText}>
+            {save.sponsorship?.seniorDomesticDebutFixtureId
+              ? 'New offers arrive next season.'
+              : 'Unlocks after your first selected-XI senior domestic appearance.'}
+          </Text>
+        )}
+        {save.sponsorship?.premium ? (
+          <View style={styles.premiumSponsorSlot}>
+            <SponsorMark name="Legacy Crown" brandId="legacy_crown" compact />
+            <Text style={styles.negotiationTitle}>Permanent sponsor</Text>
+            <Text style={styles.negotiationPayout}>
+              {permanentSponsorRate.toLocaleString()} coins / qualifying week
+            </Text>
+            <Text style={styles.negotiationMeta}>Extra slot · This save only</Text>
+          </View>
+        ) : permanentSponsorUnlocked ? (
+          <Button
+            label="View permanent sponsor"
+            size="sm"
+            variant="secondary"
+            style={styles.premiumSponsorButton}
+            onPress={() => navigation.navigate('Purchase')}
+          />
+        ) : null}
+        {activeEndorsements.length ? (
+          <View style={styles.endorsementSection}>
+            <Text style={styles.endorsementHeading}>Off-shirt endorsements</Text>
+            {activeEndorsements.map((sponsor) => (
+              <View key={sponsor.id} style={styles.endorsementRow}>
+                <View style={styles.flexText}>
+                  <Text style={styles.negotiationTitle}>{sponsor.brand}</Text>
+                  <Text style={styles.negotiationMeta}>
+                    {sponsor.tier.toLowerCase()} campaign · {sponsor.seasonsLeft} season
+                    {sponsor.seasonsLeft === 1 ? '' : 's'} left
+                  </Text>
+                </View>
+                <Text style={styles.endorsementPayout}>
+                  +{sponsor.perMatchCoins.toLocaleString()} / match
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </Card>
       <Button
         label="Open Full Inbox"
@@ -815,10 +690,9 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
       .filter((achievement): achievement is NonNullable<typeof achievement> =>
         Boolean(achievement),
       );
-    const issue = life.captainIssue;
     return (
       <>
-        {renderSectionTitle('Legacy Museum', `${legacy.score}/100 legacy score`)}
+        {renderSectionTitle('Legacy Museum')}
         <Card style={styles.museumPanel}>
           <View style={styles.museumHeader}>
             <View style={styles.museumIcon}>
@@ -844,9 +718,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
                 </View>
               ))
             ) : (
-              <Text style={styles.phoneEmpty}>
-                Win a competition to place the first trophy in the museum.
-              </Text>
+              <Text style={styles.phoneEmpty}>No trophies yet.</Text>
             )}
           </View>
           {unlocked.length ? (
@@ -861,62 +733,9 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           ) : null}
         </Card>
 
-        {save.captainClub || save.captainCountry ? (
-          <>
-            {renderSectionTitle('Captain Control Centre')}
-            <Card style={styles.panel}>
-              {issue && !issue.resolved ? (
-                <>
-                  <Text style={styles.panelTitle}>{issue.title}</Text>
-                  <Text style={styles.bodyText}>{issue.detail}</Text>
-                  <View style={styles.threeButtons}>
-                    <Button
-                      label="Support"
-                      size="sm"
-                      variant="secondary"
-                      fullWidth={false}
-                      style={styles.thirdButton}
-                      onPress={() =>
-                        resultAlert('Captaincy outcome', resolveCaptainIssue('SUPPORT'))
-                      }
-                    />
-                    <Button
-                      label="Mediate"
-                      size="sm"
-                      variant="secondary"
-                      fullWidth={false}
-                      style={styles.thirdButton}
-                      onPress={() =>
-                        resultAlert('Captaincy outcome', resolveCaptainIssue('MEDIATE'))
-                      }
-                    />
-                    <Button
-                      label="Discipline"
-                      size="sm"
-                      variant="secondary"
-                      fullWidth={false}
-                      style={styles.thirdButton}
-                      onPress={() =>
-                        resultAlert('Captaincy outcome', resolveCaptainIssue('DISCIPLINE'))
-                      }
-                    />
-                  </View>
-                </>
-              ) : (
-                <Text style={styles.emptyPanelText}>
-                  The dressing room is settled. A new leadership issue can emerge next season.
-                </Text>
-              )}
-            </Card>
-          </>
-        ) : null}
-
-        {renderSectionTitle('Career Transfer', 'Purchases are restored from the store account')}
+        {renderSectionTitle('Career Transfer')}
         <Card style={styles.panel}>
-          <Text style={styles.bodyText}>
-            Export this career through the system share sheet, or paste a Cricket Legacy transfer
-            code to replace this slot. Imported files cannot grant store entitlements.
-          </Text>
+          <Text style={styles.bodyText}>Export or replace this save. Purchases never transfer.</Text>
           <View style={styles.twoButtons}>
             <Button
               label="Export"
@@ -976,9 +795,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
   };
 
   const page =
-    tab === 'development'
-      ? renderDevelopment()
-      : tab === 'finance'
+    tab === 'finance'
         ? renderFinance()
         : tab === 'media'
           ? renderMedia()
@@ -988,11 +805,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
 
   return (
     <Screen scroll>
-      <ScreenHeader
-        title="Player Life"
-        subtitle="Career, support, money, media and legacy"
-        onBack={() => navigation.goBack()}
-      />
+      <ScreenHeader title="Player Life" onBack={() => navigation.goBack()} />
       <View style={styles.metricBand}>
         <HeaderMetric label="Followers" value={life.followers.toLocaleString()} />
         <HeaderMetric label="Wallet" value={save.wallet.coins.toLocaleString()} />
@@ -1040,16 +853,6 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
       >
         {value}
       </Text>
-    </View>
-  );
-}
-
-function InlineStat({ label, value }: { label: string; value: string }) {
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <View style={styles.inlineStat}>
-      <Text style={styles.inlineValue}>{value}</Text>
-      <Text style={styles.inlineLabel}>{label}</Text>
     </View>
   );
 }
@@ -1145,50 +948,6 @@ function ActionRow({
           {action}
         </Text>
       </Pressable>
-    </View>
-  );
-}
-
-function ReportLine({ label, value }: { label: string; value: string }) {
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <View style={styles.reportLine}>
-      <Text style={styles.reportLabel}>{label}</Text>
-      <Text style={styles.reportValue}>{value}</Text>
-    </View>
-  );
-}
-
-function ServiceTile({
-  icon,
-  title,
-  detail,
-  price,
-  disabled,
-  onPress,
-}: {
-  icon: IconName;
-  title: string;
-  detail: string;
-  price: number;
-  disabled?: boolean;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <View style={[styles.serviceTile, disabled && styles.disabledTile]}>
-      <Icon name={icon} size={24} color={colors.primaryLight} />
-      <Text style={styles.serviceTitle}>{title}</Text>
-      <Text style={styles.serviceDetail}>{detail}</Text>
-      <Button
-        label={disabled ? 'Unavailable' : `${price.toLocaleString()} coins`}
-        size="sm"
-        variant="secondary"
-        disabled={disabled}
-        style={styles.serviceButton}
-        onPress={onPress}
-      />
     </View>
   );
 }
@@ -1754,6 +1513,38 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: 3,
       textAlign: 'center',
       letterSpacing: 0,
+    },
+    premiumSponsorSlot: {
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
+    },
+    premiumSponsorButton: { marginTop: spacing.md },
+    endorsementSection: {
+      marginTop: spacing.lg,
+      paddingTop: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+      gap: spacing.sm,
+    },
+    endorsementHeading: {
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+    },
+    endorsementRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      paddingVertical: spacing.xs,
+    },
+    endorsementPayout: {
+      color: colors.success,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.semibold,
     },
     mediaGuidance: {
       color: colors.textMuted,

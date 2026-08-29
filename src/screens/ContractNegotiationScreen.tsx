@@ -2,7 +2,7 @@
  * ContractNegotiationScreen — player career mode.
  *
  * Replaces the one-tap "Sign" button with a real negotiation flow:
- *   1. See the club's offer (weekly wage, years, bonus)
+ *   1. See the club's seasonal salary, years and signing bonus
  *   2. Counter-demand: slide to your wage demand (1.0× – 1.6×), pick years
  *   3. Club accepts, or sends a counter — one more round of counters allowed
  *   4. Hold-out option: form drops but the offer improves
@@ -10,9 +10,9 @@
  */
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
-import { Button, Card, ProgressBar, Screen, ScreenHeader, WalletBar } from '../components';
+import { Button, Card, ProgressBar, Screen, ScreenHeader } from '../components';
 import { AppText as Text } from '../components/AppText';
 import {
   ContractDemand,
@@ -20,7 +20,6 @@ import {
   ContractOffer,
   holdOut,
   negotiateContract,
-  weeklyWage,
 } from '../game/career';
 import { storyRng } from '../game/careerEvents';
 import { ScreenProps } from '../navigation';
@@ -39,10 +38,8 @@ const YEARS_OPTIONS = [1, 2, 3, 4, 5] as const;
 
 type Stage = 'VIEW_OFFER' | 'COUNTER' | 'RESULT' | 'SIGNED';
 
-function fmtWeekly(annual: number): string {
-  const w = weeklyWage(annual);
-  if (w >= 1000) return `₹${Math.round(w / 1000)}k/week`;
-  return `₹${w}/week`;
+function fmtSeasonSalary(value: number): string {
+  return `${Math.round(value).toLocaleString()} coins/season`;
 }
 function fmtCoins(n: number): string {
   return n.toLocaleString() + ' coins';
@@ -73,7 +70,6 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
     );
   }
 
-  const user = save.players[save.userPlayerId];
   const team = save.userTeamId ? save.teams[save.userTeamId] : undefined;
   const baseOffer = clubOffer ?? contractOffer(save);
   const displayOffer = heldImprovedOffer ?? counterOffer ?? baseOffer;
@@ -100,7 +96,7 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
   const doHoldOut = () => {
     Alert.alert(
       'Hold Out?',
-      'Your form will drop by 3 points while negotiations drag on, but the club should improve their offer.',
+      'Form -3. The club may improve its offer.',
       [
         { text: 'Stay patient', style: 'cancel' },
         {
@@ -109,9 +105,7 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
             const improved = holdOut(save);
             setHeldImprovedOffer(improved);
             setHeld(true);
-            setResultText(
-              'You held your ground. The club came back with a slightly improved offer.',
-            );
+            setResultText('The club returned with a better offer.');
             setClubOffer(improved);
             setCounterOffer(null);
             setStage('RESULT');
@@ -142,16 +136,13 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
             <Text style={styles.signedTitle}>✅ Deal Done</Text>
             <Text style={styles.signedTeam}>{team?.name ?? 'Your club'}</Text>
             <View style={styles.dealGrid}>
-              <DealItem label="Weekly wage" value={fmtWeekly(signed.wage)} highlight />
+              <DealItem label="Season salary" value={fmtSeasonSalary(signed.wage)} highlight />
               <DealItem
                 label="Contract length"
                 value={`${signed.years} year${signed.years !== 1 ? 's' : ''}`}
               />
               <DealItem label="Signing bonus" value={fmtCoins(signed.signingBonus)} />
             </View>
-            <Text style={[styles.note, { marginTop: spacing.md }]}>
-              Your new deal starts immediately. Perform well to secure an even better renewal.
-            </Text>
           </Card>
         </Animated.View>
         <Button
@@ -188,7 +179,7 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
         <Animated.View entering={FadeInDown.duration(300).delay(100)}>
           <Card>
             <View style={styles.dealGrid}>
-              <DealItem label="Weekly wage" value={fmtWeekly(toSign.wage)} highlight />
+              <DealItem label="Season salary" value={fmtSeasonSalary(toSign.wage)} highlight />
               <DealItem
                 label="Contract length"
                 value={`${toSign.years} year${toSign.years !== 1 ? 's' : ''}`}
@@ -243,7 +234,7 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
         <Animated.View entering={FadeInDown.duration(300)}>
           <Card style={styles.demandCard}>
             <Text style={styles.demandLabel}>WAGE DEMAND</Text>
-            <Text style={styles.demandValue}>{fmtWeekly(demandedWage)}</Text>
+            <Text style={styles.demandValue}>{fmtSeasonSalary(demandedWage)}</Text>
             <Text style={styles.demandMult}>
               {demandMult === 1.0
                 ? 'Accepting the offer as-is'
@@ -346,75 +337,38 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
         onBack={() => navigation.goBack()}
       />
 
-      <WalletBar wallet={save.wallet} />
-
       <Animated.View entering={FadeInDown.duration(320)}>
         <Card style={[styles.offerCard, { borderColor: colors.accent }]}>
           <Text style={styles.offerFrom}>📝 {team?.name ?? 'Club'} Offer</Text>
           <View style={styles.dealGrid}>
-            <DealItem label="Weekly wage" value={fmtWeekly(baseOffer.wage)} highlight />
-            <DealItem label="Annual salary" value={`₹${Math.round(baseOffer.wage / 1000)}k/yr`} />
+            <DealItem label="Season salary" value={fmtSeasonSalary(baseOffer.wage)} highlight />
             <DealItem
               label="Contract length"
               value={`${baseOffer.years} year${baseOffer.years !== 1 ? 's' : ''}`}
             />
             <DealItem label="Signing bonus" value={fmtCoins(baseOffer.signingBonus)} />
           </View>
-          <Text style={styles.note}>
-            Your overall is {user?.overall}/100
-            {(save.userCaps ?? 0) > 0 ? ` · ${save.userCaps} international caps` : ''}.
-            {baseOffer.wage > 50000
-              ? ' The club values you highly.'
-              : ' There is room to negotiate upward.'}
-          </Text>
         </Card>
       </Animated.View>
 
-      <View style={[styles.boostBand, contractBoostStored > 0 && styles.boostBandActive]}>
-        <View style={styles.boostCopy}>
-          <Text style={styles.boostTitle}>
-            {contractBoostStored > 0 ? 'Renewal boost ready' : 'Want stronger terms?'}
-          </Text>
-          <Text style={styles.boostText}>
-            {contractBoostStored > 0
-              ? '+25% wage and signing bonus will apply when you sign.'
-              : 'The optional renewal boost adds 25% to your next signed wage and bonus.'}
-          </Text>
-        </View>
-        {contractBoostStored === 0 ? (
-          <Button
-            label="View boost"
-            variant="secondary"
-            size="sm"
-            fullWidth={false}
-            onPress={() => navigation.navigate('Purchase')}
-          />
-        ) : null}
-      </View>
+      {contractBoostStored > 0 ? (
+        <Text style={styles.boostReady}>Renewal boost ready · applies when signed</Text>
+      ) : null}
 
       <View style={styles.actions}>
-        <Button label="✅ Sign this deal" variant="gold" onPress={() => doSign(baseOffer)} />
-        <Animated.View entering={FadeInRight.duration(300).delay(150)}>
-          <Button
-            label="💬 Negotiate for more"
-            variant="primary"
-            style={{ marginTop: spacing.sm }}
-            onPress={() => {
-              setDemandMult(1.1);
-              setDemandYears(baseOffer.years);
-              setStage('COUNTER');
-            }}
-          />
-        </Animated.View>
+        <Button label="Sign deal" variant="gold" onPress={() => doSign(baseOffer)} />
         <Button
-          label="⏳ Hold out — wait for better"
+          label="Negotiate terms"
           variant="secondary"
           style={{ marginTop: spacing.sm }}
-          onPress={doHoldOut}
-          disabled={held}
+          onPress={() => {
+            setDemandMult(1.1);
+            setDemandYears(baseOffer.years);
+            setStage('COUNTER');
+          }}
         />
         <Button
-          label="✗ Reject & test the market"
+          label="Decline for now"
           variant="ghost"
           style={{ marginTop: spacing.sm }}
           onPress={() => navigation.goBack()}
@@ -482,23 +436,13 @@ const makeStyles = (colors: ThemeColors) =>
       marginBottom: spacing.md,
     },
     dealGrid: { gap: spacing.sm },
-    boostBand: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      gap: spacing.sm,
+    boostReady: {
+      color: colors.accent,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
       marginHorizontal: spacing.lg,
-      marginTop: spacing.md,
-      padding: spacing.md,
-      borderRadius: radius.sm,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surfaceAlt,
+      marginTop: spacing.sm,
     },
-    boostBandActive: { borderColor: colors.accent },
-    boostCopy: { flex: 1, minWidth: 180 },
-    boostTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
-    boostText: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 17, marginTop: 2 },
     actions: { marginHorizontal: spacing.lg, marginTop: spacing.xl, marginBottom: spacing.xl },
     signedCard: { marginHorizontal: spacing.lg, marginTop: spacing.lg, alignItems: 'center' },
     signedTitle: {

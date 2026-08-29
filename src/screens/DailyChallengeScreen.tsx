@@ -116,11 +116,7 @@ export function DailyChallengeScreen({ navigation }: ScreenProps<'DailyChallenge
 
   return (
     <Screen scroll gradient={gradients.pitch}>
-      <ScreenHeader
-        title="Daily Challenge"
-        subtitle="Same challenge, every player, today"
-        onBack={() => navigation.goBack()}
-      />
+      <ScreenHeader title="Daily Challenge" onBack={() => navigation.goBack()} />
       {save && <WalletBar wallet={save.wallet} />}
 
       {/* Header Banner */}
@@ -147,8 +143,6 @@ export function DailyChallengeScreen({ navigation }: ScreenProps<'DailyChallenge
       <Animated.View entering={FadeInDown.duration(380).delay(80)}>
         <Card style={[styles.descCard, { borderColor: tierMeta.color + '44' }]}>
           <Text style={styles.descTitle}>Your Mission</Text>
-          <Text style={styles.descText}>{challenge.description}</Text>
-
           <View style={styles.conditionsRow}>
             <View style={styles.condPill}>
               <Text style={styles.condIcon}>🏏</Text>
@@ -171,7 +165,7 @@ export function DailyChallengeScreen({ navigation }: ScreenProps<'DailyChallenge
       {/* Reward card */}
       <Animated.View entering={FadeInDown.duration(380).delay(160)}>
         <Card style={styles.rewardCard}>
-          <Text style={styles.rewardTitle}>🎁 Reward on Completion</Text>
+          <Text style={styles.rewardTitle}>🎁 Reward</Text>
           <View style={styles.rewardRow}>
             {challenge.rewardCoins > 0 && (
               <View style={styles.rewardItem}>
@@ -209,10 +203,7 @@ export function DailyChallengeScreen({ navigation }: ScreenProps<'DailyChallenge
             <Text style={[styles.completedTitle, { color: tierMeta.color }]}>
               Challenge Complete!
             </Text>
-            <Text style={styles.completedText}>
-              +{challenge.rewardCoins} coins
-              {challenge.rewardGems > 0 ? ` · +${challenge.rewardGems} 💎` : ''} claimed.
-            </Text>
+            <Text style={styles.completedText}>Reward claimed.</Text>
             <Button
               label="📤 Share Your Score"
               variant="secondary"
@@ -229,24 +220,8 @@ export function DailyChallengeScreen({ navigation }: ScreenProps<'DailyChallenge
             style={{ marginTop: spacing.md }}
             onPress={onPlay}
           />
-          <View style={styles.claimInfo}>
-            <Text style={styles.claimInfoTitle}>Reward locked</Text>
-            <Text style={styles.claimInfoText}>
-              Complete the challenge in a match before a reward can be claimed.
-            </Text>
-          </View>
         </Animated.View>
       )}
-
-      {/* Community share prompt */}
-      <Animated.View entering={FadeInDown.duration(380).delay(320)}>
-        <Card style={styles.lbTeaser}>
-          <Text style={styles.lbTeaserTitle}>🌍 Put your score out there</Text>
-          <Text style={styles.lbTeaserText}>
-            Challenge your rivals — share your result with #CricketLegacy and see who can beat it.
-          </Text>
-        </Card>
-      </Animated.View>
     </Screen>
   );
 }
@@ -290,12 +265,6 @@ const makeStyles = (colors: ThemeColors) =>
       fontSize: fontSize.md,
       fontWeight: fontWeight.heavy,
       marginBottom: spacing.sm,
-    },
-    descText: {
-      color: colors.textMuted,
-      fontSize: fontSize.sm,
-      lineHeight: 20,
-      marginBottom: spacing.md,
     },
     conditionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     condPill: {
@@ -358,12 +327,10 @@ const makeStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surfaceAlt,
       padding: spacing.md,
     },
-    claimInfoTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
     claimInfoText: {
-      color: colors.textMuted,
-      fontSize: fontSize.xs,
-      lineHeight: 17,
-      marginTop: spacing.xs,
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.semibold,
     },
     lbTeaser: { marginTop: spacing.md, marginBottom: spacing.xxl },
     lbTeaserTitle: {

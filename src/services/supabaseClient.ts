@@ -51,10 +51,30 @@ export function getSupabaseClient(): SupabaseClient | null {
 
 function isAnonymousUser(user: unknown): boolean {
   if (!user || typeof user !== 'object') return true;
-  const record = user as { is_anonymous?: unknown; app_metadata?: { provider?: unknown; providers?: unknown } };
+  const record = user as {
+    is_anonymous?: unknown;
+    app_metadata?: { provider?: unknown; providers?: unknown };
+  };
   if (record.is_anonymous === true) return true;
   if (record.app_metadata?.provider === 'anonymous') return true;
-  return Array.isArray(record.app_metadata?.providers) && record.app_metadata.providers.includes('anonymous');
+  return (
+    Array.isArray(record.app_metadata?.providers) &&
+    record.app_metadata.providers.includes('anonymous')
+  );
+}
+
+function hasRecoverableUserIdentity(user: unknown): boolean {
+  if (!user || typeof user !== 'object' || isAnonymousUser(user)) return false;
+  const record = user as {
+    email?: unknown;
+    phone?: unknown;
+    identities?: { provider?: unknown }[] | null;
+  };
+  if (typeof record.email === 'string' && record.email.length > 0) return true;
+  if (typeof record.phone === 'string' && record.phone.length > 0) return true;
+  return (record.identities ?? []).some(
+    (identity) => typeof identity?.provider === 'string' && identity.provider !== 'anonymous',
+  );
 }
 
 export async function currentSupabaseSession(): Promise<SupabaseUserSession | null> {
@@ -64,6 +84,18 @@ export async function currentSupabaseSession(): Promise<SupabaseUserSession | nu
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.user) return null;
   return { userId: data.session.user.id, isAnonymous: isAnonymousUser(data.session.user) };
+}
+
+/**
+ * Returns a server-validated, recoverable account ID for paid-provider identity.
+ * Anonymous/device-only Supabase users are deliberately ineligible for IAP.
+ */
+export async function currentRecoverableSupabaseUserId(): Promise<string | null> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user || !hasRecoverableUserIdentity(data.user)) return null;
+  return data.user.id;
 }
 
 export async function ensureAnonymousSupabaseUser(): Promise<SupabaseUserSession> {
@@ -87,8 +119,10 @@ function parseVerificationRow(data: unknown): OnlineDailyVerification {
 
   const record = row as { user_id?: unknown; server_time?: unknown; expires_at?: unknown };
   const userId = typeof record.user_id === 'string' ? record.user_id : '';
-  const serverTimeMs = typeof record.server_time === 'string' ? Date.parse(record.server_time) : Number.NaN;
-  const expiresAtMs = typeof record.expires_at === 'string' ? Date.parse(record.expires_at) : Number.NaN;
+  const serverTimeMs =
+    typeof record.server_time === 'string' ? Date.parse(record.server_time) : Number.NaN;
+  const expiresAtMs =
+    typeof record.expires_at === 'string' ? Date.parse(record.expires_at) : Number.NaN;
 
   if (!userId || Number.isNaN(serverTimeMs) || Number.isNaN(expiresAtMs)) {
     throw new Error('Daily verification returned malformed timestamps.');

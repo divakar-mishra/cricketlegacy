@@ -54,8 +54,10 @@ function buildAwardList(save: SaveGame, colors: ThemeColors): Award[] {
   const table = standings(save);
   const champion = table[0];
   const championName = champion ? (save.teams[champion.teamId]?.name ?? '---') : '---';
-  const userTeam = save.userTeamId ? save.teams[save.userTeamId] : null;
-  const userPos = table.findIndex((r) => r.teamId === save.userTeamId) + 1;
+  const resultTeamId =
+    save.mode === 'career' ? (save.franchiseTeamId ?? save.userTeamId) : save.userTeamId;
+  const userTeam = resultTeamId ? save.teams[resultTeamId] : null;
+  const userPos = table.findIndex((r) => r.teamId === resultTeamId) + 1;
 
   const awardList: Award[] = [
     {
@@ -234,8 +236,10 @@ export function AwardsNightScreen({ navigation }: ScreenProps<'AwardsNight'>) {
   const table = standings(save);
   const champion = table[0];
   const championName = champion ? (save.teams[champion.teamId]?.name ?? '—') : '—';
-  const userTeam = save.userTeamId ? save.teams[save.userTeamId] : null;
-  const userPos = table.findIndex((r) => r.teamId === save.userTeamId) + 1;
+  const resultTeamId =
+    save.mode === 'career' ? (save.franchiseTeamId ?? save.userTeamId) : save.userTeamId;
+  const userTeam = resultTeamId ? save.teams[resultTeamId] : null;
+  const userPos = table.findIndex((r) => r.teamId === resultTeamId) + 1;
 
   // Build award list
   const awardList: Award[] = [

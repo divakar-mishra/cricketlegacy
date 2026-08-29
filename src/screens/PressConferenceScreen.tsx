@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Button, Card, Screen, ScreenHeader, AppText as Text } from '../components';
+import { resolveNextCareerStep } from '../game/careerStep';
 import { AppliedEffect } from '../game/narrative';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
@@ -50,10 +51,41 @@ export function PressConferenceScreen({ navigation }: ScreenProps<'Press'>) {
   }
 
   if (result) {
+    const nextStep = resolveNextCareerStep(save);
+    const nextIsPress = nextStep.action === 'OPEN_PRESS';
+    const nextIsMatchday = nextStep.action === 'PLAY_MATCH';
+    const nextLabel = nextIsPress
+      ? 'NEXT PRESS DUTY'
+      : nextIsMatchday
+        ? 'ENTER MATCHDAY'
+        : 'RETURN TO MANAGER HOME';
+    const continueFromResult = () => {
+      if (nextIsPress) {
+        setResult(null);
+        return;
+      }
+      if (nextIsMatchday) {
+        navigation.replace('Match');
+        return;
+      }
+      navigation.replace('ManagerHub');
+    };
     return (
       <Screen
         gradient={gradients.pitch}
-        footer={<Button label="Continue" variant="gold" onPress={() => setResult(null)} />}
+        footer={
+          <View style={styles.resultActions}>
+            <Button label={nextLabel} variant="gold" onPress={continueFromResult} />
+            {nextIsPress || nextIsMatchday ? (
+              <Button
+                label="Return to Home"
+                variant="ghost"
+                size="sm"
+                onPress={() => navigation.replace('ManagerHub')}
+              />
+            ) : null}
+          </View>
+        }
       >
         <ScreenHeader title="On the Record" onBack={() => navigation.goBack()} />
         <Animated.View style={{ opacity: fade }}>
@@ -71,6 +103,10 @@ export function PressConferenceScreen({ navigation }: ScreenProps<'Press'>) {
               ))}
             </View>
           ) : null}
+          <View style={styles.nextActionBand}>
+            <Text style={styles.nextActionKicker}>NEXT</Text>
+            <Text style={styles.nextActionTitle}>{nextStep.title}</Text>
+          </View>
         </Animated.View>
       </Screen>
     );
@@ -85,9 +121,6 @@ export function PressConferenceScreen({ navigation }: ScreenProps<'Press'>) {
         <ScreenHeader title="Press Room" onBack={() => navigation.goBack()} />
         <Card style={styles.bodyCard}>
           <Text style={styles.emptyTitle}>No media duties right now.</Text>
-          <Text style={styles.emptyBody}>
-            Play matches and reach the season&apos;s end — the press and the board will want a word.
-          </Text>
         </Card>
       </Screen>
     );
@@ -186,4 +219,23 @@ const makeStyles = (colors: ThemeColors) =>
       paddingVertical: spacing.xs,
     },
     chipText: { fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+    nextActionBand: {
+      marginTop: spacing.xl,
+      paddingTop: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderStrong,
+    },
+    nextActionKicker: {
+      color: colors.accent,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.black,
+      letterSpacing: 1,
+    },
+    nextActionTitle: {
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.heavy,
+      marginTop: 3,
+    },
+    resultActions: { gap: spacing.sm },
   });

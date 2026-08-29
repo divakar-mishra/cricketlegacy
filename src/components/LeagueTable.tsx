@@ -30,7 +30,7 @@ export function LeagueTable({ rows, teams, highlightTeamId }: Props) {
           <View key={r.teamId} style={[styles.row, active && styles.active]}>
             <Text style={[styles.pos, styles.cell]}>{i + 1}</Text>
             <Text style={[styles.team, styles.cell, active && styles.activeText]} numberOfLines={1}>
-              {teams[r.teamId]?.shortName ?? teams[r.teamId]?.name ?? 'Team'}
+              {teams[r.teamId]?.name ?? teams[r.teamId]?.shortName ?? 'Team'}
             </Text>
             <Text style={[styles.num, styles.cell]}>{r.played}</Text>
             <Text style={[styles.num, styles.cell]}>{r.won}</Text>

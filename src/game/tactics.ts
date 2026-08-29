@@ -1,4 +1,5 @@
 import { Innings, MatchDecisionImpact, MatchState, Tactics } from '../domain/types';
+import { BOWLER_PLAN_OPTIONS, FIELD_OPTIONS, TEAM_APPROACH_OPTIONS } from '../engine/intent';
 
 function oversText(balls: number): string {
   return `${Math.floor(balls / 6)}.${balls % 6}`;
@@ -19,6 +20,19 @@ function dotCount(innings: Innings): number {
 
 function bowlingWickets(innings: Innings): number {
   return innings.bowling.reduce((sum, bowler) => sum + bowler.wickets, 0);
+}
+
+/** Human-readable confirmation for a selected/recommended manager plan. */
+export function tacticSelectionSummary(tactics: Tactics): string {
+  const batting =
+    TEAM_APPROACH_OPTIONS.find((option) => option.value === tactics.batting)?.label ??
+    tactics.batting;
+  const bowling =
+    BOWLER_PLAN_OPTIONS.find((option) => option.value === tactics.bowling)?.label ??
+    tactics.bowling;
+  const field =
+    FIELD_OPTIONS.find((option) => option.value === tactics.field)?.label ?? tactics.field;
+  return `${batting} batting · ${bowling} bowling · ${field} field`;
 }
 
 export function tacticIntentSummary(tactics: Tactics): string {
@@ -127,7 +141,8 @@ export function tacticalDecisionImpacts(
         id: 'batting-defensive',
         decision: 'Defensive batting',
         outcome: `${10 - Math.min(10, wickets)} wickets remained, with scoring held to ${runs}.`,
-        evidence: 'Wickets and runs are observed; the share caused by the plan cannot be isolated without a replay.',
+        evidence:
+          'Wickets and runs are observed; the share caused by the plan cannot be isolated without a replay.',
         confidence: 'OBSERVED',
         tone: wickets <= 5 ? 'POSITIVE' : 'MIXED',
       });

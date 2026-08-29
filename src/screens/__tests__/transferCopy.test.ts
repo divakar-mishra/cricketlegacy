@@ -32,17 +32,17 @@ describe('manager transfer screen copy', () => {
     expect(transferScreen).toContain('revealFullScout');
     expect(transferScreen).toContain("'Full Scout Intelligence'");
     expect(transferScreen).toContain("revealFullScout(p.id, 'token')");
-    expect(transferScreen).toContain(
-      'exact overall, fitness, form, injury status and valuation',
-    );
+    expect(transferScreen).toContain('exact overall, fitness, form, injury status and valuation');
     expect(transferScreen).not.toContain('exact overall, potential');
-    expect(transferScreen).toContain('Full Scout Intelligence ready:');
+    expect(transferScreen).toContain('full-reveal token');
+    expect(transferScreen).toContain('Fast-track: +25 points, once per season.');
+    expect(transferScreen).toContain('Normal report: ${fmtMoney(SCOUT_FEE)}');
   });
 
   it('keeps scouting visible but explains closed-window signing restrictions', () => {
     expect(transferScreen).toContain('Transfer window closed');
-    expect(transferScreen).toContain('Scouting and squad review remain available');
-    expect(transferScreen).toContain('signings are disabled');
+    expect(transferScreen).toContain('transferWindowLabel(save)');
+    expect(transferScreen).not.toContain('Scouting stays open');
     expect(transferScreen).toContain("? 'Closed'");
     expect(transferScreen).toContain("? 'No funds'");
     expect(transferScreen).toContain("? 'Squad full'");
@@ -59,7 +59,7 @@ describe('manager transfer screen copy', () => {
     expect(transferScreen).toContain('onExpire');
     expect(transferScreen).toContain('Outbid: deadline expired');
     expect(transferScreen).toContain('Offer rejected:');
-    expect(transferScreen).toContain('Withdrawn: you ended negotiations');
+    expect(transferScreen).toContain('Withdrawn: the player joined');
     expect(transferScreen).toContain('styles.bidActionPrimary');
     expect(transferScreen).toContain('detailMaxHeight');
     expect(transferScreen).toContain('maxHeight: detailMaxHeight');
@@ -75,11 +75,23 @@ describe('manager transfer screen copy', () => {
     expect(transferScreen).toContain('pending={Boolean(pendingTransferAction)}');
     expect(transferScreen).toContain('disabled={!canAfford || actionPending}');
     expect(transferScreen).toContain('disabled={!canLoan || actionPending}');
-    expect(transferScreen).toContain(
-      'disabled={!transferWindowOpen || team.playerIds.length >= MAX_SQUAD || actionPending}',
+    expect(transferScreen).toMatch(
+      /disabled=\{\s*!transferWindowOpen\s*\|\|\s*team\.playerIds\.length >= squadCap\s*\|\|\s*actionPending\s*\}/,
     );
     expect(transferScreen).toContain('disabled={!canRelease || actionPending}');
     expect(transferScreen).toContain('extraData={[tab, flash, pendingTransferAction]}');
+  });
+
+  it('uses the save-specific squad cap for every manager transfer action and label', () => {
+    expect(transferScreen).toContain('const squadCap = maxSquadSize(save);');
+    expect(transferScreen).toContain('team.playerIds.length < squadCap');
+    expect(transferScreen).toContain('team.playerIds.length >= squadCap');
+    expect(transferScreen).toContain('{team.playerIds.length} / {squadCap}');
+    expect(transferScreen).not.toContain('MAX_SQUAD');
+    // The Manager Home no longer duplicates the full squad/cap card. The
+    // authoritative count and all transfer guards remain on Transfers.
+    expect(managerHubScreen).not.toContain('const squadCap = maxSquadSize(save);');
+    expect(managerHubScreen).not.toContain('{squad.length}/18');
   });
 
   it('keeps Deadline Day as a gated event with shared transfer and currency rules', () => {
@@ -88,6 +100,7 @@ describe('manager transfer screen copy', () => {
     expect(deadlineScreen).toContain('Deadline Day Unavailable');
     expect(deadlineScreen).toContain('isTransferWindowOpen(save)');
     expect(deadlineScreen).toContain('formatClubCurrency(computeValue(p))');
-    expect(deadlineScreen).toContain('Real signings are made in Scout Market');
+    expect(deadlineScreen).toContain('label="Scout Market"');
+    expect(deadlineScreen).not.toContain('Real signings are made in Scout Market');
   });
 });

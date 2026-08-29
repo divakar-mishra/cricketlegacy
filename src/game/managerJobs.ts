@@ -10,6 +10,7 @@ import { ManagerJobOffer, SaveGame } from '../domain/types';
 import { Rng } from '../engine/rng';
 import { clamp } from '../utils/math';
 import { boardTargetFor } from './finance';
+import { activateManagerClub, persistActiveManagerClub } from './managerClubState';
 
 /** Minimum board confidence + reputation gap needed for a bigger club to circle. */
 const MIN_CONFIDENCE = 66;
@@ -90,11 +91,13 @@ export function applyManagerAppointment(
   const newTeam = save.teams[teamId];
   if (!newTeam) return { ok: false, reason: 'That club is no longer available.' };
   const previousTeamId = save.userTeamId;
+  persistActiveManagerClub(save);
   if (previousTeamId && save.teams[previousTeamId]) {
     save.teams[previousTeamId].isUserTeam = false;
   }
 
   save.userTeamId = teamId;
+  activateManagerClub(save, teamId);
   newTeam.isUserTeam = true;
   newTeam.xi = undefined;
   save.flags = { ...(save.flags ?? {}), sacked: false };
@@ -110,10 +113,7 @@ export function applyManagerAppointment(
     reputation: save.managerProgression?.reputation ?? newTeam.reputation,
     currentClubId: teamId,
     premiumAssistanceHistory: save.managerProgression?.premiumAssistanceHistory ?? [],
-    contractSalary: Math.max(
-      0,
-      Math.round(contractSalary ?? managerSalaryFor(newTeam.reputation)),
-    ),
+    contractSalary: Math.max(0, Math.round(contractSalary ?? managerSalaryFor(newTeam.reputation))),
     lastSalaryPaidYear: save.managerProgression?.lastSalaryPaidYear,
     lastSalaryCoinPayout: save.managerProgression?.lastSalaryCoinPayout,
   };
@@ -122,7 +122,6 @@ export function applyManagerAppointment(
       newTeam.playerIds.includes(playerId),
     ),
   );
-  save.scoutReports = [];
 
   const year = save.currentSeasonId ? (save.seasons[save.currentSeasonId]?.year ?? 2026) : 2026;
   save.boardObjective = { year, targetPosition: boardTargetFor(newTeam.reputation) };

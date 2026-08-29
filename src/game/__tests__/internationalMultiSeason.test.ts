@@ -29,9 +29,12 @@ function recordControlledWtcWins(
   year: number,
 ): void {
   const fixtures = Object.values(save.fixtures).filter(
-    (fixture) => fixture.competitionId === `wtc-test-series-${year}`,
+    (fixture) =>
+      fixture.wtcCycleId &&
+      fixture.competition === 'BILATERAL_SERIES' &&
+      fixture.seasonId === save.currentSeasonId,
   );
-  expect(fixtures).toHaveLength(2);
+  expect(fixtures).toHaveLength(year % 2 === 0 ? 10 : 9);
   for (const fixture of fixtures) {
     fixture.played = true;
     fixture.resultKind = 'HOME_WIN';
@@ -54,11 +57,11 @@ describe('multi-season international calendar smoke', () => {
     user.meta.form = 90;
 
     prepareCareerYear(save, 2026);
-    expect(generateInternationalWindowFixtures(save)).toHaveLength(9);
+    expect(generateInternationalWindowFixtures(save)).toHaveLength(48);
     recordControlledWtcWins(save, 2026);
 
     prepareCareerYear(save, 2027);
-    expect(generateInternationalWindowFixtures(save)).toHaveLength(5);
+    expect(generateInternationalWindowFixtures(save)).toHaveLength(49);
     recordControlledWtcWins(save, 2027);
     expect(
       Object.values(save.fixtures).filter(
@@ -68,14 +71,14 @@ describe('multi-season international calendar smoke', () => {
 
     prepareCareerYear(save, 2028);
     const thirdYear = generateInternationalWindowFixtures(save);
-    expect(thirdYear).toHaveLength(8);
+    expect(thirdYear).toHaveLength(48);
     expect(
       thirdYear
         .map((fixtureId) => save.fixtures[fixtureId])
         .filter((fixture) => fixture.competitionId === 'champions-trophy-2028')
         .map((fixture) => fixture.cupRound),
     ).toEqual(['Group Stage 1', 'Group Stage 2', 'Group Stage 3']);
-    expect(save.wtcCycles?.['wtc-2026-2027'].recordedFixtureIds).toHaveLength(4);
+    expect(save.wtcCycles?.['wtc-2026-2027'].recordedFixtureIds).toHaveLength(19);
   });
 
   it('preserves the same two-season WTC cycle for a National Manager', () => {
@@ -99,6 +102,6 @@ describe('multi-season international calendar smoke', () => {
         (fixture) => fixture.competitionId === 'world-test-championship-2027',
       ),
     ).toHaveLength(1);
-    expect(save.wtcCycles?.['wtc-2026-2027'].recordedFixtureIds).toHaveLength(4);
+    expect(save.wtcCycles?.['wtc-2026-2027'].recordedFixtureIds).toHaveLength(19);
   });
 });

@@ -23,13 +23,19 @@ export interface RolloverReport {
 }
 
 /** Retire veterans (never the user), then promote youth to refill each roster. */
-export function rolloverSquads(save: SaveGame, year: number, rng: Rng): RolloverReport {
+export function rolloverSquads(
+  save: SaveGame,
+  year: number,
+  rng: Rng,
+  options: { preserveTeamIds?: ReadonlySet<string> } = {},
+): RolloverReport {
   let retired = 0;
   let promoted = 0;
   const rosterTarget = save.managerCalendar ? MANAGER_ROSTER_SIZE : ROSTER_SIZE;
 
   for (const team of Object.values(save.teams)) {
     if (team.isNationalTeam) continue;
+    if (options.preserveTeamIds?.has(team.id)) continue;
     team.playerIds = team.playerIds.filter((id) => {
       const p = save.players[id];
       if (!p) return false;

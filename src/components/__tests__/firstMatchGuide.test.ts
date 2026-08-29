@@ -12,4 +12,12 @@ describe('FirstMatchGuide layout', () => {
     expect(source).toContain('blur={false}');
     expect(source).toContain('pointerEvents="auto"');
   });
+
+  it('keeps the three coach prompts concise without dropping match mechanics', () => {
+    expect(source).toContain('Choose Defend, Balanced or Attack.');
+    expect(source).toContain('Compare required and current run rate.');
+    expect(source).toContain('Ratings and milestones build reputation.');
+    expect(source).not.toContain('Switch any time; no per-ball taps.');
+    expect(source).not.toContain('as it gets harder');
+  });
 });

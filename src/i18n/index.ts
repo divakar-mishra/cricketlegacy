@@ -33,11 +33,9 @@ const EN: Dict = {
   'newgame.title': 'New Game',
   'newgame.subtitle': 'Choose how you want to live the game',
   'newgame.playerTitle': 'Player Career',
-  'newgame.playerDesc':
-    'Create a cricketer and live their whole journey — matches, milestones, relationships, sponsors, national duty and, one day, retirement.',
+  'newgame.playerDesc': 'Rise from Grade A cricket to retirement.',
   'newgame.managerTitle': 'Manager Career',
-  'newgame.managerDesc':
-    'Take charge of a club: pick your XI, set tactics, scout and sign players, build the academy, and answer to the board across full seasons.',
+  'newgame.managerDesc': 'Lead a club through seasons and promotion.',
   // Settings
   'settings.title': 'Settings',
   'settings.sound': 'Sound effects',
@@ -81,11 +79,9 @@ const HI: Dict = {
   'newgame.title': 'नया खेल',
   'newgame.subtitle': 'चुनें कि आप खेल को कैसे जीना चाहते हैं',
   'newgame.playerTitle': 'खिलाड़ी करियर',
-  'newgame.playerDesc':
-    'एक क्रिकेटर बनाएँ और उसका पूरा सफर जिएँ — मैच, कीर्तिमान, रिश्ते, प्रायोजक, देश की सेवा और एक दिन संन्यास।',
+  'newgame.playerDesc': 'ग्रेड A क्रिकेट से संन्यास तक आगे बढ़ें।',
   'newgame.managerTitle': 'मैनेजर करियर',
-  'newgame.managerDesc':
-    'एक क्लब की कमान संभालें: अपनी एकादश चुनें, रणनीति तय करें, खिलाड़ी स्काउट करें, अकादमी बनाएँ और बोर्ड को जवाब दें।',
+  'newgame.managerDesc': 'क्लब को सीज़न और प्रमोशन में आगे ले जाएँ।',
   'settings.title': 'सेटिंग्स',
   'settings.sound': 'ध्वनि प्रभाव',
   'settings.music': 'संगीत',

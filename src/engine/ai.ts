@@ -118,9 +118,11 @@ export function minimumAllRounderOvers(format: Format): number {
 }
 
 /**
- * Guarantees a selected career all-rounder a meaningful spell. The spell is
- * scheduled early enough to survive short chases, while still respecting the
- * consecutive-over and per-format bowling limits.
+ * Guarantees a selected career bowling-role player a meaningful spell. The
+ * spell is scheduled early enough to survive short chases, while still
+ * respecting the consecutive-over and per-format bowling limits. Specialist
+ * bowlers previously received no guarantee at all, which allowed a selected
+ * Bowler career to complete senior matches without delivering a ball.
  */
 export function requiredAllRounderBowler(
   bowlers: Player[],
@@ -129,7 +131,9 @@ export function requiredAllRounderBowler(
 ): Player | undefined {
   if (!preferredPlayerId) return undefined;
   const player = bowlers.find(
-    (bowler) => bowler.id === preferredPlayerId && bowler.role === 'ALLROUNDER',
+    (bowler) =>
+      bowler.id === preferredPlayerId &&
+      (bowler.role === 'ALLROUNDER' || bowler.role === 'BOWLER'),
   );
   if (!player || player.id === ctx.lastBowlerId) return undefined;
 

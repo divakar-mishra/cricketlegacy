@@ -87,8 +87,10 @@ function getPlayer(key: SfxKey): Player | null {
   try {
     const p = createAudioPlayer(SOURCES[key]);
     p.volume = VOLUME[key] ?? 0.8;
-    p.playbackRate = PLAYBACK_RATE[key] ?? 1;
-    p.shouldCorrectPitch = !['six', 'coin', 'phone', 'trophy', 'defeat'].includes(key);
+    p.setPlaybackRate(
+      PLAYBACK_RATE[key] ?? 1,
+      ['six', 'coin', 'phone', 'trophy', 'defeat'].includes(key) ? 'low' : 'medium',
+    );
     players[key] = p;
     return p;
   } catch {

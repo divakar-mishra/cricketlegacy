@@ -5,8 +5,8 @@ exports[`determinism & golden master matches a committed golden-master summary 1
   "format": "T20",
   "margin": "6 wickets",
   "scores": [
-    "148/6 (20.0)",
-    "152/4 (17.4)",
+    "147/6 (20.0)",
+    "148/4 (17.2)",
   ],
   "winner": "home",
 }

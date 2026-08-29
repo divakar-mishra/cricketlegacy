@@ -32,17 +32,17 @@ const PROMPTS: Prompt[] = [
   {
     emoji: '🏏',
     title: 'Set your stance',
-    body: 'Use the stance button to choose Defend, Balanced or Attack. You can switch it any time while you bat — no per-ball taps needed.',
+    body: 'Choose Defend, Balanced or Attack.',
   },
   {
     emoji: '📈',
     title: 'Read the chase',
-    body: 'When chasing, keep the Required Run Rate below your Current Run Rate. The pressure bar turns amber then red as it gets harder.',
+    body: 'Compare required and current run rate.',
   },
   {
     emoji: '🏆',
     title: 'After the match',
-    body: 'Check your match rating, wagon wheel and Player-of-the-Match on the result screen — that is where your reputation is built.',
+    body: 'Ratings and milestones build reputation.',
   },
 ];
 

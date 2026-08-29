@@ -2,7 +2,19 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { ImageBackground, StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
-import { Button, Card, ProgressBar, Screen, ScreenHeader, AppText as Text } from '../components';
+import {
+  AppText as Text,
+  Button,
+  Card,
+  Icon,
+  type IconName,
+  ProgressBar,
+  Screen,
+  ScreenHeader,
+  SponsorBrandRow,
+  SponsorLogo,
+  SponsorMark,
+} from '../components';
 import { MONTHLY_PASS_CONTENT } from '../data/seasonPassContent';
 import { Facilities, StaffRole } from '../domain/types';
 import { computeValue, formatClubCurrency } from '../game/finance';
@@ -12,20 +24,30 @@ import {
   expiringContracts,
   facilityMaintenance,
   facilityUpgradeCost,
+  type FacilityUpgradePaymentMethod,
   MAX_FACILITY,
   MAX_STAFF_QUALITY,
   STAFF_ROLES,
   staffInvestCost,
   staffWageBill,
-  superstarAttractionChance,
 } from '../game/manager';
+import { activeManagerClub } from '../game/managerClubState';
+import { MANAGER_ELITE_STAFF_SEARCH_GEMS, managerResourceUsed } from '../game/managerResources';
 import {
-  MANAGER_ELITE_STAFF_SEARCH_GEMS,
-  MANAGER_MATCH_ANALYSIS_COINS,
-  managerResourceUsed,
-} from '../game/managerResources';
+  activeEarnedSponsorContract,
+  activeSponsorBranding,
+  premiumSponsorWeeklyRate,
+  sponsorshipOffers,
+} from '../game/sponsorship';
+import {
+  MATCHDAY_EXPERIENCE,
+  stadiumSeasonUpkeep,
+  stadiumSummary,
+} from '../game/stadiumManagement';
+import { useIsCompact } from '../hooks/useResponsive';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
+import { confirmFacilityUpgrade } from './facilityUpgradePrompt';
 import {
   fontSize,
   fontWeight,
@@ -38,17 +60,27 @@ import {
 
 const fmtMoney = formatClubCurrency;
 
-const OFFICE_FACILITIES = ['training', 'medical'] as const satisfies readonly (keyof Facilities)[];
+const INFRASTRUCTURE_FACILITIES = [
+  { kind: 'training', label: 'Training Ground', icon: 'barbell-outline' },
+  { kind: 'medical', label: 'Medical Centre', icon: 'medkit-outline' },
+  { kind: 'academy', label: 'Youth Academy', icon: 'school-outline' },
+] as const satisfies readonly {
+  kind: keyof Facilities;
+  label: string;
+  icon: IconName;
+}[];
 
-const FACILITY_LABEL: Record<(typeof OFFICE_FACILITIES)[number], string> = {
-  training: 'Training Ground',
-  medical: 'Medical Centre',
-};
+function currentFacilityEffect(kind: keyof Facilities): string {
+  if (kind === 'training') return 'Player development';
+  if (kind === 'medical') return 'Recovery and injury prevention';
+  return 'Youth intake quality';
+}
 
 export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
   const save = useCareer((s) => s.save);
   const investStaff = useCareer((s) => s.investStaff);
   const upgradeFacilityLevel = useCareer((s) => s.upgradeFacilityLevel);
+  const acceptEarnedSponsorOffer = useCareer((s) => s.acceptEarnedSponsorOffer);
   const renewDeal = useCareer((s) => s.renewDeal);
   const releasePlayer = useCareer((s) => s.releasePlayer);
   const refreshEnergy = useCareer((s) => s.refreshEnergy);
@@ -56,6 +88,7 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
   const runManagerResource = useCareer((s) => s.useManagerResource);
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const compactActions = useIsCompact(520);
   const [, force] = useState(0);
 
   useFocusEffect(useCallback(() => refreshEnergy(), [refreshEnergy]));
@@ -69,15 +102,30 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
     );
   }
 
+  if (save.managerCareerLevel === 'NATIONAL') {
+    return (
+      <Screen gradient={gradients.pitch}>
+        <ScreenHeader title="Club Office" onBack={() => navigation.goBack()} />
+        <Card style={styles.nationalPauseCard}>
+          <Icon name="flag-outline" size={24} color={colors.primaryLight} />
+          <Text style={styles.nationalPauseTitle}>Club operations paused</Text>
+        </Card>
+      </Screen>
+    );
+  }
+
   const team = save.teams[save.userTeamId];
   const staff = save.staff ?? [];
   const facilities = save.facilities ?? { training: 1, medical: 1, academy: 1 };
   const expiring = expiringContracts(save);
   const injured = injuredIn(save, team.playerIds);
   const staffWages = staffWageBill(save);
-  const upkeep = facilityMaintenance(save);
+  const facilityUpkeep = facilityMaintenance(save);
+  const stadiumClub = activeManagerClub(save);
+  const groundSummary = stadiumClub ? stadiumSummary(save) : undefined;
+  const groundUpkeep = stadiumClub ? stadiumSeasonUpkeep(stadiumClub.stadium) : 0;
+  const upkeep = facilityUpkeep + groundUpkeep;
   const clubRating = calculateClubRating(save);
-  const eliteAppeal = Math.round(superstarAttractionChance(save) * 100);
   const selectedOffice = save.seasonPassExperience?.selectedOfficeTheme ?? 'office_classic';
   const managerLegendOffice = Boolean(save.inventory?.manager_legend_office_theme);
   const monthlyOffice = MONTHLY_PASS_CONTENT.find(
@@ -91,17 +139,23 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
   const officeAccent = managerLegendOffice
     ? '#F5CF65'
     : (monthlyOffice?.office.accent ?? '#D5B56D');
-  const analysisUsed = managerResourceUsed(save, 'MATCH_ANALYSIS');
   const staffSearchUsed = managerResourceUsed(save, 'ELITE_STAFF_SEARCH');
   const facilityUpgradeTokens = Math.max(0, save.inventory?.facility_upgrade_token ?? 0);
+  const earnedSponsorOffers = sponsorshipOffers(save);
+  const activeEarnedSponsor = activeEarnedSponsorContract(save);
+  const sponsorBranding = activeSponsorBranding(save);
+  const permanentSponsorRate = premiumSponsorWeeklyRate(save);
 
   const doInvest = (role: StaffRole) => {
     const res = investStaff(role);
     if (!res.ok) Alert.alert('Cannot invest', res.reason ?? 'Unavailable.');
     force((n) => n + 1);
   };
-  const doUpgrade = (kind: keyof Facilities) => {
-    const res = upgradeFacilityLevel(kind);
+  const applyFacilityUpgrade = (
+    kind: keyof Facilities,
+    paymentMethod: FacilityUpgradePaymentMethod,
+  ) => {
+    const res = upgradeFacilityLevel(kind, paymentMethod);
     if (!res.ok) {
       if (res.reason?.toLowerCase().includes('budget')) {
         Alert.alert(
@@ -128,6 +182,20 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
       }
     }
     force((n) => n + 1);
+  };
+  const doUpgrade = (kind: keyof Facilities, facilityLabel: string) => {
+    const currentLevel = facilities[kind];
+    if (currentLevel >= MAX_FACILITY) return;
+    confirmFacilityUpgrade(
+      {
+        facilityLabel,
+        currentLevel,
+        cashCost: facilityUpgradeCost(currentLevel + 1),
+        clubBalance: team.budget,
+        tokenCount: facilityUpgradeTokens,
+      },
+      (paymentMethod) => applyFacilityUpgrade(kind, paymentMethod),
+    );
   };
   const doRenew = (id: string, name: string) => {
     const res = renewDeal(id, 2);
@@ -159,13 +227,10 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
     ]);
   };
   const doWait = (name: string) => {
-    Alert.alert(
-      'Decision deferred',
-      `${name} remains on the current contract. You can renew or release before the season contract tick.`,
-    );
+    Alert.alert('Decision deferred', `${name} stays. Renew or release before season rollover.`);
   };
-  const runResourceAction = (action: 'MATCH_ANALYSIS' | 'ELITE_STAFF_SEARCH') => {
-    const result = runManagerResource(action);
+  const runStaffSearch = () => {
+    const result = runManagerResource('ELITE_STAFF_SEARCH');
     Alert.alert(
       result.ok ? 'Club service confirmed' : 'Unavailable',
       result.detail ?? result.reason,
@@ -177,25 +242,49 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
     <Screen scroll gradient={gradients.pitch}>
       <ScreenHeader title="Club Office" subtitle={team.name} onBack={() => navigation.goBack()} />
 
-      {officeLabel && (
-        <ImageBackground
-          source={require('../../assets/generated/season-pass-manager-office.png')}
-          resizeMode="cover"
-          imageStyle={styles.officeHeroImage}
-          style={styles.officeHero}
-        >
-          <View style={[styles.officeHeroShade, { backgroundColor: `${officeAccent}55` }]} />
-          <View style={styles.officeHeroCopy}>
-            <Text style={[styles.officeHeroLabel, { color: officeAccent }]}>
-              {officeLabel.toUpperCase()}
-            </Text>
-            <Text style={styles.officeHeroTitle}>{team.name}</Text>
-            <Text style={styles.officeHeroText}>
-              Club rating {clubRating.toFixed(1)} · Elite-player interest {eliteAppeal}%
-            </Text>
-          </View>
-        </ImageBackground>
-      )}
+      {stadiumClub && groundSummary ? (
+        <>
+          <Text style={styles.section}>Home Ground</Text>
+          <Card
+            style={styles.groundCard}
+            onPress={() => navigation.navigate('ClubStadium')}
+            accessibilityLabel="Manage home ground"
+          >
+            <View style={styles.groundHeader}>
+              <View style={styles.groundIcon}>
+                <Icon name="business-outline" size={22} color={colors.accentLight} />
+              </View>
+              <View style={styles.groundTitleCopy}>
+                <Text style={styles.groundTitle} numberOfLines={1}>
+                  {stadiumClub.stadium.name}
+                </Text>
+                <Text style={styles.groundMeta}>
+                  {MATCHDAY_EXPERIENCE[stadiumClub.stadium.experienceLevel]?.label ?? 'Essentials'}
+                </Text>
+              </View>
+              <Icon name="chevron-forward" size={20} color={colors.textMuted} />
+            </View>
+            <View style={styles.groundStats}>
+              <View style={styles.groundStat}>
+                <Text style={styles.groundStatValue}>
+                  {groundSummary.capacity.toLocaleString()}
+                </Text>
+                <Text style={styles.groundStatLabel}>Capacity</Text>
+              </View>
+              <View style={styles.groundStat}>
+                <Text style={styles.groundStatValue}>{groundSummary.fanBase.toLocaleString()}</Text>
+                <Text style={styles.groundStatLabel}>Fan base</Text>
+              </View>
+              <View style={styles.groundStat}>
+                <Text style={[styles.groundStatValue, styles.groundRevenue]}>
+                  {fmtMoney(groundSummary.currentSeasonReceipts)}
+                </Text>
+                <Text style={styles.groundStatLabel}>Gate receipts</Text>
+              </View>
+            </View>
+          </Card>
+        </>
+      ) : null}
 
       <Card style={styles.finance}>
         <View style={styles.financeRow}>
@@ -203,37 +292,23 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
             <Text style={styles.finLabel}>Club balance</Text>
             <Text style={styles.finValue}>{fmtMoney(team.budget)}</Text>
           </View>
-          <View style={styles.financeCol}>
-            <Text style={styles.finLabel}>Board confidence</Text>
-            <Text
-              style={[
-                styles.finValue,
-                { color: confidenceColor(save.boardConfidence ?? 60, colors) },
-              ]}
-            >
-              {save.boardConfidence ?? 60}%
-            </Text>
-          </View>
         </View>
         <Text style={styles.finNote}>
-          Staff wages {fmtMoney(staffWages)}/season · Facility upkeep {fmtMoney(upkeep)}/season
-        </Text>
-        <Text style={styles.finNote}>
-          Club budget pays transfers, staff, facilities and wages. Wallet coins and gems fund the
-          optional Manager services below.
+          Staff wages {fmtMoney(staffWages)}/season · Infrastructure upkeep {fmtMoney(upkeep)}
+          /season
         </Text>
         {save.finances?.lastGateReceipts ? (
           <Text style={styles.finNote}>
             Last season gate receipts {fmtMoney(save.finances.lastGateReceipts)}
           </Text>
         ) : null}
-        {/* Wage Ledger */}
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+        <View style={[styles.financeActions, compactActions && styles.financeActionsCompact]}>
           <Button
             label="💰 Wage Ledger"
             variant="ghost"
             size="sm"
-            fullWidth={false}
+            fullWidth={compactActions}
+            style={compactActions ? undefined : styles.financeActionButton}
             onPress={() => navigation.navigate('WageBreakdown')}
           />
           {team.budget < 500_000 ? (
@@ -241,7 +316,8 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
               label="Emergency Funds"
               variant="secondary"
               size="sm"
-              fullWidth={false}
+              fullWidth={compactActions}
+              style={compactActions ? undefined : styles.financeActionButton}
               onPress={() =>
                 void purchaseProduct('transfer_budget_sm').then((r) => {
                   Alert.alert(
@@ -257,6 +333,184 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
         </View>
       </Card>
 
+      <SponsorBrandRow
+        earned={sponsorBranding.earned}
+        premium={sponsorBranding.premium}
+        compact
+        style={styles.clubSponsorHeader}
+      />
+
+      {officeLabel && (
+        <ImageBackground
+          source={require('../../assets/generated/season-pass-manager-office.png')}
+          resizeMode="cover"
+          imageStyle={styles.officeHeroImage}
+          style={styles.officeHero}
+        >
+          <View style={[styles.officeHeroShade, { backgroundColor: `${officeAccent}55` }]} />
+          <View style={styles.officeHeroCopy}>
+            <Text style={styles.officeHeroKicker}>OFFICE THEME</Text>
+            <Text style={[styles.officeHeroTitle, { color: officeAccent }]}>{officeLabel}</Text>
+          </View>
+        </ImageBackground>
+      )}
+
+      <Text style={styles.section}>Kit Partnership</Text>
+      <Card style={styles.sponsorCard}>
+        {activeEarnedSponsor ? (
+          <View style={styles.sponsorActive}>
+            <SponsorMark
+              name={activeEarnedSponsor.brandName ?? activeEarnedSponsor.label}
+              brandId={activeEarnedSponsor.brandId}
+            />
+            <Text style={styles.sponsorStatus}>
+              {fmtMoney(activeEarnedSponsor.appearancePayout)} per eligible fixture
+              {activeEarnedSponsor.winBonus
+                ? ` · +${fmtMoney(activeEarnedSponsor.winBonus)} per win`
+                : ''}
+            </Text>
+            <Text style={styles.sponsorMeta}>
+              {activeEarnedSponsor.paidFixtures}/{activeEarnedSponsor.fixtureQuota} · Club Balance
+            </Text>
+          </View>
+        ) : earnedSponsorOffers.length ? (
+          <View style={styles.sponsorOffers}>
+            {earnedSponsorOffers.map((offer) => (
+              <View key={offer.id} style={styles.sponsorOffer}>
+                <SponsorLogo brand={offer} variant="badge" size={30} />
+                <View style={styles.sponsorOfferCopy}>
+                  <Text style={styles.sponsorTitle}>{offer.brandName ?? offer.label}</Text>
+                  <Text style={styles.sponsorMeta}>
+                    {offer.label} · {fmtMoney(offer.appearancePayout)} / fixture
+                    {offer.winBonus ? ` · +${fmtMoney(offer.winBonus)} / win` : ''} ·{' '}
+                    {offer.fixtureQuota} total
+                  </Text>
+                </View>
+                <Button
+                  label="Sign"
+                  size="sm"
+                  variant="secondary"
+                  fullWidth={false}
+                  onPress={() => {
+                    const result = acceptEarnedSponsorOffer(offer.id);
+                    Alert.alert(
+                      result.ok ? 'Sponsor signed' : 'Cannot sign sponsor',
+                      result.ok
+                        ? `${offer.brandName ?? offer.label} partnership confirmed. Payments go to Club Balance.`
+                        : (result.reason ?? 'Unavailable.'),
+                    );
+                  }}
+                />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.sponsorMeta}>New offers arrive next season.</Text>
+        )}
+        {save.sponsorship?.premium ? (
+          <View style={styles.sponsorPremiumSlot}>
+            <SponsorMark name="Legacy Crown" brandId="legacy_crown" compact />
+            <Text style={styles.sponsorTitle}>Permanent sponsor</Text>
+            <Text style={styles.sponsorStatus}>
+              {fmtMoney(permanentSponsorRate)} / qualifying week
+            </Text>
+            <Text style={styles.sponsorMeta}>Extra slot · This save only</Text>
+          </View>
+        ) : (
+          <View style={styles.sponsorPremiumSlot}>
+            <Button
+              label="View permanent sponsor"
+              size="sm"
+              variant="secondary"
+              fullWidth={false}
+              onPress={() => navigation.navigate('Purchase')}
+            />
+          </View>
+        )}
+      </Card>
+
+      <Text style={styles.section}>Infrastructure</Text>
+      <View style={[styles.infrastructureGrid, compactActions && styles.infrastructureGridCompact]}>
+        {INFRASTRUCTURE_FACILITIES.map(({ kind, label, icon }) => {
+          const level = facilities[kind];
+          const maxed = level >= MAX_FACILITY;
+          const cost = facilityUpgradeCost(level + 1);
+          const afford = team.budget >= cost;
+          const hasPaymentChoice = !maxed && facilityUpgradeTokens > 0;
+          return (
+            <Card
+              key={kind}
+              padded={false}
+              style={[
+                styles.infrastructureCard,
+                compactActions && styles.infrastructureCardCompact,
+              ]}
+            >
+              <View style={styles.facilityHeader}>
+                <View style={styles.facilityIcon}>
+                  <Icon name={icon} size={20} color={colors.primaryLight} />
+                </View>
+                <View style={styles.facilityTitleCopy}>
+                  <Text style={styles.facilityTitle} numberOfLines={1}>
+                    {label}
+                  </Text>
+                  <Text style={styles.facilityStatus}>
+                    Level {level}/{MAX_FACILITY}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.pips}>
+                {Array.from({ length: MAX_FACILITY }).map((_, index) => (
+                  <View key={index} style={[styles.pip, index < level && styles.pipOn]} />
+                ))}
+              </View>
+              <Text style={styles.facilityEffect} numberOfLines={2}>
+                {currentFacilityEffect(kind)}
+              </Text>
+              <Button
+                label={
+                  maxed
+                    ? 'Max level'
+                    : hasPaymentChoice
+                      ? 'Upgrade options'
+                      : `Upgrade · ${fmtMoney(cost)}`
+                }
+                size="sm"
+                variant={maxed ? 'ghost' : afford || hasPaymentChoice ? 'secondary' : 'ghost'}
+                disabled={maxed}
+                style={styles.facilityAction}
+                onPress={() => doUpgrade(kind, label)}
+              />
+              {kind === 'training' ? (
+                <Button
+                  label="Set team plan"
+                  size="sm"
+                  variant="ghost"
+                  style={styles.facilitySecondaryAction}
+                  onPress={() => navigation.navigate('Training')}
+                />
+              ) : kind === 'medical' ? (
+                <Button
+                  label="Open medical centre"
+                  size="sm"
+                  variant="ghost"
+                  style={styles.facilitySecondaryAction}
+                  onPress={() => navigation.navigate('MedicalCentre')}
+                />
+              ) : kind === 'academy' ? (
+                <Button
+                  label="View prospects"
+                  size="sm"
+                  variant="ghost"
+                  style={styles.facilitySecondaryAction}
+                  onPress={() => navigation.navigate('Academy')}
+                />
+              ) : null}
+            </Card>
+          );
+        })}
+      </View>
+
       <Text style={styles.section}>Manager Resource Desk</Text>
       <View style={styles.resourceBand}>
         <View style={styles.resourceWallet}>
@@ -271,27 +525,9 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
         </View>
         <View style={styles.resourceRow}>
           <View style={styles.resourceCopy}>
-            <Text style={styles.staffName}>Opposition Analysis</Text>
-            <Text style={styles.finNote}>
-              Once per fixture. The selected XI receives +2 form and +1 morale; no result is
-              guaranteed.
-            </Text>
-          </View>
-          <Button
-            label={analysisUsed ? 'Prepared' : `${MANAGER_MATCH_ANALYSIS_COINS} coins`}
-            size="sm"
-            variant={analysisUsed ? 'ghost' : 'secondary'}
-            fullWidth={false}
-            disabled={analysisUsed || save.wallet.coins < MANAGER_MATCH_ANALYSIS_COINS}
-            onPress={() => runResourceAction('MATCH_ANALYSIS')}
-          />
-        </View>
-        <View style={[styles.resourceRow, styles.divider]}>
-          <View style={styles.resourceCopy}>
             <Text style={styles.staffName}>Elite Staff Search</Text>
             <Text style={styles.finNote}>
-              Once per season. Adds three stronger candidates; hiring still costs club budget and
-              wages.
+              3 stronger candidates this season
             </Text>
           </View>
           <Button
@@ -300,16 +536,9 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
             variant={staffSearchUsed ? 'ghost' : 'secondary'}
             fullWidth={false}
             disabled={staffSearchUsed || save.wallet.gems < MANAGER_ELITE_STAFF_SEARCH_GEMS}
-            onPress={() => runResourceAction('ELITE_STAFF_SEARCH')}
+            onPress={runStaffSearch}
           />
         </View>
-        <Text style={styles.resourceAudit}>
-          Wallet coins come from completed matches, daily rewards and quests. They pay only for
-          manager services here; transfers, contracts, staff hiring and facilities always use the
-          club budget above.{'\n'}
-          Spent here: {(save.managerResources?.totalCoinsSpent ?? 0).toLocaleString()} coins and{' '}
-          {(save.managerResources?.totalGemsSpent ?? 0).toLocaleString()} gems.
-        </Text>
       </View>
 
       <Text style={styles.section}>Coaching Staff</Text>
@@ -317,10 +546,6 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
         <View>
           <Text style={styles.finLabel}>Club rating</Text>
           <Text style={styles.staffSummaryValue}>{clubRating.toFixed(1)}</Text>
-        </View>
-        <View>
-          <Text style={styles.finLabel}>Elite-player appeal</Text>
-          <Text style={styles.staffSummaryValue}>{eliteAppeal}%</Text>
         </View>
         <Button
           label="Recruit Staff"
@@ -365,50 +590,6 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
         })}
       </Card>
 
-      <Text style={styles.section}>Facilities</Text>
-      <Card>
-        {OFFICE_FACILITIES.map((kind, i) => {
-          const level = facilities[kind];
-          const maxed = level >= MAX_FACILITY;
-          const cost = facilityUpgradeCost(level + 1);
-          const afford = team.budget >= cost;
-          // ROI descriptions per facility kind and level
-          const roiDesc = getFacilityROI(kind, level + 1);
-          return (
-            <View key={kind} style={[styles.staffRow, i > 0 && styles.divider]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.staffRole}>
-                  {FACILITY_LABEL[kind]} · Level {level}/{MAX_FACILITY}
-                </Text>
-                <View style={styles.pips}>
-                  {Array.from({ length: MAX_FACILITY }).map((_, k) => (
-                    <View key={k} style={[styles.pip, k < level && styles.pipOn]} />
-                  ))}
-                </View>
-                {!maxed && roiDesc && <Text style={styles.roiHint}>↑ {roiDesc}</Text>}
-                {maxed && <Text style={styles.roiHint}>✓ Fully upgraded</Text>}
-              </View>
-              <Button
-                label={maxed ? 'Max' : facilityUpgradeTokens > 0 ? 'Use token' : fmtMoney(cost)}
-                size="sm"
-                variant={
-                  maxed
-                    ? 'ghost'
-                    : facilityUpgradeTokens > 0
-                      ? 'gold'
-                      : afford
-                        ? 'secondary'
-                        : 'ghost'
-                }
-                fullWidth={false}
-                disabled={maxed}
-                onPress={() => doUpgrade(kind)}
-              />
-            </View>
-          );
-        })}
-      </Card>
-
       {expiring.length ? (
         <>
           <Text style={styles.section}>Contracts expiring</Text>
@@ -427,8 +608,7 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
                       {fmtMoney(p.contract?.wage ?? 0)}
                     </Text>
                     <Text style={styles.expNote}>
-                      Renewal offer: 2 years - fee {fmtMoney(fee)} - release recoup{' '}
-                      {fmtMoney(recoup)}
+                      Renew 2yr: {fmtMoney(fee)} · Release: {fmtMoney(recoup)}
                     </Text>
                   </View>
                   <View style={styles.contractActions}>
@@ -476,47 +656,20 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
           </Card>
         </>
       ) : null}
-
     </Screen>
   );
-}
-
-const FACILITY_ROI: Record<(typeof OFFICE_FACILITIES)[number], string[]> = {
-  training: [
-    '+8% attribute growth per session',
-    '+12% attribute growth · coaches more effective',
-    '+18% growth · recovery 10% faster',
-    '+25% growth · youth development unlocked',
-    'MAX: elite training programme and faster youth development',
-  ],
-  medical: [
-    'Injuries heal 15% faster',
-    '+20% recovery speed · niggles auto-clear',
-    '+30% recovery · fitness preserved mid-season',
-    '+40% recovery · major injuries cut by half',
-    'MAX: near-instant recovery, fitness stays peak',
-  ],
-};
-
-function getFacilityROI(kind: keyof typeof FACILITY_ROI, nextLevel: number): string | undefined {
-  return FACILITY_ROI[kind]?.[nextLevel - 2];
-}
-
-function confidenceColor(v: number, colors: ThemeColors): string {
-  return v >= 60 ? colors.success : v >= 40 ? colors.warning : colors.danger;
 }
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     officeHero: {
-      minHeight: 190,
-      marginTop: spacing.md,
-      marginBottom: spacing.md,
-      borderRadius: radius.xl,
+      minHeight: 64,
+      marginTop: spacing.sm,
+      borderRadius: radius.md,
       overflow: 'hidden',
-      justifyContent: 'flex-end',
+      justifyContent: 'center',
     },
-    officeHeroImage: { borderRadius: radius.xl },
+    officeHeroImage: { borderRadius: radius.md },
     officeHeroShade: {
       position: 'absolute',
       top: 0,
@@ -525,24 +678,37 @@ const makeStyles = (colors: ThemeColors) =>
       left: 0,
       backgroundColor: 'rgba(5,8,6,0.48)',
     },
-    officeHeroCopy: { padding: spacing.lg, paddingTop: 72 },
-    officeHeroLabel: {
-      color: '#D5B56D',
+    officeHeroCopy: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+    officeHeroKicker: {
+      color: 'rgba(255,255,255,0.72)',
       fontSize: 9,
       fontWeight: fontWeight.black,
       letterSpacing: 1.1,
     },
     officeHeroTitle: {
-      color: '#F5F7F4',
-      fontSize: fontSize.xl,
+      fontSize: fontSize.md,
       fontWeight: fontWeight.black,
-      marginTop: 3,
+      marginTop: 2,
     },
-    officeHeroText: { color: '#D9E0DA', fontSize: fontSize.xs, marginTop: 3 },
     msg: { color: colors.textMuted, fontSize: fontSize.md },
+    nationalPauseCard: { marginTop: spacing.md, gap: spacing.sm },
+    nationalPauseTitle: {
+      color: colors.text,
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.heavy,
+    },
+    nationalPauseCopy: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
     finance: { marginTop: spacing.md },
     financeRow: { flexDirection: 'row', gap: spacing.lg },
     financeCol: { flex: 1 },
+    financeActions: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    financeActionsCompact: { flexDirection: 'column' },
+    financeActionButton: { flex: 1, minWidth: 0 },
     finLabel: {
       color: colors.textMuted,
       fontSize: fontSize.xs,
@@ -565,6 +731,92 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: spacing.xl,
       marginBottom: spacing.sm,
     },
+    sponsorCard: { gap: spacing.sm },
+    clubSponsorHeader: { marginTop: spacing.xs, marginBottom: spacing.sm },
+    sponsorActive: { gap: 3 },
+    sponsorTitle: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+    sponsorStatus: { color: colors.primaryLight, fontSize: fontSize.sm },
+    sponsorMeta: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 17 },
+    sponsorPremiumSlot: {
+      gap: 3,
+      marginTop: spacing.xs,
+      paddingTop: spacing.sm,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    sponsorOffers: { gap: spacing.sm },
+    sponsorOffer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.xs,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    sponsorOfferCopy: { flex: 1, minWidth: 0 },
+    infrastructureGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'stretch',
+      gap: spacing.sm,
+    },
+    infrastructureGridCompact: { flexDirection: 'column', flexWrap: 'nowrap' },
+    infrastructureCard: {
+      width: '31%',
+      flexGrow: 1,
+      minWidth: 190,
+      padding: spacing.md,
+    },
+    infrastructureCardCompact: { width: '100%', minWidth: 0 },
+    facilityHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    facilityIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    facilityTitleCopy: { flex: 1, minWidth: 0 },
+    facilityTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
+    facilityStatus: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 1 },
+    facilityEffect: {
+      minHeight: 30,
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 15,
+      marginTop: spacing.sm,
+    },
+    facilityAction: { marginTop: spacing.sm },
+    facilitySecondaryAction: { marginTop: spacing.xs },
+    groundCard: { backgroundColor: colors.bgElevated, borderColor: colors.borderStrong },
+    groundHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    groundIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    groundTitleCopy: { flex: 1, minWidth: 0 },
+    groundTitle: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+    groundMeta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+    groundStats: {
+      flexDirection: 'row',
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    groundStat: { flex: 1, minWidth: 0 },
+    groundStatValue: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.black },
+    groundRevenue: { color: colors.primaryLight },
+    groundStatLabel: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
     staffRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -624,7 +876,6 @@ const makeStyles = (colors: ThemeColors) =>
     pip: { width: 22, height: 6, borderRadius: 3, backgroundColor: colors.surfaceMuted },
     pipOn: { backgroundColor: colors.primary },
     expNote: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
-    roiHint: { color: colors.success, fontSize: fontSize.xs, marginTop: 3, fontStyle: 'italic' },
     injRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
     injLabel: { color: colors.danger, fontSize: fontSize.xs },
     // IAP banner

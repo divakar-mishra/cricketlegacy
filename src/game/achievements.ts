@@ -404,7 +404,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'life_global_deal',
     title: 'Global Icon',
-    description: 'Sign a Global-tier sponsorship.',
+    description: 'Sign a sponsorship at Icon stature.',
     icon: '🌐',
     tier: 'gold',
     category: 'life',
@@ -794,8 +794,19 @@ export function checkCareerStateAchievements(save: SaveGame): string[] {
   if (!user) return [];
 
   // Sponsors
-  if ((save.sponsors ?? []).length >= 1) try_('life_first_sponsor');
-  if ((save.sponsors ?? []).some((s) => s.tier === 'GLOBAL')) try_('life_global_deal');
+  const earnedSponsorContracts = [
+    ...(save.sponsorship?.activeEarned ? [save.sponsorship.activeEarned] : []),
+    ...(save.sponsorship?.history ?? []),
+  ];
+  if (earnedSponsorContracts.length >= 1 || (save.sponsors ?? []).length >= 1) {
+    try_('life_first_sponsor');
+  }
+  if (
+    earnedSponsorContracts.some((contract) => contract.signedStature === 'ICON') ||
+    (save.sponsors ?? []).some((sponsor) => sponsor.tier === 'GLOBAL')
+  ) {
+    try_('life_global_deal');
+  }
 
   // Brand
   if ((save.brand ?? 0) >= 80) try_('life_brand_80');

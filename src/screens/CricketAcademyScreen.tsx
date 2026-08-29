@@ -31,11 +31,7 @@ export function CricketAcademyScreen({ navigation }: ScreenProps<'CricketAcademy
 
   return (
     <Screen scroll>
-      <ScreenHeader
-        title="Cricket Academy"
-        subtitle="Handbook"
-        onBack={() => navigation.goBack()}
-      />
+      <ScreenHeader title="Cricket Academy" onBack={() => navigation.goBack()} />
 
       <View style={styles.search}>
         <Icon name="search" size={19} />
@@ -133,9 +129,6 @@ export function CricketAcademyScreen({ navigation }: ScreenProps<'CricketAcademy
         <View style={styles.empty}>
           <Icon name="search-outline" size={24} />
           <Text style={styles.emptyTitle}>No matching rule</Text>
-          <Text style={styles.emptyBody}>
-            Try a shorter term such as selection, scout or stamina.
-          </Text>
         </View>
       ) : null}
     </Screen>

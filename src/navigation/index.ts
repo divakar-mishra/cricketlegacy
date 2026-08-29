@@ -9,21 +9,23 @@ export type RootStackParamList = {
   SavedGames: undefined;
   Settings: undefined;
   CricketAcademy: undefined;
-  Login: { gate?: 'daily' } | undefined;
+  Login: undefined;
   Purchase: undefined;
   CareerHub: undefined;
   ManagerHub: undefined;
   Match: { intl?: boolean; daily?: boolean } | undefined;
   Training: undefined;
+  ManagerLeadership: undefined;
   Squad: undefined;
   Transfers: undefined;
   PlayerProfile: { playerId: string };
   PlayerLife:
-    | { initialTab?: 'overview' | 'development' | 'finance' | 'media' | 'legacy' }
-    | undefined;
+    { initialTab?: 'overview' | 'finance' | 'media' | 'legacy' } | undefined;
   Records: undefined;
   Narrative: undefined;
   ClubOffice: undefined;
+  MedicalCentre: undefined;
+  ClubStadium: undefined;
   Academy: undefined;
   Press: undefined;
   SeasonPass: undefined;
@@ -80,7 +82,6 @@ export type RootStackParamList = {
   U19WorldCup: undefined;
   // Feature 8
   InternationalCalendar: undefined;
-  AvatarQA: undefined;
 };
 
 export type ScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<

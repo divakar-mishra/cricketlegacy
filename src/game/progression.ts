@@ -6,7 +6,7 @@
 import { ATTR_META, TRAINING } from '../data/attributes';
 import { CareerPathLevel, MatchState, Player, Role, SaveGame } from '../domain/types';
 import { computeOverall } from '../engine/rating';
-import { Rng } from '../engine/rng';
+import { makeRng, Rng } from '../engine/rng';
 import { clamp } from '../utils/math';
 import { trainingAttributeCeiling } from './youthBalance';
 
@@ -14,6 +14,22 @@ type GroupId = keyof typeof ATTR_META; // 'batting' | 'bowling' | 'fielding' | '
 export type TrainGroup =
   'batting' | 'bowling' | 'fielding' | 'wicketkeeping' | 'fitness' | 'mental';
 export const TRAINING_GROUPS: GroupId[] = ['batting', 'bowling', 'fielding', 'meta'];
+
+/**
+ * All-Rounders split the same training week across two technical disciplines.
+ * The small workload reduction keeps their full-career OVR alongside the two
+ * specialist roles while every valid paid session still moves attributes.
+ */
+export const ALLROUNDER_TRAINING_GAIN_MULTIPLIER = 0.98;
+
+function stableSeed(value: string): number {
+  let hash = 2166136261 >>> 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
 
 export interface TrainingFocus {
   id: TrainGroup;
@@ -45,7 +61,7 @@ export const TRAINING_FOCUSES: Record<TrainGroup, TrainingFocus> = {
     id: 'wicketkeeping',
     label: 'Wicketkeeping',
     sourceGroup: 'fielding',
-    attributes: ['keeping'],
+    attributes: ['keeping', 'catching', 'agility'],
   },
   fitness: {
     id: 'fitness',
@@ -68,15 +84,15 @@ function groupObj(player: Player, group: GroupId): Record<string, number> {
 export function trainingGroupsForRole(role: Role): TrainGroup[] {
   switch (role) {
     case 'BATTER':
-      return ['batting', 'fitness', 'mental'];
+      return ['batting', 'fielding', 'fitness', 'mental'];
     case 'BOWLER':
-      return ['bowling', 'fitness', 'mental'];
+      return ['bowling', 'fielding', 'fitness', 'mental'];
     case 'WK_BATTER':
-      return ['batting', 'wicketkeeping', 'fitness'];
+      return ['batting', 'wicketkeeping', 'fielding', 'fitness', 'mental'];
     case 'ALLROUNDER':
-      return ['batting', 'bowling', 'fitness'];
+      return ['batting', 'bowling', 'fielding', 'fitness', 'mental'];
     default:
-      return ['batting', 'fitness', 'mental'];
+      return ['batting', 'fielding', 'fitness', 'mental'];
   }
 }
 
@@ -94,10 +110,22 @@ export function canTrainGroup(player: Player, group: TrainGroup): boolean {
 
 /* ---------------- Age-based development (season rollover) ---------------- */
 
-/** Advance a player one season: age up, then grow (young) or decline (old). */
-export function developPlayer(player: Player, rng: Rng): void {
+/**
+ * Advance a player one season. AI careers retain natural development; the
+ * playable career can disable free positive growth so upgrades come from the
+ * paid training sessions the user chose. Age-related decline still applies.
+ */
+export function developPlayer(
+  player: Player,
+  rng: Rng,
+  stageCeiling = 99,
+  allowPositiveGrowth = true,
+): void {
   player.age += 1;
-  const growthCap = player.isUserPlayer ? 99 : Math.min(99, player.potential + 5);
+  const growthCap = Math.min(
+    stageCeiling,
+    player.isUserPlayer ? 99 : Math.min(99, player.potential + 5),
+  );
 
   let center: number;
   if (player.age <= 25) center = 2.6;
@@ -106,12 +134,19 @@ export function developPlayer(player: Player, rng: Rng): void {
   else center = -2.4;
   const growing = center > 0;
 
+  if (growing && !allowPositiveGrowth) {
+    player.overall = computeOverall(player);
+    return;
+  }
+
   for (const g of TRAINING_GROUPS) {
     const obj = groupObj(player, g);
     for (const [key] of ATTR_META[g]) {
       const jitter = center + (rng() * 2 - 1) * 1.2;
       let next = Math.round(obj[key] + jitter);
-      if (growing) next = Math.min(next, growthCap);
+      // A stage cap blocks new automatic growth but never downgrades an old
+      // save whose attribute already sits above today's cap.
+      if (growing) next = Math.min(next, Math.max(obj[key], growthCap));
       obj[key] = clamp(next, 1, 99);
     }
   }
@@ -120,8 +155,27 @@ export function developPlayer(player: Player, rng: Rng): void {
 
 /* ---------------- Training (coin sink, in-season) ---------------- */
 
-export function trainingCost(sessionsDone: number): number {
-  return TRAINING.baseCost + sessionsDone * TRAINING.costGrowth;
+export function trainingSessionLimit(level?: CareerPathLevel): number {
+  if (level === 'SCHOOL') return 8;
+  if (level === 'U19') return 12;
+  return TRAINING.maxSessionsPerSeason;
+}
+
+export function trainingFocusSessionLimit(level?: CareerPathLevel): number {
+  return Math.ceil(trainingSessionLimit(level) / 2);
+}
+
+export function trainingCostMultiplier(overall: number): number {
+  if (overall >= 90) return 3.5;
+  if (overall >= 85) return 2.5;
+  if (overall >= 80) return 1.75;
+  if (overall >= 70) return 1.25;
+  return 1;
+}
+
+export function trainingCost(sessionsDone: number, overall = 0): number {
+  const base = TRAINING.baseCost + sessionsDone * TRAINING.costGrowth;
+  return Math.round(base * trainingCostMultiplier(overall));
 }
 
 export function sessionsDone(player: Player, group?: TrainGroup): number {
@@ -129,11 +183,15 @@ export function sessionsDone(player: Player, group?: TrainGroup): number {
   return player.trainingGroupSessionsThisSeason?.[group] ?? 0;
 }
 
-export function canTrain(player: Player, group?: TrainGroup): boolean {
+export function canTrain(
+  player: Player,
+  group?: TrainGroup,
+  careerPathLevel?: CareerPathLevel,
+): boolean {
   if (group && !canTrainGroup(player, group)) return false;
   return (
-    sessionsDone(player) < TRAINING.maxSessionsPerSeason &&
-    (!group || sessionsDone(player, group) < Math.ceil(TRAINING.maxSessionsPerSeason / 2))
+    sessionsDone(player) < trainingSessionLimit(careerPathLevel) &&
+    (!group || sessionsDone(player, group) < trainingFocusSessionLimit(careerPathLevel))
   );
 }
 
@@ -144,7 +202,7 @@ export interface TrainGain {
   to: number;
 }
 
-/** Improve the two weakest attributes in a focus group. Mutates the player. */
+/** Improve the three weakest attributes in a focus group. Mutates the player. */
 export function applyTraining(
   player: Player,
   group: TrainGroup,
@@ -152,7 +210,7 @@ export function applyTraining(
   careerPathLevel?: CareerPathLevel,
   gainMultiplier = 1,
 ): TrainGain[] {
-  if (!canTrain(player, group)) return [];
+  if (!canTrain(player, group, careerPathLevel)) return [];
   const focus = trainingFocusForGroup(group);
   const obj = groupObj(player, focus.sourceGroup);
   const labels = new Map(
@@ -170,7 +228,11 @@ export function applyTraining(
   for (const e of entries.slice(0, TRAINING.attrsPerSession)) {
     const baseGain =
       TRAINING.gainMin + Math.floor(rng() * (TRAINING.gainMax - TRAINING.gainMin + 1));
-    const gain = Math.max(1, Math.floor(baseGain * Math.max(1, gainMultiplier)));
+    const roleMultiplier =
+      player.role === 'ALLROUNDER' ? ALLROUNDER_TRAINING_GAIN_MULTIPLIER : 1;
+    const scaledGain = baseGain * Math.max(1, gainMultiplier) * roleMultiplier;
+    const wholeGain = Math.floor(scaledGain);
+    const gain = Math.max(1, wholeGain + (rng() < scaledGain - wholeGain ? 1 : 0));
     const to = clamp(e.val + gain, 1, ceiling);
     if (to <= e.val) continue;
     obj[e.key] = to;
@@ -245,8 +307,8 @@ export function updateFormAfterMatch(player: Player, perf: MatchPerformance): vo
     if (perf.runs >= 50) d += 12;
     else if (perf.runs >= 30) d += 7;
     else if (perf.runs >= 15) d += 2;
-    else if (perf.out && perf.runs < 10) d -= 8;
-    else d -= 3;
+    else if (perf.out && perf.runs < 10) d -= 5;
+    else d -= 1;
   }
   if (perf.bowled) {
     const econ = economy(perf);
@@ -286,11 +348,15 @@ export function updateTeamMorale(save: SaveGame, userWon: boolean, teamId = save
   const recentWins = last5.filter((f) => f.winnerTeamId === teamId).length;
   const spiritMultiplier = clamp(1 + (recentWins / 5) * 0.2, 1, 1.2);
 
+  // Match settlement must be reproducible from the save and fixture. Using
+  // ambient Math.random here made identical career-audit runs diverge and
+  // could change later selection/results after reloading the same save.
+  const rng = makeRng(stableSeed(`${save.id}:${lastFx?.id ?? save.currentSeasonId}:morale`));
   const delta = userWon
-    ? Math.round((2 + Math.random() * 3) * spiritMultiplier)
+    ? Math.round((2 + rng() * 3) * spiritMultiplier)
     : isThrashing
       ? -8
-      : -(2 + Math.round(Math.random() * 3));
+      : -(2 + Math.round(rng() * 3));
 
   for (const id of team.playerIds) {
     const p = save.players[id];
@@ -345,17 +411,17 @@ export interface Objective {
 export function matchObjective(role: Role): Objective {
   switch (role) {
     case 'BOWLER':
-      return { text: 'Take 2+ wickets', kind: 'WICKETS', wickets: 2, reward: 150 };
+      return { text: 'Take 2+ wickets', kind: 'WICKETS', wickets: 2, reward: 100 };
     case 'ALLROUNDER':
       return {
         text: 'Score 20+ or take 2 wickets',
         kind: 'EITHER',
         runs: 20,
         wickets: 2,
-        reward: 150,
+        reward: 100,
       };
     default:
-      return { text: 'Score 30+ runs', kind: 'RUNS', runs: 30, reward: 150 };
+      return { text: 'Score 30+ runs', kind: 'RUNS', runs: 30, reward: 100 };
   }
 }
 

@@ -56,4 +56,3 @@ export async function markStarterPackPurchased(
     // still prevents a duplicate checkout during this app session.
   }
 }
-

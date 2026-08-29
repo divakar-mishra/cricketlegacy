@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, useTheme } from '../theme';
 import { GlassBlurProvider } from './GlassSurface';
 
@@ -15,6 +15,8 @@ type Props = {
   contentStyle?: ViewStyle;
   /** Sticky content pinned below the screen body, respecting the safe area. */
   footer?: React.ReactNode;
+  /** Scrolls a scrolling screen back to its top whenever this value changes. */
+  scrollResetKey?: string | number;
 };
 
 /**
@@ -30,11 +32,18 @@ export function Screen({
   gradient,
   contentStyle,
   footer,
+  scrollResetKey,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { gradients, colors } = useTheme();
   const { width } = useWindowDimensions();
   const bg = gradient ?? gradients.night;
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (!scroll || scrollResetKey == null) return;
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [scroll, scrollResetKey]);
 
   // Responsive horizontal padding: ~4% of width, bounded between md and xl.
   const hPad = padded ? Math.max(spacing.md, Math.min(spacing.xl, Math.round(width * 0.045))) : 0;
@@ -52,11 +61,11 @@ export function Screen({
 
   const paddingStyle: ViewStyle = useMemo(
     () => ({
-      paddingTop: insets.top + (padded ? spacing.lg : 0),
+      paddingTop: padded ? spacing.lg : 0,
       paddingHorizontal: hPad,
       paddingBottom: padded ? spacing.lg : 0,
     }),
-    [insets.top, padded, hPad],
+    [padded, hPad],
   );
 
   const footerStyle: ViewStyle = useMemo(
@@ -75,6 +84,7 @@ export function Screen({
 
   const inner = scroll ? (
     <ScrollView
+      ref={scrollRef}
       style={styles.fill}
       contentContainerStyle={[paddingStyle, { flexGrow: 1 }, contentWidthStyle, contentStyle]}
       keyboardShouldPersistTaps="handled"
@@ -92,7 +102,9 @@ export function Screen({
       style={{ backgroundColor: colors.bg }}
       target={<LinearGradient colors={bg} style={styles.fill} />}
     >
-      {inner}
+      <SafeAreaView style={styles.fill} edges={['top']}>
+        {inner}
+      </SafeAreaView>
       {footer ? <View style={footerStyle}>{footer}</View> : null}
     </GlassBlurProvider>
   );

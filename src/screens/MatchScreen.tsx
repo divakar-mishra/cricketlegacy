@@ -42,6 +42,7 @@ import {
   ManhattanChart,
   Screen,
   ScreenHeader,
+  SponsorBrandRow,
   WagonWheel,
 } from '../components';
 import { getAchievement } from '../game/achievements';
@@ -75,10 +76,16 @@ import { careerSkipAction, continueSkipAfterInningsBreak } from '../game/matchSk
 import { deliveryDelayMs, MATCH_SPEED_OPTIONS, MatchSpeed } from '../game/matchTiming';
 import { shotAngle, shotReach } from '../engine/shots';
 import { matchObjective } from '../game/progression';
-import { tacticalImpactSummary, tacticChangeImpact } from '../game/tactics';
+import { tacticalImpactSummary, tacticChangeImpact, tacticSelectionSummary } from '../game/tactics';
 import { describeMatchup } from '../game/careerExperience';
-import { MANAGER_MATCH_ANALYSIS_COINS, managerResourceUsed } from '../game/managerResources';
+import {
+  MANAGER_EMERGENCY_TEAM_TALK_COINS,
+  MANAGER_MATCH_ANALYSIS_COINS,
+  managerResourceUsed,
+} from '../game/managerResources';
 import { buildOppositionReport } from '../game/oppositionAnalysis';
+import { applyManagerPreparationToLiveMatch } from '../game/season';
+import { activeSponsorBranding } from '../game/sponsorship';
 import { TossCall, TossChoice } from '../engine/toss';
 import { ScreenProps } from '../navigation';
 import { PlayResult, useCareer } from '../state/careerStore';
@@ -93,10 +100,9 @@ import {
   useThemedStyles,
 } from '../theme';
 import { HeroBackground, VictoryHero } from '../components/HeroBackground';
-import { TypewriterText } from '../components/TypewriterText';
 import { useSettings } from '../state/settingsStore';
 
-type Phase = 'loading' | 'prematch' | 'live' | 'done' | 'empty';
+type Phase = 'loading' | 'prematch' | 'live' | 'saving' | 'save-error' | 'done' | 'empty';
 type Mode = 'WATCH' | 'KEY' | 'INSTANT';
 type Tone = CommentaryTone;
 
@@ -182,25 +188,25 @@ const WEATHER_LABEL: Record<string, string> = {
 function surfaceBriefing(conditions: Conditions, format: Format): string {
   const { pitch, weather } = conditions;
   if (pitch === 'GREEN' && weather === 'OVERCAST') {
-    return 'New-ball seam should be strongest early. Top-order patience and accurate pace matter.';
+    return 'Best seam early; favour patience and accurate pace.';
   }
   if (pitch === 'GREEN') {
-    return 'Expect pace, carry, and early movement before batting becomes easier.';
+    return 'Early pace and carry; batting eases later.';
   }
   if (pitch === 'DUSTY') {
     return format === 'TEST'
-      ? 'Spin and uneven bounce should grow across the match. First-innings runs carry extra value.'
-      : 'Slower balls and spin should grip. Clean rotation is safer than forcing every boundary.';
+      ? 'Spin and uneven bounce increase; first-innings runs matter.'
+      : 'Spin and slower balls should grip; rotate strike.';
   }
   if (pitch === 'CRACKED') {
-    return 'Variable bounce raises wicket risk. Compact technique and disciplined lengths are rewarded.';
+    return 'Variable bounce; favour compact batting and disciplined lengths.';
   }
   if (pitch === 'FLAT') {
-    return 'A high-scoring surface. Boundary prevention and changes of pace become decisive.';
+    return 'High-scoring surface; protect boundaries and vary pace.';
   }
   return weather === 'HUMID'
-    ? 'A balanced surface with humidity aiding early movement. Conditions should settle later.'
-    : 'A balanced, true surface. Execution and match situation should outweigh the conditions.';
+    ? 'Balanced pitch; early movement in the humidity.'
+    : 'True surface; execution should decide it.';
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -249,7 +255,7 @@ function symbolFor(ev: BallEvent): string {
   }
 }
 
-function dismissalText(d?: Dismissal): string {
+function dismissalTypeText(d?: Dismissal): string {
   if (!d) return '';
   return d.type.replace(/_/g, ' ').toLowerCase();
 }
@@ -324,38 +330,131 @@ function userShots(
   return shots;
 }
 
-function generateMatchInsights(
-  match: { innings: Innings[] },
-  nameOf: (id: string) => string,
-): string[] {
-  const insights: string[] = [];
-  for (const inn of match.innings) {
-    // Best batting: find top scorer
-    const topBat = [...inn.batting].sort((a, b) => b.runs - a.runs)[0];
-    if (topBat && topBat.runs >= 30) {
-      insights.push(
-        `${nameOf(topBat.playerId)} top-scored with ${topBat.runs} off ${topBat.balls} balls`,
-      );
-    }
-    // Wicket hauls
-    const topBowl = [...inn.bowling].sort((a, b) => b.wickets - a.wickets)[0];
-    if (topBowl && topBowl.wickets >= 3) {
-      insights.push(
-        `${nameOf(topBowl.playerId)} took ${topBowl.wickets} wickets for ${topBowl.runs} runs`,
-      );
-    }
+function dismissalText(card: BatterCard, nameOf: (id: string) => string): string {
+  if (!card.out) return card.balls > 0 ? 'not out' : 'did not bat';
+  const dismissal = card.dismissal;
+  if (!dismissal) return 'out';
+  const bowler = dismissal.bowlerId ? nameOf(dismissal.bowlerId) : '';
+  const fielder = dismissal.fielderId ? nameOf(dismissal.fielderId) : '';
+  if (dismissal.type === 'CAUGHT') return `c ${fielder || 'fielder'} b ${bowler || 'bowler'}`;
+  if (dismissal.type === 'BOWLED') return `b ${bowler || 'bowler'}`;
+  if (dismissal.type === 'LBW') return `lbw b ${bowler || 'bowler'}`;
+  if (dismissal.type === 'RUN_OUT') return `run out${fielder ? ` (${fielder})` : ''}`;
+  if (dismissal.type === 'STUMPED') {
+    return `st ${fielder || 'keeper'} b ${bowler || 'bowler'}`;
   }
-  // Chase insight
-  if (match.innings.length >= 2) {
-    const first = match.innings[0];
-    const second = match.innings[1];
-    if (second.runs > first.runs) {
-      insights.push(
-        `Successful chase of ${first.runs + 1} with ${nameOf(second.batting[0]?.playerId || '')} leading the way`,
-      );
-    }
-  }
-  return insights.slice(0, 3);
+  return `hit wicket${bowler ? ` b ${bowler}` : ''}`;
+}
+
+function inningsExtras(innings: Innings): number {
+  return innings.events.reduce(
+    (sum, event) =>
+      ['WD', 'NB', 'BYE', 'LB'].includes(event.outcome) ? sum + Math.max(0, event.runs) : sum,
+    0,
+  );
+}
+
+function FullInningsScorecard({
+  innings,
+  format,
+  teamName,
+  nameOf,
+}: {
+  innings: Innings;
+  format: Format;
+  teamName: (id: string) => string;
+  nameOf: (id: string) => string;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  const ballsPerOver = FORMATS[format].ballsPerOver;
+  const oversText = (balls: number) =>
+    `${Math.floor(balls / ballsPerOver)}.${balls % ballsPerOver}`;
+  return (
+    <Card style={styles.fullScorecardCard}>
+      <View style={styles.innHeader}>
+        <Text style={styles.innTeam} numberOfLines={1}>
+          {teamName(innings.battingTeamId)}
+        </Text>
+        <Text style={styles.innScore}>
+          {innings.runs}/{innings.wickets}{' '}
+          <Text style={styles.innOvers}>({innings.overs.toFixed(1)})</Text>
+        </Text>
+      </View>
+
+      <View style={styles.scorecardHeaderRow}>
+        <Text style={styles.scorecardHeaderName}>Batting</Text>
+        {['R', 'B', '4s', '6s', 'SR'].map((label) => (
+          <Text key={label} style={styles.scorecardHeaderStat}>
+            {label}
+          </Text>
+        ))}
+      </View>
+      {[...innings.batting]
+        .sort((left, right) => left.battedOrder - right.battedOrder)
+        .map((batter) => {
+          const strikeRate =
+            batter.balls > 0 ? ((batter.runs / batter.balls) * 100).toFixed(1) : '—';
+          return (
+            <View key={batter.playerId} style={styles.scorecardPlayerBlock}>
+              <View style={styles.scorecardDataRow}>
+                <Text style={styles.scorecardPlayerName} numberOfLines={1}>
+                  {nameOf(batter.playerId)}
+                </Text>
+                {[batter.runs, batter.balls, batter.fours, batter.sixes, strikeRate].map(
+                  (value, index) => (
+                    <Text key={index} style={styles.scorecardStat}>
+                      {value}
+                    </Text>
+                  ),
+                )}
+              </View>
+              <Text style={styles.scorecardDismissal} numberOfLines={1}>
+                {dismissalText(batter, nameOf)}
+              </Text>
+            </View>
+          );
+        })}
+      <View style={styles.scorecardTotalRow}>
+        <Text style={styles.scorecardTotalLabel}>Extras</Text>
+        <Text style={styles.scorecardTotalValue}>{inningsExtras(innings)}</Text>
+      </View>
+      <View style={styles.scorecardTotalRow}>
+        <Text style={styles.scorecardTotalLabel}>Total</Text>
+        <Text style={styles.scorecardTotalValue}>
+          {innings.runs}/{innings.wickets}
+        </Text>
+      </View>
+
+      <View style={[styles.scorecardHeaderRow, styles.scorecardBowlingHeader]}>
+        <Text style={styles.scorecardHeaderName}>Bowling</Text>
+        {['O', 'M', 'R', 'W', 'Econ'].map((label) => (
+          <Text key={label} style={styles.scorecardHeaderStat}>
+            {label}
+          </Text>
+        ))}
+      </View>
+      {innings.bowling
+        .filter((bowler) => bowler.balls > 0)
+        .map((bowler) => {
+          const overs = bowler.balls / ballsPerOver;
+          const economy = overs > 0 ? (bowler.runs / overs).toFixed(1) : '—';
+          return (
+            <View key={bowler.playerId} style={styles.scorecardDataRow}>
+              <Text style={styles.scorecardPlayerName} numberOfLines={1}>
+                {nameOf(bowler.playerId)}
+              </Text>
+              {[oversText(bowler.balls), bowler.maidens, bowler.runs, bowler.wickets, economy].map(
+                (value, index) => (
+                  <Text key={index} style={styles.scorecardStat}>
+                    {value}
+                  </Text>
+                ),
+              )}
+            </View>
+          );
+        })}
+    </Card>
+  );
 }
 
 export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
@@ -369,12 +468,16 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const commitInternational = useCareer((s) => s.commitInternational);
   const beginDailyChallengeMatch = useCareer((s) => s.beginDailyChallengeMatch);
   const commitDailyChallengeMatch = useCareer((s) => s.commitDailyChallengeMatch);
+  const persistCritical = useCareer((s) => s.persistCritical);
   const grantAdReward = useCareer((s) => s.grantAdReward);
   const setSaveTactics = useCareer((s) => s.setTactics);
   const runManagerResource = useCareer((s) => s.useManagerResource);
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const TONE_COLOR = toneColors(colors);
+  const sponsorBranding = save
+    ? activeSponsorBranding(save)
+    : { earned: undefined, premium: undefined };
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [adBusy, setAdBusy] = useState(false);
@@ -431,9 +534,11 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     save?.tactics ?? { batting: 'BALANCED', bowling: 'CONTAIN', field: 'BALANCED' },
   );
   const [managerPreparationConfirmed, setManagerPreparationConfirmed] = useState(false);
+  const [managerPreparationOpen, setManagerPreparationOpen] = useState(false);
   const [managerAnalysisFlash, setManagerAnalysisFlash] = useState<string | null>(null);
   const [speedMult, setSpeedMult] = useState<MatchSpeed>(1);
   const [commentaryOpen, setCommentaryOpen] = useState(false);
+  const [fullScorecardOpen, setFullScorecardOpen] = useState(false);
   const commentaryPauseRef = useRef(false);
   const [manualPaused, setManualPaused] = useState(false);
   const manualPauseRef = useRef(false);
@@ -471,6 +576,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     transform: [{ perspective: 600 }, { rotateY: `${coinFlipRotation.value}deg` }],
   }));
   const [result, setResult] = useState<PlayResult | null>(null);
+  const [settlementError, setSettlementError] = useState<string | null>(null);
   const [lastShot, setLastShot] = useState<LastShot | null>(null);
   const [celebration, setCelebration] = useState<{ trigger: number; kind: CelebrationKind }>({
     trigger: 0,
@@ -522,6 +628,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const feedId = useRef(0);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveDialogOpen = useRef(false);
+  const finalizedFixtureRef = useRef<string | null>(null);
 
   useEffect(
     () => () => {
@@ -535,7 +642,10 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     else if (phase === 'done') music.setMusicScene(result?.userWon ? 'VICTORY' : 'DEFEAT');
   }, [phase, result?.userWon]);
 
-  const userTeamId = save?.userTeamId;
+  // Grade A/U19 careers control the pathway XI rather than save.userTeamId
+  // (their future senior club). Manager phases can also control another team.
+  // The live match is therefore the canonical team for role and skip logic.
+  const userTeamId = setup?.controlledTeamId ?? lmRef.current?.controlledTeamId ?? save?.userTeamId;
   const userPlayerId = save?.userPlayerId;
   const nameOf = useCallback((id: string) => save?.players[id]?.name ?? '—', [save]);
   const teamName = useCallback((id: string) => save?.teams[id]?.name ?? 'Opposition', [save]);
@@ -543,12 +653,22 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     (id: string) => save?.teams[id]?.shortName ?? save?.teams[id]?.name ?? 'OPP',
     [save],
   );
-  const activeMatch = phase === 'prematch' || phase === 'live';
+  const settlementPending = phase === 'saving' || phase === 'save-error';
+  const activeMatch = phase === 'prematch' || phase === 'live' || settlementPending;
   const leaveMatch = useCallback(() => {
     leaveDialogOpen.current = false;
     navigation.goBack();
   }, [navigation]);
   const guardedGoBack = useCallback(() => {
+    if (settlementPending) {
+      Alert.alert(
+        'Result not saved yet',
+        phase === 'saving'
+          ? 'The match result is being saved. Please wait.'
+          : 'Retry the save before leaving so this fixture cannot reopen.',
+      );
+      return;
+    }
     if (!activeMatch) {
       navigation.goBack();
       return;
@@ -567,7 +687,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     };
     Alert.alert(
       'Leave match?',
-      'Leaving now will restart or forfeit the current match. Are you sure you want to leave?',
+      'Leaving restarts or forfeits this match.',
       [
         {
           text: 'Stay in match',
@@ -585,7 +705,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         onDismiss: resumeAfterDialog,
       },
     );
-  }, [activeMatch, leaveMatch, navigation]);
+  }, [activeMatch, leaveMatch, navigation, phase, settlementPending]);
 
   useFocusEffect(
     useCallback(() => {
@@ -604,7 +724,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     });
     return () => sub.remove();
   }, []);
-  // DRS is a domestic/international feature only — youth (School/U19) cricket has no reviews.
+  // DRS is a domestic/international feature only — Grade A/U19 cricket has no reviews.
   const drsEligible = drsAvailableForMatch({
     mode: mode === 'career' ? 'career' : mode === 'manager' ? 'manager' : undefined,
     careerPathLevel: save?.careerPathLevel,
@@ -928,7 +1048,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
 
       if (!step.milestone && step.wicketOf) {
         flashBanner({
-          text: `WICKET! ${nameOf(step.wicketOf)} ${dismissalText(ev.dismissal)}`,
+          text: `WICKET! ${nameOf(step.wicketOf)} ${dismissalTypeText(ev.dismissal)}`,
           tone: 'danger',
         });
       } else if (step.inningsBreak) {
@@ -959,7 +1079,9 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   );
 
   const finish = useCallback(
-    (lm: LiveMatch) => {
+    async (lm: LiveMatch) => {
+      if (finalizedFixtureRef.current === lm.id) return;
+      finalizedFixtureRef.current = lm.id;
       const match = lm.finalizeMatch();
       const attack = stanceEvidenceRef.current.ATTACK;
       const big = stanceEvidenceRef.current.BIG;
@@ -1001,16 +1123,44 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         : intl
           ? commitInternational(match)
           : commitLiveMatch(match);
+      if (!res) {
+        // A second completion callback or a repaired legacy ledger must never
+        // reopen/reward the fixture. Return to the hub instead of presenting a
+        // result that was not committed.
+        setPhase('empty');
+        return;
+      }
       setResult(res);
-      setPhase('done');
+      setSettlementError(null);
+      setPhase('saving');
       if (res?.userWon) {
         moment('win');
         setCelebration((prev) => ({ trigger: prev.trigger + 1, kind: 'win' }));
       } else if (res) {
         moment('defeat');
       }
+      try {
+        // Do not expose Continue until the completed fixture and its result
+        // ledger have reached the serialized save queue.
+        await persistCritical(true);
+        setPhase('done');
+      } catch (error) {
+        setSettlementError(
+          error instanceof Error && error.message
+            ? error.message
+            : 'The device did not confirm the match-result save.',
+        );
+        setPhase('save-error');
+      }
     },
-    [commitInternational, commitLiveMatch, commitDailyChallengeMatch, intl, daily],
+    [
+      commitInternational,
+      commitLiveMatch,
+      commitDailyChallengeMatch,
+      intl,
+      daily,
+      persistCritical,
+    ],
   );
 
   const waitForPlan = useCallback(
@@ -1024,7 +1174,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       if (!lm) return;
       if (chosen === 'INSTANT') {
         while (!lm.matchDone) lm.nextBall();
-        finish(lm);
+        await finish(lm);
         return;
       }
       setPhase('live');
@@ -1271,7 +1421,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       if (!cancelled.current) {
         skipBusyRef.current = false;
         setSkipBusyLabel(null);
-        finish(lm);
+        await finish(lm);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1307,6 +1457,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       setPhase('empty');
       return;
     }
+    finalizedFixtureRef.current = null;
     lmRef.current = started.live;
     const activeSave = useCareer.getState().save;
     const activeFixture = activeSave?.fixtures[started.live.id];
@@ -1394,6 +1545,45 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     }
   };
 
+  const retrySettlementSave = async () => {
+    if (!result) return;
+    setSettlementError(null);
+    setPhase('saving');
+    try {
+      await persistCritical(true);
+      setPhase('done');
+    } catch (error) {
+      setSettlementError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'The device did not confirm the match-result save.',
+      );
+      setPhase('save-error');
+    }
+  };
+
+  // ---------- RESULT SETTLEMENT ----------
+  if ((phase === 'saving' || phase === 'save-error') && result) {
+    return (
+      <Screen>
+        <ScreenHeader title="Saving result" onBack={guardedGoBack} />
+        <Card>
+          <Text style={styles.msg}>
+            {phase === 'saving'
+              ? 'Finalising this fixture…'
+              : 'This result is still on this screen but has not been confirmed on the device.'}
+          </Text>
+          {phase === 'save-error' ? (
+            <>
+              {settlementError ? <Text style={styles.msg}>{settlementError}</Text> : null}
+              <Button label="Retry save" variant="gold" onPress={() => void retrySettlementSave()} />
+            </>
+          ) : null}
+        </Card>
+      </Screen>
+    );
+  }
+
   // ---------- EMPTY ----------
   if (phase === 'empty' || !save) {
     return (
@@ -1408,12 +1598,31 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   // ---------- PRE-MATCH ----------
   const applyManagerTactics = (next: Tactics) => {
     setManagerTactics(next);
-    setSaveTactics(next);
+    setSaveTactics(next, lmRef.current?.id);
     lmRef.current?.setTactics({
       battingBias: TEAM_APPROACH_OPTIONS.find((o) => o.value === next.batting)?.bias ?? 0,
       bowlerPlan: next.bowling,
       field: next.field,
     });
+  };
+
+  const confirmManagerPreparation = () => {
+    const live = lmRef.current;
+    if (!live) return;
+
+    // Persist and scope the plan to the exact fixture already loaded on this
+    // Matchday, then refresh its controlled side from the updated save.
+    applyManagerTactics(managerTactics);
+    const activeSave = useCareer.getState().save;
+    if (!activeSave || !applyManagerPreparationToLiveMatch(activeSave, live.id, live)) {
+      setManagerAnalysisFlash(
+        'Preparation could not be applied to this fixture. Please try again.',
+      );
+      return;
+    }
+
+    updateCrease(live);
+    setManagerPreparationConfirmed(true);
   };
 
   const callToss = (call: TossCall) => {
@@ -1498,21 +1707,69 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     const awayKeyPlayer = bestPlayer(setup.awayTeamId);
     const managerReport =
       mode === 'manager' ? buildOppositionReport(save, lmRef.current?.id) : undefined;
-    const managerAnalysisUsed = mode === 'manager' && managerResourceUsed(save, 'MATCH_ANALYSIS');
+    const managerAnalysisUsed =
+      mode === 'manager' && managerResourceUsed(save, 'MATCH_ANALYSIS', lmRef.current?.id);
+    const managerTeamTalkUsed =
+      mode === 'manager' && managerResourceUsed(save, 'EMERGENCY_TEAM_TALK', lmRef.current?.id);
+    const refreshAfterManagerResource = () => {
+      const live = lmRef.current;
+      const activeSave = useCareer.getState().save;
+      if (!live || !activeSave || !applyManagerPreparationToLiveMatch(activeSave, live.id, live)) {
+        return false;
+      }
+      updateCrease(live);
+      return true;
+    };
     const applyRecommendedPlan = () => {
       if (!managerReport) return;
       applyManagerTactics(managerReport.recommendedTactics);
       setManagerAnalysisFlash(
-        `Recommended plan applied: ${managerReport.recommendedTactics.batting} batting, ${managerReport.recommendedTactics.bowling} bowling, ${managerReport.recommendedTactics.field} field.`,
+        `Plan applied: ${tacticSelectionSummary(managerReport.recommendedTactics)}.`,
       );
     };
     const buyManagerAnalysis = () => {
-      const outcome = runManagerResource('MATCH_ANALYSIS');
-      setManagerAnalysisFlash(outcome.detail ?? outcome.reason ?? 'Analysis is unavailable.');
+      const outcome = runManagerResource('MATCH_ANALYSIS', lmRef.current?.id);
+      const refreshed = !outcome.ok || refreshAfterManagerResource();
+      setManagerAnalysisFlash(
+        outcome.ok
+          ? refreshed
+            ? 'Analysis unlocked · XI +2 form · +1 morale'
+            : 'Analysis saved · confirm preparation to refresh this match'
+          : (outcome.reason ?? 'Analysis unavailable.'),
+      );
+    };
+    const buyManagerTeamTalk = () => {
+      const outcome = runManagerResource('EMERGENCY_TEAM_TALK', lmRef.current?.id);
+      const refreshed = !outcome.ok || refreshAfterManagerResource();
+      setManagerAnalysisFlash(
+        outcome.ok
+          ? refreshed
+            ? 'Team talk complete · 3 players +5 morale'
+            : 'Team talk saved · confirm preparation to refresh this match'
+          : (outcome.reason ?? 'Team talk unavailable.'),
+      );
     };
 
     return (
-      <Screen scroll gradient={gradients.pitch}>
+      <Screen
+        scroll
+        gradient={gradients.pitch}
+        footer={
+          !tossRevealed ? (
+            <View style={styles.requirementFooter}>
+              <Text style={styles.requirementText}>
+                {coinFlipping ? 'Toss in progress…' : 'Choose Heads or Tails above to continue'}
+              </Text>
+              <Button label="Continue to Match" variant="secondary" disabled />
+            </View>
+          ) : mode === 'manager' && !managerPreparationConfirmed ? (
+            <View style={styles.requirementFooter}>
+              <Text style={styles.requirementText}>Confirm the match plan above to continue</Text>
+              <Button label="Continue to Match" variant="secondary" disabled />
+            </View>
+          ) : undefined
+        }
+      >
         <ScreenHeader title="Matchday" onBack={guardedGoBack} />
 
         {/* Cinematic team clash header */}
@@ -1548,6 +1805,12 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             </View>
           </Animated.View>
         </Animated.View>
+        <SponsorBrandRow
+          earned={sponsorBranding.earned}
+          premium={sponsorBranding.premium}
+          compact
+          style={styles.matchSponsorRow}
+        />
 
         {/* Conditions card */}
         <Animated.View entering={FadeInDown.duration(350).delay(400)}>
@@ -1629,15 +1892,13 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                   </View>
                   <Text style={styles.tossPrompt}>
                     {setup.userCanCallToss && selectedTossCall
-                      ? `You called ${selectedTossCall.toLowerCase()}. It landed ${setup.tossCoinFace.toLowerCase()}.`
-                      : `The coin landed ${setup.tossCoinFace.toLowerCase()}.`}
+                      ? `Called ${selectedTossCall.toLowerCase()} · Landed ${setup.tossCoinFace.toLowerCase()}`
+                      : `Landed ${setup.tossCoinFace.toLowerCase()}`}
                   </Text>
                 </View>
                 {setup.userMayChooseToss ? (
                   <>
-                    <Text style={styles.tossPrompt}>
-                      You won. Choose what your team does first.
-                    </Text>
+                    <Text style={styles.tossPrompt}>Choose to bat or bowl.</Text>
                     <View style={styles.tossChoices}>
                       {(['BAT', 'BOWL'] as TossChoice[]).map((choice) => {
                         const selected = setup.tossChoice === choice;
@@ -1668,9 +1929,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                     first.
                   </Text>
                 )}
-                <Text style={styles.tossOutcome}>
-                  {teamName(setup.battingFirstTeamId)} will bat first. {setup.tossReason}
-                </Text>
+                <Text style={styles.tossOutcome}>{setup.tossReason}</Text>
               </>
             ) : null}
           </Card>
@@ -1694,9 +1953,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                   </View>
                 </>
               ) : (
-                <Text style={styles.missionPreGoal}>
-                  No personal challenge is active because you are not in the XI.
-                </Text>
+                <Text style={styles.missionPreGoal}>Not selected · no personal objective.</Text>
               )}
             </Card>
           </Animated.View>
@@ -1704,64 +1961,56 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           <Animated.View entering={FadeInDown.duration(350).delay(520)}>
             <Card style={styles.missionPreCard}>
               <Text style={styles.missionPreTitle}>Match Preparation</Text>
-              <Text style={styles.missionPreGoal}>
-                Review the opponent, choose a plan and confirm preparation before entering the
-                match.
-              </Text>
               <Text style={styles.fieldRestrictionText}>
                 Head-to-head: {homeShort} {homeHeadToHeadWins}-{awayHeadToHeadWins} {awayShort}
               </Text>
               {managerReport ? (
                 <>
-                  <Text style={styles.preparationScale}>
-                    Opposition unit ratings are out of 100. Red means an elite danger, amber means
-                    strong, and green means manageable.
-                  </Text>
                   <View style={styles.preparationRatings}>
                     <PreparationRating label="Batting" value={managerReport.battingRating} />
                     <PreparationRating label="Bowling" value={managerReport.bowlingRating} />
                     <PreparationRating label="Fielding" value={managerReport.fieldingRating} />
                   </View>
-                  <Text style={styles.preparationLine}>
-                    Attack shape: {managerReport.attackShape}
-                  </Text>
-                  {managerAnalysisUsed ? (
-                    <View style={styles.analysisReport}>
-                      <Text style={styles.analysisReportTitle}>Full opposition report</Text>
-                      <Text style={styles.preparationLine}>
-                        Batting threat: {managerReport.topBatter.name} (
-                        {managerReport.topBatter.rating}). {managerReport.topBatter.detail}
-                      </Text>
-                      <Text style={styles.preparationLine}>
-                        Bowling threat: {managerReport.topBowler.name} (
-                        {managerReport.topBowler.rating}). {managerReport.topBowler.detail}
-                      </Text>
-                      <Text style={styles.preparationLine}>Weakness: {managerReport.weakness}</Text>
-                      <Text style={styles.preparationLine}>
-                        Recommendation: {managerReport.recommendation}
-                      </Text>
-                      <Button
-                        label="Apply Recommended Plan"
-                        variant="secondary"
-                        size="sm"
-                        onPress={applyRecommendedPlan}
-                      />
-                    </View>
-                  ) : (
-                    <View style={styles.analysisLocked}>
-                      <Text style={styles.preparationLine}>
-                        The basic review shows unit strength and attack shape. Full analysis reveals
-                        named threats, a technical weakness and recommended tactics.
-                      </Text>
-                      <Button
-                        label={`Unlock Full Analysis · ${MANAGER_MATCH_ANALYSIS_COINS}`}
-                        variant="secondary"
-                        size="sm"
-                        disabled={save.wallet.coins < MANAGER_MATCH_ANALYSIS_COINS}
-                        onPress={buyManagerAnalysis}
-                      />
-                    </View>
-                  )}
+                  <Button
+                    label={
+                      managerPreparationOpen ? 'Hide preparation details' : 'Review preparation'
+                    }
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => setManagerPreparationOpen((open) => !open)}
+                  />
+                  {managerPreparationOpen ? (
+                    managerAnalysisUsed ? (
+                      <View style={styles.analysisReport}>
+                        <Text style={styles.analysisReportTitle}>Full opposition report</Text>
+                        <Text style={styles.preparationLine}>
+                          Batting · {managerReport.topBatter.name} ({managerReport.topBatter.rating}
+                          )
+                        </Text>
+                        <Text style={styles.preparationLine}>
+                          Bowling · {managerReport.topBowler.name} ({managerReport.topBowler.rating}
+                          )
+                        </Text>
+                        <Text style={styles.preparationLine}>{managerReport.recommendation}</Text>
+                        <Button
+                          label="Apply Recommended Plan"
+                          variant="secondary"
+                          size="sm"
+                          onPress={applyRecommendedPlan}
+                        />
+                      </View>
+                    ) : (
+                      <View style={styles.analysisLocked}>
+                        <Button
+                          label={`Unlock Full Analysis · ${MANAGER_MATCH_ANALYSIS_COINS} coins`}
+                          variant="secondary"
+                          size="sm"
+                          disabled={save.wallet.coins < MANAGER_MATCH_ANALYSIS_COINS}
+                          onPress={buyManagerAnalysis}
+                        />
+                      </View>
+                    )
+                  ) : null}
                 </>
               ) : (
                 <Text style={styles.fieldRestrictionText}>
@@ -1770,85 +2019,121 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                   {awayKeyPlayer?.name ?? awayShort} ({awayKeyPlayer?.overall ?? '-'})
                 </Text>
               )}
-              {managerAnalysisFlash ? (
-                <Text style={styles.analysisFlash}>{managerAnalysisFlash}</Text>
-              ) : null}
-              <Text style={styles.tacticPreLabel}>Batting approach</Text>
-              <View style={styles.tacticPreRow}>
-                {TEAM_APPROACH_OPTIONS.map((o) => {
-                  const sel = managerTactics.batting === o.value;
-                  return (
-                    <Pressable
-                      key={o.value}
-                      style={[styles.tacticPreChip, sel && styles.tacticPreChipActive]}
-                      onPress={() => applyManagerTactics({ ...managerTactics, batting: o.value })}
-                    >
-                      <Text
-                        style={[styles.tacticPreChipText, sel && styles.tacticPreChipTextActive]}
-                      >
-                        {o.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={styles.tacticPreLabel}>Bowling plan</Text>
-              <View style={styles.tacticPreRow}>
-                {BOWLER_PLAN_OPTIONS.map((o) => {
-                  const sel = managerTactics.bowling === o.value;
-                  return (
-                    <Pressable
-                      key={o.value}
-                      style={[styles.tacticPreChip, sel && styles.tacticPreChipActive]}
-                      onPress={() => applyManagerTactics({ ...managerTactics, bowling: o.value })}
-                    >
-                      <Text
-                        style={[styles.tacticPreChipText, sel && styles.tacticPreChipTextActive]}
-                      >
-                        {o.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={styles.tacticPreLabel}>Field setting</Text>
-              <Text style={styles.fieldRestrictionText}>
-                {fieldRestriction(setup.format, 0).label}
-              </Text>
-              <View style={styles.tacticPreRow}>
-                {FIELD_OPTIONS.map((o) => {
-                  const sel = managerTactics.field === o.value;
-                  const legal = isFieldSettingLegal(o.value, setup.format, 0);
-                  return (
-                    <Pressable
-                      key={o.value}
-                      disabled={!legal}
-                      style={[
-                        styles.tacticPreChip,
-                        sel && styles.tacticPreChipActive,
-                        !legal && styles.tacticChipDisabled,
-                      ]}
-                      onPress={() => applyManagerTactics({ ...managerTactics, field: o.value })}
-                    >
-                      <Text
-                        style={[styles.tacticPreChipText, sel && styles.tacticPreChipTextActive]}
-                      >
-                        {o.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={styles.fieldRestrictionText}>
-                More defensive fields unlock after the powerplay.
-              </Text>
+              {managerPreparationOpen ? (
+                <>
+                  <View style={styles.analysisLocked}>
+                    <Text style={styles.analysisReportTitle}>Emergency Team Talk</Text>
+                    <Button
+                      label={
+                        managerTeamTalkUsed
+                          ? 'Team Talk Applied'
+                          : `Run Team Talk · ${MANAGER_EMERGENCY_TEAM_TALK_COINS.toLocaleString()} coins`
+                      }
+                      variant="secondary"
+                      size="sm"
+                      disabled={
+                        managerTeamTalkUsed || save.wallet.coins < MANAGER_EMERGENCY_TEAM_TALK_COINS
+                      }
+                      onPress={buyManagerTeamTalk}
+                    />
+                  </View>
+                  {managerAnalysisFlash ? (
+                    <Text style={styles.analysisFlash}>{managerAnalysisFlash}</Text>
+                  ) : null}
+                  <Text style={styles.tacticPreLabel}>Batting approach</Text>
+                  <View style={styles.tacticPreRow}>
+                    {TEAM_APPROACH_OPTIONS.map((o) => {
+                      const sel = managerTactics.batting === o.value;
+                      return (
+                        <Pressable
+                          key={o.value}
+                          style={[styles.tacticPreChip, sel && styles.tacticPreChipActive]}
+                          onPress={() =>
+                            applyManagerTactics({ ...managerTactics, batting: o.value })
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.tacticPreChipText,
+                              sel && styles.tacticPreChipTextActive,
+                            ]}
+                          >
+                            {o.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.tacticPreLabel}>Bowling plan</Text>
+                  <View style={styles.tacticPreRow}>
+                    {BOWLER_PLAN_OPTIONS.map((o) => {
+                      const sel = managerTactics.bowling === o.value;
+                      return (
+                        <Pressable
+                          key={o.value}
+                          style={[styles.tacticPreChip, sel && styles.tacticPreChipActive]}
+                          onPress={() =>
+                            applyManagerTactics({ ...managerTactics, bowling: o.value })
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.tacticPreChipText,
+                              sel && styles.tacticPreChipTextActive,
+                            ]}
+                          >
+                            {o.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.tacticPreLabel}>Field setting</Text>
+                  <View style={styles.fieldRestrictionCallout}>
+                    <Text style={styles.fieldRestrictionCalloutText}>
+                      {fieldRestriction(setup.format, 0).label}
+                    </Text>
+                  </View>
+                  <View style={styles.tacticPreRow}>
+                    {FIELD_OPTIONS.map((o) => {
+                      const sel = managerTactics.field === o.value;
+                      const legal = isFieldSettingLegal(o.value, setup.format, 0);
+                      return (
+                        <Pressable
+                          key={o.value}
+                          disabled={!legal}
+                          style={[
+                            styles.tacticPreChip,
+                            sel && styles.tacticPreChipActive,
+                            !legal && styles.tacticChipDisabled,
+                          ]}
+                          onPress={() => applyManagerTactics({ ...managerTactics, field: o.value })}
+                        >
+                          <Text
+                            style={[
+                              styles.tacticPreChipText,
+                              sel && styles.tacticPreChipTextActive,
+                            ]}
+                          >
+                            {o.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              ) : (
+                <Text style={styles.managerPlanSummary}>
+                  Current plan · {tacticSelectionSummary(managerTactics)}
+                </Text>
+              )}
               <Button
                 label={
                   managerPreparationConfirmed ? 'Preparation Confirmed' : 'Confirm Preparation'
                 }
                 variant={managerPreparationConfirmed ? 'secondary' : 'primary'}
                 disabled={managerPreparationConfirmed}
-                onPress={() => setManagerPreparationConfirmed(true)}
+                onPress={confirmManagerPreparation}
                 style={{ marginTop: spacing.md }}
               />
             </Card>
@@ -1858,32 +2143,17 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         {tossRevealed && (mode !== 'manager' || managerPreparationConfirmed) ? (
           <>
             <Animated.View entering={FadeInDown.duration(300).delay(560)}>
-              <Text style={styles.pickLabel}>How do you want to play it?</Text>
+              <Text style={styles.pickLabel}>Match mode</Text>
             </Animated.View>
 
             <Animated.View entering={FadeInDown.duration(300).delay(600)}>
-              <ModeButton
-                emoji="🎙️"
-                title="Watch ball-by-ball"
-                desc="Live commentary; you choose your shot every ball you face."
-                onPress={() => drive('WATCH')}
-              />
+              <ModeButton emoji="🎙️" title="Watch ball-by-ball" onPress={() => drive('WATCH')} />
             </Animated.View>
             <Animated.View entering={FadeInDown.duration(300).delay(640)}>
-              <ModeButton
-                emoji="⏱️"
-                title="Key moments"
-                desc="Skim the match; decide only the big moments."
-                onPress={() => drive('KEY')}
-              />
+              <ModeButton emoji="⏱️" title="Key moments" onPress={() => drive('KEY')} />
             </Animated.View>
             <Animated.View entering={FadeInDown.duration(300).delay(720)}>
-              <ModeButton
-                emoji="⏭️"
-                title="Instant sim"
-                desc="Jump straight to the result."
-                onPress={() => drive('INSTANT')}
-              />
+              <ModeButton emoji="⏭️" title="Instant sim" onPress={() => drive('INSTANT')} />
             </Animated.View>
           </>
         ) : null}
@@ -1893,34 +2163,73 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
 
   // ---------- DONE (summary) ----------
   if (phase === 'done' && result) {
-    const { match, userWon, tie, coinsAwarded } = result;
-    const headline = userWon ? 'Victory!' : tie ? 'Tied!' : 'Defeat';
-    const headlineColor = userWon ? colors.success : tie ? colors.accent : colors.danger;
+    const { match, userWon, coinsAwarded } = result;
+    const marginText = match.result?.margin?.toLowerCase() ?? '';
+    const neutralOutcome = !match.result?.winnerTeamId;
+    const drawn = neutralOutcome && (match.format === 'TEST' || marginText.includes('draw'));
+    const tied = neutralOutcome && Boolean(match.result?.tie);
+    const headline = userWon
+      ? 'Victory!'
+      : drawn
+        ? 'Draw'
+        : tied
+          ? 'Tied!'
+          : neutralOutcome
+            ? 'No Result'
+            : 'Defeat';
+    const headlineColor = userWon
+      ? colors.success
+      : neutralOutcome
+        ? colors.accent
+        : colors.danger;
     const rewardedAdsAvailable = ads.isAdsReady() || ads.isReady('rewarded');
     return (
       <>
         <Screen
           scroll
+          scrollResetKey={`match-result:${result.fixtureId}`}
           gradient={gradients.pitch}
           footer={
-            <Button
-              label="Continue"
-              variant="gold"
-              onPress={() => {
-                // A fresh injury this match → present the Injury Report (replacing
-                // this screen so its back button returns to the hub, not here).
-                if (result.injury) {
-                  navigation.replace('InjuryReport', {
-                    playerName: result.injury.playerName,
-                    weeksOut: result.injury.matchesOut,
-                    matchesMissed: result.injury.matchesOut,
-                    playerId: result.injury.playerId,
-                  });
-                } else {
-                  navigation.goBack();
-                }
-              }}
-            />
+            <View style={styles.resultFooter}>
+              <Button
+                label={result.injury ? 'View Injury Report' : 'Continue'}
+                variant="gold"
+                onPress={() => {
+                  // A fresh injury this match → present the Injury Report (replacing
+                  // this screen so its back button returns to the hub, not here).
+                  if (result.injury) {
+                    navigation.replace('InjuryReport', {
+                      playerName: result.injury.playerName,
+                      weeksOut: result.injury.matchesOut,
+                      matchesMissed: result.injury.matchesOut,
+                      playerId: result.injury.playerId,
+                    });
+                  } else {
+                    navigation.goBack();
+                  }
+                }}
+              />
+              {mode === 'career' && !result.injury ? (
+                <View style={styles.resultFooterChoices}>
+                  <Button
+                    label="Training"
+                    variant="secondary"
+                    size="sm"
+                    fullWidth={false}
+                    style={styles.resultFooterChoice}
+                    onPress={() => navigation.replace('Training')}
+                  />
+                  <Button
+                    label="Life & Ventures"
+                    variant="secondary"
+                    size="sm"
+                    fullWidth={false}
+                    style={styles.resultFooterChoice}
+                    onPress={() => navigation.replace('PlayerLife')}
+                  />
+                </View>
+              ) : null}
+            </View>
           }
         >
           <ScreenHeader
@@ -1929,7 +2238,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             onBack={() => navigation.goBack()}
           />
           <Card style={styles.resultCard}>
-            <VictoryHero won={userWon} style={styles.victoryImg} />
+            <VictoryHero won={userWon} neutral={neutralOutcome} style={styles.victoryImg} />
             <Text style={[styles.resultBig, { color: headlineColor }]}>{headline}</Text>
             <Text style={styles.margin}>{match.result?.margin}</Text>
             {match.result?.playerOfMatchId ? (
@@ -1962,10 +2271,10 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                 <Text style={styles.ratingLabel}>MATCH RATING</Text>
                 <Text style={styles.ratingImpact}>
                   {result.rating >= 8
-                    ? '⬆ Selection reputation boosted significantly'
+                    ? '⬆ Selection boost'
                     : result.rating >= 6
-                      ? '➡ Reputation holding steady'
-                      : '⬇ Form dip — fight back next match'}
+                      ? '➡ Reputation steady'
+                      : '⬇ Form down'}
                 </Text>
               </Animated.View>
             ) : null}
@@ -2006,9 +2315,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               </Animated.View>
             ) : null}
             {result.selected === false ? (
-              <Text style={styles.callup}>
-                You were left out of the XI — regain form in training.
-              </Text>
+              <Text style={styles.callup}>Not selected; train to regain form.</Text>
             ) : null}
             {mode === 'manager' ? (
               <Animated.View
@@ -2017,13 +2324,11 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               >
                 <Text style={styles.tacticProofTitle}>Tactical readout</Text>
                 <Text style={styles.tacticProofText}>
-                  {tacticalImpactSummary(managerTactics, match, save?.userTeamId)}
+                  {tacticalImpactSummary(managerTactics, match, userTeamId)}
                 </Text>
               </Animated.View>
             ) : null}
-            {result.calledUp ? (
-              <Text style={styles.callup}>🧢 You&apos;ve been called up to the national side!</Text>
-            ) : null}
+            {result.calledUp ? <Text style={styles.callup}>🧢 National call-up</Text> : null}
             {result.international ? (
               <Text style={styles.callup}>
                 🧢 International cap earned{result.bonus ? ' · Player of the Match' : ''}
@@ -2081,77 +2386,29 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             ) : null}
           </Card>
 
-          {result.impact ? (
+          {result.impact?.changes.length ? (
             <Animated.View entering={FadeInDown.duration(350).delay(400)}>
               <Card style={styles.whyCard}>
-                <Text style={styles.whyEyebrow}>WHY THIS HAPPENED</Text>
-                <Text style={styles.whyTitle}>{result.impact.headline}</Text>
-                <Text style={styles.whyNarrative}>{result.impact.narrative}</Text>
-                {result.impact.why.map((line) => (
-                  <Text key={line} style={styles.whyLine}>
-                    • {line}
-                  </Text>
-                ))}
-                {result.impact.decisions?.length ? (
-                  <View style={styles.decisionEvidence}>
-                    <Text style={styles.potmReasonLabel}>YOUR DECISIONS</Text>
-                    {result.impact.decisions.map((decision) => (
-                      <View key={decision.id} style={styles.decisionRow}>
-                        <View style={styles.decisionHeading}>
-                          <Text style={styles.decisionTitle}>{decision.decision}</Text>
-                          <Text style={styles.decisionConfidence}>
-                            {decision.confidence === 'OBSERVED' ? 'Observed' : 'Estimated'}
-                          </Text>
-                        </View>
-                        <Text style={styles.potmReasonText}>{decision.outcome}</Text>
-                        <Text style={styles.decisionEvidenceText}>{decision.evidence}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-                {result.impact.playerOfMatchReason ? (
-                  <View style={styles.potmReason}>
-                    <Text style={styles.potmReasonLabel}>PLAYER OF THE MATCH</Text>
-                    <Text style={styles.potmReasonText}>{result.impact.playerOfMatchReason}</Text>
-                  </View>
-                ) : null}
-                {result.impact.changes.length > 0 ? (
-                  <View style={styles.progressionGrid}>
-                    {result.impact.changes.map((change) => (
-                      <View key={change.label} style={styles.progressionItem}>
-                        <Text style={styles.progressionLabel}>{change.label}</Text>
-                        <Text
-                          style={[
-                            styles.progressionValue,
-                            { color: change.delta >= 0 ? colors.success : colors.warning },
-                          ]}
-                        >
-                          {change.before} → {change.after} ({change.delta >= 0 ? '+' : ''}
-                          {change.delta})
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
+                <Text style={styles.whyEyebrow}>PROGRESS</Text>
+                <View style={styles.progressionGrid}>
+                  {result.impact.changes.map((change) => (
+                    <View key={change.label} style={styles.progressionItem}>
+                      <Text style={styles.progressionLabel}>{change.label}</Text>
+                      <Text
+                        style={[
+                          styles.progressionValue,
+                          { color: change.delta >= 0 ? colors.success : colors.warning },
+                        ]}
+                      >
+                        {change.before} → {change.after} ({change.delta >= 0 ? '+' : ''}
+                        {change.delta})
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               </Card>
             </Animated.View>
           ) : null}
-
-          {(() => {
-            const insights = generateMatchInsights(match, nameOf);
-            return insights.length > 0 ? (
-              <Animated.View entering={FadeInDown.duration(350).delay(420)}>
-                <Card style={styles.insightCard}>
-                  <Text style={styles.insightTitle}>📊 Match Insights</Text>
-                  {insights.map((line, i) => (
-                    <Text key={i} style={styles.insightLine}>
-                      • {line}
-                    </Text>
-                  ))}
-                </Card>
-              </Animated.View>
-            ) : null;
-          })()}
 
           {match.innings.map((inn, idx) => (
             <Card key={idx} style={{ marginTop: spacing.lg }}>
@@ -2189,6 +2446,27 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               ))}
             </Card>
           ))}
+
+          <Button
+            label={fullScorecardOpen ? 'Hide Full Scorecard' : 'View Full Scorecard'}
+            variant="secondary"
+            style={styles.fullScorecardButton}
+            onPress={() => setFullScorecardOpen((open) => !open)}
+          />
+          {fullScorecardOpen ? (
+            <Animated.View entering={FadeInDown.duration(240)}>
+              <Text style={styles.fullScorecardTitle}>Full Scorecard</Text>
+              {match.innings.map((innings, index) => (
+                <FullInningsScorecard
+                  key={`${innings.battingTeamId}-${index}`}
+                  innings={innings}
+                  format={match.format}
+                  teamName={teamName}
+                  nameOf={nameOf}
+                />
+              ))}
+            </Animated.View>
+          ) : null}
 
           <Text style={styles.analysisHeader}>Match Analysis</Text>
           <Card style={styles.analysisCard}>
@@ -2291,7 +2569,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       skipToBatActive: skipToBatRef.current,
       skipRestActive: skipRestOfInningsRef.current,
       userSelected: Boolean(
-        userPlayerId && (save.teams[save.userTeamId ?? '']?.xi ?? []).includes(userPlayerId),
+        userPlayerId && (save.teams[userTeamId ?? '']?.xi ?? []).includes(userPlayerId),
       ),
       userCanStillBat:
         Boolean(setup?.isTest) ||
@@ -2413,13 +2691,25 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             />
           ) : null}
 
-          <Button
-            label={manualPaused ? 'Resume' : 'Pause'}
-            variant="secondary"
-            fullWidth={false}
-            style={[styles.footerBtn, manualPaused && styles.pauseActive]}
+          {/* This control intentionally avoids the animated shared Button. The
+              match body re-lays out when speed changes, and on Android the
+              recycled animated layer could turn transparent while its native
+              hit target remained mounted. */}
+          <Pressable
+            key="live-match-pause"
+            accessibilityRole="button"
+            accessibilityLabel={manualPaused ? 'Resume match' : 'Pause match'}
+            accessibilityState={{ selected: manualPaused }}
+            android_ripple={{ color: 'rgba(255,255,255,0.12)', borderless: false }}
+            style={({ pressed }) => [
+              styles.pauseControl,
+              manualPaused && styles.pauseActive,
+              pressed && styles.pausePressed,
+            ]}
             onPress={toggleManualPause}
-          />
+          >
+            <Text style={styles.pauseControlText}>{manualPaused ? 'Resume' : 'Pause'}</Text>
+          </Pressable>
 
           {/* Skip to my bat — shown when user player hasn't come to bat yet */}
           {skipBusyLabel ? (
@@ -2696,32 +2986,17 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                 <Icon name="chevron-forward" size={14} color={colors.primaryLight} />
               </Pressable>
             </View>
-            {recentFeed.map((f, idx) => (
-              <Animated.View
-                key={f.id}
-                entering={speedMult === 1 ? SlideInDown.duration(180) : FadeIn.duration(80)}
-                style={styles.feedRow}
-              >
+            {recentFeed.map((f) => (
+              <View key={f.id} style={styles.feedRow}>
                 <Text style={styles.feedLabel}>{f.label}</Text>
-                {/* Only typewrite the most recent commentary entry at 1x speed */}
-                {idx === recentFeed.length - 1 && speedMult === 1 ? (
-                  <TypewriterText
-                    text={f.text}
-                    speed={1}
-                    style={[styles.feedText, { color: TONE_COLOR[f.tone] }]}
-                    numberOfLines={2}
-                    charDelay={14}
-                  />
-                ) : (
-                  <Text
-                    style={[styles.feedText, { color: TONE_COLOR[f.tone] }]}
-                    numberOfLines={2}
-                    ellipsizeMode="tail"
-                  >
-                    {f.text}
-                  </Text>
-                )}
-              </Animated.View>
+                <Text
+                  style={[styles.feedText, { color: TONE_COLOR[f.tone] }]}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
+                  {f.text}
+                </Text>
+              </View>
             ))}
           </View>
 
@@ -2929,12 +3204,10 @@ function PreparationRating({ label, value }: { label: string; value: number }) {
   const styles = useThemedStyles(makeStyles);
   const { colors } = useTheme();
   const color = value >= 72 ? colors.danger : value >= 62 ? colors.warning : colors.success;
-  const assessment = value >= 72 ? 'Elite danger' : value >= 62 ? 'Strong' : 'Manageable';
   return (
     <View style={styles.preparationRating}>
       <Text style={[styles.preparationRatingValue, { color }]}>{value}</Text>
       <Text style={styles.preparationRatingLabel}>{label}</Text>
-      <Text style={[styles.preparationRatingAssessment, { color }]}>{assessment}</Text>
     </View>
   );
 }
@@ -2942,12 +3215,10 @@ function PreparationRating({ label, value }: { label: string; value: number }) {
 function ModeButton({
   emoji,
   title,
-  desc,
   onPress,
 }: {
   emoji: string;
   title: string;
-  desc: string;
   onPress: () => void;
 }) {
   const styles = useThemedStyles(makeStyles);
@@ -2956,7 +3227,6 @@ function ModeButton({
       <Text style={styles.modeEmoji}>{emoji}</Text>
       <View style={{ flex: 1 }}>
         <Text style={styles.modeTitle}>{title}</Text>
-        <Text style={styles.modeDesc}>{desc}</Text>
       </View>
     </Card>
   );
@@ -2994,6 +3264,13 @@ function CreaseRow({
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     msg: { color: colors.textMuted, fontSize: fontSize.md, marginBottom: spacing.lg },
+    requirementFooter: { gap: spacing.sm },
+    requirementText: {
+      color: colors.warning,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+      textAlign: 'center',
+    },
 
     // pre-match cinematic
     prematchHeroWrap: {
@@ -3040,6 +3317,7 @@ const makeStyles = (colors: ThemeColors) =>
       paddingHorizontal: spacing.sm,
     },
     victoryImg: { width: '100%', height: 160, borderRadius: radius.md, marginBottom: spacing.md },
+    matchSponsorRow: { marginBottom: spacing.sm },
     vsCard: { alignItems: 'center', marginTop: spacing.md },
     vsTeams: {
       color: colors.text,
@@ -3295,6 +3573,16 @@ const makeStyles = (colors: ThemeColors) =>
       fontSize: fontSize.sm,
       lineHeight: 18,
       marginTop: spacing.sm,
+    },
+    managerPlanSummary: {
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.semibold,
+      lineHeight: 20,
+      marginTop: spacing.md,
+      padding: spacing.sm,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surfaceMuted,
     },
     missionPreReward: {
       backgroundColor: colors.surfaceAlt,
@@ -3666,6 +3954,26 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: spacing.xs,
       textAlign: 'center',
     },
+    fieldRestrictionCallout: {
+      alignSelf: 'stretch',
+      minHeight: 36,
+      marginBottom: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      backgroundColor: colors.surfaceMuted,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    fieldRestrictionCalloutText: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 16,
+      fontWeight: fontWeight.semibold,
+      textAlign: 'center',
+    },
     tacticChipDisabled: { opacity: 0.35 },
 
     // in-match tactics
@@ -3693,6 +4001,28 @@ const makeStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
     },
     footerBtn: { flexGrow: 1, flexShrink: 1, minWidth: 104, maxWidth: 190 },
+    pauseControl: {
+      flexGrow: 1,
+      flexShrink: 1,
+      minWidth: 104,
+      maxWidth: 190,
+      minHeight: 52,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    pauseControlText: {
+      color: colors.white,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.bold,
+      fontFamily: fonts.bold,
+      letterSpacing: 0.3,
+    },
+    pausePressed: { opacity: 0.82 },
     pauseActive: {
       borderWidth: 1.5,
       borderColor: colors.warning,
@@ -3919,6 +4249,9 @@ const makeStyles = (colors: ThemeColors) =>
       paddingVertical: spacing.xs,
     },
     rewardText: { color: colors.accent, fontWeight: fontWeight.bold },
+    resultFooter: { gap: spacing.sm },
+    resultFooterChoices: { flexDirection: 'row', gap: spacing.sm },
+    resultFooterChoice: { flex: 1 },
     adDone: {
       color: colors.success,
       fontSize: fontSize.sm,
@@ -3939,20 +4272,12 @@ const makeStyles = (colors: ThemeColors) =>
       fontWeight: fontWeight.black,
       letterSpacing: 0,
     },
-    whyTitle: {
-      color: colors.text,
-      fontFamily: fonts.display,
-      fontSize: fontSize.xl,
-      fontWeight: fontWeight.black,
-      marginTop: 3,
-    },
     whyNarrative: {
       color: colors.textMuted,
       fontSize: fontSize.sm,
       lineHeight: 19,
       marginVertical: spacing.sm,
     },
-    whyLine: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 18 },
     decisionEvidence: {
       marginTop: spacing.md,
       borderTopWidth: StyleSheet.hairlineWidth,
@@ -4009,6 +4334,70 @@ const makeStyles = (colors: ThemeColors) =>
       height: StyleSheet.hairlineWidth,
       backgroundColor: colors.border,
       marginVertical: spacing.sm,
+    },
+    fullScorecardButton: { marginTop: spacing.lg },
+    fullScorecardTitle: {
+      color: colors.accent,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      marginTop: spacing.xl,
+      marginBottom: spacing.sm,
+    },
+    fullScorecardCard: { marginBottom: spacing.md },
+    scorecardHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 30,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderStrong,
+    },
+    scorecardBowlingHeader: { marginTop: spacing.md },
+    scorecardHeaderName: {
+      flex: 1,
+      color: colors.textFaint,
+      fontSize: 10,
+      fontWeight: fontWeight.black,
+      textTransform: 'uppercase',
+    },
+    scorecardHeaderStat: {
+      width: 35,
+      color: colors.textFaint,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+      textAlign: 'right',
+    },
+    scorecardPlayerBlock: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+      paddingVertical: 5,
+    },
+    scorecardDataRow: { flexDirection: 'row', alignItems: 'center', minHeight: 25 },
+    scorecardPlayerName: {
+      flex: 1,
+      color: colors.text,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.semibold,
+      paddingRight: spacing.xs,
+    },
+    scorecardStat: {
+      width: 35,
+      color: colors.text,
+      fontSize: 10,
+      textAlign: 'right',
+    },
+    scorecardDismissal: { color: colors.textFaint, fontSize: 9, marginTop: 1 },
+    scorecardTotalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingTop: spacing.xs,
+    },
+    scorecardTotalLabel: { color: colors.textMuted, fontSize: fontSize.xs },
+    scorecardTotalValue: {
+      color: colors.text,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
     },
     analysisHeader: {
       color: colors.textMuted,

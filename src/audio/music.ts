@@ -59,14 +59,12 @@ function applySceneMix(): void {
   const base = getPlayer();
   if (base) {
     base.volume = mix.baseVolume;
-    base.playbackRate = mix.baseRate;
-    base.shouldCorrectPitch = false;
+    base.setPlaybackRate(mix.baseRate, 'low');
   }
   const texture = getTexturePlayer();
   if (!texture) return;
   texture.volume = mix.textureVolume;
-  texture.playbackRate = mix.textureRate;
-  texture.shouldCorrectPitch = false;
+  texture.setPlaybackRate(mix.textureRate, 'low');
   try {
     if (enabled && playing && mix.textureVolume > 0) texture.play();
     else texture.pause();

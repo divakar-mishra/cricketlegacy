@@ -3,7 +3,9 @@ import {
   canRetire,
   maybeQueueMatchStory,
   nextPendingEvent,
-  paySponsorsForMatch,
+  normalizePendingStoryQueue,
+  queueStoryForTrigger,
+  releaseDeferredStoryAfterMatch,
   resolveStoryChoice,
   rolloverSponsors,
   shouldPromptRetirement,
@@ -164,6 +166,40 @@ describe('pickEvent', () => {
 });
 
 describe('match story queueing + resolution', () => {
+  it('keeps one pending beat instead of stacking stories across youth matches', () => {
+    const save = makeCareerSave();
+    save.story = {
+      flags: {},
+      strings: {},
+      seenEventIds: [],
+      pendingEventIds: ['career_start'],
+    };
+
+    for (let index = 0; index < 4; index += 1) {
+      expect(queueStoryForTrigger(save, 'GOOD_MATCH', makeRng(index + 1), { rating: 9 })).toBe(
+        true,
+      );
+    }
+
+    expect(save.story.pendingEventIds).toEqual(['career_start']);
+  });
+
+  it('preserves an old backlog but releases only one story after each later match', () => {
+    const save = makeCareerSave();
+    save.story!.pendingEventIds = ['one', 'two', 'three', 'four'];
+
+    normalizePendingStoryQueue(save);
+    expect(save.story!.pendingEventIds).toEqual(['one']);
+
+    save.story!.pendingEventIds = [];
+    save.story!.seenEventIds.push('one');
+    save.timeline!.push({ year: 2026, kind: 'STORY', text: 'Resolved one.' });
+    expect(releaseDeferredStoryAfterMatch(save)).toBe(true);
+    expect(save.story!.pendingEventIds).toEqual(['two']);
+    expect(releaseDeferredStoryAfterMatch(save)).toBe(false);
+    expect(save.story!.pendingEventIds).toEqual(['two']);
+  });
+
   it('renders queued titles and choice labels without leaking template placeholders', () => {
     const save = makeCareerSave();
     save.story!.pendingEventIds = ['x_injury_dark_days'];
@@ -200,7 +236,7 @@ describe('match story queueing + resolution', () => {
 });
 
 describe('sponsor economy', () => {
-  it('pays per-match coins and expires/loses deals on rollover', () => {
+  it('expires or loses legacy story deals on rollover without a parallel payout path', () => {
     const save = makeCareerSave();
     save.sponsors = [
       {
@@ -221,11 +257,6 @@ describe('sponsor economy', () => {
         requiresIntegrity: true,
       },
     ];
-    const before = save.wallet.coins;
-    const paid = paySponsorsForMatch(save);
-    expect(paid).toBe(130);
-    expect(save.wallet.coins).toBe(before + 130);
-
     save.integrity = 20; // breaks the integrity clause
     const { expired, lost } = rolloverSponsors(save);
     expect(expired).toContain('PayDeal'); // seasonsLeft hit 0

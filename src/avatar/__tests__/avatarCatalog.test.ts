@@ -1,18 +1,17 @@
 import {
-  avatarAssetMetadata,
-  avatarAssetSources,
-  avatarFromLegacy,
-  avatarFromPreset,
-  avatarPresets,
-  avatarPresetsForSex,
+  avatarFromSeed,
   DEFAULT_AVATAR_CONFIG,
   isValidAvatarConfig,
   normalizeAvatarConfig,
+  portraitAssetMetadata,
+  portraitAssetSources,
+  portraitsForSex,
+  portraitsForTone,
+  portraitToneBand,
   randomAvatarConfig,
-  resolveAvatarLayers,
-  switchAvatarRig,
   switchAvatarSex,
 } from '..';
+import { SAVE_SCHEMA_VERSION } from '../../domain/types';
 import { buildUserPlayer, createCareerSave } from '../../game/createGame';
 import { runMigrations } from '../../storage/migrate';
 
@@ -37,100 +36,118 @@ function makeCareer() {
   });
 }
 
-describe('supplied modular avatar catalog', () => {
-  it('registers exactly 186 explicit runtime assets and 300 supplied presets', () => {
-    expect(avatarAssetMetadata).toHaveLength(186);
-    expect(Object.keys(avatarAssetSources)).toHaveLength(186);
-    expect(avatarPresets).toHaveLength(300);
-    expect(avatarPresetsForSex('male')).toHaveLength(150);
-    expect(avatarPresetsForSex('female')).toHaveLength(150);
-    expect(new Set(avatarAssetMetadata.map((asset) => asset.id)).size).toBe(186);
-    expect(new Set(avatarPresets.map((preset) => preset.id)).size).toBe(300);
-  });
+describe('fixed portrait avatar catalog', () => {
+  it('registers 64 male and 64 female portraits across eight balanced tone bands', () => {
+    expect(portraitAssetMetadata).toHaveLength(128);
+    expect(Object.keys(portraitAssetSources)).toHaveLength(128);
+    expect(new Set(portraitAssetMetadata.map((portrait) => portrait.id)).size).toBe(128);
 
-  it('resolves every supplied preset to a valid configuration without changing its recipe', () => {
-    for (const preset of avatarPresets) {
-      const resolved = avatarFromPreset(preset);
-      expect(isValidAvatarConfig(resolved)).toBe(true);
-      expect(resolved).toEqual({
-        sex: preset.sex,
-        rigId: preset.rigId,
-        baseFaceId: preset.baseFaceId,
-        eyeColorId: preset.eyeColorId,
-        hairBackId: preset.hairBackId,
-        hairFrontId: preset.hairFrontId,
-        beardId: preset.beardId,
-        moustacheId: preset.moustacheId,
-        headwearId: preset.headwearId,
-        outfitId: preset.outfitId,
-      });
+    for (const sex of ['male', 'female'] as const) {
+      expect(portraitsForSex(sex)).toHaveLength(64);
+      for (const toneBand of [1, 2, 3, 4, 5, 6, 7, 8] as const) {
+        expect(portraitsForTone(sex, toneBand)).toHaveLength(8);
+      }
     }
   });
 
-  it('keeps randomization and rig/sex changes compatible', () => {
-    for (let index = 0; index < 300; index += 1) {
-      const random = () => index / 300;
-      expect(isValidAvatarConfig(randomAvatarConfig(index % 2 ? 'male' : 'female', random))).toBe(
-        true,
-      );
-    }
-    for (const rig of ['narrow', 'medium', 'wide'] as const) {
-      expect(isValidAvatarConfig(switchAvatarRig(DEFAULT_AVATAR_CONFIG, rig))).toBe(true);
-    }
-    const female = switchAvatarSex(DEFAULT_AVATAR_CONFIG, 'female');
-    expect(isValidAvatarConfig(female)).toBe(true);
-    expect(female.beardId).toBe('beard_none');
-    expect(female.moustacheId).toBe('moustache_none');
-  });
-
-  it('falls back from invalid saved IDs and hides hair under headwear without erasing it', () => {
-    const invalid = normalizeAvatarConfig({
-      ...DEFAULT_AVATAR_CONFIG,
-      baseFaceId: 'missing-base',
-      hairFrontId: 'missing-hair',
+  it('normalizes unknown IDs to an offline-safe default', () => {
+    expect(isValidAvatarConfig(DEFAULT_AVATAR_CONFIG)).toBe(true);
+    expect(normalizeAvatarConfig({ sex: 'female', portraitId: 'missing' })).toEqual({
+      sex: 'female',
+      portraitId: 'portrait_female_025',
     });
-    expect(isValidAvatarConfig(invalid)).toBe(true);
+  });
 
-    const helmet = normalizeAvatarConfig({
-      ...DEFAULT_AVATAR_CONFIG,
-      headwearId: 'headwear_medium_batting_helmet',
+  it('keeps the same numbered identity when switching sex and randomizes across all 64', () => {
+    const male = normalizeAvatarConfig({ sex: 'male', portraitId: 'portrait_male_047' });
+    expect(switchAvatarSex(male, 'female')).toEqual({
+      sex: 'female',
+      portraitId: 'portrait_female_047',
     });
-    const storedHair = [helmet.hairBackId, helmet.hairFrontId];
-    const layers = resolveAvatarLayers(helmet);
-    expect(layers.hairBack).toBeUndefined();
-    expect(layers.hairFront).toBeUndefined();
-    expect([helmet.hairBackId, helmet.hairFrontId]).toEqual(storedHair);
-    expect(layers.headwear).toBe('headwear_medium_batting_helmet');
+
+    const ids = new Set<string>();
+    for (let index = 0; index < 64; index += 1) {
+      const config = randomAvatarConfig('male', () => (index + 0.25) / 64);
+      expect(isValidAvatarConfig(config)).toBe(true);
+      ids.add(config.portraitId);
+    }
+    expect(ids.size).toBe(64);
   });
 
-  it('maps the former SVG controls to a valid modular avatar', () => {
-    const migrated = avatarFromLegacy(
-      {
-        skinTone: '#8C5439',
-        faceShape: 'angular',
-        hairStyle: 'crop',
-        hairColor: '#17130F',
-        facialHair: 'full_beard',
-        moustache: 'handlebar',
-        eyeColor: '#314E63',
-        browStyle: 'bold',
-      },
-      'kit_red',
-      'frame_gold',
-    );
-    expect(isValidAvatarConfig(migrated)).toBe(true);
-    expect(migrated.rigId).toBe('narrow');
-    expect(migrated.outfitId).toBe('outfit_red');
-    expect(migrated.frameId).toBe('frame_gold');
+  it('assigns deterministic player-age portraits to generated squad players', () => {
+    const first = avatarFromSeed('Aarav Sharma');
+    const second = avatarFromSeed('Aarav Sharma');
+    expect(first).toEqual(second);
+    const index = Number(first.portraitId.slice(-3));
+    expect((index - 1) % 8).toBeLessThan(6);
   });
 
-  it('migrates schema 29 without altering unrelated career data and survives JSON reload', () => {
+  it('maps the former SVG controls deterministically and retains the profile frame', () => {
+    const legacy = {
+      skinTone: '#8C5439',
+      faceShape: 'angular' as const,
+      hairStyle: 'crop' as const,
+      hairColor: '#17130F',
+      facialHair: 'full_beard' as const,
+      moustache: 'handlebar' as const,
+      eyeColor: '#314E63',
+      browStyle: 'bold' as const,
+    };
+    const first = normalizeAvatarConfig({ ...legacy, frameId: 'frame_gold' });
+    const second = normalizeAvatarConfig({ ...legacy, frameId: 'frame_gold' });
+
+    expect(first).toEqual(second);
+    expect(isValidAvatarConfig(first)).toBe(true);
+    expect(portraitToneBand(first)).toBe(8);
+    expect(first.frameId).toBe('frame_gold');
+  });
+
+  it('migrates a schema-31 modular recipe once without altering unrelated career data', () => {
     const save = makeCareer();
-    save.schemaVersion = 29;
+    save.schemaVersion = 31;
     save.wallet.coins = 12_345;
     save.flags = { ...save.flags, avatarMigrationSentinel: true };
     if (!save.cosmetics) throw new Error('Expected career cosmetics');
-    save.cosmetics.avatarCustomization = {
+    save.cosmetics.profileFrame = 'frame_gold';
+    save.cosmetics.avatarConfig = {
+      sex: 'female',
+      rigId: 'wide',
+      baseFaceId: 'base_female_wide_medium',
+      eyeColorId: 'eyes_female_wide_brown',
+      hairBackId: 'hair_female_wide_braid_back',
+      hairFrontId: 'hair_female_wide_braid_front',
+      beardId: 'beard_none',
+      moustacheId: 'moustache_none',
+      headwearId: 'headwear_none',
+      outfitId: 'outfit_white',
+    } as unknown as typeof save.cosmetics.avatarConfig;
+    const playerCount = Object.keys(save.players).length;
+
+    const migrated = runMigrations(JSON.parse(JSON.stringify(save)));
+    expect(migrated?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(migrated?.wallet.coins).toBe(12_345);
+    expect(migrated?.flags?.avatarMigrationSentinel).toBe(true);
+    expect(Object.keys(migrated?.players ?? {})).toHaveLength(playerCount);
+    expect(
+      (migrated?.cosmetics as { avatarCustomization?: unknown } | undefined)?.avatarCustomization,
+    ).toBeUndefined();
+    expect(migrated?.cosmetics?.avatarConfig).toEqual(
+      expect.objectContaining({ sex: 'female', frameId: 'frame_gold' }),
+    );
+    expect(isValidAvatarConfig(migrated!.cosmetics!.avatarConfig!)).toBe(true);
+
+    const reopened = runMigrations(JSON.parse(JSON.stringify(migrated)));
+    expect(reopened?.cosmetics?.avatarConfig).toEqual(migrated?.cosmetics?.avatarConfig);
+  });
+
+  it('still upgrades schema-29 saves that only contain the legacy customization recipe', () => {
+    const save = makeCareer();
+    save.schemaVersion = 29;
+    if (!save.cosmetics) throw new Error('Expected career cosmetics');
+    delete save.cosmetics.avatarConfig;
+    (
+      save.cosmetics as unknown as { avatarCustomization: Record<string, unknown> }
+    ).avatarCustomization = {
       skinTone: '#DFA477',
       faceShape: 'round',
       hairStyle: 'swept',
@@ -140,18 +157,13 @@ describe('supplied modular avatar catalog', () => {
       eyeColor: '#3E5638',
       browStyle: 'straight',
     };
-    delete save.cosmetics.avatarConfig;
-    const playerCount = Object.keys(save.players).length;
 
     const migrated = runMigrations(JSON.parse(JSON.stringify(save)));
-    expect(migrated?.schemaVersion).toBe(30);
-    expect(migrated?.wallet.coins).toBe(12_345);
-    expect(migrated?.flags?.avatarMigrationSentinel).toBe(true);
-    expect(Object.keys(migrated?.players ?? {})).toHaveLength(playerCount);
-    expect(migrated?.cosmetics?.avatarCustomization).toEqual(save.cosmetics.avatarCustomization);
+    expect(migrated?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     expect(isValidAvatarConfig(migrated!.cosmetics!.avatarConfig!)).toBe(true);
-
-    const reopened = JSON.parse(JSON.stringify(migrated));
-    expect(reopened.cosmetics.avatarConfig).toEqual(migrated?.cosmetics?.avatarConfig);
+    expect(portraitToneBand(migrated!.cosmetics!.avatarConfig!)).toBe(4);
+    expect(
+      (migrated?.cosmetics as { avatarCustomization?: unknown } | undefined)?.avatarCustomization,
+    ).toBeUndefined();
   });
 });

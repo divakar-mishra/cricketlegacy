@@ -8,6 +8,15 @@ export { ScreenHeader } from './ScreenHeader';
 export { Stepper } from './Stepper';
 export { Emblem } from './Emblem';
 export { WalletBar } from './WalletBar';
+export { SponsorMark } from './SponsorMark';
+export {
+  AvatarSponsorBadges,
+  PortraitSponsorPrint,
+  SponsorBrandRow,
+  SponsoredKitPreview,
+  SponsorLogo,
+} from './SponsorBranding';
+export type { SponsorBrandRef } from './SponsorBranding';
 export { LeagueTable } from './LeagueTable';
 export { FieldView } from './FieldView';
 export type { LastShot } from './FieldView';
@@ -19,13 +28,13 @@ export { Icon } from './Icon';
 export type { IconName } from './Icon';
 export { Skeleton, SMOOTH_CARD_ZOOM, SMOOTH_MODAL_ENTER, SMOOTH_MODAL_EXIT } from './Motion';
 export { Onboarding } from './Onboarding';
-export { LiveOpsCards } from './LiveOpsCards';
+export { LiveOpsCards, SeasonPassHomeCard } from './LiveOpsCards';
 export { CupCard } from './CupCard';
 export { HubTabBar } from './HubTabBar';
 export { ErrorBoundary } from './ErrorBoundary';
 export { AchievementToast } from './AchievementToast';
 export { PlayerAvatar } from './PlayerAvatar';
-export { AvatarCustomizer, LayeredAvatar } from './avatar';
+export { PortraitAvatar, PortraitPicker } from './avatar';
 export { PlayerStatusBadges } from './PlayerStatusBadges';
 export { RadarChart } from './charts/RadarChart';
 export { WagonWheel } from './charts/WagonWheel';
@@ -46,3 +55,4 @@ export { ModeGuideModal } from './ModeGuideModal';
 export { NewspaperModal } from './NewspaperModal';
 export { MechanicInfoButton } from './MechanicInfoButton';
 export { CountryFlag } from './CountryFlag';
+export { CountrySelect } from './CountrySelect';

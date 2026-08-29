@@ -27,9 +27,8 @@ import {
   Button,
   Card,
   CareerSpotlight,
-  CupCard,
-  GlassSurface,
   HubTabBar,
+  Icon,
   LeagueTable,
   LiveOpsCards,
   LockedFeatureCard,
@@ -42,16 +41,17 @@ import {
   RivalryBadge,
   Screen,
   ScreenHeader,
+  SeasonPassHomeCard,
   WalletBar,
 } from '../components';
 import { AppText as Text } from '../components/AppText';
-import { ContextualOffer, OfferBanner, OfferKind } from '../components/ContextualOffer';
+import { FranchiseOfferModal } from '../components/FranchiseOfferModal';
+import { DomesticClubOfferModal } from '../components/DomesticClubOfferModal';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { StarterPackModal } from '../components/StarterPackModal';
-import { kitColorHex } from '../data/cosmetics';
-import { COUNTRIES, getCountry } from '../data/countries';
+import { getCountry } from '../data/countries';
 import { ECONOMY } from '../data/gameConfig';
-import type { NewspaperStory, PlayerStats } from '../domain/types';
+import type { CareerCompetitionStatScope, NewspaperStory, PlayerStats } from '../domain/types';
 import { computeOverall } from '../engine/rating';
 import {
   ACHIEVEMENTS,
@@ -60,6 +60,7 @@ import {
   totalGamerscore,
 } from '../game/achievements';
 import {
+  ACADEMY_COSTS,
   CAREER_PATH_LABEL,
   careerSelectionDecision,
   careerPathProgress,
@@ -81,15 +82,22 @@ import {
 } from '../game/careerEvents';
 import { playerIdentityLine } from '../game/careerExperience';
 import { CareerStepType, resolveNextCareerStep } from '../game/careerStep';
+import { activeCompetitionTable } from '../game/competitionTable';
 import { areAdsRemoved, fixtureEnergyCost } from '../game/economy';
 import { renderText } from '../game/narrative';
 import { seasonAwards } from '../game/progression';
-import { franchiseAuctionGate, seniorProfessionalFeaturesUnlocked } from '../game/readiness';
+import {
+  franchiseAuctionGate,
+  seniorProfessionalFeaturesUnlocked,
+  stockMarketUnlocked,
+} from '../game/readiness';
 import { rivalComparison } from '../game/rivalry';
+import { activeSponsorBranding, sponsorshipOffers } from '../game/sponsorship';
 import { PlayerCalendarChoice } from '../game/playerCalendar';
-import { nextUserFixtureId, nextUserFixturesByCompetition, standings } from '../game/season';
-import { emptyStats } from '../game/stats';
-import { trainingAttributeCeiling, youthOpponentQuality } from '../game/youthBalance';
+import { domesticCountryContractOffers } from '../game/playerMigration';
+import { nextUserFixtureId, nextUserFixturesByCompetition } from '../game/season';
+import { CAREER_COMPETITION_STAT_LABELS, earlierCareerStats, emptyStats } from '../game/stats';
+import { getU19WorldCupState, u19WorldCupSelectionStatus } from '../game/u19WorldCup';
 import { careerPlayingTeamId } from '../game/youthFixtures';
 import { ScreenProps } from '../navigation';
 import { accountPurchases, ads, analytics } from '../services';
@@ -106,6 +114,18 @@ import {
   useThemedStyles,
 } from '../theme';
 
+const CAREER_STAT_GROUPS: readonly {
+  label: string;
+  scopes: readonly CareerCompetitionStatScope[];
+}[] = [
+  { label: 'Pathway', scopes: ['GRADE_A', 'U19', 'U19_WORLD_CUP'] },
+  {
+    label: 'Domestic',
+    scopes: ['DOMESTIC_T20', 'LIST_A', 'FIRST_CLASS', 'HUNDRED', 'T10'],
+  },
+  { label: 'International', scopes: ['T20I', 'ODI', 'TEST'] },
+];
+
 const ROLE_LABEL: Record<string, string> = {
   BATTER: 'Batter',
   BOWLER: 'Bowler',
@@ -117,38 +137,41 @@ type HubPage = 'home' | 'stats' | 'narrative' | 'progress' | 'profile';
 
 const EMPTY_PRESS_ARCHIVE: readonly NewspaperStory[] = [];
 
+/** Player Home's cricket-ticket palette. Kept local so the shared Player and Manager shell stays intact. */
+const CRICKET_HOME = {
+  cream: '#F2E5C6',
+  creamDeep: '#C7A96B',
+  creamInk: '#281C10',
+  creamMuted: '#6D583B',
+  leather: '#9B3328',
+  leatherDark: '#6F211A',
+} as const;
+
 const PLAYER_GUIDE_STEPS = [
   {
     icon: 'home' as const,
     title: 'Follow the next action',
-    body: 'Home prioritises the one thing blocking your career: a story decision, training, recovery or the next match.',
-    action: 'Use the highlighted action on Home before exploring the other tabs.',
+    body: 'Your next step.',
   },
   {
     icon: 'fitness' as const,
     title: 'Train with a purpose',
-    body: 'Training improves attributes but uses coins and recovery. Form, fitness and confidence affect how reliably you perform.',
-    action: 'Train your role strengths, then stop when fatigue or cost outweighs the next gain.',
+    body: 'Develop your role.',
   },
   {
     icon: 'game-controller' as const,
     title: 'Play your role',
-    body: 'In matches, choose a batting stance or bowling plan. The simulation pauses for guides and decisions, and speed only changes presentation pace.',
-    action:
-      'Read the score situation, set your approach, and change it when the required rate or wickets demand it.',
+    body: 'Choose your approach.',
   },
   {
     icon: 'trending-up' as const,
     title: 'Earn selection and progress',
-    body: 'Ability, form, coach trust, condition and format readiness drive selection. Match output then drives contracts and pathway promotions.',
-    action:
-      'Open Progress after each match to see what moved and what your next milestone requires.',
+    body: 'Selection and milestones.',
   },
   {
     icon: 'person' as const,
     title: 'Review your career',
-    body: 'Stats tracks performance, Story holds career decisions, and Profile keeps identity, records, equipment and legacy in one place.',
-    action: 'Return to this guide from the Profile tab whenever you need a refresher.',
+    body: 'Stats, story and profile.',
   },
 ] as const;
 
@@ -156,15 +179,17 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   const {
     save,
     refreshEnergy,
+    newSeason,
     advanceSeason,
+    advanceWhileBenched,
     claimDaily,
     retire,
-    playCupTie,
     acceptAuctionOffer,
     declineAuction,
+    acceptDomesticClubOffer,
+    declineDomesticClubOffers,
     contractStatus,
-    renewUserContract,
-    persist,
+    persistCritical,
     markFlagSeen,
     lastPromotion,
     clearPromotion,
@@ -182,15 +207,17 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     useShallow((s) => ({
       save: s.save,
       refreshEnergy: s.refreshEnergy,
+      newSeason: s.newSeason,
       advanceSeason: s.advanceSeason,
+      advanceWhileBenched: s.advanceWhileBenched,
       claimDaily: s.claimDaily,
       retire: s.retire,
-      playCupTie: s.playCupTie,
       acceptAuctionOffer: s.acceptAuctionOffer,
       declineAuction: s.declineAuction,
+      acceptDomesticClubOffer: s.acceptDomesticClubOffer,
+      declineDomesticClubOffers: s.declineDomesticClubOffers,
       contractStatus: s.contractStatus,
-      renewUserContract: s.renewUserContract,
-      persist: s.persist,
+      persistCritical: s.persistCritical,
       markFlagSeen: s.markFlagSeen,
       lastPromotion: s.lastPromotion,
       clearPromotion: s.clearPromotion,
@@ -213,12 +240,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   const [canClaimDaily, setCanClaimDaily] = useState(false);
   const [rewardModal, setRewardModal] = useState<RewardModalData | null>(null);
   const [contractFlash, setContractFlash] = useState<string | null>(null);
-  const [activeOffer, setActiveOffer] = useState<OfferKind | null>(null);
-  const [dismissedOffers, setDismissedOffers] = useState<Set<string>>(new Set());
-  const dismissOffer = (key: string) => {
-    setDismissedOffers((prev) => new Set([...prev, key]));
-    setActiveOffer(null);
-  };
   const [showStarterPack, setShowStarterPack] = useState(false);
   const starterPackShownRef = useRef(false);
   const [toastIdx, setToastIdx] = useState(0);
@@ -229,14 +250,10 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     useCallback(() => {
       if (Platform.OS !== 'android') return undefined;
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-        Alert.alert(
-          'Leave career?',
-          'Leaving now returns to the main menu. Your save is kept, but this matchday flow will be interrupted.',
-          [
-            { text: 'Stay', style: 'cancel' },
-            { text: 'Leave', style: 'destructive', onPress: () => navigation.navigate('MainMenu') },
-          ],
-        );
+        Alert.alert('Leave career?', 'Your save is kept.', [
+          { text: 'Stay', style: 'cancel' },
+          { text: 'Leave', style: 'destructive', onPress: () => navigation.navigate('MainMenu') },
+        ]);
         return true;
       });
       return () => sub.remove();
@@ -366,24 +383,11 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   const showCareerGuide = !dismissedTips.includes('career_hub_guide');
   const pressArchive = save?.experience?.mediaScrapbook ?? EMPTY_PRESS_ARCHIVE;
   const pendingPressId = save?.experience?.pendingNewspaperId;
-  const stockUnlocked = save ? seniorProfessionalFeaturesUnlocked(save) : false;
-  const stockUnlockSeen = save?.flags?.stockUnlockSeen;
-
   useEffect(() => {
     if (!pendingPressId) return;
     const pending = pressArchive.find((story) => story.id === pendingPressId);
     if (pending) setSelectedNewspaper(pending);
   }, [pendingPressId, pressArchive]);
-
-  useEffect(() => {
-    if (!stockUnlocked || stockUnlockSeen) return;
-    markFlagSeen('stockUnlockSeen');
-    Alert.alert(
-      'Stock Market unlocked!',
-      'Now that you are a senior pro, you can invest a slice of your earnings in the market. Grow your wealth between matches, but remember that values can go down as well as up.',
-      [{ text: 'Got it' }],
-    );
-  }, [markFlagSeen, stockUnlocked, stockUnlockSeen]);
 
   if (!save || !save.userPlayerId || !save.players[save.userPlayerId]) {
     return (
@@ -397,15 +401,46 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
 
   const user = save.players[save.userPlayerId];
   const userOverall = computeOverall(user);
+  const u19WorldCup = getU19WorldCupState(save);
+  const u19WorldCupSelection = u19WorldCupSelectionStatus(save);
+  const showU19WorldCup =
+    save.careerPathLevel === 'U19' ||
+    u19WorldCupSelection.status === 'SELECTED' ||
+    user.age === 18 ||
+    u19WorldCup?.opportunityYear !== undefined;
+  const u19WorldCupSummary = (() => {
+    switch (u19WorldCupSelection.status) {
+      case 'TRACKING':
+        return `Age-18 selection · ${u19WorldCupSelection.merit.appearances}/3 appearances · ${u19WorldCupSelection.merit.averageRating.toFixed(1)}/6.0 rating · ${Math.round(u19WorldCupSelection.merit.readiness * 100)}%/55% ready`;
+      case 'SELECTED': {
+        const fixtureIds = [
+          ...(u19WorldCup?.quarterFinalFixtureIds ?? []),
+          ...(u19WorldCup?.semiFinalFixtureIds ?? []),
+          ...(u19WorldCup?.finalFixtureId ? [u19WorldCup.finalFixtureId] : []),
+        ];
+        const started = fixtureIds.some((fixtureId) => save.fixtures[fixtureId]?.played);
+        return started ? 'Selected · Tournament active' : 'Selected for the tournament';
+      }
+      case 'NOT_SELECTED':
+        return 'Selection missed';
+      case 'ELIMINATED':
+        return 'Tournament run complete';
+      case 'RUNNER_UP':
+        return 'U19 World Cup runners-up';
+      case 'CHAMPION':
+        return 'U19 World Cup champions';
+    }
+  })();
   const team = save.userTeamId ? save.teams[save.userTeamId] : undefined;
   const season = save.currentSeasonId ? save.seasons[save.currentSeasonId] : undefined;
   const stats = user.careerStats ?? emptyStats();
-  const domesticStats = user.domesticStats ?? emptyStats();
-  const internationalStats = user.internationalStats ?? emptyStats();
-
+  const seasonStats = user.seasonStats ?? emptyStats();
+  const recentPlayerMatches = save.playerLife?.recentMatches?.slice(0, 5) ?? [];
+  const sponsorBranding = activeSponsorBranding(save);
   // Memoize CPU-heavy computations so they don't re-run on every render tick.
   // These are pure reads of the save blob — only recalculate when save changes.
-  const table = standings(save);
+  const competitionTable = activeCompetitionTable(save);
+  const table = competitionTable.rows;
   const fixtureId = nextUserFixtureId(save);
   const fixture = fixtureId ? save.fixtures[fixtureId] : undefined;
   const matchAuthority = matchDecisionAuthority(save, fixture);
@@ -447,6 +482,8 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   const storyN = save.story?.pendingEventIds.length ?? 0;
   const storyPreview = pendingStory();
   const offers = save.auctionOffers ?? [];
+  const domesticClubOffers = save.domesticClubOffers ?? [];
+  const currentSeasonSalary = Math.max(0, user.contract?.wage ?? 0);
   const seniorProUnlocked = seniorProfessionalFeaturesUnlocked(save);
   const contract = seniorProUnlocked ? contractStatus() : null;
   const rivalCmp = rivalComparison(save);
@@ -456,10 +493,45 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   const nextStep = resolveNextCareerStep(save, {
     pendingPromotion: Boolean(lastPromotion?.promoted),
   });
+  const earnedSponsorOffers = sponsorshipOffers(save);
+  const portfolioUnlocked = stockMarketUnlocked(save.careerPathLevel, user.age);
+  const portfolioHomeVisited = Boolean(save.flags?.playerHomePortfolioVisited);
+  const academyReady = !save.personalAcademy && save.wallet.coins >= ACADEMY_COSTS[1];
+  const retirementReviewDue = shouldPromptRetirement(user, save);
+  const offFieldOpportunity = retirementReviewDue
+    ? {
+        kind: 'RETIREMENT' as const,
+        icon: 'flag-outline' as const,
+        title: 'Review your playing future',
+        action: 'DECIDE',
+      }
+    : earnedSponsorOffers.length
+    ? {
+        kind: 'SPONSOR' as const,
+        icon: 'shirt-outline' as const,
+        title: 'Kit sponsor offers ready',
+        action: 'REVIEW',
+      }
+    : portfolioUnlocked && !portfolioHomeVisited
+      ? {
+          kind: 'PORTFOLIO' as const,
+          icon: 'trending-up-outline' as const,
+          title: 'Portfolio is now available',
+          action: 'VIEW',
+        }
+      : academyReady
+        ? {
+            kind: 'ACADEMY' as const,
+            icon: 'school-outline' as const,
+            title: 'Your academy is ready',
+            action: 'OPEN',
+          }
+        : undefined;
+  const careerSeasonNumber = (save.careerSeasons ?? 0) + 1;
   const calendarEvent = nextStep.mode === 'career' ? nextStep.calendarEvent : undefined;
+  const countryContractOffers =
+    calendarEvent?.kind === 'TRANSFER_WINDOW' ? domesticCountryContractOffers(save) : [];
   const identityLine = playerIdentityLine(save);
-  const lastImpact = save.experience?.lastMatchImpact;
-  const latestPress = pressArchive[pressArchive.length - 1];
   const primaryIsStory =
     nextStep.mode === 'career' && nextStep.type === CareerStepType.STORY_EVENT_REQUIRED;
   const primaryIsCalendar = Boolean(
@@ -467,6 +539,51 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     nextStep.type === CareerStepType.TRAINING_MANDATORY &&
     calendarEvent,
   );
+  const primaryCalendarNeedsChoice = Boolean(
+    primaryIsCalendar &&
+    (calendarEvent?.kind === 'EXAM' ||
+      calendarEvent?.kind === 'TRAINING' ||
+      calendarEvent?.kind === 'NCA_CAMP'),
+  );
+  const primaryCalendarAdvancesDirectly = Boolean(
+    primaryIsCalendar && calendarEvent && !primaryCalendarNeedsChoice,
+  );
+  const primaryActionLabel =
+    nextStep.action === 'OPEN_STORY'
+      ? 'Open story'
+      : nextStep.action === 'PLAY_MATCH'
+        ? 'Play match'
+        : nextStep.action === 'SIMULATE_MATCH'
+          ? 'Advance while benched'
+          : nextStep.action === 'REFILL_ENERGY'
+            ? 'Restore energy'
+            : nextStep.action === 'ACKNOWLEDGE_PROMOTION'
+              ? 'Continue'
+              : nextStep.action === 'ADVANCE_SEASON'
+                ? `Start Season ${careerSeasonNumber + 1}`
+                : nextStep.action === 'ADVANCE_CAREER_CALENDAR'
+                  ? 'Continue season'
+                  : nextStep.action === 'OPEN_TRAINING'
+                    ? 'Open training'
+                    : 'Continue';
+  const openOffFieldOpportunity = () => {
+    if (!offFieldOpportunity) return;
+    hapticTap();
+    if (offFieldOpportunity.kind === 'RETIREMENT') {
+      onRetire();
+      return;
+    }
+    if (offFieldOpportunity.kind === 'SPONSOR') {
+      navigation.navigate('PlayerLife', { initialTab: 'media' });
+      return;
+    }
+    if (offFieldOpportunity.kind === 'PORTFOLIO') {
+      markFlagSeen('playerHomePortfolioVisited');
+      navigation.navigate('InvestmentScreen');
+      return;
+    }
+    navigation.navigate('AcademyManagement');
+  };
   const resolveCalendar = (choice?: PlayerCalendarChoice) => {
     const result = resolvePlayerWeek(choice);
     if (result.ok && result.outcome) {
@@ -491,10 +608,34 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         navigation.navigate('Purchase');
         break;
       case 'PLAY_MATCH':
-      case 'SIMULATE_MATCH':
         void handlePlayMatch();
         break;
+      case 'SIMULATE_MATCH': {
+        const outcome = advanceWhileBenched();
+        if (outcome.ok) {
+          const current = useCareer.getState().save;
+          const nextFixture = outcome.nextFixtureId
+            ? current?.fixtures[outcome.nextFixtureId]
+            : undefined;
+          const selectedNext =
+            current && nextFixture && outcome.nextFixtureId
+              ? careerSelectionDecision(current, nextFixture.format, outcome.nextFixtureId).selected
+              : false;
+          setContractFlash(
+            selectedNext
+              ? `${outcome.simulated} team fixture${outcome.simulated === 1 ? '' : 's'} advanced. You are back in the XI.`
+              : `${outcome.simulated} team fixture${outcome.simulated === 1 ? '' : 's'} advanced while you were outside the XI.`,
+          );
+          setTimeout(() => setContractFlash(null), 3200);
+        } else if (outcome.reason) {
+          Alert.alert('Team selection', outcome.reason);
+        }
+        break;
+      }
       case 'ADVANCE_SEASON':
+        newSeason();
+        break;
+      case 'ADVANCE_CAREER_CALENDAR':
         advanceSeason();
         break;
       case 'OPEN_TRANSFERS':
@@ -510,11 +651,18 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
 
   const onSaveExit = async () => {
     useCareer.getState().scheduleReminders();
-    await persist();
-    goMenu();
+    try {
+      await persistCritical(true);
+      goMenu();
+    } catch {
+      Alert.alert(
+        'Save failed',
+        'Your device did not confirm the save. Stay in the career and try again before closing the app.',
+      );
+    }
   };
 
-  const onRetire = () => {
+  function onRetire() {
     Alert.alert(
       'Retire from cricket?',
       'This ends the career for good. You can begin again with a protégé (New Game+).',
@@ -523,7 +671,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         { text: 'Retire', style: 'destructive', onPress: () => retire() },
       ],
     );
-  };
+  }
 
   // ---------- RETIRED ----------
   if (user.retired || save.flags?.retired) {
@@ -541,10 +689,10 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 role={user.role}
                 primaryColor={team?.primaryColor}
                 secondaryColor={team?.secondaryColor}
-                kitColor={kitColorHex(save.cosmetics?.kit)}
-                customization={save.cosmetics?.avatarCustomization}
                 config={save.cosmetics?.avatarConfig}
                 profileFrame={save.cosmetics?.profileFrame}
+                earnedSponsor={sponsorBranding.earned}
+                premiumSponsor={sponsorBranding.premium}
                 size="lg"
               />
               <View style={{ flex: 1, marginLeft: spacing.md }}>
@@ -563,10 +711,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             {(user.awards ?? []).length ? (
               <View style={styles.honours}>
                 {(user.awards ?? []).slice(0, 10).map((a, i) => (
-                  <View
-                    key={i}
-                    style={styles.honourPill}
-                  >
+                  <View key={i} style={styles.honourPill}>
                     <Text style={styles.honour}>🏅 {a}</Text>
                   </View>
                 ))}
@@ -579,10 +724,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             <Text style={styles.section}>The Journey</Text>
             <Card style={styles.timelineCard}>
               {timeline.slice(0, 20).map((t, i) => (
-                <View
-                  key={i}
-                  style={styles.tlRow}
-                >
+                <View key={i} style={styles.tlRow}>
                   <View style={styles.tlLeft}>
                     <View style={[styles.tlDot, { backgroundColor: colors.accent }]} />
                     {i < timeline.length - 1 && <View style={styles.tlLine} />}
@@ -699,47 +841,106 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
 
   const renderHomeTab = () => (
     <>
-      <View>
-        <GlassSurface highlighted intensity={0.62} style={styles.nextChapterHero}>
-          <Text style={styles.nextChapterEyebrow}>{identityLine}</Text>
-          <Text style={styles.nextChapterTitle} numberOfLines={2}>
+      <View style={styles.fixtureTicketWrap}>
+        <View style={[styles.fixtureTicket, !fixture && styles.fixtureTicketCompact]}>
+          <View style={styles.ticketStitchRail}>
+            {[0, 1, 2, 3, 4, 5, 6].map((stitch) => (
+              <View key={stitch} style={styles.ticketStitch} />
+            ))}
+          </View>
+          <View style={[styles.ticketNotch, styles.ticketNotchLeft]} />
+          <View style={[styles.ticketNotch, styles.ticketNotchRight]} />
+          <View style={styles.ticketTopRule} />
+          <Text style={styles.ticketKicker}>
+            {primaryIsStory ? 'CAREER DECISION' : fixture ? 'NEXT FIXTURE' : 'NEXT CHAPTER'}
+          </Text>
+          <Text style={styles.ticketTitle} numberOfLines={2}>
             {primaryIsStory && storyPreview?.title ? storyPreview.title : nextStep.title}
           </Text>
-          <Text style={styles.nextChapterReason} numberOfLines={2}>
-            {primaryIsStory && storyPreview?.speaker
-              ? `${storyPreview.speaker} is waiting for your answer.`
-              : nextStep.detail}
-          </Text>
+
           {fixture && opponentId ? (
-            <View style={styles.nextFixtureStrip}>
-              <View style={styles.nextFixtureCopy}>
-                <Text style={styles.nextFixtureTeams} numberOfLines={1}>
-                  {fixtureTeam?.shortName} v {save.teams[opponentId]?.shortName}
-                </Text>
-                <Text
-                  style={[
-                    styles.nextFixtureStatus,
-                    { color: selectionOutlook?.selected ? colors.success : colors.warning },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {selectionOutlook?.selected ? 'Selected' : 'Bench / rest'} |{' '}
-                  {selectionOutlook?.selected ? `${matchEnergyCost} energy` : 'No energy cost'}
-                </Text>
+            <>
+              <View style={styles.ticketTeamsRow}>
+                <View style={styles.ticketTeam}>
+                  <View
+                    style={[
+                      styles.ticketCrest,
+                      { backgroundColor: fixtureTeam?.primaryColor ?? colors.surfaceAlt },
+                    ]}
+                  >
+                    <Text style={styles.ticketCrestText}>{fixtureTeam?.shortName}</Text>
+                  </View>
+                  <Text style={styles.ticketTeamName} numberOfLines={2}>
+                    {fixtureTeam?.name ?? 'Your team'}
+                  </Text>
+                </View>
+                <View style={styles.ticketVersus}>
+                  <Text style={styles.ticketVs}>VS</Text>
+                  <Text style={styles.ticketFormat}>{fixture.cupRound ?? fixture.format}</Text>
+                  <Text style={styles.ticketRound}>ROUND {fixture.round}</Text>
+                </View>
+                <View style={styles.ticketTeam}>
+                  <View
+                    style={[
+                      styles.ticketCrest,
+                      {
+                        backgroundColor:
+                          save.teams[opponentId]?.primaryColor ?? CRICKET_HOME.leather,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.ticketCrestText}>{save.teams[opponentId]?.shortName}</Text>
+                  </View>
+                  <Text style={styles.ticketTeamName} numberOfLines={2}>
+                    {save.teams[opponentId]?.name ?? 'Opposition'}
+                  </Text>
+                </View>
               </View>
-              <MechanicInfoButton topicId="selection-formula" size={34} />
-            </View>
+              <View style={styles.ticketDetailsRow}>
+                <View style={styles.ticketDetail}>
+                  <Text style={styles.ticketDetailLabel}>VENUE</Text>
+                  <Text style={styles.ticketDetailValue} numberOfLines={1}>
+                    {fixture.venue}
+                  </Text>
+                </View>
+                <View style={styles.ticketDetailDivider} />
+                <View style={styles.ticketDetail}>
+                  <Text style={styles.ticketDetailLabel}>STATUS</Text>
+                  <Text
+                    style={[
+                      styles.ticketDetailValue,
+                      {
+                        color: selectionOutlook?.selected ? colors.success : CRICKET_HOME.leather,
+                      },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {selectionOutlook?.selected
+                      ? 'SELECTED'
+                      : selectionOutlook?.reason.startsWith('Unavailable')
+                        ? 'UNAVAILABLE'
+                        : selectionOutlook?.reason.startsWith('Rested')
+                          ? 'RESTED'
+                          : 'BENCHED'}
+                  </Text>
+                </View>
+                <View style={styles.ticketInfoButton}>
+                  <MechanicInfoButton topicId="selection-formula" size={34} />
+                </View>
+              </View>
+              {selectionOutlook?.selected === false ? (
+                <Text style={styles.ticketBenchReason}>{selectionOutlook.reason}</Text>
+              ) : null}
+            </>
           ) : null}
-          {primaryIsCalendar &&
-          (calendarEvent?.kind === 'EXAM' ||
-            calendarEvent?.kind === 'TRAINING' ||
-            calendarEvent?.kind === 'NCA_CAMP') ? (
+
+          {primaryCalendarNeedsChoice ? (
             <View style={styles.calendarChoiceRow}>
               <Button
                 label={
-                  calendarEvent.kind === 'EXAM'
+                  calendarEvent?.kind === 'EXAM'
                     ? 'Study'
-                    : calendarEvent.kind === 'NCA_CAMP'
+                    : calendarEvent?.kind === 'NCA_CAMP'
                       ? 'Attend camp'
                       : 'Skill work'
                 }
@@ -747,9 +948,9 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 style={styles.calendarChoiceButton}
                 onPress={() =>
                   resolveCalendar(
-                    calendarEvent.kind === 'EXAM'
+                    calendarEvent?.kind === 'EXAM'
                       ? 'STUDY'
-                      : calendarEvent.kind === 'NCA_CAMP'
+                      : calendarEvent?.kind === 'NCA_CAMP'
                         ? 'ATTEND'
                         : 'SKILL',
                   )
@@ -757,9 +958,9 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               />
               <Button
                 label={
-                  calendarEvent.kind === 'EXAM'
+                  calendarEvent?.kind === 'EXAM'
                     ? 'Extra nets'
-                    : calendarEvent.kind === 'NCA_CAMP'
+                    : calendarEvent?.kind === 'NCA_CAMP'
                       ? 'Recover'
                       : 'Fitness'
                 }
@@ -767,134 +968,350 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 style={styles.calendarChoiceButton}
                 onPress={() =>
                   resolveCalendar(
-                    calendarEvent.kind === 'EXAM'
+                    calendarEvent?.kind === 'EXAM'
                       ? 'TRAIN'
-                      : calendarEvent.kind === 'NCA_CAMP'
+                      : calendarEvent?.kind === 'NCA_CAMP'
                         ? 'REST'
                         : 'FITNESS',
                   )
                 }
               />
             </View>
-          ) : (
+          ) : null}
+
+          {primaryCalendarAdvancesDirectly ? (
             <Button
               label={
-                nextStep.action === 'OPEN_STORY'
-                  ? 'Open story'
-                  : nextStep.action === 'PLAY_MATCH'
-                    ? 'Play match'
-                    : nextStep.action === 'SIMULATE_MATCH'
-                      ? 'Continue fixture'
-                      : nextStep.action === 'REFILL_ENERGY'
-                        ? 'Restore energy'
-                        : nextStep.action === 'ACKNOWLEDGE_PROMOTION'
-                          ? 'Continue'
-                          : nextStep.action === 'ADVANCE_SEASON'
-                            ? 'Advance season'
-                            : nextStep.action === 'OPEN_TRAINING'
-                              ? 'Open training'
-                              : 'Continue'
+                calendarEvent?.kind === 'SELECTION'
+                  ? 'Attend Selection Meeting'
+                  : calendarEvent?.kind === 'RECOVERY'
+                    ? 'Complete Recovery Week'
+                    : 'Continue'
               }
               variant="gold"
-              style={{ marginTop: spacing.md }}
+              style={styles.ticketPrimaryAction}
+              onPress={() => resolveCalendar()}
+            />
+          ) : null}
+
+          {!fixture && !primaryIsCalendar ? (
+            <>
+              <Button
+                label={primaryActionLabel}
+                variant="gold"
+                style={styles.ticketPrimaryAction}
+                onPress={runPrimaryAction}
+              />
+              {nextStep.action === 'ADVANCE_CAREER_CALENDAR' ? (
+                <Button
+                  label="Train first"
+                  variant="secondary"
+                  style={styles.ticketSecondaryAction}
+                  onPress={() => navigation.navigate('Training')}
+                />
+              ) : null}
+            </>
+          ) : null}
+          {fixture && !primaryIsCalendar ? (
+            <Button
+              label={primaryActionLabel}
+              variant="gold"
+              style={styles.ticketPrimaryAction}
               onPress={runPrimaryAction}
             />
-          )}
-          {fixture && opponentId ? (
-            <View style={styles.nextFixtureActions}>
+          ) : null}
+          <View style={styles.ticketBottomRule} />
+        </View>
+
+        {fixture && opponentId ? (
+          <View style={styles.nextFixtureActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setCareerRestNext(!restRequested)}
+              style={styles.heroTextAction}
+            >
+              <Text style={styles.heroTextActionLabel}>
+                {restRequested ? 'Cancel planned rest' : 'Plan rest'}
+              </Text>
+            </Pressable>
+            <Text style={styles.fixtureActionDot}>•</Text>
+            <Text style={styles.fixtureEnergyLabel}>
+              {selectionOutlook?.selected ? `${matchEnergyCost} energy` : 'No energy cost'}
+            </Text>
+            {matchAuthority.canControlTeam ? (
               <Pressable
                 accessibilityRole="button"
-                onPress={() => setCareerRestNext(!restRequested)}
+                onPress={() => navigation.navigate('Squad')}
                 style={styles.heroTextAction}
               >
-                <Text style={styles.heroTextActionLabel}>
-                  {restRequested ? 'Cancel planned rest' : 'Plan rest'}
-                </Text>
+                <Text style={styles.heroTextActionLabel}>Captain&apos;s XI</Text>
               </Pressable>
-              {matchAuthority.canControlTeam ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => navigation.navigate('Squad')}
-                  style={styles.heroTextAction}
-                >
-                  <Text style={styles.heroTextActionLabel}>Captain&apos;s XI</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-        </GlassSurface>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
-      {calendarEvent?.kind === 'TRANSFER_WINDOW' ? (
-        <Card style={styles.countryMoveCard}>
-          <Text style={styles.tierLabel}>Domestic country offers</Text>
-          <Text style={styles.note}>
-            A move starts next season in the same tier with a new country-specific club pyramid.
-          </Text>
-          <View style={styles.countryChipGrid}>
-            {COUNTRIES.filter(
-              (country) => country.id !== save.playerCareerResources?.domesticCountry,
-            ).map((country) => {
-              const pending = save.pendingDomesticCountry === country.id;
-              return (
-                <Pressable
-                  key={country.id}
-                  accessibilityRole="button"
-                  style={[styles.countryChip, pending && styles.countryChipSelected]}
-                  onPress={() => {
-                    const result = requestDomesticCountryMove(country.id);
-                    if (!result.ok && result.reason) Alert.alert('Country move', result.reason);
-                  }}
-                >
-                  <Text style={[styles.countryChipText, pending && styles.countryChipTextSelected]}>
-                    {pending ? `Moving to ${country.name}` : country.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Card>
-      ) : null}
+      <SeasonPassHomeCard />
 
-      {lastImpact ? (
-        <View style={[styles.impactStrip, compact && styles.impactStripCompact]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.impactEyebrow}>LAST MATCH</Text>
-            <Text style={styles.impactTitle}>{lastImpact.headline}</Text>
-            <Text style={styles.impactText} numberOfLines={2}>
-              {lastImpact.narrative}
+      {offFieldOpportunity ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${offFieldOpportunity.title}. ${offFieldOpportunity.action}`}
+          onPress={openOffFieldOpportunity}
+          style={styles.offFieldOpportunity}
+        >
+          <View style={styles.offFieldOpportunityIcon}>
+            <Icon name={offFieldOpportunity.icon} size={21} color={CRICKET_HOME.cream} />
+          </View>
+          <View style={styles.offFieldOpportunityCopy}>
+            <Text style={styles.offFieldOpportunityKicker}>
+              {offFieldOpportunity.kind === 'RETIREMENT'
+                ? 'CAREER DECISION'
+                : 'OFF-FIELD OPPORTUNITY'}
+            </Text>
+            <Text style={styles.offFieldOpportunityTitle} numberOfLines={1}>
+              {offFieldOpportunity.title}
             </Text>
           </View>
-          <View style={[styles.impactChanges, compact && styles.impactChangesCompact]}>
-            {lastImpact.changes.slice(0, 2).map((change) => (
-              <Text
-                key={change.label}
-                style={[
-                  styles.impactDelta,
-                  { color: change.delta >= 0 ? colors.success : colors.warning },
-                ]}
-              >
-                {change.label} {change.delta >= 0 ? '+' : ''}
-                {change.delta}
-              </Text>
-            ))}
-          </View>
-        </View>
+          <Text style={styles.offFieldOpportunityAction}>
+            {offFieldOpportunity.action} →
+          </Text>
+        </Pressable>
       ) : null}
 
-      {latestPress ? (
-        <Card style={styles.pressClip} onPress={() => setSelectedNewspaper(latestPress)}>
-          <Text style={styles.pressClipKicker}>{latestPress.kicker}</Text>
-          <Text style={styles.pressClipHeadline} numberOfLines={2}>
-            {latestPress.headline}
-          </Text>
-          <Text style={styles.pressClipBody} numberOfLines={3}>
-            {latestPress.subheadline}
-          </Text>
+      {calendarEvent?.kind === 'TRANSFER_WINDOW' && countryContractOffers.length > 0 ? (
+        <Card style={styles.countryMoveCard}>
+          <Text style={styles.tierLabel}>Overseas contract offers</Text>
+          <View
+            style={[
+              styles.countryOffer,
+              !save.pendingDomesticCountry && styles.countryOfferSelected,
+            ]}
+          >
+            <View style={styles.countryOfferCopy}>
+              <Text style={styles.countryOfferClub}>{team?.name ?? 'Current club'}</Text>
+              <Text style={styles.countryOfferMeta}>
+                {getCountry(save.playerCareerResources?.domesticCountry ?? '')?.name ?? 'Home'} ·{' '}
+                {currentSeasonSalary > 0
+                  ? `${currentSeasonSalary.toLocaleString()} coins/season`
+                  : 'renewal due'}
+              </Text>
+            </View>
+            <Button
+              label={!save.pendingDomesticCountry ? 'Staying' : 'Stay'}
+              variant={!save.pendingDomesticCountry ? 'gold' : 'secondary'}
+              size="sm"
+              fullWidth={false}
+              onPress={() => {
+                const countryId = save.playerCareerResources?.domesticCountry;
+                if (!countryId) return;
+                const result = requestDomesticCountryMove(countryId);
+                if (!result.ok && result.reason) Alert.alert('Contract offer', result.reason);
+              }}
+            />
+          </View>
+          {countryContractOffers.map((offer) => {
+            const pending = save.pendingDomesticCountry === offer.countryId;
+            const increase =
+              currentSeasonSalary > 0
+                ? Math.max(
+                    0,
+                    Math.round((offer.seasonSalary / currentSeasonSalary - 1) * 100),
+                  )
+                : null;
+            return (
+              <View
+                key={offer.countryId}
+                style={[styles.countryOffer, pending && styles.countryOfferSelected]}
+              >
+                <View style={styles.countryOfferCopy}>
+                  <Text style={styles.countryOfferClub}>{offer.teamName}</Text>
+                  <Text style={styles.countryOfferMeta}>
+                    {offer.countryName} · {offer.seasonSalary.toLocaleString()} coins/season
+                    {increase !== null ? ` · +${increase}%` : ''}
+                  </Text>
+                  <Text style={styles.countryOfferBonus}>
+                    {offer.signingBonus.toLocaleString()} coin signing bonus
+                  </Text>
+                </View>
+                <Button
+                  label={pending ? 'Accepted' : 'Accept'}
+                  variant={pending ? 'gold' : 'secondary'}
+                  size="sm"
+                  fullWidth={false}
+                  onPress={() => {
+                    const result = requestDomesticCountryMove(offer.countryId);
+                    if (!result.ok && result.reason) Alert.alert('Contract offer', result.reason);
+                  }}
+                />
+              </View>
+            );
+          })}
         </Card>
       ) : null}
 
-      {/* Notification bell */}
+      <View style={styles.formScoreboard} accessibilityRole="summary">
+        <View style={styles.scoreboardHeadingRow}>
+          <View style={styles.scoreboardBatIcon}>
+            <View style={styles.scoreboardBatBlade} />
+            <View style={styles.scoreboardBatHandle} />
+          </View>
+          <Text style={styles.scoreboardHeading}>CURRENT FORM</Text>
+          <Text
+            style={[
+              styles.scoreboardAvailability,
+              user.injury && styles.scoreboardAvailabilityRecovery,
+            ]}
+          >
+            {user.injury ? 'IN RECOVERY' : 'AVAILABLE'}
+          </Text>
+        </View>
+        <View style={[styles.formMetricRow, compact && styles.formMetricRowCompact]}>
+          <View style={styles.formMetric}>
+            <Text style={styles.formMetricLabel}>SEASON RUNS</Text>
+            <Text style={styles.formMetricValue}>{seasonStats.runs.toLocaleString()}</Text>
+          </View>
+          <View style={styles.formMetricDivider} />
+          <View style={styles.formMetric}>
+            <Text style={styles.formMetricLabel}>BATTING AVG</Text>
+            <Text style={styles.formMetricValue}>
+              {seasonStats.matches > 0
+                ? (
+                    seasonStats.runs / Math.max(1, seasonStats.matches - (seasonStats.notOuts ?? 0))
+                  ).toFixed(1)
+                : '0.0'}
+            </Text>
+          </View>
+          <View style={styles.formMetricDivider} />
+          <View style={[styles.formMetric, styles.formRecentMetric]}>
+            <Text style={styles.formMetricLabel}>RECENT SCORES</Text>
+            {recentPlayerMatches.length ? (
+              <View style={styles.recentScoresRow}>
+                {recentPlayerMatches.map((match) => (
+                  <View
+                    key={match.id}
+                    style={[
+                      styles.recentScoreChip,
+                      match.result === 'W'
+                        ? styles.recentScoreWin
+                        : match.result === 'L'
+                          ? styles.recentScoreLoss
+                          : styles.recentScoreDraw,
+                    ]}
+                  >
+                    <Text style={styles.recentScoreText}>
+                      {user.role === 'BOWLER'
+                        ? `${match.wickets}W`
+                        : user.role === 'ALLROUNDER'
+                          ? `${match.runs}/${match.wickets}W`
+                          : match.runs}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.noRecentScores}>NO APPEARANCES YET</Text>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Contract renewal — now with negotiation */}
+      {contract?.expiring && !contractFlash ? (
+        <Card style={styles.auctionCard}>
+          <Text style={styles.auctionTitle}>📝 Contract Renewal</Text>
+          <Text style={styles.note}>
+            {contract.offer.years} year{contract.offer.years === 1 ? '' : 's'} ·{' '}
+            {contract.offer.wage > 0
+              ? `${contract.offer.wage.toLocaleString()} coins/season`
+              : 'market rate'}
+            {contract.offer.signingBonus > 0
+              ? ` · +${contract.offer.signingBonus.toLocaleString()} signing`
+              : ''}
+          </Text>
+          <Button
+            label="Review offer"
+            variant="gold"
+            style={{ marginTop: spacing.sm }}
+            onPress={() => navigation.navigate('ContractNegotiation')}
+          />
+        </Card>
+      ) : contractFlash ? (
+        <Card style={styles.auctionCard}>
+          <Text style={styles.note}>{contractFlash}</Text>
+        </Card>
+      ) : null}
+
+      {/* Cricket journey — scorebook presentation, same profile route and career data. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open player profile"
+        style={styles.journeyBoard}
+        onPress={() => navigation.navigate('PlayerProfile', { playerId: user.id })}
+      >
+        <View style={styles.journeyHeader}>
+          <View style={styles.journeyTrophy}>
+            <Text style={styles.journeyTrophyGlyph}>🏆</Text>
+          </View>
+          <View style={styles.journeyHeadingCopy}>
+            <Text style={styles.journeyEyebrow}>CRICKET JOURNEY</Text>
+            <Text style={styles.journeyTitle} numberOfLines={1}>
+              {CAREER_PATH_LABEL[save.careerPathLevel ?? 'DOMESTIC']}
+            </Text>
+          </View>
+          <View style={styles.ovrRingMini}>
+            <Svg width={48} height={48} viewBox="0 0 48 48">
+              <Circle
+                cx={24}
+                cy={24}
+                r={20}
+                fill="none"
+                stroke={colors.surfaceAlt}
+                strokeWidth={4}
+              />
+              <Circle
+                cx={24}
+                cy={24}
+                r={20}
+                fill="none"
+                stroke={colors.accent}
+                strokeWidth={4}
+                strokeDasharray={`${2 * Math.PI * 20}`}
+                strokeDashoffset={`${2 * Math.PI * 20 * (1 - userOverall / 100)}`}
+                strokeLinecap="round"
+                rotation="-90"
+                origin="24,24"
+              />
+            </Svg>
+            <View style={styles.ovrCenterMini}>
+              <Text style={styles.ovrValueMini}>{userOverall}</Text>
+              <Text style={styles.ovrLabelMini}>OVR</Text>
+            </View>
+          </View>
+        </View>
+        <View style={[styles.journeyMetrics, compact && styles.journeyMetricsCompact]}>
+          <Stat label="Matches" value={stats.matches} />
+          <View style={styles.journeyDivider} />
+          <Stat label="Runs" value={stats.runs.toLocaleString()} />
+          <View style={styles.journeyDivider} />
+          <Stat label="High score" value={stats.highScore} />
+          <View style={styles.journeyDivider} />
+          <Stat label="Wickets" value={stats.wickets} />
+        </View>
+        {(save.careerPathLevel ?? 'DOMESTIC') !== 'INTERNATIONAL' ? (
+          <View style={styles.journeyProgressRow}>
+            <View style={styles.journeyProgressCopy}>
+              <Text style={styles.journeyProgressLabel}>NEXT MILESTONE</Text>
+              <Text style={styles.journeyProgressValue}>{nextCareerPathLabel(save)}</Text>
+            </View>
+            <Text style={styles.journeyProgressPct}>
+              {Math.round(careerPathProgress(save, user) * 100)}%
+            </Text>
+          </View>
+        ) : null}
+        <Text style={styles.journeyOpenLabel}>OPEN MY CAREER →</Text>
+      </Pressable>
+
       {inboxUnread > 0 && (
         <Pressable
           style={styles.inboxBanner}
@@ -910,217 +1327,20 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         </Pressable>
       )}
 
-      {/* Daily reward */}
       {canClaimDaily && (
-        <View>
-          <Button
-            label="🎁 Claim daily reward"
-            variant="gold"
-            style={{ marginTop: spacing.md }}
-            onPress={handleClaimDaily}
-          />
-        </View>
-      )}
-
-      {/* Win streak badge + streak protection offer */}
-      {(save.winStreak ?? 0) >= 3 && (
-        <View style={styles.streakBadge}>
-          <Text style={styles.streakFire}>🔥</Text>
-          <Text style={styles.streakText}>{save.winStreak} match win streak!</Text>
-        </View>
-      )}
-
-      {/* Streak at risk — show protection offer if high streak and low energy */}
-      {!dismissedOffers.has('streak') && (save.winStreak ?? 0) >= 5 && !canPlay && (
-        <OfferBanner
-          kind="streak_protection"
-          streakDays={save.winStreak}
-          onPress={() => {
-            analytics.logEvent(analytics.EVT.OFFER_SHOWN, { kind: 'streak_protection' });
-            setActiveOffer('streak_protection');
-          }}
-          onDismiss={() => dismissOffer('streak')}
+        <Button
+          label="🎁 Claim daily reward"
+          variant="gold"
+          style={{ marginTop: spacing.md }}
+          onPress={handleClaimDaily}
         />
       )}
-
-      {/* Energy empty offer — shown when out of energy with a match available */}
-      {!dismissedOffers.has('energy') && !canPlay && !!fixture && (
-        <OfferBanner
-          kind="energy_empty"
-          onPress={() => {
-            analytics.logEvent(analytics.EVT.OFFER_SHOWN, { kind: 'energy_empty' });
-            setActiveOffer('energy_empty');
-          }}
-          onDismiss={() => dismissOffer('energy')}
-        />
-      )}
-
-      {/* Auction offers */}
-      {offers.length > 0 && (
-        <Card style={styles.auctionCard}>
-          <Text style={styles.auctionTitle}>🏏 Franchise Auction</Text>
-          <Text style={styles.note}>
-            Clubs are bidding for your signature. Choose your next move.
-          </Text>
-          {offers.map((o) => (
-            <View key={o.teamId} style={styles.offerRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.offerTeam} numberOfLines={1}>
-                  {save.teams[o.teamId]?.name ?? 'Interested club'}
-                </Text>
-                <Text style={styles.offerMeta}>
-                  ₹{Math.round(o.wagePromise / 52000)}k/wk · +{o.signingBonus.toLocaleString()}{' '}
-                  bonus · ₹{(o.fee / 1000).toFixed(0)}k fee
-                </Text>
-              </View>
-              <Button
-                label="Sign"
-                size="sm"
-                fullWidth={false}
-                onPress={async () => {
-                  await hapticTap();
-                  acceptAuctionOffer(o.teamId);
-                }}
-              />
-            </View>
-          ))}
-          <Button
-            label="Stay at my club"
-            variant="ghost"
-            style={{ marginTop: spacing.sm }}
-            onPress={declineAuction}
-          />
-        </Card>
-      )}
-
-      {/* Contract renewal — now with negotiation */}
-      {contract?.expiring && !contractFlash ? (
-        <Card style={styles.auctionCard}>
-          <Text style={styles.auctionTitle}>📝 Contract Renewal</Text>
-          <Text style={styles.note}>
-            Your deal is up. The club offers a {contract.offer.years}-year extension at{' '}
-            {contract.offer.wage > 0
-              ? `₹${Math.round(contract.offer.wage / 52000)}k/week`
-              : 'market rate'}
-            {contract.offer.signingBonus > 0
-              ? ` + ${contract.offer.signingBonus.toLocaleString()} coins signing bonus`
-              : ''}
-            .
-          </Text>
-          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
-            <Button
-              label="💬 Negotiate"
-              variant="primary"
-              fullWidth={false}
-              style={{ flex: 1 }}
-              onPress={() => navigation.navigate('ContractNegotiation')}
-            />
-            <Button
-              label={`Sign`}
-              variant="secondary"
-              fullWidth={false}
-              style={{ flex: 0, minWidth: 72 }}
-              onPress={async () => {
-                try {
-                  playHaptic('notify-success');
-                } catch {
-                  /* optional */
-                }
-                const r = renewUserContract();
-                if (r.ok)
-                  setContractFlash(`Signed! +${r.bonus.toLocaleString()} coins in the bank.`);
-              }}
-            />
-          </View>
-        </Card>
-      ) : contractFlash ? (
-        <Card style={styles.auctionCard}>
-          <Text style={styles.note}>{contractFlash}</Text>
-        </Card>
-      ) : null}
-
-      {/* Hero player card with avatar */}
-      <View>
-        <Card
-          style={[styles.playerCard, compact && styles.playerCardCompact]}
-          onPress={() => navigation.navigate('PlayerProfile', { playerId: user.id })}
-        >
-          <View style={styles.playerAvatarWrap}>
-            <PlayerAvatar
-              name={user.name}
-              role={user.role}
-              primaryColor={team?.primaryColor}
-              secondaryColor={team?.secondaryColor}
-              kitColor={kitColorHex(save.cosmetics?.kit)}
-              customization={save.cosmetics?.avatarCustomization}
-              config={save.cosmetics?.avatarConfig}
-              profileFrame={save.cosmetics?.profileFrame}
-              size="lg"
-              showRole
-            />
-          </View>
-          <View style={[styles.playerIdentity, compact && styles.playerIdentityCompact]}>
-            <Text style={styles.role}>{ROLE_LABEL[user.role] ?? user.role}</Text>
-            <Text style={styles.styleLine}>
-              {user.battingStyle === 'RHB' ? 'RH bat' : 'LH bat'}
-              {user.bowlingStyle ? ` · ${user.bowlingStyle.replace(/_/g, ' ').toLowerCase()}` : ''}
-            </Text>
-            <View style={styles.statLine}>
-              <Stat label="Mat" value={stats.matches} />
-              <Stat label="Runs" value={stats.runs} />
-              <Stat label="HS" value={stats.highScore} />
-              <Stat label="Wkts" value={stats.wickets} />
-            </View>
-            {/* OVR ring */}
-            <View style={[styles.ovrRingMini, compact && styles.ovrRingMiniCompact]}>
-              <Svg width={48} height={48} viewBox="0 0 48 48">
-                <Circle
-                  cx={24}
-                  cy={24}
-                  r={20}
-                  fill="none"
-                  stroke={colors.surfaceAlt}
-                  strokeWidth={4}
-                />
-                <Circle
-                  cx={24}
-                  cy={24}
-                  r={20}
-                  fill="none"
-                  stroke={colors.accent}
-                  strokeWidth={4}
-                  strokeDasharray={`${2 * Math.PI * 20}`}
-                  strokeDashoffset={`${2 * Math.PI * 20 * (1 - userOverall / 100)}`}
-                  strokeLinecap="round"
-                  rotation="-90"
-                  origin="24,24"
-                />
-              </Svg>
-              <View style={styles.ovrCenterMini}>
-                <Text style={styles.ovrValueMini}>{userOverall}</Text>
-                <Text style={styles.ovrLabelMini}>OVR</Text>
-              </View>
-            </View>
-          </View>
-        </Card>
-      </View>
-
-      <CupCard
-        save={save}
-        canPlay={canPlay}
-        onPlay={() => {
-          if (playCupTie()) navigation.navigate('Match');
-        }}
-      />
 
       {/* Competition picker — shown when multiple formats available (Feature 4) */}
       {competitionOptions.length > 1 && (
         <>
           <Text style={styles.section}>Other Competitions</Text>
           <Card style={{ marginTop: 0 }}>
-            <Text style={[styles.note, { marginTop: 0, marginBottom: spacing.sm }]}>
-              You have fixtures available across multiple formats. Pick which to play next.
-            </Text>
             {competitionOptions.map((opt) => {
               const optFixture = save.fixtures[opt.fixtureId];
               const optCost = optFixture ? fixtureEnergyCost(optFixture) : ECONOMY.energyPerMatch;
@@ -1140,6 +1360,18 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 </View>
               );
             })}
+            {competitionOptions.some((opt) => {
+              const optionFixture = save.fixtures[opt.fixtureId];
+              return optionFixture && save.wallet.energy < fixtureEnergyCost(optionFixture);
+            }) ? (
+              <Button
+                label="Restore energy"
+                variant="gold"
+                size="sm"
+                style={{ marginTop: spacing.md }}
+                onPress={() => navigation.navigate('Purchase')}
+              />
+            ) : null}
           </Card>
         </>
       )}
@@ -1149,7 +1381,9 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         const pathLevel = save.careerPathLevel ?? 'DOMESTIC';
         const isYouth = pathLevel === 'SCHOOL' || pathLevel === 'U19';
         if (isYouth) return null;
-        const myRow = table.find((r) => r.teamId === save.userTeamId);
+        const tableTeamId = competitionTable.highlightTeamId ?? save.userTeamId;
+        const tableTeam = tableTeamId ? save.teams[tableTeamId] : team;
+        const myRow = table.find((r) => r.teamId === tableTeamId);
         const myPos = myRow ? table.indexOf(myRow) + 1 : '—';
         return (
           <>
@@ -1165,7 +1399,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                   {myPos}
                 </Text>
                 <View style={{ flex: 1, marginLeft: spacing.md }}>
-                  <Text style={styles.leaguePreviewTeam}>{team?.name ?? '—'}</Text>
+                  <Text style={styles.leaguePreviewTeam}>{tableTeam?.name ?? '—'}</Text>
                   {myRow ? (
                     <Text style={styles.leaguePreviewMeta}>
                       {myRow.points} pts · W{myRow.won} L{myRow.lost}
@@ -1178,8 +1412,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           </>
         );
       })()}
-
-      <LiveOpsCards />
 
       {/* Quick links */}
       <View style={styles.quickRow}>
@@ -1243,16 +1475,50 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         <StatCard label="Catches" value={String(stats.catches)} color={colors.textMuted} />
       </View>
 
-      <Text style={styles.section}>Domestic and International</Text>
+      <Text style={styles.section}>Career by Competition</Text>
       <Card style={styles.scopeTable}>
-        <CareerScopeRow label="Domestic" stats={domesticStats} />
-        <CareerScopeRow label="International" stats={internationalStats} last />
+        {(() => {
+          const earlier = earlierCareerStats(user);
+          if (earlier.matches === 0 && earlier.runs === 0 && earlier.wickets === 0) return null;
+          return (
+            <View>
+              <Text style={styles.scopeGroupLabel}>Earlier record</Text>
+              <CareerScopeRow label="Combined career" stats={earlier} />
+            </View>
+          );
+        })()}
+        {CAREER_STAT_GROUPS.map((group, groupIndex) => {
+          const visibleScopes = group.scopes.filter(
+            (scope) =>
+              !['HUNDRED', 'T10'].includes(scope) ||
+              (user.competitionStats?.[scope]?.matches ?? 0) > 0,
+          );
+          return (
+            <View key={group.label}>
+              <Text style={styles.scopeGroupLabel}>{group.label}</Text>
+              {visibleScopes.map((scope, scopeIndex) => (
+                <CareerScopeRow
+                  key={scope}
+                  label={CAREER_COMPETITION_STAT_LABELS[scope]}
+                  stats={user.competitionStats?.[scope] ?? emptyStats()}
+                  last={
+                    groupIndex === CAREER_STAT_GROUPS.length - 1 &&
+                    scopeIndex === visibleScopes.length - 1
+                  }
+                />
+              ))}
+            </View>
+          );
+        })}
       </Card>
-
       {/* League table */}
-      <Text style={styles.section}>League Table</Text>
+      <Text style={styles.section}>{competitionTable.title}</Text>
       <Card>
-        <LeagueTable rows={table} teams={save.teams} highlightTeamId={save.userTeamId} />
+        <LeagueTable
+          rows={competitionTable.rows}
+          teams={save.teams}
+          highlightTeamId={competitionTable.highlightTeamId}
+        />
       </Card>
 
       {/* Rival comparison — persistent head-to-head badge */}
@@ -1332,22 +1598,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       {/* Promotion alert */}
       {lastPromotion?.promoted
         ? (() => {
-            const from = lastPromotion.from!;
             const to = lastPromotion.to!;
-            const newCap = trainingAttributeCeiling(to);
-            const opponentQuality = youthOpponentQuality(to);
-            const reason =
-              to === 'U19'
-                ? 'Your school performances have earned you a regional Under-19 place.'
-                : to === 'DOMESTIC'
-                  ? 'Your youth performances have earned a senior domestic contract.'
-                  : 'Your domestic body of work has put you on the international stage.';
-            const competitions =
-              to === 'U19'
-                ? 'Regional Under-19 fixtures and national youth tournaments.'
-                : to === 'DOMESTIC'
-                  ? 'List A, First-Class and T20 cricket, plus contracts and auctions.'
-                  : 'International tours, caps and national leadership goals.';
             const nextObjective =
               to === 'U19'
                 ? 'Build a run of strong youth performances.'
@@ -1359,14 +1610,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 <Card style={styles.promotionCard}>
                   <Text style={styles.promotionKicker}>PROMOTED TO</Text>
                   <Text style={styles.promotionTitle}>{CAREER_PATH_LABEL[to]}</Text>
-                  <Text style={styles.promotionBody}>{reason}</Text>
-                  <View style={styles.promotionGrid}>
-                    <InfoPill label="From" value={CAREER_PATH_LABEL[from]} />
-                    <InfoPill label="Training cap" value={String(newCap)} />
-                    <InfoPill label="Opponent quality" value={`${opponentQuality} OVR`} />
-                  </View>
-                  <Text style={styles.promotionLine}>New competitions: {competitions}</Text>
-                  <Text style={styles.promotionLine}>Next objective: {nextObjective}</Text>
+                  <Text style={styles.promotionLine}>Next · {nextObjective}</Text>
                 </Card>
               </View>
             );
@@ -1393,7 +1637,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               </View>
               {pathLevel !== 'INTERNATIONAL' && (
                 <>
-                  <Text style={styles.note}>Next: {nextLabel}</Text>
                   <ProgressBar
                     value={progress}
                     color={colors.accent}
@@ -1406,24 +1649,20 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               )}
               {nat.capped && isInternationalFixture(fixture) && (
                 <Button
-                  label={canPlay ? `🧢 Represent ${countryName}` : 'Not enough energy'}
+                  label={canPlay ? `🧢 Represent ${countryName}` : 'Restore energy'}
                   variant="gold"
-                  disabled={!canPlay}
                   style={{ marginTop: spacing.sm }}
-                  onPress={() => navigation.navigate('Match', { intl: true })}
+                  onPress={() =>
+                    canPlay
+                      ? navigation.navigate('Match', { intl: true })
+                      : navigation.navigate('Purchase')
+                  }
                 />
-              )}
-              {nat.capped && !isInternationalFixture(fixture) && (
-                <Text style={[styles.note, { marginTop: spacing.sm }]}>
-                  You remain contracted to {team?.name ?? 'your domestic club'}. International tours
-                  appear here when you are selected; domestic cricket continues between call-ups.
-                </Text>
               )}
               {nat.capped && nat.caps === 0 && (
                 <>
                   <Text style={[styles.note, { marginTop: spacing.md }]}>
-                    Declared country: {countryName}. You may change between eligible countries until
-                    your first senior cap permanently locks allegiance.
+                    {countryName} · Locks after your first senior cap.
                   </Text>
                   <View style={styles.countryChipGrid}>
                     {(save.playerCareerResources?.eligibleCountries ?? [user.nationality]).map(
@@ -1459,17 +1698,14 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               )}
               {!nat.capped && pathLevel === 'DOMESTIC' && (
                 <>
-                  <Text style={styles.note}>
-                    National selection watch — strong performances earn a call-up for {countryName}.
-                  </Text>
+                  <Text style={styles.note}>{countryName} selection watch</Text>
                   <ProgressBar
                     value={nat.rep / 100}
                     color={colors.primaryLight}
                     style={{ marginTop: spacing.sm }}
                   />
                   <Text style={[styles.note, { marginTop: spacing.md }]}>
-                    Declared country: {countryName}. Your first senior cap permanently locks this
-                    choice.
+                    Locks after your first senior cap.
                   </Text>
                   <View style={styles.countryChipGrid}>
                     {(save.playerCareerResources?.eligibleCountries ?? [user.nationality]).map(
@@ -1531,7 +1767,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       )}
 
       <Button
-        label="Player Life: media, support and finance"
+        label="Player Life"
         variant="secondary"
         style={{ marginTop: spacing.lg }}
         onPress={() => navigation.navigate('PlayerLife')}
@@ -1546,9 +1782,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               <Text style={styles.tierLabel}>🌍 ICC Schedule</Text>
               <Text style={styles.caps}>{save.userCaps ?? 0} caps</Text>
             </View>
-            <Text style={styles.note}>
-              View ICC events, bilateral series and your international record.
-            </Text>
             <Button
               label="View Calendar →"
               variant="ghost"
@@ -1560,15 +1793,15 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         </>
       )}
 
-      {/* U19 World Cup status (Feature 5) */}
-      {save.careerPathLevel === 'U19' && (
+      {/* One-time, merit-based U19 World Cup opportunity. */}
+      {showU19WorldCup && (
         <>
           <Text style={styles.section}>U19 World Cup</Text>
-          <Card onPress={() => navigation.navigate('U19WorldCup')}>
+          <Card>
             <Text style={[styles.tierLabel, { fontSize: fontSize.md }]}>🏆 Under-19 World Cup</Text>
-            <Text style={styles.note}>Track your U19 qualification and bracket progress.</Text>
+            <Text style={styles.note}>{u19WorldCupSummary}</Text>
             <Button
-              label="View Bracket →"
+              label="View tournament"
               variant="ghost"
               size="sm"
               style={{ marginTop: spacing.sm }}
@@ -1591,18 +1824,13 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           >
             Management Path Available
           </Text>
-          <Text style={styles.note}>
-            Your career qualifies you to step into management. Retire on your terms, then take
-            charge of a club.
-          </Text>
+          <Text style={styles.note}>Retire to begin a Manager Career.</Text>
         </Card>
       )}
 
       {/* Retire */}
-      {shouldPromptRetirement(user) && (
-        <Text style={styles.retireHint}>
-          The years are catching up. When you're ready, you can retire on your own terms.
-        </Text>
+      {shouldPromptRetirement(user, save) && (
+        <Text style={styles.retireHint}>The time is right to review your playing future.</Text>
       )}
       {canRetire(user) && (
         <Button
@@ -1669,7 +1897,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           <View style={styles.legacyHeader}>
             <View>
               <Text style={styles.legacyTitle}>🌱 Legacy</Text>
-              <Text style={styles.legacySub}>Boosts your New Game+ protégé&apos;s head-start</Text>
+              <Text style={styles.legacySub}>New Game+ head-start</Text>
             </View>
             <View style={styles.legacyScoreBadge}>
               <Text style={styles.legacyScoreVal}>{legacyScore}</Text>
@@ -1682,9 +1910,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             style={{ marginTop: spacing.sm }}
           />
           <Text style={styles.legacyNextHint}>
-            {legacyScore >= 100
-              ? '✦ Max legacy — your protégé starts with a massive head-start!'
-              : `Next tier at ${nextMilestone}`}
+            {legacyScore >= 100 ? '✦ Maximum legacy' : `Next tier at ${nextMilestone}`}
           </Text>
           <View style={styles.legacyBreakdown}>
             {[
@@ -1762,6 +1988,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             </Card>
           </>
         )}
+        <LiveOpsCards />
       </>
     );
   };
@@ -1888,22 +2115,93 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         }
       >
         <ScreenHeader
-          title={user.name}
-          subtitle={`${activePathTeam?.name ?? team?.name ?? ''} · Season ${season?.year ?? ''} · Age ${user.age}`}
+          title={page === 'home' ? 'Player Career' : user.name}
+          subtitle={
+            page === 'home'
+              ? `${activePathTeam?.name ?? team?.name ?? ''} · Season ${careerSeasonNumber} · ${season?.year ?? ''}`
+              : `${activePathTeam?.name ?? team?.name ?? ''} · Season ${careerSeasonNumber} · Age ${user.age}`
+          }
           onBack={goMenu}
         />
-        <CareerSpotlight
-          mode="player"
-          title={identityLine}
-          meta={`${CAREER_PATH_LABEL[save.careerPathLevel ?? 'DOMESTIC']} | ${countryName} | ${userOverall} OVR`}
-          accentColor={activePathTeam?.primaryColor ?? team?.primaryColor ?? colors.accent}
-          status={`FORM ${Math.round(user.meta.form)} | COND ${Math.round(save.playerCareerResources?.playerCondition ?? 100)} | TRUST ${Math.round(save.playerCareerResources?.coachTrust ?? 55)}`}
-        />
-        <View>
+        {page === 'home' ? (
+          <View style={[styles.playerMasthead, compact && styles.playerMastheadCompact]}>
+            <View style={styles.mastheadGoldRule} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${user.name}, ${ROLE_LABEL[user.role] ?? user.role}, ${CAREER_PATH_LABEL[save.careerPathLevel ?? 'DOMESTIC']}, ${countryName}, age ${user.age}, overall ${userOverall}, form ${Math.round(user.meta.form)}, condition ${Math.round(save.playerCareerResources?.playerCondition ?? 100)}, coach trust ${Math.round(save.playerCareerResources?.coachTrust ?? 55)}${sponsorBranding.earned?.brandName ? `, kit sponsor ${sponsorBranding.earned.brandName}` : ''}${sponsorBranding.premium?.brandName ? `, premium sponsor ${sponsorBranding.premium.brandName}` : ''}. Open player profile.`}
+              onPress={() => navigation.navigate('PlayerProfile', { playerId: user.id })}
+              style={styles.mastheadProfileLink}
+            >
+              <PlayerAvatar
+                name={user.name}
+                role={user.role}
+                primaryColor={team?.primaryColor}
+                secondaryColor={team?.secondaryColor}
+                config={save.cosmetics?.avatarConfig}
+                profileFrame={save.cosmetics?.profileFrame}
+                earnedSponsor={sponsorBranding.earned}
+                premiumSponsor={sponsorBranding.premium}
+                size="lg"
+                showRole
+              />
+              <View style={styles.mastheadIdentity}>
+                <Text style={styles.mastheadName} numberOfLines={1} adjustsFontSizeToFit>
+                  {user.name}
+                </Text>
+                <Text style={styles.mastheadRole} numberOfLines={1}>
+                  {user.battingStyle === 'RHB' ? 'RIGHT-HAND BAT' : 'LEFT-HAND BAT'} ·{' '}
+                  {(ROLE_LABEL[user.role] ?? user.role).toUpperCase()}
+                </Text>
+                <Text style={styles.mastheadPath} numberOfLines={2}>
+                  {CAREER_PATH_LABEL[save.careerPathLevel ?? 'DOMESTIC']} · {countryName} · Age{' '}
+                  {user.age}
+                </Text>
+                <View style={styles.mastheadAvailability}>
+                  <View
+                    style={[
+                      styles.mastheadStatusDot,
+                      {
+                        backgroundColor: user.injury ? CRICKET_HOME.leather : colors.success,
+                      },
+                    ]}
+                  />
+                  <Text style={styles.mastheadAvailabilityText}>
+                    {user.injury ? 'IN RECOVERY' : 'AVAILABLE'}
+                  </Text>
+                </View>
+                <Text style={styles.mastheadReadiness} numberOfLines={1}>
+                  FORM {Math.round(user.meta.form)} · CONDITION{' '}
+                  {Math.round(save.playerCareerResources?.playerCondition ?? 100)} · TRUST{' '}
+                  {Math.round(save.playerCareerResources?.coachTrust ?? 55)}
+                </Text>
+              </View>
+            </Pressable>
+            <View style={styles.mastheadSideActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open Player Life"
+                onPress={() => navigation.navigate('PlayerLife')}
+                style={styles.mastheadLifeAction}
+              >
+                <Text style={styles.mastheadLifeActionText}>PLAYER LIFE</Text>
+                <Icon name="chevron-forward" size={14} color={colors.accentLight} />
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <CareerSpotlight
+            mode="player"
+            title={identityLine}
+            meta={`${CAREER_PATH_LABEL[save.careerPathLevel ?? 'DOMESTIC']} | ${countryName} | ${userOverall} OVR`}
+            accentColor={activePathTeam?.primaryColor ?? team?.primaryColor ?? colors.accent}
+            status={`FORM ${Math.round(user.meta.form)} | COND ${Math.round(save.playerCareerResources?.playerCondition ?? 100)} | TRUST ${Math.round(save.playerCareerResources?.coachTrust ?? 55)}`}
+          />
+        )}
+        <View style={styles.walletSection}>
           <WalletBar wallet={save.wallet} />
         </View>
 
-        <View>{renderPageContent()}</View>
+        <View style={styles.pageContent}>{renderPageContent()}</View>
       </Screen>
       <AchievementToast achievement={currentToast} onDismiss={onDismissToast} />
       <ModeGuideModal
@@ -1920,31 +2218,23 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           setSelectedNewspaper(null);
         }}
       />
-      {/* Contextual monetization modal */}
-      <ContextualOffer
-        kind={activeOffer}
-        streakDays={save?.winStreak}
-        onAccept={() => {
-          const kind = activeOffer;
-          if (kind) analytics.logEvent(analytics.EVT.OFFER_ACCEPTED, { kind });
-          setActiveOffer(null);
-          const store = useCareer.getState();
-          // Perform the real action the CTA promises; fall back to the store
-          // (to buy gems) when the player can't afford it.
-          if (kind === 'energy_empty' || kind === 'streak_protection') {
-            if (!store.refillEnergy().ok) navigation.navigate('Purchase');
-            return;
-          }
-          if (kind === 'injury_recovery') {
-            if (!store.recoverInjuryNow().ok) navigation.navigate('Purchase');
-            return;
-          }
-          navigation.navigate('Purchase');
+      <FranchiseOfferModal
+        save={save}
+        offers={selectedNewspaper || domesticClubOffers.length > 0 ? [] : offers}
+        onAccept={async (teamId) => {
+          await hapticTap();
+          acceptAuctionOffer(teamId);
         }}
-        onDismiss={() => {
-          if (activeOffer) analytics.logEvent(analytics.EVT.OFFER_DISMISSED, { kind: activeOffer });
-          setActiveOffer(null);
+        onStay={declineAuction}
+      />
+      <DomesticClubOfferModal
+        save={save}
+        offers={selectedNewspaper ? [] : domesticClubOffers}
+        onAccept={async (teamId) => {
+          await hapticTap();
+          acceptDomesticClubOffer(teamId);
         }}
+        onStay={declineDomesticClubOffers}
       />
       {/* Starter pack — unlocked by the first completed match */}
       <StarterPackModal
@@ -2106,6 +2396,503 @@ const makeStyles = (colors: ThemeColors) =>
     memorySummary: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 17, marginTop: 4 },
     memoryConsequence: { color: colors.textFaint, fontSize: 10, lineHeight: 15, marginTop: 2 },
     msg: { color: colors.textMuted, fontSize: fontSize.md, marginBottom: spacing.lg },
+    walletSection: { marginTop: spacing.md },
+    pageContent: { marginTop: spacing.md },
+    playerMasthead: {
+      alignItems: 'center',
+      backgroundColor: colors.surfaceMuted,
+      borderBottomColor: colors.accentDark,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginHorizontal: -spacing.md,
+      marginTop: spacing.sm,
+      minHeight: 128,
+      overflow: 'hidden',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      position: 'relative',
+    },
+    playerMastheadCompact: {
+      alignItems: 'flex-start',
+      paddingHorizontal: spacing.md,
+    },
+    mastheadProfileLink: {
+      alignItems: 'center',
+      flex: 1,
+      flexDirection: 'row',
+      gap: spacing.md,
+      minWidth: 0,
+    },
+    mastheadSideActions: {
+      alignItems: 'flex-end',
+      flexShrink: 0,
+      justifyContent: 'center',
+    },
+    mastheadLifeAction: {
+      alignItems: 'center',
+      backgroundColor: colors.bgElevated,
+      borderColor: colors.accentDark,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 2,
+      justifyContent: 'center',
+      minHeight: 44,
+      paddingHorizontal: spacing.sm,
+    },
+    mastheadLifeActionText: {
+      color: colors.accentLight,
+      fontFamily: fonts.display,
+      fontSize: 9,
+      fontWeight: fontWeight.black,
+      letterSpacing: 0.35,
+    },
+    mastheadGoldRule: {
+      backgroundColor: colors.accent,
+      height: 2,
+      left: spacing.md,
+      opacity: 0.78,
+      position: 'absolute',
+      right: spacing.md,
+      top: 0,
+    },
+    mastheadIdentity: { flex: 1, minWidth: 0 },
+    mastheadName: {
+      color: colors.text,
+      fontFamily: fonts.display,
+      fontSize: fontSize.xl,
+      fontWeight: fontWeight.black,
+      letterSpacing: 0.3,
+    },
+    mastheadRole: {
+      color: colors.accentLight,
+      fontSize: 10,
+      fontWeight: fontWeight.bold,
+      letterSpacing: 0.4,
+      marginTop: 2,
+    },
+    mastheadPath: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 16,
+      marginTop: 3,
+    },
+    mastheadAvailability: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 6,
+      marginTop: spacing.xs,
+    },
+    mastheadStatusDot: { borderRadius: 5, height: 9, width: 9 },
+    mastheadAvailabilityText: {
+      color: colors.text,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+      letterSpacing: 0.25,
+    },
+    mastheadReadiness: {
+      color: colors.textFaint,
+      fontSize: 10,
+      fontWeight: fontWeight.bold,
+      marginTop: 3,
+    },
+    fixtureTicketWrap: { marginBottom: spacing.md },
+    fixtureTicket: {
+      backgroundColor: CRICKET_HOME.cream,
+      borderColor: colors.accentDark,
+      borderRadius: radius.sm,
+      borderWidth: 1.5,
+      minHeight: 208,
+      overflow: 'hidden',
+      paddingBottom: spacing.md,
+      paddingHorizontal: spacing.xl,
+      paddingLeft: spacing.xxl,
+      paddingTop: spacing.md,
+      position: 'relative',
+    },
+    fixtureTicketCompact: {
+      minHeight: 128,
+    },
+    ticketStitchRail: {
+      alignItems: 'center',
+      borderRightColor: CRICKET_HOME.leather,
+      borderRightWidth: 1,
+      bottom: 8,
+      gap: 7,
+      justifyContent: 'center',
+      left: 9,
+      position: 'absolute',
+      top: 8,
+      width: 13,
+    },
+    ticketStitch: {
+      backgroundColor: CRICKET_HOME.leather,
+      height: 2,
+      transform: [{ rotate: '34deg' }],
+      width: 12,
+    },
+    ticketNotch: {
+      backgroundColor: colors.bgElevated,
+      borderColor: colors.accentDark,
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 36,
+      position: 'absolute',
+      top: '48%',
+      width: 36,
+      zIndex: 4,
+    },
+    ticketNotchLeft: { left: -22 },
+    ticketNotchRight: { right: -22 },
+    ticketTopRule: {
+      backgroundColor: CRICKET_HOME.leather,
+      height: 1,
+      left: spacing.xxl,
+      opacity: 0.52,
+      position: 'absolute',
+      right: spacing.md,
+      top: 8,
+    },
+    ticketBottomRule: {
+      backgroundColor: CRICKET_HOME.leather,
+      bottom: 8,
+      height: 1,
+      left: spacing.xxl,
+      opacity: 0.52,
+      position: 'absolute',
+      right: spacing.md,
+    },
+    ticketKicker: {
+      color: CRICKET_HOME.leather,
+      fontFamily: fonts.display,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+      letterSpacing: 1,
+      textAlign: 'center',
+    },
+    ticketTitle: {
+      color: CRICKET_HOME.creamInk,
+      fontFamily: fonts.display,
+      fontSize: fontSize.xl,
+      fontWeight: fontWeight.black,
+      lineHeight: 27,
+      marginTop: 2,
+      textAlign: 'center',
+    },
+    ticketTeamsRow: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      gap: spacing.sm,
+      justifyContent: 'space-between',
+      marginTop: spacing.sm,
+    },
+    ticketTeam: { alignItems: 'center', flex: 1, minWidth: 0 },
+    ticketCrest: {
+      alignItems: 'center',
+      borderColor: CRICKET_HOME.creamInk,
+      borderRadius: radius.sm,
+      borderWidth: 2,
+      height: 52,
+      justifyContent: 'center',
+      paddingHorizontal: 3,
+      width: 52,
+    },
+    ticketCrestText: {
+      color: '#FFFFFF',
+      fontFamily: fonts.display,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+      textAlign: 'center',
+      textShadowColor: 'rgba(0,0,0,0.65)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 1,
+    },
+    ticketTeamName: {
+      color: CRICKET_HOME.creamInk,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+      lineHeight: 12,
+      marginTop: 3,
+      textAlign: 'center',
+    },
+    ticketVersus: { alignItems: 'center', minWidth: 74, paddingTop: 3 },
+    ticketVs: {
+      color: colors.accentDark,
+      fontFamily: fonts.display,
+      fontSize: fontSize.xxl,
+      fontWeight: fontWeight.black,
+      lineHeight: 31,
+    },
+    ticketFormat: {
+      color: CRICKET_HOME.creamInk,
+      fontSize: 10,
+      fontWeight: fontWeight.black,
+      marginTop: 1,
+      textAlign: 'center',
+      textTransform: 'uppercase',
+    },
+    ticketRound: {
+      color: CRICKET_HOME.creamMuted,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+      marginTop: 1,
+    },
+    ticketDetailsRow: {
+      alignItems: 'center',
+      borderBottomColor: CRICKET_HOME.creamDeep,
+      borderBottomWidth: 1,
+      borderTopColor: CRICKET_HOME.creamDeep,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+      minHeight: 44,
+      paddingVertical: spacing.xs,
+    },
+    ticketDetail: { flex: 1, minWidth: 0 },
+    ticketDetailLabel: {
+      color: CRICKET_HOME.creamMuted,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+      letterSpacing: 0.7,
+    },
+    ticketDetailValue: {
+      color: CRICKET_HOME.creamInk,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.black,
+      marginTop: 1,
+    },
+    ticketDetailDivider: { backgroundColor: CRICKET_HOME.creamDeep, height: 28, width: 1 },
+    ticketInfoButton: { marginLeft: -spacing.xs },
+    ticketReason: {
+      color: CRICKET_HOME.creamMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 16,
+      marginTop: spacing.sm,
+      textAlign: 'center',
+    },
+    offFieldOpportunity: {
+      alignItems: 'center',
+      backgroundColor: CRICKET_HOME.leatherDark,
+      borderColor: CRICKET_HOME.leather,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+      minHeight: 64,
+      padding: spacing.sm,
+    },
+    offFieldOpportunityIcon: {
+      alignItems: 'center',
+      backgroundColor: CRICKET_HOME.leather,
+      borderColor: CRICKET_HOME.creamDeep,
+      borderRadius: 22,
+      borderWidth: 1,
+      height: 44,
+      justifyContent: 'center',
+      width: 44,
+    },
+    offFieldOpportunityCopy: { flex: 1, minWidth: 0 },
+    offFieldOpportunityKicker: {
+      color: CRICKET_HOME.creamDeep,
+      fontFamily: fonts.display,
+      fontSize: 9,
+      fontWeight: fontWeight.black,
+      letterSpacing: 0.7,
+    },
+    offFieldOpportunityTitle: {
+      color: CRICKET_HOME.cream,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.heavy,
+      marginTop: 2,
+    },
+    offFieldOpportunityAction: {
+      color: colors.accentLight,
+      flexShrink: 0,
+      fontSize: 9,
+      fontWeight: fontWeight.black,
+      letterSpacing: 0.25,
+      paddingHorizontal: spacing.xs,
+    },
+    fixtureActionDot: { color: colors.textFaint, fontSize: fontSize.sm },
+    fixtureEnergyLabel: { color: colors.textMuted, fontSize: fontSize.xs },
+    formScoreboard: {
+      backgroundColor: colors.surfaceMuted,
+      borderColor: colors.accentDark,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      marginBottom: spacing.md,
+      padding: spacing.md,
+    },
+    scoreboardHeadingRow: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      gap: spacing.sm,
+      paddingBottom: spacing.sm,
+    },
+    scoreboardBatIcon: { height: 25, position: 'relative', width: 14 },
+    scoreboardBatBlade: {
+      backgroundColor: colors.accentDark,
+      borderRadius: 2,
+      bottom: 0,
+      height: 18,
+      left: 2,
+      position: 'absolute',
+      transform: [{ rotate: '24deg' }],
+      width: 7,
+    },
+    scoreboardBatHandle: {
+      backgroundColor: CRICKET_HOME.cream,
+      height: 9,
+      position: 'absolute',
+      right: 1,
+      top: 0,
+      transform: [{ rotate: '24deg' }],
+      width: 3,
+    },
+    scoreboardHeading: {
+      color: colors.accentLight,
+      flex: 1,
+      fontFamily: fonts.display,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+      letterSpacing: 0.7,
+    },
+    scoreboardAvailability: {
+      color: colors.success,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+    },
+    scoreboardAvailabilityRecovery: { color: CRICKET_HOME.leather },
+    formMetricRow: {
+      alignItems: 'stretch',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingTop: spacing.md,
+    },
+    formMetricRowCompact: { flexWrap: 'wrap', rowGap: spacing.md },
+    formMetric: { flex: 1, minWidth: 60 },
+    formMetricDivider: { backgroundColor: colors.borderStrong, marginHorizontal: 6, width: 1 },
+    formMetricLabel: {
+      color: colors.textFaint,
+      fontSize: 10,
+      fontWeight: fontWeight.bold,
+      letterSpacing: 0.45,
+    },
+    formMetricValue: {
+      color: colors.text,
+      fontFamily: fonts.display,
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.black,
+      marginTop: 3,
+    },
+    formMetricSuccess: { color: colors.success },
+    formRecentMetric: { flex: 2.4, minWidth: 150 },
+    recentScoresRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 5,
+      marginTop: 5,
+    },
+    recentScoreChip: {
+      alignItems: 'center',
+      borderRadius: 4,
+      minWidth: 34,
+      paddingHorizontal: 6,
+      paddingVertical: 5,
+    },
+    recentScoreWin: { backgroundColor: 'rgba(39, 130, 74, 0.42)' },
+    recentScoreLoss: { backgroundColor: 'rgba(155, 51, 40, 0.46)' },
+    recentScoreDraw: { backgroundColor: colors.surfaceAlt },
+    recentScoreText: {
+      color: colors.text,
+      fontFamily: fonts.display,
+      fontSize: 11,
+      fontWeight: fontWeight.black,
+    },
+    noRecentScores: { color: colors.textFaint, fontSize: 9, marginTop: 7 },
+    journeyBoard: {
+      backgroundColor: colors.surfaceMuted,
+      borderColor: colors.accentDark,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      marginTop: spacing.lg,
+      padding: spacing.md,
+    },
+    journeyHeader: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+    journeyTrophy: {
+      alignItems: 'center',
+      borderColor: colors.accentDark,
+      borderRadius: 26,
+      borderWidth: 1,
+      height: 52,
+      justifyContent: 'center',
+      width: 52,
+    },
+    journeyTrophyGlyph: { fontSize: fontSize.xl },
+    journeyHeadingCopy: { flex: 1, minWidth: 0 },
+    journeyEyebrow: {
+      color: colors.accentLight,
+      fontFamily: fonts.display,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+      letterSpacing: 0.7,
+    },
+    journeyTitle: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+      marginTop: 2,
+    },
+    journeyMetrics: {
+      alignItems: 'stretch',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      marginTop: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    journeyMetricsCompact: { flexWrap: 'wrap', rowGap: spacing.md },
+    journeyDivider: { backgroundColor: colors.borderStrong, width: 1 },
+    journeyProgressRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginTop: spacing.md,
+    },
+    journeyProgressCopy: { flex: 1, minWidth: 0 },
+    journeyProgressLabel: {
+      color: colors.textFaint,
+      fontSize: 10,
+      fontWeight: fontWeight.bold,
+      letterSpacing: 0.5,
+    },
+    journeyProgressValue: {
+      color: colors.accentLight,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+      marginTop: 2,
+    },
+    journeyProgressPct: {
+      color: colors.accent,
+      fontFamily: fonts.display,
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.black,
+    },
+    journeyOpenLabel: {
+      color: colors.accent,
+      fontSize: 10,
+      fontWeight: fontWeight.black,
+      marginTop: spacing.md,
+      textAlign: 'right',
+    },
     nextChapterHero: {
       borderColor: colors.accent,
       borderWidth: 1.5,
@@ -2164,7 +2951,7 @@ const makeStyles = (colors: ThemeColors) =>
       paddingHorizontal: spacing.sm,
     },
     heroTextActionLabel: {
-      color: colors.primaryLight,
+      color: colors.accentLight,
       fontSize: fontSize.sm,
       fontWeight: fontWeight.bold,
     },
@@ -2178,11 +2965,39 @@ const makeStyles = (colors: ThemeColors) =>
       flexGrow: 1,
       flexBasis: 140,
     },
+    ticketPrimaryAction: {
+      marginTop: spacing.md,
+    },
+    ticketSecondaryAction: {
+      marginTop: spacing.sm,
+    },
+    ticketBenchReason: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 17,
+      marginTop: spacing.sm,
+    },
     countryMoveCard: {
       marginBottom: spacing.md,
       borderLeftColor: colors.info,
       borderLeftWidth: 3,
     },
+    countryOffer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+      padding: spacing.sm,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+    },
+    countryOfferSelected: { borderColor: colors.accent },
+    countryOfferCopy: { flex: 1, minWidth: 0 },
+    countryOfferClub: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+    countryOfferMeta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+    countryOfferBonus: { color: colors.success, fontSize: fontSize.xs, marginTop: 2 },
     countryChipGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -2341,12 +3156,10 @@ const makeStyles = (colors: ThemeColors) =>
     },
     // OVR ring (mini — shown inline in player card)
     ovrRingMini: {
-      position: 'absolute',
-      right: 0,
-      top: 0,
       width: 48,
       height: 48,
       alignItems: 'center',
+      flexShrink: 0,
       justifyContent: 'center',
     },
     ovrRingMiniCompact: {
@@ -2463,20 +3276,20 @@ const makeStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: colors.primary + '22',
+      backgroundColor: `${CRICKET_HOME.leather}22`,
       borderRadius: radius.md,
       borderWidth: 1,
-      borderColor: colors.primary,
+      borderColor: CRICKET_HOME.leather,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
       marginTop: spacing.md,
     },
     inboxBannerText: {
-      color: colors.primaryLight,
+      color: colors.accentLight,
       fontSize: fontSize.sm,
       fontWeight: fontWeight.semibold,
     },
-    inboxBannerArrow: { color: colors.primaryLight, fontSize: fontSize.md },
+    inboxBannerArrow: { color: colors.accentLight, fontSize: fontSize.md },
     storyHomeCard: {
       marginTop: spacing.md,
       borderColor: colors.accent,
@@ -2585,6 +3398,15 @@ const makeStyles = (colors: ThemeColors) =>
     gsMax: { color: colors.textFaint, fontSize: fontSize.xs },
     gsLabel: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: spacing.xs },
     scopeTable: { paddingVertical: 0 },
+    scopeGroupLabel: {
+      color: colors.accent,
+      fontSize: 10,
+      fontWeight: fontWeight.black,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      paddingTop: spacing.md,
+      paddingBottom: spacing.xs,
+    },
     scopeRow: {
       minHeight: 58,
       flexDirection: 'row',

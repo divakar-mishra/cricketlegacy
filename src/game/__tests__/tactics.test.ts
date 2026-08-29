@@ -1,5 +1,5 @@
 import { MatchState, Tactics } from '../../domain/types';
-import { tacticalImpactSummary, tacticIntentSummary } from '../tactics';
+import { tacticalImpactSummary, tacticIntentSummary, tacticSelectionSummary } from '../tactics';
 
 const tactics: Tactics = {
   batting: 'AGGRESSIVE',
@@ -89,6 +89,12 @@ const match: MatchState = {
 };
 
 describe('tacticalImpactSummary', () => {
+  it('turns manager tactic enums into a readable plan confirmation', () => {
+    expect(
+      tacticSelectionSummary({ batting: 'BALANCED', bowling: 'VARY', field: 'CATCHING' }),
+    ).toBe('Balanced batting · Mix it up bowling · All-Out Attack field');
+  });
+
   it('summarizes tactical impact from the actual scorecard', () => {
     const summary = tacticalImpactSummary(tactics, match, 'user');
 

@@ -3,15 +3,21 @@ import path from 'path';
 
 const loginSource = fs.readFileSync(path.join(__dirname, '..', 'LoginScreen.tsx'), 'utf8');
 
-describe('Login daily gate copy', () => {
-  it('lets already signed-in users refresh the daily verification window', () => {
-    expect(loginSource).toContain('Verify online session');
-    expect(loginSource).toContain('onVerifyDailyGate');
-    expect(loginSource).toContain("navigation.replace('MainMenu')");
+describe('Login offline-first copy', () => {
+  it('does not present account verification as a launch requirement', () => {
+    expect(loginSource).toContain('label="Play as Guest"');
+    expect(loginSource).not.toContain('Accounts are optional');
+    expect(loginSource).not.toContain('Verify online session');
+    expect(loginSource).not.toContain('onVerifyDailyGate');
   });
 
-  it('keeps offline-expiry copy explicit', () => {
-    expect(loginSource).toContain('Reconnect to refresh the 24-hour play window');
-    expect(loginSource).toContain('Normal career play can continue offline');
+  it('makes local-only persistence and offline guest play explicit', () => {
+    expect(loginSource).toContain('Guest saves stay on this device');
+    expect(loginSource).toMatch(/Cloud save is\s+not available in this build/);
+  });
+
+  it('warns that deleting local data also destroys save-bound sponsor ownership', () => {
+    expect(loginSource).toContain('Permanent per-save sponsors are deleted with their saves');
+    expect(loginSource).toContain('cannot be transferred or recovered');
   });
 });

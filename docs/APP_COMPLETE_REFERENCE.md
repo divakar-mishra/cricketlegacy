@@ -1,6 +1,6 @@
 # Cricket Legacy - Complete App Reference
 
-Last audited: 30 July 2026
+Last audited: 13 August 2026
 
 This document describes the current source implementation in `D:\APP`. It is a
 code-backed product reference, not a pitch deck. It separates:
@@ -14,6 +14,9 @@ code-backed product reference, not a pitch deck. It separates:
 Secrets, private keys, environment-variable values and store credentials are
 deliberately excluded. The visual companion document is
 [`UI_UX_COMPLETE_SPEC.md`](./UI_UX_COMPLETE_SPEC.md).
+The exact current sponsorship, stadium, Manager training and leadership values,
+together with the still-held decisions, are recorded in
+[`MANAGER_SYSTEMS_IMPLEMENTATION_AUDIT.md`](./MANAGER_SYSTEMS_IMPLEMENTATION_AUDIT.md).
 
 ## 1. Product Snapshot
 
@@ -55,7 +58,7 @@ selected at career creation.
 5. The foreground notification listener and ambient music synchronization are
    started.
 6. An `APP_OPEN` analytics event is written to the local analytics buffer.
-7. The Splash route checks the daily online session gate.
+7. The Splash route transitions to Main Menu without requiring a network check.
 8. The player reaches Main Menu.
 9. On first launch, a five-page onboarding sequence appears. It can later be
    replayed from Settings.
@@ -65,27 +68,26 @@ and safe-area treatment. Most routes use a horizontal slide transition;
 ceremonies and full-screen moments use route-specific fades or bottom-entry
 transitions.
 
-### 2.2 Daily session gate
+### 2.2 Offline-first access
 
-- A stable local guest identity is created if no account exists.
-- The first daily verification requires an online connection.
-- A successful check permits offline play for the next 24 hours.
-- With valid Supabase configuration, the server RPC records the verification.
-  Without it, the app records an online local verification.
-- A backward clock change beyond the five-minute tolerance invalidates the
-  cached window.
-- If NetInfo is unavailable, connectivity is treated optimistically.
-
-This gate is separate from the seven-day daily-reward streak.
+- Splash and Main Menu never require a network connection.
+- Accounts are optional for local careers.
+- Guest creation falls back to a stable device-local identity when Supabase is
+  disabled, offline or temporarily unavailable.
+- Supabase authorization checks remain available to future online-only
+  capabilities, but they do not gate the single-player game.
+- The seven-day daily-reward streak is a gameplay system, not an authorization
+  requirement.
 
 ### 2.3 Registered routes
 
-There are 42 registered destinations:
+There are 45 registered destinations:
 
 `Splash`, `MainMenu`, `NewGame`, `PlayerCreation`, `TeamSelect`, `Match`,
 `SavedGames`, `Settings`, `CricketAcademy`, `Login`, `Purchase`, `CareerHub`,
-`ManagerHub`, `Training`, `Squad`, `Transfers`, `PlayerProfile`, `Records`,
-`Narrative`, `ClubOffice`, `Academy`, `Press`, `SeasonPass`,
+`ManagerHub`, `Training`, `ManagerLeadership`, `Squad`, `Transfers`,
+`PlayerProfile`, `PlayerLife`, `Records`, `Narrative`, `ClubOffice`,
+`ClubStadium`, `Academy`, `Press`, `SeasonPass`,
 `PremiumClubhouse`, `LeagueEditor`, `StaffRecruitment`, `AwardsNight`,
 `MilestoneCinematic`, `PlayerCosmetics`, `NotificationInbox`,
 `DailyChallenge`, `BoardMeeting`, `HallOfFameCeremony`, `InjuryReport`,
@@ -173,11 +175,11 @@ There are 42 registered destinations:
 - Long rows wrap, truncate or switch to stacked layouts based on available
   width.
 
-The shared footer and modular-avatar flows were audited on an Android emulator
-at effective 360x800, 390x844, 412x915, 768x1024, 915x412 landscape and
-1024x768 tablet viewports. Every avatar control remained reachable and the
-scroll viewport ended before the active action footer. This does not replace a
-full physical-device audit of every screen and unusual aspect ratio.
+The shared footer flows were audited on an Android emulator at effective
+360x800, 390x844, 412x915, 768x1024, 915x412 landscape and 1024x768 tablet
+viewports. The fixed portrait picker remains inside the normal scroll flow, so
+its identity grid cannot cover the active action footer. This does not replace
+a full physical-device audit of every screen and unusual aspect ratio.
 
 ### 3.5 Shared controls
 
@@ -240,36 +242,36 @@ light haptic.
 
 ### 4.1 Entry, setup and account
 
-| Route           | Layout and visible content                                                                                                        | Main actions and state                                                                                     |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Splash          | Full-screen centered emblem, product name, tagline and loading copy over the app background                                       | Resolves fonts and the daily-session gate, then routes forward                                             |
-| Main Menu       | Code-rendered cricket-ground hero; resume card showing mode, identity, season, wallet and last result; icon-led action grid below | Continue, New Game, Saves, Store, Account, Settings and Exit                                               |
-| New Game        | Two large mode cards with role-specific summary and iconography                                                                   | Start Player Career or Manager Career                                                                      |
-| Player Creation | Four-step flow: identity/avatar, pathway/attributes, club context, review; progress header and responsive in-flow action footer            | Name, country, role, hand/style, appearance, difficulty, stat allocation and confirmation                  |
-| Team Select     | Country-aware club rows/cards with selected state and a reserved start footer                                                     | Select a valid club and begin Manager Career                                                               |
-| Saved Games     | Player/manager tabs, save-slot cards, empty slots, premium sixth-slot lock, metadata and destructive confirmation                 | Load or delete a save                                                                                      |
-| Login           | Account-status surface, Google action marked `Coming soon`, and active Guest action                                               | Guest play is active; email/password and cloud login are not exposed                                       |
-| Settings        | Grouped audio/gameplay toggles, graphics/theme/language selectors, guide controls, handbook link, reset and build metadata        | Sound, music, haptics, notifications, quality, theme, app-chrome language, replay guides, restore defaults |
-| Cricket Academy | Search field, four tabs and expandable rule articles                                                                              | Search and inspect career, match, club and physicality mechanics                                           |
-| League Editor   | Competition/club text inputs and availability state                                                                               | Rename supported league/team content while the pass-gated editor is active                                 |
+| Route           | Layout and visible content                                                                                                        | Main actions and state                                                                                                                                     |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Splash          | Full-screen centered emblem, product name, tagline and loading copy over the app background                                       | Resolves fonts, then routes to Main Menu without a network gate                                                                                            |
+| Main Menu       | Code-rendered cricket-ground hero; resume card showing mode, identity, season, wallet and last result; icon-led action grid below | Continue, New Game, Saves, Account, Settings and Exit; Store appears after two completed matches when development mocks or the live provider are available |
+| New Game        | Two large mode cards with role-specific summary and iconography                                                                   | Start Player Career or Manager Career                                                                                                                      |
+| Player Creation | Four-step flow: identity/avatar, pathway/attributes, club context, review; progress header and responsive in-flow action footer   | Name, country, role, hand/style, appearance, difficulty, stat allocation and confirmation                                                                  |
+| Team Select     | Country-aware club rows/cards with selected state and a reserved start footer                                                     | Select a valid club and begin Manager Career                                                                                                               |
+| Saved Games     | Player/manager tabs, save-slot cards, empty slots, premium sixth-slot lock, metadata and destructive confirmation                 | Load or delete a save                                                                                                                                      |
+| Login           | Account-status surface, Google action marked `Coming soon`, and active Guest action                                               | Guest play is active; email/password and cloud login are not exposed                                                                                       |
+| Settings        | Grouped audio/gameplay toggles, graphics/theme/language selectors, guide controls, handbook link, reset and build metadata        | Sound, music, haptics, notifications, quality, theme, app-chrome language, replay guides, restore defaults                                                 |
+| Cricket Academy | Search field, four tabs and expandable rule articles                                                                              | Search and inspect career, match, club and physicality mechanics                                                                                           |
+| League Editor   | Competition/club text inputs and availability state                                                                               | Rename supported league/team content while the pass-gated editor is active                                                                                 |
 
 ### 4.2 Player Career
 
-| Route                  | Layout and visible content                                                                                                               | Main actions and state                                                                                           |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Career Hub             | Stadium spotlight, identity/header, wallet, four persistent tabs, urgent story/event block and exactly one resolver-owned primary action | Continue the next canonical career step; captains can open the relevant club/national XI and tactics; open training, profile, records, calendar and store |
-| Training               | Role-specific training cards, total/focus limits, escalating coin price and trainability feedback                                         | Complete a paid session; view an immediate centered result modal                                                  |
-| Player Life            | Five responsive tabs for selection risk, recent form, development services, personal finance, phone/media and legacy                       | Hire coaches, use physio/analysis, buy equipment/assets, bank/trade, post, negotiate sponsors, handle captaincy and import/export |
-| Player Profile         | Avatar and identity, current form/condition, contract, equipment, career/season statistics and role-relevant attributes                  | Inspect career, contract, awards and records; fielding remains engine-visible but is not a dedicated UI section  |
-| Contract Negotiation   | Staged offer card, demand controls, club response, result summary and held/disabled buttons during transitions                           | Accept, negotiate and sign; a stored contract token automatically improves the next renewal                      |
-| Narrative              | Full story/event copy, choices, relationship/economy effects and resolved/empty state                                                    | Make one persisted choice and return to the career resolver                                                      |
-| Player Cosmetics       | Live modular preview, sex-compatible preset/manual tabs, free appearance controls, owned/gem/pass kit/frame states and save feedback       | Select modular appearance, equip owned kit/frame/celebration items and persist the result                         |
-| Daily Challenge        | Date-seeded format/pitch briefing, bronze/silver/gold target, progress and reward panel                                                  | Play once per date and claim the reached coin tier                                                               |
-| U19 World Cup          | Youth-international status, schedule/progress, result panel and unavailable/empty state                                                  | Play or advance eligible youth fixtures                                                                          |
-| International Calendar | Format-specific selection status, reason copy, year-round fixtures, WTC standings, bilateral tours and ICC event progress                | Play selected international matches and inspect country/format status                                            |
-| Injury Report          | Full-screen severity presentation, missed-match estimate, recovery timeline and action cards                                             | Continue normal recovery or pay gems to accelerate                                                               |
-| Milestone Cinematic    | Full-screen colored gradient, particles, milestone number/type and short caption                                                         | Auto-closes after four seconds or closes on tap                                                                  |
-| Hall Of Fame Ceremony  | Highlight reel, gold plaque, career identity and legacy statistics                                                                       | Complete induction and return                                                                                    |
+| Route                  | Layout and visible content                                                                                                                                                                                                                                 | Main actions and state                                                                                                                                                                                              |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Career Hub             | Stadium spotlight, identity/header with a visible Player Life action, wallet, four persistent tabs, exactly one resolver-owned primary action and at most one timely off-field opportunity row                                                             | Continue the next canonical career step; open Player Life from the identity card; a real sponsor, Portfolio unlock or affordable Academy state deep-links to its destination without creating a permanent menu wall |
+| Training               | Role-specific training cards, total/focus limits, escalating coin price and trainability feedback                                                                                                                                                          | Complete a paid session; view an immediate centered result modal                                                                                                                                                    |
+| Player Life            | Five responsive tabs for selection risk, recent form, development services, personal finance, phone/media and legacy                                                                                                                                       | Hire coaches, use physio/analysis, buy equipment/assets, bank/trade, post, negotiate sponsors, handle captaincy and import/export                                                                                   |
+| Player Profile         | Avatar and identity, current form/condition, contract, equipment, career/season statistics and role-relevant attributes                                                                                                                                    | Inspect career, contract, awards and records; fielding remains engine-visible but is not a dedicated UI section                                                                                                     |
+| Contract Negotiation   | Staged offer card, demand controls, club response, result summary and held/disabled buttons during transitions                                                                                                                                             | Accept, negotiate and sign; a stored contract token automatically improves the next renewal                                                                                                                         |
+| Narrative              | Full story/event copy, choices, relationship/economy effects and resolved/empty state                                                                                                                                                                      | Make one persisted choice and return to the career resolver                                                                                                                                                         |
+| Player Cosmetics       | Shaded front/back cricket-kit preview, editable back name/number, fixed-portrait picker and owned/gem/pass cosmetic states                                                                                                                                 | Personalize and persist shirt identity, kit colour, portrait and celebration                                                                                                                                        |
+| Daily Challenge        | Date-seeded format/pitch briefing, bronze/silver/gold target, progress and reward panel                                                                                                                                                                    | Play once per date and claim the reached coin tier                                                                                                                                                                  |
+| U19 World Cup          | One age-18 merit opportunity, selection progress and a persisted six-country 50-over knockout bracket                                                                                                                                                      | Earn selection, play the user's quarter-final/semi-final/final through normal Matchday and review the result                                                                                                        |
+| International Calendar | Format-specific selection status, year-round fixtures, WTC standings and compact world rankings. Capped players can switch Test/ODI/T20I and Batting/Bowling/All-Rounder; National Managers see format-specific team position, matches, points and rating. | Play selected international matches and inspect country, format and ranking status                                                                                                                                  |
+| Injury Report          | Full-screen severity presentation, missed-match estimate, recovery timeline and action cards                                                                                                                                                               | Continue normal recovery or pay gems to accelerate                                                                                                                                                                  |
+| Milestone Cinematic    | Full-screen colored gradient, particles, milestone number/type and short caption                                                                                                                                                                           | Auto-closes after four seconds or closes on tap                                                                                                                                                                     |
+| Hall Of Fame Ceremony  | Highlight reel, gold plaque, career identity and legacy statistics                                                                                                                                                                                         | Complete induction and return                                                                                                                                                                                       |
 
 Retirement is represented inside Career Hub rather than by a separate route.
 The hub changes to `A Career Remembered`, displays the final legacy summary and
@@ -277,21 +279,24 @@ offers the Hall of Fame path when eligible.
 
 ### 4.3 Manager Career
 
-| Route                   | Layout and visible content                                                                                                                         | Main actions and state                                                                      |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Manager Hub             | Club or national spotlight, role identity, board/appointment alerts, one Continue action, latest result, earnings, league table and live-ops cards | Advance the calendar; enter squad, transfers, office, press, records and store               |
-| Squad                   | Playing XI followed by bench, player role/fitness/morale, batting-order controls, tactics and mechanic info buttons                                | Select XI, reorder batting, set plan, use supported recovery                                |
-| Transfers               | Market/Squad/Loan tabs, compact player rows, search/filter/sort, scouting uncertainty and action buttons                                           | Scout, fast-track a report, bid, sign, sell, release or loan                                |
-| Transfer Deadline Day   | Full-screen countdown, current budget, urgency color, transfer ticker and deal status                                                              | Jump to the real transfer market or squad; no fake isolated transfer inventory              |
-| Club Office             | Club budget, staff/facility sections, wallet services, resources and economy explanation                                                           | Opposition Analysis, Morale Session, resources, facility/staff actions and investments       |
-| Academy                 | Youth prospect list with age, role and current overall; hidden development ceilings are not shown                                                   | Promote or release prospects                                                                |
-| Academy Management      | Personal academy name, tier, students, income and upgrade state                                                                                    | Open or upgrade the wallet-funded personal academy                                          |
-| Staff Recruitment       | Candidate cards with role, quality, effect, wage/signing cost and affordability                                                                    | Search, hire and develop staff                                                              |
-| Wage Breakdown          | Club payroll totals, wage ceiling/FFP context and per-player rows                                                                                  | Audit current costs before signing or renewal                                               |
-| Press                   | Event/speaker copy and response choices, followed by positive/negative/neutral effect chips                                                        | Commit one response affecting board, reputation, club budget or morale                      |
-| Board Meeting           | Cinematic boardroom with sacked, praised, warned or extended theme                                                                                 | Acknowledge outcome and continue                                                            |
-| Youth Graduate Ceremony | Club-colored shirt, star particles, name, role and attributes                                                                                      | Promote the revealed graduate into the first team                                           |
-| Investment Screen       | Personal wallet amount input, portfolio status/history, academy/legacy funding and withdrawal controls                                             | Invest wallet coins, withdraw the portfolio or fund legacy projects                         |
+| Route                   | Layout and visible content                                                                                                                                                                     | Main actions and state                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Manager Hub             | Club/national spotlight, one resolver-owned Continue action, current competition, compact navigation, board state and Objectives & Pass; duplicate budget/streak/table/level blocks are absent | Advance the calendar; enter Squad, Training, Transfers or a tab destination         |
+| Training                | Automatic club-training plan with six focuses, three intensities, remaining development blocks and optional player overrides                                                                   | Set the between-fixture squad plan; individual players can follow a different focus |
+| Manager Leadership      | Current captain/vice-captain, leadership scores, review state and senior-squad candidate list                                                                                                  | Appoint or swap the club captain and vice-captain                                   |
+| Squad                   | Playing XI followed by bench, player role/fitness/morale, captain/vice badges, batting-order controls, tactics and mechanic info buttons                                                       | Select XI, reorder batting, set plan, open leadership and use supported recovery    |
+| Transfers               | Market/Squad/Loan tabs, compact player rows, search/filter/sort, scouting uncertainty and action buttons                                                                                       | Scout, fast-track a report, bid, sign, sell, release or loan                        |
+| Transfer Deadline Day   | Full-screen countdown, current budget, urgency color, transfer ticker and deal status                                                                                                          | Jump to the real transfer market or squad; no fake isolated transfer inventory      |
+| Club Office             | Kit partnership, prominent infrastructure cards, Home Ground entry, club finance, resources, staff, contracts and treatment room                                                               | Sign a kit deal; manage facilities, staff, wages and club resources                 |
+| Club Stadium            | Capacity, fan/crowd summary, two upgrade tracks, ticket strategy, next-home forecast and recent attendance                                                                                     | Upgrade the ground/experience and choose Low, Standard or Premium prices by format  |
+| Academy                 | Youth prospect list with age, role and current overall; hidden development ceilings are not shown                                                                                              | Promote or release prospects                                                        |
+| Academy Management      | Personal academy name, tier, students, income and upgrade state                                                                                                                                | Open or upgrade the wallet-funded personal academy                                  |
+| Staff Recruitment       | Candidate cards with role, quality, effect, wage/signing cost and affordability                                                                                                                | Search, hire and develop staff                                                      |
+| Wage Breakdown          | Club payroll totals, wage ceiling/FFP context and per-player rows                                                                                                                              | Audit current costs before signing or renewal                                       |
+| Press                   | Event/speaker copy and response choices, followed by positive/negative/neutral effect chips                                                                                                    | Commit one response affecting board, reputation, club budget or morale              |
+| Board Meeting           | Cinematic boardroom with sacked, praised, warned or extended theme                                                                                                                             | Acknowledge outcome and continue                                                    |
+| Youth Graduate Ceremony | Club-colored shirt, star particles, name, role and attributes                                                                                                                                  | Promote the revealed graduate into the first team                                   |
+| Investment Screen       | Personal wallet amount input, portfolio status/history, academy/legacy funding and withdrawal controls                                                                                         | Invest wallet coins, withdraw the portfolio or fund legacy projects                 |
 
 ### 4.4 Shared match, progression and store
 
@@ -381,8 +386,9 @@ The user chooses:
 - Batter, Bowler, All-Rounder or Wicketkeeper.
 - Batting hand, bowling hand and bowling style.
 - Difficulty.
-- Avatar from the supplied 300 deterministic recipes (150 male and 150 female)
-  or individual appearance controls backed by 186 modular runtime assets.
+- One of 128 fixed bundled portrait identities: 64 male and 64 female, with
+  eight identities in each of eight tone bands per sex. Portrait availability
+  is independent of the selected country.
 - Initial attribute allocation and a country-specific starting club.
 
 Specialist Batter and Bowler builds receive a 150-point creation budget.
@@ -422,10 +428,14 @@ Automatic trait examples:
 
 ### 6.3 Career pyramid
 
-The player begins at age 14 in School cricket:
+The player begins at age 16 in Grade A cricket:
 
-`School -> U19 -> Senior Tier 3 -> Tier 2 -> Tier 1 -> format-specific national
+`Grade A -> earned U19 place -> Senior Tier 3 -> Tier 2 -> Tier 1 -> format-specific national
 selection -> retirement/legacy`
+
+Age advances once when a completed campaign rolls into the next season. Player
+Home labels the career year as Season 1, Season 2 and so on; the rollover card
+previews the exact age change before the next season begins.
 
 Each country has a generated 24-club senior world:
 
@@ -434,63 +444,58 @@ Each country has a generated 24-club senior world:
 - Twenty-two players per club.
 - Fourteen-match double round-robin T20 block.
 
-The selected Tier 3 club is a reserved future destination, not the age-14
-player's current team. School and U19 each use a separate age-appropriate XI.
+The selected Tier 3 club is a reserved future destination, not the age-16
+player's current team. Grade A and U19 each use a separate pathway XI.
 The 24-club senior world continues in the background without the user. On U19
 promotion, the user enters the reserved Tier 3 roster, one same-role senior is
 moved to the free-agent pool, and the user is placed in the XI.
 
 ### 6.4 Opposition curve and youth gates
 
-| Stage  | Typical opponent OVR | Generated range | Selection requirement |
-| ------ | -------------------: | --------------: | --------------------: |
-| School |                   34 |           28-40 |                    34 |
-| U19    |                   48 |           42-54 |                    47 |
+| Stage   | Typical opponent OVR | Generated range | Selection requirement |
+| ------- | -------------------: | --------------: | --------------------: |
+| Grade A |                   34 |           28-40 |                    34 |
+| U19     |                   48 |           42-54 |                    47 |
 
-School promotion requires at least five appearances and either 140 runs or nine
+Grade A promotion requires at least five appearances and either 140 runs or nine
 wickets. U19 promotion requires at least six appearances and either 320 runs or
-16 wickets. Age safeguards force movement to U19 at 16 and senior domestic
-cricket at 20 even if the statistical gate has not been completed.
+16 wickets. Grade A never grants an automatic U19 place: performance sends an
+eligible player to U19, or directly to Domestic from age 19. U19 players move
+to senior domestic cricket at 20 if the statistical gate has not been completed.
 
 Readiness combines 75% match output and 25% match rating. For an All-Rounder,
 the stronger discipline contributes 70% and the secondary discipline 30%.
 
-School injuries use a 0.3 multiplier. A School player is generally selected
+Grade A injuries use a 0.3 multiplier. A Grade A player is generally selected
 unless injured, intentionally resting or below 18 condition.
 
-### 6.5 Literal calendar events
+### 6.5 Career calendar
 
-| Stage/window      | Current events                                                         |
-| ----------------- | ---------------------------------------------------------------------- |
-| School Sep-Nov    | Tactics, team strategy and examinations                                |
-| School Jan-Feb    | Recovery and examinations                                              |
-| School Mar onward | Selection and T20 fixtures                                             |
-| U19 Sep-Nov       | ODI camp, selection and youth ODIs                                     |
-| U19 Dec-Feb       | NCA camps                                                              |
-| U19 Mar onward    | T20 selection and fixtures                                             |
-| Senior Sep-Nov    | Preparation, selection and List A                                      |
-| Senior Dec-Feb    | Recovery, Test-format selection and First-Class                        |
-| Senior Mar-May    | T20 preparation, selection, league and playoffs                        |
-| June-August       | Transfers, contracts, recovery, migration and major international duty |
+Grade A and U19 progression is match-led: there are no mandatory study, nets,
+camp, recovery or selection events between the player and the next fixture.
+Grade A presents six T20 fixtures directly. U19 presents four youth ODIs followed
+by four youth T20s. Missing youth fixtures are rebuilt automatically when the
+calendar is opened, and older saves discard obsolete filler-event cursors
+without skipping an unplayed match.
 
-Event choices have real state effects. Examples:
+Senior careers retain their full seasonal calendar:
 
-- Tactics work: `+3` adaptability, `+2` confidence, `-2` condition.
-- Team strategy: `+3` coach trust, `+1` confidence.
-- Fitness session: `+10` condition, `+1` confidence.
-- Study in an exam window: `+2` trust, `+2` confidence.
-- NCA training: `+3` adaptability, `+2` trust, `-3` condition.
-- NCA rest: `+15` condition.
-- Recovery event: `+18` condition.
+| Window        | Current events                                                                           |
+| ------------- | ---------------------------------------------------------------------------------------- |
+| September-Nov | Preparation, selection and List A                                                        |
+| December-Feb  | Recovery, Test-format selection and First-Class                                          |
+| March         | Franchise T20 preparation and selection; March international assignments may still occur |
+| April-May     | Protected franchise T20 league and playoffs; no international cricket                    |
+| June-August   | Transfers, contracts, recovery, migration and major international duty                   |
 
 ### 6.6 Player archetypes
 
-| Archetype    | Main behavior                                                                                                                                                                                                                                          |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Prodigy      | Training multiplier 1.20 through age 20, 1.05 in the middle years and 0.92 from 27; easier 0.68 readiness gate, one fewer required match, fast-track OVR gate reduced by three; positive reputation x1.22 and negative x1.15; higher young injury risk |
-| Late Bloomer | Training x0.88 before 23 and x1.24 from 23; readiness 0.80, one additional match and OVR gate +5; reputation x0.82 before 23 and x1.22 after; lower injury risk                                                                                        |
-| Specialist   | Signature-discipline growth x1.18 and other growth x0.96; standard readiness; drop threshold 28                                                                                                                                                        |
-| Comeback     | Training x0.92 below 60 fitness and x1.15 otherwise; higher injury risk until the comeback and x0.82 after; readiness 0.74; negative reputation is softened to x0.70                                                                                   |
+| Archetype    | Main behavior                                                                                                                                                                                                                                                                                             |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prodigy      | Training multiplier 1.20 through age 20, 1.05 in the middle years and 0.92 from 27; easier 0.62 readiness gate, one fewer required match, fast-track OVR gate reduced by three; positive reputation x1.22 and negative x1.15; higher young injury risk                                                    |
+| Late Bloomer | Training x0.88 before 23 and x1.24 from 23; readiness 0.72, one additional match and OVR gate +5; reputation x0.82 before 23 and x1.22 after; lower injury risk                                                                                                                                           |
+| Specialist   | Batter/Bowler signature-discipline growth x1.27 and other growth x0.96. Because an All-Rounder must build eleven primary attributes, dual-discipline growth is x1.25 in Grade A/U19 and x1.55 in senior cricket, followed by the role's x0.98 workload factor. Standard 0.68 readiness; drop threshold 28 |
+| Comeback     | Training x0.92 below 60 fitness and x1.15 otherwise; higher injury risk until the comeback and x0.82 after; readiness 0.67; negative reputation is softened to x0.70                                                                                                                                      |
 
 ### 6.7 Selection
 
@@ -525,10 +530,10 @@ Role workload can add up to ten. Age-based recovery declines from six to four,
 two and then zero across older age bands. Rest recovery similarly declines
 from 28 to 24, 20 and 16.
 
-A selected career All-Rounder is guaranteed a meaningful bowling spell where
-the innings lasts long enough: one over in T10, two in T20/Hundred, four in
-ODI/List A and eight in Test/First-Class. The spell is scheduled early enough
-to avoid disappearing in a short chase while still obeying bowler limits.
+A selected career Bowler or All-Rounder is guaranteed a meaningful bowling
+spell where the innings lasts long enough: one over in T10, two in T20/Hundred,
+four in ODI/List A and eight in Test/First-Class. The spell is scheduled early
+enough to avoid disappearing in a short chase while still obeying bowler limits.
 
 A Player Career trophy is credited only when the user participated in at least
 40% of the club's matches, preventing a mostly absent player from receiving an
@@ -536,32 +541,62 @@ unearned cabinet entry.
 
 ### 6.9 Training
 
-Training groups are role-specific. A player receives six sessions in total per
-season, with at most three sessions in one focus. Prices rise with total use:
+Training groups are role-specific. The number of paid sessions expands with
+the player's career stage:
 
-`250, 400, 550, 700, 850, 1,000 coins`.
+Paid training is optional and never gates career progression. When no player
+fixture is currently due, `Continue season` advances the remaining calendar
+for free; `Train first` remains available as an optional development choice.
 
-The price curve is identical at School, Under-19, Domestic and International
-level. Career level changes the development ceiling and available pathway, not
-the session price. A season always has six paid uses in total and no focus can
-consume more than three of them.
+| Career stage        | Sessions per season | Maximum in one focus |
+| ------------------- | ------------------: | -------------------: |
+| Grade A             |                   8 |                    4 |
+| Under-19            |                  12 |                    6 |
+| Senior professional |                  18 |                    9 |
 
-Training improves the two weakest relevant attributes by one to three points.
-There is no zero-cost `+1` path: an empty wallet cannot change attributes or
-consume a session. Active Season Pass training uses a `1.10` growth multiplier.
-A one-season personal specialist multiplies matching paid gains by `1.50`. A
-Training Accelerator triples the next three training-session gains and
-overrides the normal multiplier for those sessions.
+The base price of session `n` is `300 + 150 * sessions already completed`.
+That price is then multiplied by current OVR: `1.00x` below 70, `1.25x` from
+70-79, `1.75x` from 80-84, `2.50x` from 85-89 and `3.50x` from 90 onward. At a
+fixed rating, a complete 18-session senior season therefore costs 28,350 coins
+below OVR 70, rising to 99,225 coins at OVR 90+.
+
+Every completed session directly improves up to the three weakest eligible
+attributes in the selected focus by two to four points each before approved
+archetype, Pass or consumable multipliers. The training
+result always shows the exact old and new values and their combined growth.
+Because the displayed OVR is rounded, the screen also exposes decimal OVR
+progress and its movement after each session; a useful session never appears
+to have done nothing merely because it did not cross the next whole OVR.
+
+There is no creation-style point conversion and no zero-cost `+1` path: the
+listed coin price buys direct attribute growth. A focus at its current pathway
+cap is disabled before payment, so it cannot consume coins or a session without
+a gain. Active Season Pass training uses a `1.10x` growth multiplier. A
+one-season personal specialist multiplies matching paid gains by `1.50x`. A
+Training Accelerator gives `1.50x` gains to the next three paid training
+sessions; normal session prices and all stage/focus limits still apply.
 
 ### 6.10 International career and dual contracts
 
-A first national call-up requires approximately OVR 70 and national reputation 80. Selection is independent for T20I, ODI and Test cricket:
+A first national call-up remains merit-led and has three timing routes:
+
+- Strong-player route: age 22+, OVR 58 and national reputation 80.
+- Exceptional early route: age 20-21, OVR 65 and national reputation 95.
+- Late Bloomer route: age 27+, OVR 70 and national reputation 80.
+
+After the first call-up, selection is independent for T20I, ODI and Test cricket:
 
 `40% Overall + 35% Form + 25% National Reputation + format readiness`.
 
 Indicative score thresholds are 64 for short-format, 66 for ODI and 68 for
-Test selection. A debut receives a guarantee. Injury, form below 40 or condition
-below 25 blocks selection.
+Test selection. A debut receives a guarantee. Injury, form below 30 or condition
+below 25 blocks selection. The selection score is refreshed when every
+assignment arrives. It is not cached at the beginning of the season, so form
+recovery can earn a recall for a later tour or tournament in the same year.
+Calendar time between assignments restores enough condition for a healthy
+player to be considered again. Within a selected tour, a single poor match does
+not remove every remaining fixture: release requires collapsed form after at
+least three appearances in that assignment.
 
 The user keeps two statuses:
 
@@ -573,6 +608,10 @@ still plays; that fixture is simulated without the user and is stored as
 `Away on National Duty`. If no international match exists or the user is not
 selected for that format, the domestic fixture remains playable.
 
+April and May contain no international fixtures. They are protected for the
+player's separate franchise contract. National selection never cancels either
+the domestic or franchise agreement.
+
 The first played senior cap permanently stores the capped country. Birth
 nationality never disappears. After three domestic seasons in another country,
 that country becomes an additional pre-cap eligibility option.
@@ -583,23 +622,43 @@ at the same tier.
 
 ### 6.11 International annual rotation
 
-Every season also contains:
+For a player selected for every assignment who reaches the available finals,
+the annual programme is exactly 10 Tests, 25 ODIs and 15 T20Is. These are
+ceilings rather than guaranteed caps: every bilateral series and tournament is
+selected independently, and injury, low form, low condition or elimination
+removes only the affected appearances.
 
-- An autumn three-match bilateral in October/November. Years 1 and 3 use T20;
-  years 2 and 4 use ODI.
-- Two bilateral WTC Tests in January/February.
+- Non-final WTC seasons contain five two-Test series. WTC-final seasons contain
+  nine bilateral Tests plus the standalone final for a qualifying country.
+- Seasons without an ODI tournament contain five five-match ODI series. The
+  Champions Trophy season contains 20 bilateral ODIs plus up to five tournament
+  matches; the ODI World Cup season contains 14 bilateral ODIs plus up to 11
+  tournament matches.
+- The T20 World Cup season contains nine bilateral T20Is plus up to six World
+  Cup matches. Other seasons contain three five-match T20I series.
+- No plan or fixture may be scheduled in April or May, leaving those months to
+  franchise cricket.
 
 The June-August marquee rotation is:
 
 | Rotation year | Main event                                                                                   |
 | ------------- | -------------------------------------------------------------------------------------------- |
 | 1             | T20 World Cup: 10 teams, four user group matches, then dynamic knockout qualification        |
-| 2             | World Test Championship Final window                                                         |
+| 2             | World Test Championship Final in late August                                                 |
 | 3             | Champions Trophy: eight teams, three user group matches, then dynamic knockout qualification |
-| 4             | ODI World Cup: 10 teams, nine user group matches, then dynamic knockout qualification        |
+| 4             | ODI World Cup plus the two-season World Test Championship Final                              |
 
 WTC standings run on a two-season cycle. Bilateral Test wins award 12 points and
-draws award four. The top two countries play one standalone June final.
+draws award four. The top two countries play one standalone late-August final,
+after every points series in the cycle has been resolved.
+
+Player ranking history is save-local and prospective. After every canonically
+settled international appearance, Test/ODI/T20I × Batting/Bowling/All-Rounder
+records independently retain best rank, rating at that rank, exact save-season
+ID, displayed year and age, plus best rating, rank at that rating, exact
+save-season ID, displayed year and age. Schema-42 and older careers begin with
+an empty ledger because historic rankings cannot be reconstructed honestly from
+aggregate score totals.
 
 World Cup and Champions Trophy semifinals are not created at tournament start.
 After the last group match, the table is ranked by points, wins and a stable
@@ -615,20 +674,42 @@ returns the user to domestic/off-season flow.
 - Earned Legend status requires the player to be capped and satisfy one major
   threshold: 8,000 runs; 300 wickets; 4,000 runs plus 150 wickets; five titles;
   60 caps; or 40 caps plus OVR 84.
-- A fading-international retirement nudge begins at age 34 when the last two
-  seasons added no caps, rather than checking whether the career ever had a cap.
-- Standard retirement can begin at age 33 when OVR is 62 or lower.
+- Retirement is optional from age 33.
+- A normal retirement review occurs from 35 to 38. Poor form (below 40), poor
+  condition (below 25 or injury), and a weak selection outlook bring the review
+  forward; every career receives it by age 38 even when still performing.
+- A player may continue after the recommendation, but retires at age 40 at the
+  latest.
 - A completed player can transition into management after 8,000 runs, 250
   wickets, 5,000 runs plus 150 wickets, 50 caps or ten seasons.
 
 ### 6.13 Contracts, auctions, sponsors and stories
 
+- Player Career holds two simultaneous affiliations: `userTeamId` is the
+  First-Class/List A domestic club and `franchiseTeamId` is the T20 team.
+- Domestic-club windows present two or three rival offers in a popup. Their
+  interest and terms use First-Class/List A appearances and output rather than
+  international caps, so an uncapped player can sustain a long domestic career.
+- Franchise offers never transfer the domestic contract. Domestic offers never
+  cancel the franchise contract. National duty overrides a clashing club
+  fixture without cancelling either agreement.
 - Franchise auction eligibility begins after two senior domestic seasons, ten
   matches and star value of at least 145.
 - Up to two auction bids are generated.
-- Example sponsor contracts include Willow at 40 coins per match plus a
-  300-coin signing bonus for three seasons, and BurgerBlast at 70 per match plus
-  600 up front for two seasons.
+- The Player has one earned kit-partner slot. It unlocks only after a verified
+  selected-XI senior Domestic appearance; School, Under-19 and Under-19 World
+  Cup fixtures cannot unlock or pay it.
+- The three guaranteed base offers are All formats (16 appearances, 110 coins
+  each), White ball (10 at 180) and Red ball (six at 300), each with a 250-coin
+  signing bonus. Domestic/Franchise/International/Icon multipliers are fixed at
+  signing and contracts end at their quota or two season rollovers.
+- A separate ₹499 permanent weekly sponsor adds one extra slot to one exact
+  Player save. Its Store card appears after sponsorship unlocks; production
+  checkout remains gated until the backend can verify and bind a consumable
+  transaction to that save.
+- Story-event sponsors are off-shirt endorsement campaigns, not kit partners.
+  All active campaigns keep their original per-match values and expiry terms,
+  settle once per fixture, and do not consume either kit slot.
 - Relationship tracks cover coach, captain, mentor, agent, rival and selector
   from `-100` to `100`.
 - Relationship memory retains up to 40 entries; the broader timeline retains
@@ -665,21 +746,27 @@ scattering duplicate cards through Career Hub:
   gloves grant `+2` catching; 7,500-coin shoes grant `+1` running and agility;
   the 9,000-coin protective kit grants `+1` temperament and fitness. Each item
   can be bought once and applies its listed permanent increase once.
-- **Finance:** personal banking unlocks at age 18 in senior domestic cricket.
+- **Finance:** personal banking and the Portfolio unlock at age 18 in senior domestic cricket.
   Bank balances receive 2% at season end. Three properties cost
   `12,000/45,000/120,000` and pay `450/1,800/5,200` per season. Three businesses
   cost `25,000/60,000/150,000` and pay `1,500/4,200/11,000` per season.
-- **Legacy Exchange:** a save/year-seeded fictional token can be bought and
-  sold with Wallet Coins. It is labelled as fictional and has no real-money or
-  real-world value.
+- **Company Portfolio:** 24 fictional companies cover Technology,
+  Infrastructure, Mining, Energy, Consumer, Manufacturing, Logistics and
+  Healthcare. Players may hold several companies, add funds and sell part or
+  all of a position. Deterministic company/sector values update once per
+  season and never depend on cricket results. Stable annual moves remain
+  within `-4%..+7%`, Balanced within `-8%..+12%`, and Volatile within
+  `-16%..+20%`.
+- **Legacy migration:** the retired anonymous stock balance remains available
+  as a sell-only Legacy Market Index. The removed Legacy Token market refunds
+  the higher of its cost basis or current fictional value exactly once.
 - **Phone and media:** Feed, Inbox, News and Money views live inside one bounded
   phone surface. Followers grow from actual appearances and milestone posts.
   The player may publish three deliberate media posts per season.
-- **Sponsors:** one Safe, Balanced or Bold negotiation can be completed per
-  season, up to two active sponsor slots. Higher demands improve payout while
-  lowering the deterministic acceptance chance. Each choice previews its exact
-  acceptance chance, signing bonus, per-match fee, two-season duration and
-  minimum-form requirement before the once-per-season attempt is committed.
+- **Sponsors:** one earned slot presents three guaranteed format-based offers
+  after the first selected-XI senior Domestic appearance. It previews the exact
+  signing payment, matching-appearance payment and total quota. Player sponsor
+  income always goes to Wallet Coins.
 - **Captain control:** earned club/national captains can resolve squad-role
   disputes through Support, Mediate or Discipline choices with persisted
   morale, trust or discipline effects.
@@ -713,6 +800,11 @@ The club budget is separate from personal wallet coins and gems.
 
 ### 7.2 Manager progression and calendar
 
+A new Manager Career begins at age 35. Age advances exactly once at each
+completed-season rollover; the Manager retires at age 60 after 25 completed
+seasons, at which point Matchday and calendar progression close and the final
+career record remains available.
+
 | Level                 | Active competitions                      | Background competitions                | Main progression                                            |
 | --------------------- | ---------------------------------------- | -------------------------------------- | ----------------------------------------------------------- |
 | Rookie / Tier 3       | March-May T20                            | List A and First-Class                 | Finish strongly and earn Tier 2 opportunity                 |
@@ -720,12 +812,31 @@ The club budget is separate from personal wallet coins and gems.
 | Master / Tier 1       | List A, First-Class and T20              | None of the three domestic blocks      | Win elite trophies and earn National Head Coach eligibility |
 | National Head Coach   | Shared year-round international calendar | Domestic world continues in background | Bilaterals, WTC cycle and ICC events                        |
 
+Tier 2 promotion normally comes from a top-two T20 finish. It also recognizes a
+broader professional body of work after at least six State seasons: reputation
+73, four domestic trophies and a career win rate of at least 50%; a ten-season,
+six-trophy route protects especially long decorated careers. The Tier 1
+First-Class title is the fastest National appointment. A Manager can also
+qualify through sustained merit: three completed Elite seasons, reputation 73
+and either a title or two top-two finishes; or five Elite seasons and reputation 75. Every route is a performance gate rather than a hardcoded appointment
+percentage.
+
+Personal Manager reputation is recalculated from experience, results, trophies
+and career level. Earned progression is capped at 88. Match-reward ads can add
+three more points at one point per 15 completed ads, and recorded premium
+assistance can add a further eight, with a combined cap of 99. This value is
+separate from the reputation owned by the current club.
+
 The broad yearly sequence is:
 
 1. September-November List A.
 2. December-March First-Class.
 3. March-May T20.
-4. June-August transfer, development and international window.
+4. June-August transfer, development and major-event window.
+
+For a National Head Coach, international assignments overlay the relevant
+format blocks throughout the year. April and May remain clear of international
+fixtures.
 
 When a licence-locked block finishes, the modal names the format, explains why
 club staff controlled it, expands the record as wins from total matches,
@@ -733,18 +844,50 @@ states which competition table changed and itemizes the 30% wallet-coin
 oversight stipend. List A and First-Class results never alter the T20 table.
 
 The National Head Coach uses the same international generator as Player
-Career: autumn white-ball bilaterals, winter WTC Tests and dynamic summer ICC
-events/final qualification. National squad selection, readiness, mandatory
+Career: a successful complete season contains 10 Tests, 25 ODIs and 15 T20Is,
+with dynamic ICC knockout/final qualification and no April-May internationals.
+National Managers can open format-specific Test, ODI and T20I world team tables
+from Manager Home. The controlled country is highlighted; completed
+international results update matches, points and rating once through canonical
+fixture settlement. Capped Player Careers use the same destination for
+format-specific Batting, Bowling and All-Rounder tables, with the user's row
+highlighted and pinned below the top ten when necessary. Only completed-format
+performers qualify and retired players leave the table.
+National squad selection, readiness, mandatory
 match preparation, analysis and match controls all target the controlled
-country while domestic clubs continue to simulate.
+country. International eligibility is independent of a player's current
+domestic contract. Before each National calendar is generated, every country
+is refreshed from active players under 40; a season-specific national pool is
+generated when ageing, retirement or a below-standard best XI leaves the country
+without a viable senior side. International calendars are seeded by country
+strength instead of raw player-pool size. During National Manager careers, peer
+opponents also refresh toward the controlled XI's current generation, with a
+two-OVR gap per country-strength tier. This prevents smaller nations from
+collapsing and stops a mature host-country pool monopolizing 25-season careers.
+The Elite season that earns the appointment is settled once before
+promotion. At each later full National rollover, the retained club's finances,
+upkeep, contracts, youth, board state, pyramid position, player development and
+training are frozen while the next National calendar is built; the domestic
+tables are preserved.
+
+Domestic contract expiry can never leave a managed club without a playable XI.
+If only eleven active contracted players remain, an expiring player receives a
+one-year emergency extension at the existing wage. Normal renewal decisions
+continue for every contract above that safety floor.
 
 Every manager match opens a Match Preparation stage before Watch, Key Moments
 or Instant Result can be selected. The free report displays opponent
 batting/bowling/fielding ratings out of 100 and the attack shape. Ratings are
 labelled Manageable, Strong or Elite danger. The 650-coin full analysis names
 the leading batter and bowler, identifies a technical weakness, recommends a
-tactical plan and can apply that plan directly; its existing +2 XI form and +1
-XI morale effects remain real.
+tactical plan and can apply that plan directly; it can be purchased only inside
+this Matchday stage, never from Manager Home or Club Office. Its existing +2 XI
+form and +1 XI morale effects remain real.
+
+All three presentation modes share the same underlying balance. Manager ODI
+innings apply a symmetric `0.86x` scoring environment to both teams. This is
+calibrated to move the previous 327-run simulation mean toward 280 without
+changing Player Career; the post-change full-career audit remains pending.
 
 ### 7.3 League rules
 
@@ -757,13 +900,32 @@ XI morale effects remain real.
 
 ### 7.4 Fatigue and over-rate
 
-First-Class cricket applies a heavy condition cost. Pace bowlers lose a net
-amount around nine condition per match under the typical base-plus-pace model.
+The automatic between-fixture training path applies exact match loads before
+recovery. List A participants lose five condition and T20 participants lose
+six. In First-Class cricket, batters/keepers lose two, bowlers/all-rounders lose
+seven and a pace bowling role loses two more.
+
+The stored club plan is Balanced, Batting, Bowling, Fielding, Fitness or
+Recovery, with optional player overrides. Light/Normal/High intensities use
+base development points `0.16/0.25/0.36`, condition recovery `+7/+5/+2` and
+training-injury chances `0%/0.08%/0.30%`. Recovery focus gives no development,
+restores `+10` condition before medical bonuses and has no training-injury risk.
+The exact actual XI takes match load, the bench receives between-fixture
+recovery, and a fixture is processed once across watched, instant and background
+paths. Regular-season development is capped at 28 blocks; playoff recovery
+continues without development.
+
+Condition and morale form a continuous, temporary match-readiness curve for
+both sides instead of a threshold cliff. Confirming Match Preparation does not
+add a blanket rating boost: only the real effects of tactics, condition, morale,
+captaincy, team talks and squad quality reach the match engine.
+
 Selecting four or more pace bowlers whose average stamina is below 72 creates a
 one-point slow-over-rate deduction.
 
-This makes spinner balance and squad rotation materially important. During the
-off-season, player condition resets to 100.
+This makes training intensity, recovery, spinner balance and squad rotation
+materially important. National-camp training is disabled pending its policy;
+the retained club plan is not advanced during National duty.
 
 ### 7.5 Tactics
 
@@ -777,11 +939,22 @@ labels. For example:
 
 The match UI displays the selected plan and post-match tactical readout.
 
+The Manager also appoints a club captain and vice-captain. New clubs receive a
+one-time sensible pair and a review prompt. Leadership produces only a small
+match-pressure modifier: 0.5% from score 55, 1% from 70 and 1.5% from 85. A
+strong vice-captain can add 0.25 percentage points, capped at 1.75%. The vice
+leads if the captain misses the XI; an emergency captain gets no bonus. Stored
+OVR and attributes are never changed. National-team appointments remain held.
+
 ### 7.6 Jobs, board and salary
 
 - A new appointment starts with board confidence 75.
 - A five-match protected grace period suppresses normal firing checks.
 - Club identity, roster and budget switch atomically on a job transition.
+- Staff, facilities, academy/prospects, scout reports, finances, training plan,
+  stadium/tickets and captaincy are stored by club ID. They stay with that club
+  when the Manager changes jobs and are restored if the Manager returns.
+- Inactive clubs do not autonomously purchase infrastructure upgrades.
 - Board target is top two around reputation 69+, top four around 66+, otherwise
   top six.
 - After grace, finishing more than two positions below target can cause
@@ -789,7 +962,7 @@ The match UI displays the selected plan and post-match tactical readout.
 - Annual manager salary is approximately
   `250,000 + manager reputation x 14,000`.
 - At the T20/season completion point, salary converts to wallet coins using
-  `floor(contract salary / 200)` and is paid once.
+  `floor(contract salary / 400)` and is paid once.
 
 ### 7.7 Squad, scouting and transfers
 
@@ -839,17 +1012,53 @@ Maintenance is `sum of facility levels x 18,000` per season.
 Club rating combines approximately 68% starting-XI quality, 18% staff, 7%
 normalized facilities and 7% club reputation.
 
+Club Office presents Training Ground, Medical Centre and Youth Academy as
+prominent independent cards. Facility upgrades always retain the normal Club
+Balance path. When an optional facility token is owned, both Club Office and the
+separate Academy screen show an explicit choice between `Pay $X from Club
+Balance` and `Use 1 optional token`; the unselected resource is never consumed.
+The confirmation also discloses that normal seasonal upkeep still applies.
+
 ### 7.10 Club finance
 
-Typical seasonal inflows:
+Seasonal broadcast rights are `80,000 + reputation x 3,000`. The three chosen
+Manager kit-partner offers are separate and pay Club Balance fixture by fixture;
+their exact Club/State/Elite quotas and appearance/win values are in the Manager
+systems audit linked at the start of this document. An earned contract belongs
+to its signing club: after a Manager job move it keeps paying that club from
+simulated eligible fixtures, while the new club restores its own deal or receives
+three independent offers. The save-owned permanent sponsor instead follows the
+Manager to the current domestic club and pauses on National duty.
 
-- Sponsor/broadcast: `120,000 + reputation x 6,000`.
-- League prize: 800,000 for first, 500,000 second, 300,000 top four, 150,000
-  top six, otherwise 80,000.
-- Gate income: `(60,000 + reputation x 3,500) x 7`.
-- Continental trophy prize: 600,000.
+Negative Club Balance blocks ordinary cash purchases. Season settlement limits
+the overdraft to one season's broadcast-rights value, costs six Board
+Confidence for ordinary debt and twelve if a board intervention is needed, and
+places the intervention in the Manager inbox. A deeper deficit is brought back
+to that limit rather than growing without bound.
 
-Player wages, staff wages and facility upkeep are subtracted.
+After the first itemised season settlement, optional Club Balance purchases also
+protect an operating reserve for the active squad's wages, staff wages and
+facility/stadium upkeep, net of guaranteed broadcast rights. Transfer fees,
+renewal fees, new wages, loans, scouting, staff and infrastructure cannot spend
+that committed reserve. Token-funded facility upgrades remain independent of
+Club Balance, but their new annual upkeep is still included in later reserves.
+
+Gate income is also settled from actual fixtures rather than a synthetic season
+amount. Attendance uses club fan base, opponent appeal, recent form, format,
+ticket price, Matchday Experience, derby and knockout context. Regular Low,
+Standard and Premium occupancy is bounded at `70-80%`, `65-75%` and `60-68%`
+respectively. Home knockouts have a 90% floor, finals use a neutral 92%-occupied
+ground with a 25% finalist share, and away league matches pay no gate.
+
+Capacity and Matchday Experience are separate five-level upgrade tracks. Ticket
+prices can be set to Low/Standard/Premium separately for short format, 50-over
+and First-Class cricket. The Home Ground screen shows the next-home projection,
+average crowd/occupancy, season receipts and recent attendance. Player wages,
+staff wages, ordinary facility upkeep and stadium upkeep are subtracted at
+season settlement.
+
+The season statement reports broadcast rights, kit sponsorship and exact gate
+receipts as separate lines without crediting fixture-paid income twice.
 
 ### 7.11 Academy
 
@@ -965,8 +1174,8 @@ User-batting outcome multipliers:
 
 | Difficulty | User wicket risk x | User scoring x |
 | ---------- | -----------------: | -------------: |
-| Easy       |               0.68 |           1.15 |
-| Normal     |               0.82 |           1.09 |
+| Easy       |               0.50 |           1.28 |
+| Normal     |               0.56 |           1.24 |
 | Hard       |               1.00 |           1.00 |
 | Pro        |               1.08 |           0.96 |
 
@@ -974,14 +1183,33 @@ Opponent-batting multipliers:
 
 | Difficulty | Opponent wicket risk x | Opponent scoring x |
 | ---------- | ---------------------: | -----------------: |
-| Easy       |                   1.28 |               0.86 |
-| Normal     |                   1.16 |               0.92 |
+| Easy       |                   1.34 |               0.84 |
+| Normal     |                   1.20 |               0.90 |
 | Hard       |                   1.00 |               1.00 |
 | Pro        |                   0.94 |               1.04 |
 
 AI aggression also scales by 0.78, 1.00, 1.08 and 1.15 for Easy through Pro.
 Easy therefore helps the user both while batting and while bowling; it is not
-only a cosmetic label.
+only a cosmetic label. In Player Career these outcome multipliers apply only
+when the created player is the striker or bowler; they do not secretly boost
+the other ten members of the club or national XI.
+
+Manager Career uses a separate, narrower balance profile because squad quality,
+condition, morale, captaincy and tactics must decide results. Normal is neutral.
+Easy supplies modest assistance; Hard and Pro give the opposition approximately
+5% and 10% two-sided outcome advantages respectively:
+
+| Difficulty | Manager wicket risk x | Manager scoring x | Opposition wicket risk x | Opposition scoring x |
+| ---------- | --------------------: | ----------------: | -----------------------: | -------------------: |
+| Easy       |                 0.950 |             1.025 |                    1.050 |                0.975 |
+| Normal     |                 1.000 |             1.000 |                    1.000 |                1.000 |
+| Hard       |                 1.025 |             0.988 |                    0.975 |                1.013 |
+| Pro        |                 1.050 |             0.975 |                    0.950 |                1.025 |
+
+After every ordinary factor is applied, limited-overs wicket weight is bounded
+to `1.60x` its ODI base or `1.75x` its T20/Hundred/T10 base. This prevents
+conditions, tactics and fresh-batter risk from making extreme collapses routine;
+it does not impose a minimum team score.
 
 ### 8.6 User batting and bowling decisions
 
@@ -1181,9 +1409,9 @@ Base result reward:
 
 | Result | Base coins |
 | ------ | ---------: |
-| Win    |        320 |
-| Tie    |        180 |
-| Loss   |        120 |
+| Win    |        240 |
+| Tie    |        140 |
+| Loss   |         90 |
 
 The active Player Career live-match path scales the base with user impact:
 
@@ -1213,19 +1441,20 @@ bonuses must not be added a second time when describing one live match.
 
 ### 10.1 Daily login streak
 
-| Day in cycle | Base coins | Gems |
-| ------------ | ---------: | ---: |
-| 1            |        100 |    0 |
-| 2            |        150 |    0 |
-| 3            |        200 |    0 |
-| 4            |        250 |    0 |
-| 5            |        300 |    0 |
-| 6            |        400 |    0 |
-| 7            |        600 |   10 |
+| Day in cycle | Player coins | Player gems | Manager coins | Manager gems |
+| ------------ | -----------: | ----------: | ------------: | -----------: |
+| 1            |           50 |           0 |            75 |            0 |
+| 2            |           75 |           0 |           125 |            0 |
+| 3            |          100 |           0 |           150 |            0 |
+| 4            |          125 |           0 |           200 |            0 |
+| 5            |          150 |           0 |           250 |            0 |
+| 6            |          200 |           0 |           300 |            0 |
+| 7            |          300 |           5 |           400 |           10 |
 
-After each completed seven-day cycle, coin payout gains another `0.5x`, capped
-at `3x`. Day-seven gems remain 10 and are never multiplied. Missing more than
-one day or moving the device day backward resets the streak to day one.
+The cycle repeats without a later-week multiplier: a complete Player week is
+1,000 Wallet Coins and a complete Manager week is 1,500 Manager Wallet Coins.
+Missing more than one day or moving the device day backward resets the streak
+to day one.
 
 Permanent VIP streak extras:
 
@@ -1234,42 +1463,44 @@ Permanent VIP streak extras:
 
 ### 10.2 Player daily quests
 
-Three consecutive definitions from this pool rotate each day:
+Two consecutive definitions from this pool rotate each day:
 
 | Quest           |                      Target | Coins | Gems | Pass XP after claim |
 | --------------- | --------------------------: | ----: | ---: | ------------------: |
-| Match Fit       |              Play 2 matches |   120 |    0 |                 100 |
-| Winning Feeling |                 Win 1 match |   150 |    0 |                 100 |
-| Run Machine     |               Score 50 runs |   140 |    0 |                 100 |
-| Strike Bowler   |              Take 3 wickets |   140 |    0 |                 100 |
-| Find the Fence  |            Hit 6 boundaries |   130 |    0 |                 100 |
-| Sharpen Up      | Complete 1 training session |   100 |    0 |                 100 |
+| Match Fit       |              Play 2 matches |    75 |    0 |                  75 |
+| Winning Feeling |                 Win 1 match |   100 |    0 |                  75 |
+| Run Machine     |               Score 50 runs |    90 |    0 |                  75 |
+| Strike Bowler   |              Take 3 wickets |    90 |    0 |                  75 |
+| Find the Fence  |            Hit 6 boundaries |    85 |    0 |                  75 |
+| Sharpen Up      | Complete 1 training session |    70 |    0 |                  75 |
 
 ### 10.3 Player weekly quests
 
 | Quest      |          Target | Coins | Gems | Pass XP after claim |
 | ---------- | --------------: | ----: | ---: | ------------------: |
-| Grinder    | Play 10 matches |   600 |    0 |                 300 |
-| On a Roll  |   Win 5 matches |   800 |    0 |                 300 |
-| Big Week   |  Score 300 runs |   700 |    0 |                 300 |
-| Demolition | Take 15 wickets |   700 |    0 |                 300 |
+| Grinder    | Play 10 matches |   400 |    0 |                 500 |
+| On a Roll  |   Win 5 matches |   550 |    0 |                 500 |
+| Big Week   |  Score 300 runs |   475 |    0 |                 500 |
+| Demolition | Take 15 wickets |   475 |    0 |                 500 |
 
 ### 10.4 Manager daily quests
 
 | Quest          |           Target | Coins | Gems | Pass XP after claim |
 | -------------- | ---------------: | ----: | ---: | ------------------: |
-| Matchday Ready |   Manage 1 match |   140 |    0 |                 100 |
-| Three Points   |      Win 1 match |   170 |    0 |                 100 |
-| Double Header  | Manage 2 matches |   220 |    0 |                 100 |
-| Squad Builder  |    Sign 1 player |   180 |    0 |                 100 |
+| Matchday Ready |   Manage 1 match |   100 |    0 |                  75 |
+| Three Points   |      Win 1 match |   125 |    0 |                  75 |
+| Double Header  | Manage 2 matches |   150 |    0 |                  75 |
+| Squad Builder  |    Sign 1 player |   125 |    0 |                  75 |
+
+Two Manager daily quests are active at once.
 
 ### 10.5 Manager weekly quests
 
 | Quest             |           Target | Coins | Gems | Pass XP after claim |
 | ----------------- | ---------------: | ----: | ---: | ------------------: |
-| Touchline General | Manage 8 matches |   800 |    0 |                 300 |
-| Winning Culture   |    Win 4 matches |   950 |    0 |                 300 |
-| Market Moves      |   Sign 2 players |   900 |    0 |                 300 |
+| Touchline General | Manage 8 matches |   500 |    0 |                 500 |
+| Winning Culture   |    Win 4 matches |   650 |    0 |                 500 |
+| Market Moves      |   Sign 2 players |   600 |    0 |                 500 |
 
 Quests deliberately do not award gems. Gems are concentrated in achievements,
 day seven, the pass and purchases.
@@ -1302,11 +1533,13 @@ The result can be shared through the native share sheet.
 - Reference price: INR 299, replaced by RevenueCat's localized price when
   available.
 - Duration: 30 days.
+- One active store subscription unlocks Premium access across every Player and
+  Manager save. Each save retains separate XP, tiers and reward claims.
 - Twenty tiers.
-- Pass XP per match: 50.
-- Additional Pass XP per win: 40.
-- Daily quest claim: 100.
-- Weekly quest claim: 300.
+- Pass XP per match: 20.
+- Additional Pass XP per win: 10.
+- Daily quest claim: 75.
+- Weekly quest claim: 500.
 - Purchase is blocked until two matches have been played.
 - A second pass cannot be bought while the current pass is active.
 - Earned cosmetics stay in inventory after expiration.
@@ -1315,35 +1548,37 @@ The result can be shared through the native share sheet.
 
 Premium rewards are additional to the free reward when Premium is active.
 
-| Tier | Cumulative XP | Free reward       | Premium reward                                 |
-| ---: | ------------: | ----------------- | ---------------------------------------------- |
-|    1 |            80 | 110 coins         | 325 coins, 8 gems, Stadium Noir kit            |
-|    2 |           176 | 120 coins         | 230 coins, 3 gems                              |
-|    3 |           288 | 130 coins         | 245 coins, 3 gems                              |
-|    4 |           416 | 140 coins         | 260 coins, 3 gems                              |
-|    5 |           560 | 275 coins, 2 gems | 425 coins, 8 gems, Championship profile frame  |
-|    6 |           720 | 160 coins         | 290 coins, 3 gems                              |
-|    7 |           896 | 170 coins         | 305 coins, 3 gems                              |
-|    8 |         1,088 | 180 coins         | 320 coins, 3 gems                              |
-|    9 |         1,296 | 190 coins         | 335 coins, 3 gems                              |
-|   10 |         1,520 | 350 coins, 2 gems | 550 coins, 8 gems, Floodlight celebration      |
-|   11 |         1,760 | 210 coins         | 365 coins, 3 gems                              |
-|   12 |         2,016 | 220 coins         | 380 coins, 3 gems                              |
-|   13 |         2,288 | 230 coins         | 395 coins, 3 gems                              |
-|   14 |         2,576 | 240 coins         | 410 coins, 3 gems                              |
-|   15 |         2,880 | 425 coins, 2 gems | 675 coins, 8 gems, Stadium Noir theme          |
-|   16 |         3,200 | 260 coins         | 440 coins, 3 gems                              |
-|   17 |         3,536 | 270 coins         | 455 coins, 3 gems                              |
-|   18 |         3,888 | 280 coins         | 470 coins, 3 gems                              |
-|   19 |         4,256 | 290 coins         | 485 coins, 3 gems                              |
-|   20 |         4,640 | 500 coins, 2 gems | 800 coins, 8 gems, Executive office theme      |
+| Tier | Cumulative XP | Free coins | Premium coins |
+| ---: | ------------: | ---------: | ------------: |
+|    1 |           285 |        110 |           325 |
+|    2 |           598 |        120 |           230 |
+|    3 |           939 |        130 |           245 |
+|    4 |         1,308 |        140 |           260 |
+|    5 |         1,705 |        275 |           425 |
+|    6 |         2,130 |        160 |           290 |
+|    7 |         2,583 |        170 |           305 |
+|    8 |         3,064 |        180 |           320 |
+|    9 |         3,573 |        190 |           335 |
+|   10 |         4,110 |        350 |           550 |
+|   11 |         4,675 |        210 |           365 |
+|   12 |         5,268 |        220 |           380 |
+|   13 |         5,889 |        230 |           395 |
+|   14 |         6,538 |        240 |           410 |
+|   15 |         7,215 |        425 |           675 |
+|   16 |         7,920 |        260 |           440 |
+|   17 |         8,653 |        270 |           455 |
+|   18 |         9,414 |        280 |           470 |
+|   19 |        10,203 |        290 |           485 |
+|   20 |        11,020 |        500 |           800 |
 
-Full free track total: **4,750 coins and 8 gems**.
+Full free track total: **4,750 coins**.
 
-Full premium track additional total: **8,160 coins and 85 gems**.
+Full premium track additional total: **8,160 coins**.
 
-Claiming both tracks completely gives **12,910 coins, 93 gems and five
-milestone items**.
+Claiming both tracks completely gives **12,910 coins** plus mode-usable
+milestone items. Player earns Stadium Noir kit, Championship frame,
+Floodlight celebration and Stadium Noir ground. Manager earns Stadium Noir
+ground and Executive office. The shared XP and coin curve is identical.
 
 ### 11.3 Active pass benefits
 
@@ -1354,8 +1589,11 @@ milestone items**.
 - Ads disabled for the pass duration.
 - Sixth save slot while any listed save has an active pass.
 - Active team/league naming editor.
-- Monthly kit, celebration, Manager office, collectible, scenario and story
-  chain.
+- Player monthly claim: kit, celebration and collectible.
+- Manager monthly claim: office and collectible.
+- Both modes receive their own story chain and the featured scenario.
+- Both Home screens show a compact pass ticket, and the main Pass screen opens
+  the Premium Clubhouse where the monthly claim/scenario lives.
 
 ### 11.4 Twelve monthly content cycles
 
@@ -1363,22 +1601,26 @@ Each cycle contains one kit, one celebration, one Manager office theme, one
 collectible, a two-step Player story, a two-step Manager story and this
 scenario:
 
-| Cycle            | Objective         | Coins | Gems |
-| ---------------- | ----------------- | ----: | ---: |
-| Monsoon Nights   | Win 2 of next 3   | 1,250 |   18 |
-| Coastal Clash    | Win 3 of next 4   | 1,650 |   24 |
-| Heritage Cup     | Win 3 consecutive | 1,900 |   28 |
-| Neon Finals      | Win 3 of next 4   | 1,700 |   25 |
-| Winter Tour      | Win 2 of next 4   | 1,300 |   20 |
-| Champions Month  | Win 4 of next 5   | 2,200 |   32 |
-| Rising Stars     | Win 2 of next 3   | 1,350 |   20 |
-| Red Soil Rivalry | Win 3 of next 5   | 1,700 |   24 |
-| Night Derby      | Win 3 consecutive | 1,950 |   29 |
-| Festival Cricket | Win 2 of next 4   | 1,250 |   18 |
-| Record Breakers  | Win 4 of next 6   | 2,250 |   32 |
-| Legacy Finals    | Win 4 of next 5   | 2,400 |   35 |
+| Cycle            | Objective         | Coins |
+| ---------------- | ----------------- | ----: |
+| Monsoon Nights   | Win 2 of next 3   | 1,250 |
+| Coastal Clash    | Win 3 of next 4   | 1,650 |
+| Heritage Cup     | Win 3 consecutive | 1,900 |
+| Neon Finals      | Win 3 of next 4   | 1,700 |
+| Winter Tour      | Win 2 of next 4   | 1,300 |
+| Champions Month  | Win 4 of next 5   | 2,200 |
+| Rising Stars     | Win 2 of next 3   | 1,350 |
+| Red Soil Rivalry | Win 3 of next 5   | 1,700 |
+| Night Derby      | Win 3 consecutive | 1,950 |
+| Festival Cricket | Win 2 of next 4   | 1,250 |
+| Record Breakers  | Win 4 of next 6   | 2,250 |
+| Legacy Finals    | Win 4 of next 5   | 2,400 |
 
 Exact monthly ownership items:
+
+The catalogue contains all four authored items, but a claim is filtered by
+mode: Player gets the Kit + Celebration + Collectible columns; Manager gets the
+Manager office + Collectible columns.
 
 | Cycle            | Kit                       | Celebration      | Manager office        | Collectible           |
 | ---------------- | ------------------------- | ---------------- | --------------------- | --------------------- |
@@ -1495,7 +1737,7 @@ Manager mode's visible subset is achievements 35-40 plus 47-54.
 - Repeated taps on the same save/product are locked while a request is active.
 - RevenueCat currently uses its platform-generated purchase identity; the app
   does not call a separate account-login bridge.
-- Restore restores durable entitlements. Consumable coins, gems, energy and
+- Restore restores durable entitlements. Consumable coins, gems and
   tokens are not replayed as fresh grants.
 
 The INR amounts below are reference/fallback catalog prices. The Google Play or
@@ -1506,22 +1748,30 @@ App Store localized price is authoritative in production.
 | Product ID               | Product                    | Reference price | Exact grant                                                                                                                              | Intended mode | Main Store visibility |
 | ------------------------ | -------------------------- | --------------: | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------- | --------------------- |
 | `starter_pack`           | Starter Pack               |          INR 99 | 3,000 coins, 50 gems, seven days ad-free                                                                                                 | Either        | Contextual only       |
-| `coins_medium`           | Bag of Coins               |         INR 299 | 5,000 coins                                                                                                                              | Either        | Yes                   |
-| `coins_large`            | Sack of Coins              |         INR 599 | 15,000 coins                                                                                                                             | Either        | Yes                   |
+| `coins_medium`           | Bag of Coins               |         INR 299 | 10,000 coins                                                                                                                             | Either        | Yes                   |
+| `coins_large`            | Sack of Coins              |         INR 499 | 20,000 coins                                                                                                                             | Either        | Yes                   |
 | `gems_medium`            | Bag of Gems                |         INR 299 | 300 gems                                                                                                                                 | Either        | Yes                   |
 | `gems_large`             | Chest of Gems              |         INR 999 | 1,200 gems                                                                                                                               | Either        | Yes                   |
-| `bundle_legend`          | Player Legend Edition      |         INR 999 | 20,000 coins, 600 gems, permanent ads off, VIP 60-energy cap, Legend frame, all kit colors                                               | Player        | Player hero only      |
+| `bundle_legend`          | Player Legend Edition      |         INR 999 | 40,000 coins, 1,200 gems, permanent ads off, VIP 60-energy cap, Legend frame, all kit colors                                             | Player        | Player hero only      |
 | `remove_ads`             | VIP Upgrade + Remove Ads   |         INR 299 | Permanent ads off, 60-energy cap and +20% match coins                                                                                    | Shared        | Yes                   |
 | `season_pass`            | Season Pass Premium        |         INR 299 | 30-day premium track, monthly content, benefits and ad-free period                                                                       | Shared        | Yes                   |
-| `energy_refill`          | Energy Refill              |          INR 99 | +30 energy                                                                                                                               | Either        | Shown when low        |
 | `manager_legend_pack`    | Manager Legacy Edition     |         INR 599 | Permanent backing/office, board floor 82, first-grant club rep +3 capped 95, two scout tokens, one facility token and one recovery token | Manager       | Manager hero only     |
 | `transfer_budget_sm`     | Transfer Budget Boost      |         INR 149 | +500,000 club transfer budget                                                                                                            | Manager       | Yes                   |
 | `scout_full_reveal`      | Full Scout Intelligence    |          INR 49 | One exact-reveal scout token                                                                                                             | Manager       | Yes                   |
-| `facility_upgrade_token` | Instant Facility Upgrade   |         INR 149 | One no-club-budget facility level                                                                                                        | Manager       | Yes                   |
+| `facility_upgrade_token` | Instant Facility Upgrade   |         INR 199 | Optional shortcut for one no-club-budget facility level; cash upgrades remain available and seasonal upkeep remains                      | Manager       | Yes                   |
 | `recovery_pack`          | Squad Conditioning Pack    |          INR 99 | One squad conditioning token                                                                                                             | Manager       | Yes                   |
 | `contract_boost`         | Contract Negotiation Boost |          INR 99 | One stored next-renewal token: wage and signing bonus +25%                                                                               | Player        | Yes                   |
 | `form_recovery`          | Mental Coaching Session    |          INR 49 | Form floor 70 and confidence floor 65                                                                                                    | Player        | Only when needed      |
-| `training_accelerator`   | Training Accelerator       |         INR 149 | Three training sessions at 3x gains; maximum six charges stored                                                                          | Player        | Yes                   |
+| `training_accelerator`   | Training Accelerator       |         INR 149 | Three paid training sessions at 1.5x gains; normal coin prices/limits apply and a maximum six charges can be stored                      | Player        | Yes                   |
+| `player_save_sponsor`    | Permanent Player Sponsor   |         INR 499 | One-save weekly Player stipend: 250/350/500/650 Wallet Coins by current stature                                                          | Player        | After sponsor unlock  |
+| `manager_save_sponsor`   | Permanent Manager Sponsor  |         INR 499 | One-save weekly Manager stipend: 30,000/40,000/55,000 Club Balance by current stature; paused on National duty                           | Manager       | After sponsor unlock  |
+
+Both permanent-sponsor products are repeat-purchasable consumables because each
+checkout belongs to a different exact save. Their cards and development-mock
+fulfillment are implemented, but release checkout is hard-gated: the current
+Supabase setup has no server-owned receipt verification or unique
+transaction-to-save binding. The Store must not charge for them until that
+backend trust boundary and same-save recovery are deployed.
 
 ### 13.3 Starter and first-gem rules
 
@@ -1551,7 +1801,7 @@ rows are also separate:
 
 - Player: training accelerator, contract boost and form recovery.
 - Manager: scout reveal, facility token, conditioning and 500,000 budget.
-- Shared: VIP, pass, energy, coins and gems.
+- Shared: VIP, pass, coins and gems.
 
 Player Legend does not grant Manager backing. Manager Legacy does not grant
 Player stats, selection or cosmetics. Season Pass and VIP are intentionally
@@ -1577,13 +1827,18 @@ Manager premium assistance is recorded in a history ledger for transparency.
 
 Avatar appearance:
 
-- Core face, skin, eye, hair, beard, moustache and supplied headwear choices
-  are free appearance controls; the integration does not invent new prices.
+- All 128 fixed portrait identities are free to select. The catalog contains
+  64 male and 64 female portraits, distributed evenly across eight tone bands.
+- Portraits are complete authored identities rather than interchangeable
+  appearance parts. The picker does not attach ethnicity or nationality labels
+  to them.
 - Existing owned profile frames, Season Pass cosmetics, Legend/VIP visual
   entitlements and kit ownership remain authoritative.
-- Saves persist stable modular asset IDs. Existing frame selection is rendered
-  above the modular layers and legacy appearance fields remain available for
-  rollback compatibility.
+- Saves persist only a stable portrait ID, never an image module or file path.
+  The selected profile frame remains a separate overlay above the portrait.
+- Schema 32 migrates both the former modular `avatarConfig` shape and earlier
+  `avatarCustomization` fields to a valid fixed portrait without changing
+  unrelated career data or owned profile frames.
 
 Kit:
 
@@ -1613,6 +1868,16 @@ Stadium Noir and all monthly pass cosmetics cost zero gems but require prior
 pass ownership/unlock.
 
 ### 14.2 Injury and energy gems
+
+Player Career also offers a one-way Gem Exchange at `1 gem = 40 Wallet Coins`:
+
+| Gems | Wallet Coins |
+| ---: | -----------: |
+|   25 |        1,000 |
+|  100 |        4,000 |
+|  300 |       12,000 |
+
+The exchange is unavailable in Manager Career and cannot be reversed.
 
 - Energy refill to standard cap: 10 gems.
 - Injury fast recovery:
@@ -1646,13 +1911,13 @@ Full fitness:
 
 ### 14.5 Manager wallet-coin services
 
-| Service                 |        Cost | Effect                                                                               | Limit                      |
-| ----------------------- | ----------: | ------------------------------------------------------------------------------------ | -------------------------- |
-| Opposition Analysis     |   650 coins | Selected XI receives +2 form and +1 morale                                           | Once per upcoming fixture  |
-| Morale Session          | 8,000 coins | Three lowest-morale squad players receive +5 morale                                  | Once per upcoming fixture  |
-| Fast-Track Scout Report | 6,000 coins | Report uncertainty falls by 25 percentage points and known rating moves toward truth | Once per target per season |
+| Service                 |        Cost | Effect                                                                               | Limit                       |
+| ----------------------- | ----------: | ------------------------------------------------------------------------------------ | --------------------------- |
+| Opposition Analysis     |   650 coins | Selected XI receives +2 form and +1 morale                                           | Matchday only; once/fixture |
+| Morale Session          | 8,000 coins | Three lowest-morale squad players receive +5 morale                                  | Once per upcoming fixture   |
+| Fast-Track Scout Report | 6,000 coins | Report uncertainty falls by 25 percentage points and known rating moves toward truth | Once per target per season  |
 
-Manager match and background-simulation rewards use the same 320/180/120 base
+Manager match and background-simulation rewards use the same 160/90/60 base
 for matches the user actively manages. Locked background matches pay 30% of
 that base as an oversight stipend; VIP then applies its 1.20 multiplier.
 Background stipends are accumulated and explained in the phase summary. The
@@ -1685,15 +1950,19 @@ Legacy ranks:
 
 ### 14.7 Investment portfolio
 
-- Minimum investment: 500 wallet coins.
-- The current UI caps one entered amount at 50,000.
-- End-of-season return uses
-  `(win rate - 0.5) x 0.14 + random -5% to +5%`.
-- Eight history entries are retained.
-- Withdraw removes the full current portfolio balance.
-
-Known validation gap: the store function itself does not enforce the UI's
-50,000 maximum, so a future alternate caller must add or preserve that guard.
+- The market contains 24 fictional companies across eight sectors.
+- Minimum investment is 500 Wallet Coins; every engine entry point enforces
+  the 50,000-per-investment maximum.
+- Players may hold multiple companies, add to a holding and sell part or all
+  of one position.
+- Company and sector behavior is deterministic per save/year and completely
+  independent of cricket results. Values update once at season end.
+- Stable annual moves remain within `-4%..+7%`, Balanced within
+  `-8%..+12%`, and Volatile within `-16%..+20%`.
+- Eight history entries are retained per active holding.
+- Schema-41 anonymous positions remain sellable as a frozen Legacy Market
+  Index. Legacy Token holders receive the higher of token cost basis or
+  fictional market value exactly once.
 
 ## 15. Advertising
 
@@ -1807,14 +2076,23 @@ settings setter does not cancel reminders that were already scheduled.
 
 - Storage keys use `sg:<mode>:<slot>`.
 - Each slot also has a rolling `:bak` copy.
-- Save schema version is 30.
-- Migrations support legacy schema versions 2 through 30. Schema 25 adds the
+- Save schema version is 39.
+- Migrations support legacy schema versions 2 through 38. Schema 25 adds the
   dynamic ICC knockout state; schema 26 separates School/U19 teams from the
   reserved senior club and removes persisted potential-band labels. Schema 27
   begins exact domestic/international ledgers, schema 28 initializes Player
   Life, schema 29 begins exact current-season per-format player ledgers without
-  inventing historical format splits, and schema 30 adds normalized modular
-  `AvatarConfig` IDs while retaining the legacy appearance fields.
+  inventing historical format splits, schema 30 introduced the former modular
+  `AvatarConfig`, schema 31 removes internal suffixes from generated domestic
+  names, schema 32 converts both generations of legacy avatar data to a stable
+  fixed portrait ID, schema 33 adds the one-chance U19 World Cup state, schema
+  34 validates immutable newspaper metadata, schema 35 moves Manager club
+  assets into persistent per-club records without transferring balances, and
+  schema 36 moves earned Manager sponsorship into the signing club's record,
+  schema 37 adds approved dynamic sponsor identities, schema 38 separates
+  story endorsements from the earned kit-partner ledger, and schema 39 adds a
+  persistent user-selected back-of-shirt name and number without changing any
+  gameplay or balance.
 - Before a new primary write, the previous valid primary becomes the backup.
 - Saves are wrapped in an FNV-1a checksum envelope.
 - A corrupt/truncated primary falls back to the backup.
@@ -1830,20 +2108,16 @@ cryptographic signature and should not be described as unbreakable anti-cheat.
 Current reachable account behavior:
 
 - Guest sign-in.
-- Online verification once every 24 hours.
+- Offline local play without signing in.
 - Sign out without deleting local saves.
-- Delete all local career/manager save slots and sign out.
+- Delete all local app data, including saves, settings, Hall of Fame records,
+  account markers and cached sync metadata.
 - Google sign-in is marked `Coming soon`.
 - Cloud backup is marked unavailable.
 
-Known copy/data gap: `Delete account data` deletes local save slots, clears the
-active career and signs out. It does not visibly clear settings, the global
-Starter Pack marker or durable local Hall of Fame data. The success copy `All
-account data deleted` is broader than the actual deletion.
-
 ### 17.4 Cloud implementation status
 
-Supabase supports anonymous authentication, the once-per-day online verification
+Supabase supports optional anonymous authentication, an online authorization
 RPC and an RLS-protected `cloud_saves` table. Runtime configuration reads
 `EXPO_PUBLIC_*` environment variables.
 
@@ -1910,18 +2184,18 @@ save or the device-local Hall of Fame store. `src/game/leaderboard.ts` provides
 save-local rankings for runs, wickets and overall rating.
 
 The Supabase foundation also includes public `leaderboard` rows, private
-`shadow_leaderboard` review rows, an online fetch/submit service and a client
-sanity prototype. Implausible global limits, score-per-match values,
-titles-per-season values, wallet balances and long-sample win rates are routed
-away from public rankings. No reachable online leaderboard screen or automatic
-career submission hook is wired yet, so this is preserved infrastructure rather
-than a completed player-facing feature.
+`shadow_leaderboard` review rows and a feature-flagged online service. Clients
+cannot write either table directly; submissions go through a security-definer
+RPC that repeats basic plausibility checks on the server and routes suspicious
+rows away from public rankings. No reachable online leaderboard screen or
+automatic career submission hook is wired yet, so this remains disabled
+infrastructure rather than a completed player-facing feature.
 
 Save envelopes use checksums and rolling backups to detect corruption and
 recover the previous valid local state. This protects reliability, not
 competitive server authority or cryptographic tamper resistance. The
-leaderboard sanity filter is also client-side and must not be described as
-unbreakable anti-cheat.
+leaderboard plausibility checks do not cryptographically prove an offline save
+and must not be described as unbreakable anti-cheat.
 
 ## 21. Countries, Clubs And Grounds
 
@@ -2080,14 +2354,19 @@ The Hindi option is app-chrome localization, not a fully translated game.
 
 Android permissions declared by the project:
 
-- `VIBRATE`.
-- `SCHEDULE_EXACT_ALARM`.
-- `POST_NOTIFICATIONS`.
-- `INTERNET`.
 - `ACCESS_NETWORK_STATE`.
+- `INTERNET`.
+- `MODIFY_AUDIO_SETTINGS`.
+- `VIBRATE`.
+- `POST_NOTIFICATIONS`.
 
-Android backup is disabled. Predictive back is disabled. iPad support is
-enabled. Ads request non-personalized inventory.
+Microphone, legacy external-storage and exact-alarm permissions are explicitly
+blocked. The app plays bundled audio but does not record, read the media library
+or schedule exact-time alarms.
+
+Android backup is disabled. Predictive back is disabled. This repository's Expo
+platform target is Android; iOS work is maintained separately. Ads request
+non-personalized inventory.
 
 No private environment values or service-account keys belong in source
 control. Dependencies, build output and APK files are also excluded from the
@@ -2118,35 +2397,35 @@ bitmap files have been removed.
 
 ## 25. Current Content Inventory
 
-| Content area                                  | Current count/state           |
-| --------------------------------------------- | ----------------------------- |
-| Registered routes                             | 42                            |
-| Play modes                                    | 2                             |
-| Countries                                     | 18                            |
-| Fictional grounds                             | 55                            |
-| Senior clubs per generated country/mode world | 24                            |
-| Domestic tiers                                | 3                             |
-| Clubs per tier                                | 8                             |
-| Generated players per club                    | 22                            |
-| Player roles                                  | 4                             |
-| Match formats                                 | 5                             |
-| Difficulty settings                           | 4                             |
-| Achievements                                  | 56                            |
-| Pass tiers                                    | 20                            |
-| Monthly pass cycles                           | 12                            |
-| Player story definitions                      | Approximately 115             |
-| Manager story definitions                     | 35                            |
-| Searchable handbook topics                    | 17                            |
-| Contextual Coach Tip definitions              | 3                             |
-| Local save schema                             | 29                            |
-| Standard saves                                | 5 per mode                    |
-| Pass save                                     | 1 additional slot             |
-| Hall of Fame entries retained                 | 25 player and 25 manager      |
-| Media scrapbook entries retained              | 40                            |
-| Relationship memories retained                | 40                            |
-| Career timeline entries retained              | 200                           |
-| Analytics ring-buffer events                  | 200                           |
-| Investment history entries                    | 8                             |
+| Content area                                  | Current count/state      |
+| --------------------------------------------- | ------------------------ |
+| Registered routes                             | 45                       |
+| Play modes                                    | 2                        |
+| Countries                                     | 18                       |
+| Fictional grounds                             | 55                       |
+| Senior clubs per generated country/mode world | 24                       |
+| Domestic tiers                                | 3                        |
+| Clubs per tier                                | 8                        |
+| Generated players per club                    | 22                       |
+| Player roles                                  | 4                        |
+| Match formats                                 | 5                        |
+| Difficulty settings                           | 4                        |
+| Achievements                                  | 56                       |
+| Pass tiers                                    | 20                       |
+| Monthly pass cycles                           | 12                       |
+| Player story definitions                      | Approximately 115        |
+| Manager story definitions                     | 35                       |
+| Searchable handbook topics                    | 17                       |
+| Contextual Coach Tip definitions              | 3                        |
+| Local save schema                             | 35                       |
+| Standard saves                                | 5 per mode               |
+| Pass save                                     | 1 additional slot        |
+| Hall of Fame entries retained                 | 25 player and 25 manager |
+| Media scrapbook entries retained              | 40                       |
+| Relationship memories retained                | 40                       |
+| Career timeline entries retained              | 200                      |
+| Analytics ring-buffer events                  | 200                      |
+| Investment history entries                    | 8                        |
 
 ## 26. Implemented But Not Fully User-Facing
 
@@ -2157,6 +2436,9 @@ available:
 - Firebase forwarding: facade exists; native package is absent.
 - Restore-purchase service/state action: implemented, but the current Purchase
   screen has no visible `Restore Purchases` control.
+- Per-save Player and Manager permanent-sponsor products: catalog, verified
+  fulfillment and weekly stipend state exist, but both products are omitted
+  from visible Store sections pending exact price and fictional brand approval.
 
 ## 27. Known Gaps And Release Risks
 
@@ -2203,6 +2485,8 @@ This is the consolidated honest list as of this audit:
     physical-device check.
 24. The Investment screen enforces its 50,000 input ceiling, but the underlying
     function does not.
+25. National-team training and captain/vice-captain controls are disabled while
+    their national-camp policy is undecided. The domestic club state is retained.
 
 None of these gaps changes the exact reward, price or gameplay tables earlier
 in this document. They identify what still needs release validation or
@@ -2221,7 +2505,9 @@ This reference was audited against current local source, including:
   `src/game/progression.ts`.
 - Manager flow: `src/game/managerCalendar.ts`, `src/game/managerCareer.ts`,
   `src/game/managerJobs.ts`, `src/game/finance.ts`,
-  `src/game/managerResources.ts`.
+  `src/game/managerResources.ts`, `src/game/managerClubState.ts`,
+  `src/game/managerTraining.ts`, `src/game/leadership.ts`,
+  `src/game/stadiumManagement.ts`, `src/game/sponsorship.ts`.
 - International flow: `src/game/intlCalendar.ts`, `src/game/season.ts`.
 - Match engine: `src/engine/*`, `src/data/gameConfig.ts`.
 - Rewards/pass: `src/game/liveops.ts`, `src/game/seasonPass.ts`,
@@ -2232,9 +2518,12 @@ This reference was audited against current local source, including:
   `src/config/monetization.ts`.
 - State fulfillment: `src/state/careerStore.ts`.
 - Cosmetics/legacy: `src/data/cosmetics.ts`, `src/data/legacy.ts`.
+- Fixed portraits: `assets/avatar/portraits/*`, `src/avatar/catalog.ts`,
+  `src/avatar/generated/portraitAssets.generated.ts`,
+  `src/components/avatar/*`, `src/storage/schema32.ts`.
 - Countries/grounds: `src/data/countries.ts`, `src/data/stadiums.ts`,
   `src/game/domesticBranding.ts`.
-- Persistence: `src/storage/*`, current schema 30.
+- Persistence: `src/storage/*`, current schema 33.
 - Account/session/notifications: `src/services/auth.ts`,
   `src/services/sessionGate.ts`, `src/services/supabaseClient.ts`,
   `src/services/notifications.ts`.
@@ -2243,11 +2532,15 @@ This reference was audited against current local source, including:
   `src/game/leaderboard.ts`.
 - Analytics/crash: `src/services/analytics.ts`, `src/services/crash.ts`.
 
-Verification on 2 August 2026:
+Portrait integration status on 10 August 2026:
 
-- `npm run generate:avatars`: generated 186 literal Metro asset registrations
-  and 300 deterministic presets.
-- `npm run validate:avatars`: validated 186 assets and 300 unique presets.
+- The portrait registry uses 128 literal Expo/Metro `require()` calls for
+  offline-safe bundling: 64 male and 64 female 300x300 portrait files.
+- Portrait metadata assigns eight identities per tone band for each sex; saves
+  reference the stable ID and profile frames remain separate.
+
+Broader verification snapshot from 2 August 2026:
+
 - `npm run typecheck`: passed.
 - `npm run lint`: passed with zero errors and zero warnings.
 - `npm test -- --runInBand --silent`: 119 suites, 579 tests and two snapshots
@@ -2255,11 +2548,10 @@ Verification on 2 August 2026:
 - `npx expo-doctor`: 20/20 checks passed.
 - Android regression run: fresh Player and Manager careers crossed the former
   post-team-selection crash boundary; save/restart/resume retained the Player
-  career and modular avatar.
-- Android visual run: male hair/beard alignment, female paired hair,
-  headwear-driven hair hiding, preset/manual selection, Cosmetics saving and
-  Profile reload were checked. The footer remained structurally separate at
-  six phone/tablet/landscape viewport sizes.
+  career.
+- The former modular-layer visual checks no longer apply. The fixed portrait
+  grid, Cosmetics saving, legacy migration and Profile reload require their own
+  release-candidate device pass.
 - Hub stability run: settled Player and Manager hub captures were pixel-identical
   across timed samples, with no recurring entry animation or black-card flash.
 - Production import traversal: active modules are reachable; explicitly retained

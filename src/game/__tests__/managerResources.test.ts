@@ -4,6 +4,7 @@ import {
   MANAGER_EMERGENCY_TEAM_TALK_COINS,
   MANAGER_FAST_TRACK_SCOUT_COINS,
   MANAGER_MATCH_ANALYSIS_COINS,
+  managerResourceUsed,
 } from '../managerResources';
 import { ensureNationalTeam } from '../intlCalendar';
 import { buildManagerSeasonCalendar } from '../managerCalendar';
@@ -33,6 +34,25 @@ describe('Manager wallet resource desk', () => {
     expect(first.detail).toContain(report.topBowler.name);
     expect(first.detail).toContain('Recommended plan');
     expect(save.managerResources?.transactions).toHaveLength(1);
+  });
+
+  it('scopes Matchday analysis to the exact loaded fixture when one is supplied', () => {
+    const save = makeManagerSave();
+    save.wallet.coins = 5_000;
+    const defaultFixtureId = nextUserFixtureId(save)!;
+    const selectedFixtureId = Object.values(save.fixtures).find(
+      (fixture) =>
+        !fixture.played &&
+        fixture.id !== defaultFixtureId &&
+        (fixture.homeTeamId === save.userTeamId || fixture.awayTeamId === save.userTeamId),
+    )!.id;
+
+    const result = executeManagerResourceAction(save, 'MATCH_ANALYSIS', selectedFixtureId);
+
+    expect(result.ok).toBe(true);
+    expect(managerResourceUsed(save, 'MATCH_ANALYSIS', selectedFixtureId)).toBe(true);
+    expect(managerResourceUsed(save, 'MATCH_ANALYSIS', defaultFixtureId)).toBe(false);
+    expect(save.managerResources?.transactions[0].scopeId).toBe(selectedFixtureId);
   });
 
   it('spends gems once per season and adds stronger budget-gated staff candidates', () => {

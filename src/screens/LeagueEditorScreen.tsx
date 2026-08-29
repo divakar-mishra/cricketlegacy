@@ -59,9 +59,6 @@ export function LeagueEditorScreen({ navigation }: ScreenProps<'LeagueEditor'>) 
     <Screen scroll gradient={gradients.pitch}>
       <ScreenHeader
         title="League Editor"
-        subtitle={
-          save.mode === 'manager' ? 'Shape your club world' : 'Personalize your career world'
-        }
         onBack={() => navigation.goBack()}
       />
 
@@ -73,8 +70,8 @@ export function LeagueEditorScreen({ navigation }: ScreenProps<'LeagueEditor'>) 
         </Text>
         <Text style={styles.note}>
           {active
-            ? 'Custom names are local to this save. Official logos and artwork are never implied.'
-            : 'Your custom names are retained, but the fictional defaults return until Premium Pass is active again.'}
+            ? 'Names apply to this save.'
+            : 'Defaults return until Premium is active.'}
         </Text>
       </View>
 

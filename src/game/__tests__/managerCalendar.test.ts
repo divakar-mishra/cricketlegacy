@@ -14,9 +14,12 @@ import {
   managerPhaseUnlocked,
   MANAGER_BACKGROUND_REWARD_RATE,
   processManagerSalary,
+  refreshManagerNationalTeams,
 } from '../managerCalendar';
 import { isInternationalFixture, recordWtcFixtureResult } from '../intlCalendar';
 import { addCoins, matchReward } from '../economy';
+import { nationalReplacementQualityFloor } from '../nationalTalent';
+import { getCountry } from '../../data/countries';
 
 function makeSave(seed = 731) {
   const save = createManagerSave({
@@ -114,21 +117,22 @@ describe('manager domestic calendar', () => {
     const internationalFixtures = Object.values(save.fixtures).filter((fixture) =>
       isInternationalFixture(fixture),
     );
-    const autumn = internationalFixtures.filter(
-      (fixture) => fixture.competitionId === 'autumn-t20-tour-2026',
-    );
-    const winter = internationalFixtures.filter(
-      (fixture) => fixture.competitionId === 'wtc-test-series-2026',
-    );
+    const tests = internationalFixtures.filter((fixture) => fixture.format === 'TEST');
+    const odis = internationalFixtures.filter((fixture) => fixture.format === 'ODI');
+    const t20is = internationalFixtures.filter((fixture) => fixture.format === 'T20');
     const nationalFixtures = internationalFixtures.filter(
       (fixture) => fixture.competitionId === 't20-world-cup-2026',
     );
 
-    expect(internationalFixtures).toHaveLength(9);
-    expect(autumn).toHaveLength(3);
-    expect(autumn.every((fixture) => fixture.managerPhase === 'LIST_A')).toBe(true);
-    expect(winter).toHaveLength(2);
-    expect(winter.every((fixture) => fixture.managerPhase === 'FIRST_CLASS')).toBe(true);
+    expect(internationalFixtures).toHaveLength(48);
+    expect(tests).toHaveLength(10);
+    expect(tests.every((fixture) => fixture.managerPhase === 'FIRST_CLASS')).toBe(true);
+    expect(odis).toHaveLength(25);
+    expect(odis.every((fixture) => fixture.managerPhase === 'LIST_A')).toBe(true);
+    expect(t20is).toHaveLength(13);
+    expect(t20is.every((fixture) => fixture.managerPhase === 'T20')).toBe(true);
+    expect(internationalFixtures.every((fixture) => fixture.calendarMonth !== 4)).toBe(true);
+    expect(internationalFixtures.every((fixture) => fixture.calendarMonth !== 5)).toBe(true);
     expect(nationalFixtures).toHaveLength(4);
     expect(nationalFixtures.every((fixture) => fixture.format === 'T20')).toBe(true);
     expect(nationalFixtures.every((fixture) => fixture.cupRound?.startsWith('Group Stage'))).toBe(
@@ -137,13 +141,105 @@ describe('manager domestic calendar', () => {
     expect(managerControlledTeamId(save, 'LIST_A')).toBe(save.managerNationalTeamId);
     expect(managerControlledTeamId(save, 'FIRST_CLASS')).toBe(save.managerNationalTeamId);
     expect(managerControlledTeamId(save, 'OFF_SEASON')).toBe(save.managerNationalTeamId);
-    expect(nextUserFixtureId(save)).toBe(autumn[0].id);
+    expect(save.fixtures[nextUserFixtureId(save)!].format).toBe('ODI');
 
-    save.managerCalendar!.phase = 'OFF_SEASON';
-    save.managerCalendar!.phaseStartedAtMonth = 6;
-    save.managerCalendar!.offSeasonPrepared = true;
-    expect(nextUserFixtureId(save)).toBe(nationalFixtures[0].id);
+    save.managerCalendar!.phase = 'T20';
+    save.managerCalendar!.phaseStartedAtMonth = 3;
+    expect(save.fixtures[nextUserFixtureId(save)!].format).toBe('T20');
     expect(seasonComplete(save)).toBe(false);
+  });
+
+  it('keeps free agents eligible when refreshing smaller national squads', () => {
+    const save = makeSave(7341);
+    save.managerCareerLevel = 'NATIONAL';
+    buildManagerSeasonCalendar(save, 2026);
+    const usa = save.teams['national-usa'];
+    expect(usa.playerIds.length).toBeGreaterThanOrEqual(11);
+    const usaPool = Object.values(save.players)
+      .filter((player) => player.nationality === 'usa')
+      .map((player) => player.id);
+    save.freeAgents = [...new Set([...(save.freeAgents ?? []), ...usaPool.slice(1)])];
+    for (const playerId of usaPool.slice(1)) save.players[playerId].age = 41;
+    usa.playerIds = usa.playerIds.slice(0, 1);
+
+    refreshManagerNationalTeams(save);
+
+    expect(usa.playerIds.length).toBeGreaterThanOrEqual(11);
+    expect(usa.xi).toHaveLength(11);
+    expect(usa.playerIds.every((playerId) => save.players[playerId].age < 40)).toBe(true);
+    const averageOverall =
+      usa.xi!.reduce((sum, playerId) => sum + save.players[playerId].overall, 0) / usa.xi!.length;
+    expect(averageOverall).toBeGreaterThanOrEqual(nationalReplacementQualityFloor('usa'));
+  });
+
+  it('gives peer nations comparable senior talent instead of a host-country depth monopoly', () => {
+    const save = makeSave(7342);
+    save.managerCareerLevel = 'NATIONAL';
+    buildManagerSeasonCalendar(save, 2026);
+    const xiAverage = (teamId: string) => {
+      const team = save.teams[teamId];
+      const xi = team.xi?.length ? team.xi : team.playerIds.slice(0, 11);
+      return xi.reduce((sum, playerId) => sum + save.players[playerId].overall, 0) / xi.length;
+    };
+
+    const india = xiAverage('national-india');
+    const australia = xiAverage('national-australia');
+    const england = xiAverage('national-england');
+
+    expect(australia).toBeGreaterThanOrEqual(nationalReplacementQualityFloor('australia'));
+    expect(england).toBeGreaterThanOrEqual(nationalReplacementQualityFloor('england'));
+    expect(Math.abs(india - australia)).toBeLessThanOrEqual(5);
+    expect(Math.abs(india - england)).toBeLessThanOrEqual(5);
+  });
+
+  it('refreshes peer opponents to match a late-career National Manager generation', () => {
+    const save = makeSave(7343);
+    for (const player of Object.values(save.players)) {
+      if (player.nationality === 'india') player.overall = 99;
+    }
+    save.managerCareerLevel = 'NATIONAL';
+
+    buildManagerSeasonCalendar(save, 2026);
+
+    const fixtures = Object.values(save.fixtures).filter((fixture) =>
+      isInternationalFixture(fixture),
+    );
+    const opponentCountries = fixtures.map((fixture) => save.teams[fixture.awayTeamId].country);
+    expect(
+      opponentCountries.filter((country) => (getCountry(country)?.strength ?? 0) < 4),
+    ).toHaveLength(2);
+    expect(
+      fixtures
+        .filter((fixture) => fixture.competitionId === 't20-world-cup-2026')
+        .every(
+          (fixture) => (getCountry(save.teams[fixture.awayTeamId].country)?.strength ?? 0) >= 4,
+        ),
+    ).toBe(true);
+    const australia = save.teams['national-australia'];
+    const australiaAverage =
+      australia.xi!.reduce((sum, playerId) => sum + save.players[playerId].overall, 0) /
+      australia.xi!.length;
+    const india = save.teams['national-india'];
+    const indiaAverage =
+      india.xi!.reduce((sum, playerId) => sum + save.players[playerId].overall, 0) /
+      india.xi!.length;
+    expect(Math.abs(indiaAverage - australiaAverage)).toBeLessThanOrEqual(1);
+  });
+
+  it('uses the save identity for background international tournament worlds', () => {
+    const first = makeSave(7344);
+    const second = makeSave(7345);
+    first.managerCareerLevel = 'NATIONAL';
+    second.managerCareerLevel = 'NATIONAL';
+
+    buildManagerSeasonCalendar(first, 2026);
+    buildManagerSeasonCalendar(second, 2026);
+
+    const tiebreaks = (save: typeof first) =>
+      Object.values(save.internationalTournaments?.['t20-world-cup-2026']?.standings ?? {})
+        .sort((left, right) => left.countryId.localeCompare(right.countryId))
+        .map((row) => row.tiebreak);
+    expect(tiebreaks(first)).not.toEqual(tiebreaks(second));
   });
 
   it('stages the national manager WTC Final only after the second-season Tests finish', () => {
@@ -160,9 +256,9 @@ describe('manager domestic calendar', () => {
       ),
     ).toHaveLength(0);
     const tests = Object.values(save.fixtures).filter(
-      (fixture) => fixture.competitionId === 'wtc-test-series-2027',
+      (fixture) => fixture.wtcCycleId && fixture.competition === 'BILATERAL_SERIES',
     );
-    expect(tests).toHaveLength(2);
+    expect(tests).toHaveLength(9);
     for (const fixture of tests) {
       fixture.played = true;
       fixture.resultKind = 'HOME_WIN';
@@ -187,12 +283,12 @@ describe('manager domestic calendar', () => {
     save.wallet.coins = 0;
     save.managerProgression!.contractSalary = 1_000_000;
 
-    expect(processManagerSalary(save, 2026)).toBe(5_000);
+    expect(processManagerSalary(save, 2026)).toBe(2_500);
     expect(processManagerSalary(save, 2026)).toBe(0);
-    expect(save.wallet.coins).toBe(5_000);
+    expect(save.wallet.coins).toBe(2_500);
     expect(save.managerProgression).toMatchObject({
       lastSalaryPaidYear: 2026,
-      lastSalaryCoinPayout: 5_000,
+      lastSalaryCoinPayout: 2_500,
     });
     expect(save.inbox?.filter((message) => message.id === 'manager-salary-2026')).toHaveLength(1);
   });
@@ -211,7 +307,7 @@ describe('manager domestic calendar', () => {
 
     expect(standardResult.summary?.walletCoins).toBeGreaterThan(0);
     expect(standardResult.summary?.walletCoins).toBeLessThanOrEqual(
-      Math.floor((standardResult.summary?.userMatches ?? 0) * 320 * MANAGER_BACKGROUND_REWARD_RATE),
+      Math.floor((standardResult.summary?.userMatches ?? 0) * 160 * MANAGER_BACKGROUND_REWARD_RATE),
     );
     expect(vipResult.summary?.walletCoins).toBeGreaterThan(
       standardResult.summary?.walletCoins ?? 0,
@@ -241,7 +337,7 @@ describe('manager domestic calendar', () => {
           applyResult(save, match);
           const won = match.result?.winnerTeamId === save.userTeamId;
           const tied = Boolean(match.result?.tie);
-          save.wallet = addCoins(save.wallet, matchReward(won, tied));
+          save.wallet = addCoins(save.wallet, matchReward(won, tied, undefined, 'MANAGER'));
         } else {
           advanceManagerCalendarPhase(save);
         }

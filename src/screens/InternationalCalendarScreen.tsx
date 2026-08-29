@@ -1,4 +1,5 @@
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Button, Card, Screen, ScreenHeader } from '../components';
 import { AppText as Text } from '../components/AppText';
@@ -6,9 +7,16 @@ import { getCountry } from '../data/countries';
 import {
   buildIntlCalendar,
   internationalWindowFixtureIds,
-  topIccTeams,
   wtcStandings,
 } from '../game/intlCalendar';
+import {
+  INTERNATIONAL_PLAYER_RANKING_LABEL,
+  INTERNATIONAL_RANKING_FORMAT_LABEL,
+  internationalPlayerRankings,
+  InternationalPlayerRankingKind,
+  internationalTeamRankings,
+  InternationalRankingFormat,
+} from '../game/internationalRankings';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import {
@@ -48,6 +56,11 @@ export function InternationalCalendarScreen({ navigation }: ScreenProps<'Interna
   const save = useCareer((state) => state.save);
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const [teamRankingFormat, setTeamRankingFormat] = useState<InternationalRankingFormat>('TEST');
+  const [playerRankingFormat, setPlayerRankingFormat] =
+    useState<InternationalRankingFormat>('TEST');
+  const [playerRankingKind, setPlayerRankingKind] =
+    useState<InternationalPlayerRankingKind>('BATTING');
 
   if (!save) {
     return (
@@ -67,26 +80,41 @@ export function InternationalCalendarScreen({ navigation }: ScreenProps<'Interna
     save.playerCareerResources?.cappedCountry ??
     save.playerCareerResources?.declaredCountry ??
     userPlayer?.nationality;
-  const userCountryName = userCountry ? (getCountry(userCountry)?.name ?? 'Your country') : '-';
+  const isNationalManager = save.mode === 'manager' && save.managerCareerLevel === 'NATIONAL';
+  const managedNationalCountry = isNationalManager
+    ? save.managerNationalTeamId
+      ? save.teams[save.managerNationalTeamId]?.country
+      : save.userTeamId
+        ? save.teams[save.userTeamId]?.country
+        : undefined
+    : undefined;
+  const controlledCountry = isNationalManager ? managedNationalCountry : userCountry;
+  const userCountryName = controlledCountry
+    ? (getCountry(controlledCountry)?.name ?? 'Your country')
+    : '-';
   const windowFixtures = internationalWindowFixtureIds(save).map((id) => save.fixtures[id]);
   const testTable = wtcStandings(save, currentYear);
-  const topTeams = topIccTeams(save, 5);
+  const teamRankings = internationalTeamRankings(save, teamRankingFormat).slice(0, 10);
+  const playerRankings = internationalPlayerRankings(save, playerRankingFormat, playerRankingKind);
+  const playerTopTen = playerRankings.slice(0, 10);
+  const userRanking = playerRankings.find((row) => row.isUser);
+  const visiblePlayerRankings =
+    userRanking && userRanking.rank > 10 ? [...playerTopTen, userRanking] : playerTopTen;
+  const selectedRankingPeak =
+    save.internationalPlayerRankingPeaks?.[playerRankingFormat]?.[playerRankingKind];
+  const controlsInternationalTeam = save.capped || isNationalManager;
 
   return (
     <Screen scroll>
       <ScreenHeader title="International Calendar" onBack={() => navigation.goBack()} />
 
       <Card style={styles.windowCard}>
-        <Text style={styles.sectionLabel}>YEAR-ROUND INTERNATIONAL DUTY</Text>
-        <Text style={styles.windowTitle}>Tours plus ICC windows</Text>
-        <Text style={styles.windowBody}>
-          White-ball tours overlap List A, WTC Test series overlap First-Class cricket, and global
-          events remain in June-August. Your domestic contract stays active between call-ups.
-        </Text>
-        {save.capped ? (
+        <Text style={styles.sectionLabel}>INTERNATIONAL DUTY</Text>
+        <Text style={styles.windowTitle}>Tours and ICC events</Text>
+        {controlsInternationalTeam ? (
           <Text style={styles.windowProgress}>
             {windowFixtures.filter((fixture) => fixture.played).length}/{windowFixtures.length}{' '}
-            selected international matches completed
+            matches completed
           </Text>
         ) : null}
       </Card>
@@ -120,6 +148,140 @@ export function InternationalCalendarScreen({ navigation }: ScreenProps<'Interna
             ) : null}
           </Card>
         </Animated.View>
+      ) : null}
+
+      {isNationalManager ? (
+        <>
+          <Text style={styles.section}>World Team Rankings</Text>
+          <RankingTabs
+            values={['TEST', 'ODI', 'T20']}
+            selected={teamRankingFormat}
+            label={(value) => INTERNATIONAL_RANKING_FORMAT_LABEL[value]}
+            onSelect={setTeamRankingFormat}
+            styles={styles}
+          />
+          <Card style={styles.rankingCard}>
+            <View style={styles.teamRankingHeader}>
+              <Text style={styles.rankHeaderPos}>POS</Text>
+              <Text style={styles.rankHeaderName}>TEAM</Text>
+              <Text style={styles.rankHeaderMetric}>M</Text>
+              <Text style={styles.rankHeaderMetric}>PTS</Text>
+              <Text style={styles.rankHeaderMetric}>RATING</Text>
+            </View>
+            {teamRankings.map((entry, index) => {
+              const isManaged = entry.countryId === controlledCountry;
+              return (
+                <View
+                  key={entry.countryId}
+                  style={[
+                    styles.teamRankingRow,
+                    index > 0 && styles.rankingDivider,
+                    isManaged && styles.currentRankingRow,
+                  ]}
+                >
+                  <Text style={styles.teamRankPosition}>{entry.rank}</Text>
+                  <Text
+                    style={[styles.teamRankName, isManaged && styles.currentRankingText]}
+                    numberOfLines={1}
+                  >
+                    {getCountry(entry.countryId)?.flag ?? ''}{' '}
+                    {getCountry(entry.countryId)?.name ?? 'National side'}
+                  </Text>
+                  <Text style={styles.teamRankMetric}>{entry.matches}</Text>
+                  <Text style={styles.teamRankMetric}>{entry.points}</Text>
+                  <Text style={[styles.teamRankMetric, styles.teamRankRating]}>{entry.rating}</Text>
+                </View>
+              );
+            })}
+          </Card>
+        </>
+      ) : null}
+
+      {save.mode === 'career' && save.capped ? (
+        <>
+          <Text style={styles.section}>World Player Rankings</Text>
+          <RankingTabs
+            values={['TEST', 'ODI', 'T20']}
+            selected={playerRankingFormat}
+            label={(value) => INTERNATIONAL_RANKING_FORMAT_LABEL[value]}
+            onSelect={setPlayerRankingFormat}
+            styles={styles}
+          />
+          <RankingTabs
+            values={['BATTING', 'BOWLING', 'ALL_ROUNDER']}
+            selected={playerRankingKind}
+            label={(value) => INTERNATIONAL_PLAYER_RANKING_LABEL[value]}
+            onSelect={setPlayerRankingKind}
+            styles={styles}
+            compact
+          />
+          {selectedRankingPeak ? (
+            <Card style={styles.careerBestCard}>
+              <Text style={styles.sectionLabel}>CAREER BEST</Text>
+              <View style={styles.careerBestRow}>
+                <View style={styles.careerBestItem}>
+                  <Text style={styles.careerBestValue}>#{selectedRankingPeak.bestRank}</Text>
+                  <Text style={styles.careerBestLabel}>
+                    Best rank · {selectedRankingPeak.bestRankYear} · age{' '}
+                    {selectedRankingPeak.bestRankAge}
+                  </Text>
+                  <Text style={styles.careerBestMeta}>
+                    {selectedRankingPeak.ratingAtBestRank} rating
+                  </Text>
+                </View>
+                <View style={styles.careerBestDivider} />
+                <View style={styles.careerBestItem}>
+                  <Text style={styles.careerBestValue}>{selectedRankingPeak.bestRating}</Text>
+                  <Text style={styles.careerBestLabel}>
+                    Peak rating · {selectedRankingPeak.bestRatingYear} · age{' '}
+                    {selectedRankingPeak.bestRatingAge}
+                  </Text>
+                  <Text style={styles.careerBestMeta}>
+                    Ranked #{selectedRankingPeak.rankAtBestRating}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          ) : null}
+          <Card style={styles.rankingCard}>
+            <View style={styles.playerRankingHeader}>
+              <Text style={styles.rankHeaderPos}>POS</Text>
+              <Text style={styles.rankHeaderName}>PLAYER</Text>
+              <Text style={styles.playerRankHeaderRating}>RATING</Text>
+            </View>
+            {visiblePlayerRankings.length > 0 ? (
+              visiblePlayerRankings.map((entry, index) => (
+                <View
+                  key={entry.playerId}
+                  style={[
+                    styles.playerRankingRow,
+                    index > 0 && styles.rankingDivider,
+                    entry.isUser && styles.currentRankingRow,
+                    index === 10 && styles.pinnedRankingRow,
+                  ]}
+                >
+                  <Text style={styles.playerRankPosition}>{entry.rank}</Text>
+                  <View style={styles.playerRankIdentity}>
+                    <Text
+                      style={[styles.playerRankName, entry.isUser && styles.currentRankingText]}
+                      numberOfLines={1}
+                    >
+                      {entry.name}
+                      {entry.isUser ? ' (You)' : ''}
+                    </Text>
+                    <Text style={styles.playerRankCountry} numberOfLines={1}>
+                      {getCountry(entry.countryId)?.flag ?? ''}{' '}
+                      {getCountry(entry.countryId)?.name ?? 'International'}
+                    </Text>
+                  </View>
+                  <Text style={styles.playerRankRating}>{entry.rating}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyRankings}>Rankings appear after international matches.</Text>
+            )}
+          </Card>
+        </>
       ) : null}
 
       <Text style={styles.section}>Assignments ({currentYear})</Text>
@@ -192,7 +354,7 @@ export function InternationalCalendarScreen({ navigation }: ScreenProps<'Interna
                 <Text
                   style={[
                     styles.rankTeam,
-                    entry.countryId === userCountry && { color: colors.accent },
+                    entry.countryId === controlledCountry && { color: colors.accent },
                   ]}
                 >
                   {getCountry(entry.countryId)?.name ?? 'National side'}
@@ -206,38 +368,6 @@ export function InternationalCalendarScreen({ navigation }: ScreenProps<'Interna
         </>
       ) : null}
 
-      {topTeams.length > 0 ? (
-        <>
-          <Text style={styles.section}>ICC Rankings</Text>
-          <Card>
-            {topTeams.map((entry, index) => (
-              <View
-                key={entry.teamId}
-                style={[
-                  styles.rankRow,
-                  index > 0 && {
-                    borderTopWidth: StyleSheet.hairlineWidth,
-                    borderTopColor: colors.border,
-                  },
-                ]}
-              >
-                <Text style={styles.rankPos}>{index + 1}</Text>
-                <Text
-                  style={[
-                    styles.rankTeam,
-                    entry.teamId === userCountry && { color: colors.accent },
-                  ]}
-                >
-                  {getCountry(entry.teamId)?.name ?? 'National side'}
-                  {entry.teamId === userCountry ? ' (You)' : ''}
-                </Text>
-                <Text style={styles.rankPoints}>{entry.points} pts</Text>
-              </View>
-            ))}
-          </Card>
-        </>
-      ) : null}
-
       <Button
         label="Back"
         variant="ghost"
@@ -245,6 +375,52 @@ export function InternationalCalendarScreen({ navigation }: ScreenProps<'Interna
         onPress={() => navigation.goBack()}
       />
     </Screen>
+  );
+}
+
+interface RankingTabsProps<T extends string> {
+  values: readonly T[];
+  selected: T;
+  label: (value: T) => string;
+  onSelect: (value: T) => void;
+  styles: ReturnType<typeof makeStyles>;
+  compact?: boolean;
+}
+
+function RankingTabs<T extends string>({
+  values,
+  selected,
+  label,
+  onSelect,
+  styles,
+  compact = false,
+}: RankingTabsProps<T>) {
+  return (
+    <View style={[styles.rankingTabs, compact && styles.rankingTabsCompact]}>
+      {values.map((value) => {
+        const active = value === selected;
+        return (
+          <Pressable
+            key={value}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            style={[
+              styles.rankingTab,
+              compact && styles.rankingTabCompact,
+              active && styles.rankingTabActive,
+            ]}
+            onPress={() => onSelect(value)}
+          >
+            <Text
+              style={[styles.rankingTabText, active && styles.rankingTabTextActive]}
+              numberOfLines={1}
+            >
+              {label(value)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -340,7 +516,11 @@ const makeStyles = (colors: ThemeColors) =>
       paddingVertical: 2,
     },
     selectionBadgeWarning: { borderColor: colors.warning },
-    selectionBadgeText: { color: colors.success, fontSize: fontSize.xs, fontWeight: fontWeight.bold },
+    selectionBadgeText: {
+      color: colors.success,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+    },
     selectionTextWarning: { color: colors.warning },
     teamsLine: { color: colors.textFaint, fontSize: fontSize.xs },
     selectionReason: {
@@ -364,5 +544,153 @@ const makeStyles = (colors: ThemeColors) =>
     },
     rankTeam: { flex: 1, color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.bold },
     rankPoints: { color: colors.textMuted, fontSize: fontSize.xs },
+    rankingTabs: {
+      flexDirection: 'row',
+      gap: spacing.xs,
+      marginBottom: spacing.sm,
+    },
+    rankingTabsCompact: { marginTop: spacing.xs },
+    rankingTab: {
+      flex: 1,
+      minHeight: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.sm,
+    },
+    rankingTabCompact: { minHeight: 38, paddingHorizontal: spacing.xs },
+    rankingTabActive: { borderColor: colors.accent, backgroundColor: colors.accent + '14' },
+    rankingTabText: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+    },
+    rankingTabTextActive: { color: colors.accent },
+    rankingCard: { paddingVertical: spacing.xs },
+    careerBestCard: { marginBottom: spacing.sm },
+    careerBestRow: { flexDirection: 'row', alignItems: 'stretch' },
+    careerBestItem: { flex: 1, minWidth: 0 },
+    careerBestDivider: {
+      width: StyleSheet.hairlineWidth,
+      backgroundColor: colors.borderStrong,
+      marginHorizontal: spacing.md,
+    },
+    careerBestValue: {
+      color: colors.accent,
+      fontSize: fontSize.xl,
+      fontWeight: fontWeight.black,
+    },
+    careerBestLabel: { color: colors.text, fontSize: fontSize.xs, marginTop: 2 },
+    careerBestMeta: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
+    teamRankingHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingBottom: spacing.xs,
+    },
+    playerRankingHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingBottom: spacing.xs,
+    },
+    rankHeaderPos: {
+      width: 34,
+      color: colors.textFaint,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+      textAlign: 'center',
+    },
+    rankHeaderName: {
+      flex: 1,
+      color: colors.textFaint,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+    },
+    rankHeaderMetric: {
+      width: 42,
+      color: colors.textFaint,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+      textAlign: 'right',
+    },
+    playerRankHeaderRating: {
+      width: 56,
+      color: colors.textFaint,
+      fontSize: 9,
+      fontWeight: fontWeight.bold,
+      textAlign: 'right',
+    },
+    teamRankingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 45,
+    },
+    rankingDivider: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    currentRankingRow: {
+      backgroundColor: colors.accent + '14',
+      marginHorizontal: -spacing.xs,
+      paddingHorizontal: spacing.xs,
+      borderRadius: radius.sm,
+    },
+    pinnedRankingRow: { marginTop: spacing.xs, borderTopColor: colors.accent },
+    currentRankingText: { color: colors.accent },
+    teamRankPosition: {
+      width: 34,
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+      textAlign: 'center',
+    },
+    teamRankName: {
+      flex: 1,
+      minWidth: 0,
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+    },
+    teamRankMetric: {
+      width: 42,
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      textAlign: 'right',
+    },
+    teamRankRating: { color: colors.text, fontWeight: fontWeight.black },
+    playerRankingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 54,
+    },
+    playerRankPosition: {
+      width: 34,
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.black,
+      textAlign: 'center',
+    },
+    playerRankIdentity: { flex: 1, minWidth: 0 },
+    playerRankName: {
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+    },
+    playerRankCountry: { color: colors.textFaint, fontSize: 10, marginTop: 2 },
+    playerRankRating: {
+      width: 56,
+      color: colors.accent,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.black,
+      textAlign: 'right',
+    },
+    emptyRankings: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      paddingVertical: spacing.md,
+      textAlign: 'center',
+    },
     backButton: { marginTop: spacing.xl },
   });

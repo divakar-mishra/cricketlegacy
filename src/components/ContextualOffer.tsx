@@ -43,7 +43,6 @@ interface OfferConfig {
   ctaLabel: string;
   dismissLabel: string;
   gemCost?: number;
-  fiatLabel?: string;
   accentColor: string;
   Icon: React.FC<{ size: number }>;
 }
@@ -111,31 +110,31 @@ function getOfferConfig(kind: OfferKind, streakDays?: number): OfferConfig {
   switch (kind) {
     case 'energy_empty':
       return {
-        title: 'Out of energy!',
-        body: 'Your energy tank is empty. Refill instantly for 10 gems and keep the momentum going — or wait for free regen.',
+        title: 'Out of energy',
+      body: 'Refill now or wait for recovery.',
         urgencyLabel: 'Match available now',
-        ctaLabel: 'Refill Energy - 10 Gems',
-        dismissLabel: 'Wait for free regen',
+        ctaLabel: 'Refill · 10 gems',
+        dismissLabel: 'Wait for regeneration',
         gemCost: 10,
         accentColor: '#31A85A',
         Icon: EnergyBoltIcon,
       };
     case 'injury_recovery':
       return {
-        title: 'Injury setback!',
-        body: 'Your player picked up an injury. Speed up recovery with gems and be back for the next crucial match.',
-        urgencyLabel: 'Big match coming up',
-        ctaLabel: 'Fast-track recovery',
+        title: 'Injury setback',
+      body: 'Recover before the next match.',
+        urgencyLabel: 'Next match approaching',
+        ctaLabel: 'Speed up recovery',
         dismissLabel: 'Sit it out',
         accentColor: '#E5484D',
         Icon: InjuryIcon,
       };
     case 'streak_protection':
       return {
-        title: `${streakDays ?? 7}-match win streak at risk!`,
-        body: "You've built an incredible win streak but you're out of energy. Refill for 10 gems to play your next match and keep the run alive.",
+        title: `${streakDays ?? 7}-match streak at risk`,
+      body: 'Refill and keep playing.',
         urgencyLabel: 'Play before it resets',
-        ctaLabel: 'Refill & keep streak - 10 Gems',
+        ctaLabel: 'Refill · 10 gems',
         dismissLabel: 'Risk it',
         gemCost: 10,
         accentColor: '#4C9AFF',
@@ -143,8 +142,8 @@ function getOfferConfig(kind: OfferKind, streakDays?: number): OfferConfig {
       };
     case 'gem_pack':
       return {
-        title: 'Double gems on your first purchase',
-        body: 'Your first-ever gem purchase comes with 2× the gems — twice the value to kick-start your career.',
+        title: '2× first gem purchase',
+      body: 'First gem purchase: 2× gems.',
         urgencyLabel: 'First-purchase bonus',
         ctaLabel: 'View Gem Packs',
         dismissLabel: 'Maybe later',
@@ -154,12 +153,11 @@ function getOfferConfig(kind: OfferKind, streakDays?: number): OfferConfig {
     case 'vip_unlock':
     default:
       return {
-        title: 'Go VIP — play without limits',
-        body: 'Remove all ads, get double energy cap, earn 20% more coins every match, and unlock exclusive VIP rewards.',
+        title: 'VIP + Remove Ads',
+      body: 'Permanent in both career modes.',
         urgencyLabel: 'Popular upgrade',
-        ctaLabel: 'Remove Ads — ₹299',
+        ctaLabel: 'View VIP',
         dismissLabel: 'Not now',
-        fiatLabel: '₹299',
         accentColor: '#E9B23B',
         Icon: VIPIcon,
       };
@@ -230,30 +228,21 @@ export function ContextualOffer({ kind, streakDays, onAccept, onDismiss }: Conte
               <Text style={styles.title}>{cfg.title}</Text>
               <Text style={styles.body}>{cfg.body}</Text>
 
-              {/* Value proposition bullets */}
-              <View style={styles.bullets}>
-                {kind === 'vip_unlock' &&
-                  [
-                    'No more ads, ever',
-                    'Double energy cap (60)',
-                    '+20% coins every match',
-                    'Exclusive VIP daily rewards',
+              {/* The VIP body is intentionally brief; its effects live here once. */}
+              {kind === 'vip_unlock' ? (
+                <View style={styles.bullets}>
+                  {[
+                    'Permanent ad removal',
+                    '60-energy cap',
+                    '+20% match coins',
+                    'VIP daily rewards',
                   ].map((b, i) => (
                     <View key={i} style={styles.bullet}>
                       <Text style={styles.bulletText}>{b}</Text>
                     </View>
                   ))}
-                {kind === 'energy_empty' &&
-                  [
-                    'Instantly back to full energy',
-                    'Play your match right now',
-                    'Keep your form streak alive',
-                  ].map((b, i) => (
-                    <View key={i} style={styles.bullet}>
-                      <Text style={styles.bulletText}>{b}</Text>
-                    </View>
-                  ))}
-              </View>
+                </View>
+              ) : null}
 
               <Button
                 label={cfg.ctaLabel}
@@ -306,9 +295,7 @@ export function OfferBanner({ kind, streakDays, onPress, onDismiss }: OfferBanne
           </Text>
         </View>
         <Pressable style={[styles.bannerCta, { backgroundColor: accentColor }]} onPress={onPress}>
-          <Text style={styles.bannerCtaText}>
-            {cfg.gemCost ? `${cfg.gemCost}💎` : (cfg.fiatLabel ?? 'View')}
-          </Text>
+          <Text style={styles.bannerCtaText}>{cfg.gemCost ? `${cfg.gemCost}💎` : 'View'}</Text>
         </Pressable>
         <Pressable onPress={onDismiss} style={styles.bannerClose}>
           <Text style={{ color: colors.textFaint, fontSize: 16 }}>✕</Text>

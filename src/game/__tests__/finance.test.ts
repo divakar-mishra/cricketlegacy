@@ -3,6 +3,7 @@ import { Player } from '../../domain/types';
 import { createManagerSave } from '../createGame';
 import {
   boardTargetFor,
+  broadcastIncome,
   computeValue,
   formatClubCurrency,
   MIN_SQUAD,
@@ -11,6 +12,13 @@ import {
   releasePlayer,
   signFreeAgent,
 } from '../finance';
+
+describe('manager commercial income', () => {
+  it('keeps broadcast distribution separate from fixture sponsor contracts', () => {
+    expect(broadcastIncome(60)).toBe(260_000);
+    expect(broadcastIncome(80)).toBe(320_000);
+  });
+});
 
 const makeSave = () =>
   createManagerSave({ teamId: TEAM_BLUEPRINTS[0].id, difficulty: 'NORMAL', seed: 999 });
@@ -37,6 +45,20 @@ describe('formatClubCurrency', () => {
 });
 
 describe('transfers', () => {
+  it('starts a manager roster at 22 players with three legitimate recruitment places', () => {
+    const save = makeSave();
+    const team = save.teams[save.userTeamId!];
+
+    expect(team.playerIds).toHaveLength(22);
+    expect(maxSquadSize(save)).toBe(25);
+    expect(team.playerIds.length).toBeLessThan(maxSquadSize(save));
+
+    team.budget = 10_000_000;
+    if (save.finances) save.finances.wageBudgetPerSeason = 5_000_000;
+    expect(signFreeAgent(save, save.freeAgents![0]).ok).toBe(true);
+    expect(team.playerIds).toHaveLength(23);
+  });
+
   it('signs a free agent: budget down, squad up, removed from market', () => {
     const save = makeSave();
     const team = save.teams[save.userTeamId!];

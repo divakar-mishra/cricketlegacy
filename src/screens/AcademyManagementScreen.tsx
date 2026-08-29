@@ -156,10 +156,7 @@ export function AcademyManagementScreen({ navigation }: ScreenProps<'AcademyMana
           <Animated.View entering={FadeInDown.duration(300)}>
             <Card style={styles.setupCard}>
               <Text style={styles.setupTitle}>Found Your Cricket Academy</Text>
-              <Text style={styles.setupDesc}>
-                Invest in the next generation. A cricket academy generates passive income every
-                season and cements your legacy in the sport.
-              </Text>
+              <Text style={styles.setupDesc}>Seasonal income · Legacy</Text>
               <Text style={styles.inputLabel}>Name your academy</Text>
               <TextInput
                 style={styles.input}

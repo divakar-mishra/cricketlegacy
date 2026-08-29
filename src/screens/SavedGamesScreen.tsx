@@ -7,6 +7,7 @@ import { GameMode, SaveGame } from '../domain/types';
 import { saveSubtitle, saveTitle } from '../game/saveMeta';
 import { isSeasonPassActive } from '../game/seasonPass';
 import { ScreenProps } from '../navigation';
+import { premiumSponsorSave } from '../services';
 import { useCareer } from '../state/careerStore';
 import { BASE_MAX_SLOTS, deleteSave, listSlots, SlotView } from '../storage/saveGames';
 import { fontSize, fontWeight, radius, spacing, ThemeColors, useThemedStyles } from '../theme';
@@ -33,15 +34,40 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
     navigation.navigate(mode === 'career' ? 'CareerHub' : 'ManagerHub');
   };
 
-  const onDelete = (slot: number) => {
-    Alert.alert('Delete save', 'This save will be permanently deleted. This cannot be undone.', [
+  const onDelete = (slot: number, save: SaveGame) => {
+    const permanentSponsor = save.sponsorship?.premium;
+    const permanentSponsorWarning = permanentSponsor
+      ? permanentSponsor.purchaseToken.startsWith('mock:')
+        ? ' This development sponsor exists only on this device and will be permanently destroyed.'
+        : ' Reinstall or device-loss recovery can restore this exact purchased save when you sign in. Choosing Delete permanently destroys that server backup and sponsor binding; it can never be moved or recovered afterward.'
+      : '';
+    Alert.alert('Delete save', `This cannot be undone.${permanentSponsorWarning}`, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
+        text: save.sponsorship?.premium ? 'Delete permanently' : 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteSave(mode, slot);
-          refresh();
+          try {
+            if (save.sponsorship?.premium) {
+              const result = await premiumSponsorSave.deletePremiumSponsorExactSave(save);
+              if (result.status !== 'DELETED' && result.status !== 'LOCAL_ONLY') {
+                Alert.alert(
+                  'Save not deleted',
+                  'error' in result
+                    ? result.error
+                    : 'The permanent sponsor deletion was not confirmed. Nothing was deleted.',
+                );
+                return;
+              }
+            }
+            await deleteSave(mode, slot);
+            await refresh();
+          } catch {
+            Alert.alert(
+              'Save not deleted',
+              'The device did not confirm deletion. The save has been left in place.',
+            );
+          }
         },
       },
     ]);
@@ -95,7 +121,7 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
                   variant="ghost"
                   fullWidth={false}
                   style={{ flex: 1 }}
-                  onPress={() => onDelete(slot)}
+                  onPress={() => onDelete(slot, save)}
                 />
               </View>
             </>

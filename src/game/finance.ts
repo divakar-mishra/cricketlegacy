@@ -15,6 +15,8 @@ export function maxSquadSize(save: SaveGame): number {
 
 /** Fraction of a player's transfer value paid as wages each season. */
 export const WAGE_RATE = 0.03;
+/** Seasonal upkeep for one level of one club facility. */
+export const FACILITY_LEVEL_UPKEEP = 18_000;
 
 /** Manager club money formatter. This is separate from wallet coins/gems and Google Play prices. */
 export function formatClubCurrency(amount: number): string {
@@ -31,9 +33,14 @@ export function seasonWageBill(players: Player[]): number {
   return Math.round(players.reduce((sum, p) => sum + computeValue(p) * WAGE_RATE, 0));
 }
 
-/** Seasonal sponsor/broadcast income, scaling with club reputation. */
+/** Seasonal broadcast distribution, separate from fixture-based kit sponsorship. */
+export function broadcastIncome(reputation: number): number {
+  return 80_000 + Math.round(reputation) * 3_000;
+}
+
+/** @deprecated Compatibility name for saves/screens written before sponsorship was split. */
 export function sponsorIncome(reputation: number): number {
-  return 120_000 + Math.round(reputation) * 6_000;
+  return broadcastIncome(reputation);
 }
 
 export interface ObjectiveOutcome {
@@ -78,6 +85,57 @@ export function currentWageBill(save: SaveGame): number {
 }
 
 /**
+ * Fixed-cost reserve protected by the board after the club has completed its
+ * first fully itemised settlement. Gate receipts and prize money stay upside;
+ * only committed wages, staff and known infrastructure upkeep are protected,
+ * net of guaranteed broadcast rights.
+ */
+export function managerOperatingReserve(save: SaveGame): number {
+  if (save.mode !== 'manager' || !save.userTeamId || !save.lastSeasonSettlement) return 0;
+  const team = save.teams[save.userTeamId];
+  if (!team) return 0;
+  const squad = team.playerIds
+    .map((playerId) => save.players[playerId])
+    .filter((player): player is Player => Boolean(player && !player.retired));
+  const playerWages = seasonWageBill(squad);
+  const staffWages = (save.staff ?? []).reduce((sum, member) => sum + member.wage, 0);
+  const facilityLevels = save.facilities
+    ? save.facilities.training + save.facilities.medical + save.facilities.academy
+    : 0;
+  const currentFacilityUpkeep = facilityLevels * FACILITY_LEVEL_UPKEEP;
+  // The prior itemised line also contains stadium upkeep, which is otherwise
+  // owned by the stadium module. Retain the larger known commitment.
+  const infrastructureUpkeep = Math.max(
+    currentFacilityUpkeep,
+    save.lastSeasonSettlement.facilityUpkeep ?? 0,
+  );
+  return Math.max(
+    0,
+    Math.round(
+      playerWages + staffWages + infrastructureUpkeep - broadcastIncome(team.reputation),
+    ),
+  );
+}
+
+/** Board guard for optional Club Balance spending and new annual commitments. */
+export function optionalClubSpendBlockReason(
+  save: SaveGame,
+  immediateCost: number,
+  additionalAnnualCommitment = 0,
+): string | null {
+  if (!save.userTeamId) return 'No active club.';
+  const team = save.teams[save.userTeamId];
+  const cost = Math.max(0, Math.round(immediateCost));
+  if (!team || team.budget < cost) return 'Not enough club balance.';
+  if (save.mode !== 'manager') return null;
+  const protectedReserve = managerOperatingReserve(save) + Math.max(0, additionalAnnualCommitment);
+  if (team.budget - cost < protectedReserve) {
+    return `Board requires ${formatClubCurrency(protectedReserve)} for committed season costs.`;
+  }
+  return null;
+}
+
+/**
  * FFP check for a prospective signing. Manager mode only — career mode has no
  * wage budget. Returns a human reason if it breaches the hard wage ceiling, else
  * null (allowed).
@@ -112,7 +170,8 @@ export function signFreeAgent(save: SaveGame, playerId: string, feeOverride?: nu
     return { ok: false, cost: 0, reason: 'Squad is full.' };
   const baseCost = computeValue(p);
   const cost = feeOverride == null ? baseCost : Math.max(baseCost, Math.round(feeOverride));
-  if (team.budget < cost) return { ok: false, cost, reason: 'Not enough budget.' };
+  const budgetBlock = optionalClubSpendBlockReason(save, cost, playerWage(p));
+  if (budgetBlock) return { ok: false, cost, reason: budgetBlock };
   const ffp = ffpBlockReason(save, p);
   if (ffp) return { ok: false, cost, reason: ffp };
 

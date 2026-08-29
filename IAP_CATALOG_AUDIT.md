@@ -12,7 +12,7 @@ human-readable product table is Section 13 of
   mode-specific fulfillment branch.
 - Player and Manager products must pass both UI filtering and state-level mode
   guards.
-- Durable entitlements may restore; coins, gems, energy and action tokens may
+- Durable entitlements may restore; coins, gems and action tokens may
   not be re-granted by restore.
 - Fulfillment requires a purchased, verified transaction and an unused
   purchase token.

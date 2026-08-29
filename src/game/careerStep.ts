@@ -7,6 +7,7 @@ import { nextUserFixtureId, seasonComplete } from './season';
 
 export enum CareerStepType {
   TRAINING_MANDATORY = 'TRAINING_MANDATORY',
+  CALENDAR_ADVANCE = 'CALENDAR_ADVANCE',
   MATCHDAY_SELECTED = 'MATCHDAY_SELECTED',
   MATCHDAY_BENCHED = 'MATCHDAY_BENCHED',
   MATCHDAY_RESTED = 'MATCHDAY_RESTED',
@@ -34,6 +35,7 @@ export type CareerStepAction =
   | 'SIMULATE_MATCH'
   | 'OPEN_TRANSFERS'
   | 'ADVANCE_SEASON'
+  | 'ADVANCE_CAREER_CALENDAR'
   | 'ACKNOWLEDGE_PROMOTION'
   | 'OPEN_PRESS'
   | 'OPEN_JOB_OFFER'
@@ -107,6 +109,21 @@ function resolvePlayerStep(save: SaveGame, context: CareerStepContext): Resolved
     };
   }
 
+  const level = save.careerPathLevel ?? 'DOMESTIC';
+  const isYouthCareer = level === 'SCHOOL' || level === 'U19';
+  let calendarEvent: PlayerCalendarEvent | undefined;
+
+  if (isYouthCareer) {
+    calendarEvent = currentPlayerCalendarEvent(save);
+    const youthFixtureId =
+      calendarEvent?.kind === 'MATCH' && calendarEvent.fixtureId
+        ? calendarEvent.fixtureId
+        : nextUserFixtureId(save);
+    // Pathway stories remain available from their own card, but a real Grade A or
+    // U19 fixture is never held behind an optional narrative decision.
+    if (youthFixtureId) return playerMatchStep(save, youthFixtureId);
+  }
+
   const storyCount = save.story?.pendingEventIds.length ?? 0;
   if (storyCount > 0) {
     return {
@@ -118,7 +135,7 @@ function resolvePlayerStep(save: SaveGame, context: CareerStepContext): Resolved
     };
   }
 
-  const calendarEvent = currentPlayerCalendarEvent(save);
+  calendarEvent ??= currentPlayerCalendarEvent(save);
   if (calendarEvent?.kind === 'MATCH' && calendarEvent.fixtureId) {
     return playerMatchStep(save, calendarEvent.fixtureId);
   }
@@ -147,12 +164,14 @@ function resolvePlayerStep(save: SaveGame, context: CareerStepContext): Resolved
   if (fixtureId) return playerMatchStep(save, fixtureId);
 
   if (seasonComplete(save)) {
+    const completedSeasonNumber = (save.careerSeasons ?? 0) + 1;
+    const player = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
     return {
       mode: 'career',
       type: CareerStepType.SEASON_WRAPUP,
       action: 'ADVANCE_SEASON',
-      title: 'Season review ready',
-      detail: 'Review the completed campaign and begin the next season.',
+      title: `Season ${completedSeasonNumber} complete`,
+      detail: player ? `Age ${player.age} → ${player.age + 1}` : 'Begin the next season.',
     };
   }
 
@@ -168,15 +187,16 @@ function resolvePlayerStep(save: SaveGame, context: CareerStepContext): Resolved
 
   return {
     mode: 'career',
-    type: CareerStepType.TRAINING_MANDATORY,
-    action: 'OPEN_TRAINING',
-    title: 'Training week',
-    detail: 'Choose a focused paid session, or continue when you want to save your coins.',
+    type: CareerStepType.CALENDAR_ADVANCE,
+    action: 'ADVANCE_CAREER_CALENDAR',
+    title: 'Continue season',
+    detail: 'Training is optional.',
   };
 }
 
 function resolveManagerStep(save: SaveGame): ResolvedManagerStep {
-  if (save.managerJobOffer) {
+  const isNationalManager = save.managerCareerLevel === 'NATIONAL';
+  if (!isNationalManager && save.managerJobOffer) {
     return {
       mode: 'manager',
       type: ManagerStepType.JOB_OFFER_REQUIRED,
@@ -185,7 +205,7 @@ function resolveManagerStep(save: SaveGame): ResolvedManagerStep {
       detail: 'Accept or decline the offer before advancing the calendar.',
     };
   }
-  if (save.flags?.sacked) {
+  if (!isNationalManager && save.flags?.sacked) {
     return {
       mode: 'manager',
       type: ManagerStepType.JOB_SEARCH,

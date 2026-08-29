@@ -4,14 +4,36 @@
  * Premium cosmetics cost gems (gem sink), creating value for gem purchases.
  * Basic options are free. Premium options are gem-gated.
  */
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { avatarFromLegacy, normalizeAvatarConfig, outfitForKitId } from '../avatar';
+import { type ComponentProps, useState } from 'react';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { normalizeAvatarConfig } from '../avatar';
 import type { AvatarConfig } from '../avatar';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
-import { AvatarCustomizer, Button, Screen, ScreenHeader, WalletBar } from '../components';
+import {
+  Button,
+  PortraitPicker,
+  Screen,
+  ScreenHeader,
+  SponsoredKitPreview,
+  WalletBar,
+} from '../components';
 import { AppText as Text } from '../components/AppText';
-import { CELEBRATIONS, cosmeticCost, CosmeticOption, KIT_COLORS } from '../data/cosmetics';
+import {
+  CELEBRATIONS,
+  cosmeticCost,
+  CosmeticOption,
+  KIT_COLORS,
+  kitColorHex,
+} from '../data/cosmetics';
+import { activeSponsorBranding } from '../game/sponsorship';
+import {
+  defaultShirtName,
+  defaultShirtNumber,
+  normalizeShirtName,
+  normalizeShirtNumber,
+  SHIRT_NAME_MAX_LENGTH,
+} from '../game/kitIdentity';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import {
@@ -54,9 +76,17 @@ function CosmeticGrid({
           const isOwned = isFree || ownedIds.has(opt.id);
           const canAfford = !opt.passExclusive && gems >= opt.gemCost;
           const isColor = opt.preview.startsWith('#');
+          const previewAccent = opt.previewAccent ?? colors.accent;
+          const status = isSelected
+            ? 'selected'
+            : isOwned
+              ? 'owned'
+              : opt.passExclusive
+                ? 'Season Pass reward'
+                : `${opt.gemCost} gems`;
 
           return (
-            <View key={opt.id}>
+            <View key={opt.id} style={styles.optionCell}>
               <Pressable
                 style={[
                   styles.optionCard,
@@ -64,6 +94,7 @@ function CosmeticGrid({
                   !isOwned && !canAfford && styles.optionCardLocked,
                 ]}
                 accessibilityState={{ disabled: !isOwned && opt.passExclusive }}
+                accessibilityLabel={`${opt.label}, ${status}`}
                 disabled={!isOwned && opt.passExclusive}
                 onPress={() => onSelect(opt.id, opt.gemCost)}
               >
@@ -78,8 +109,21 @@ function CosmeticGrid({
                     <View style={[styles.colorPreview, { backgroundColor: opt.preview }]}>
                       {isSelected && <Text style={styles.colorCheck}>✓</Text>}
                     </View>
+                  ) : opt.previewIcon ? (
+                    <View style={[styles.iconPreview, { backgroundColor: `${previewAccent}18` }]}>
+                      <Ionicons
+                        name={opt.previewIcon as ComponentProps<typeof Ionicons>['name']}
+                        size={30}
+                        color={previewAccent}
+                      />
+                    </View>
                   ) : (
-                    <Text style={styles.previewEmoji}>{opt.preview}</Text>
+                    <Text style={[styles.previewEmoji, { color: colors.text }]}>{opt.preview}</Text>
+                  )}
+                  {!isOwned && opt.passExclusive && (
+                    <View style={styles.lockBadge}>
+                      <Ionicons name="lock-closed" size={10} color={colors.white} />
+                    </View>
                   )}
                   {isSelected && !isColor && (
                     <View style={styles.selectedBadge}>
@@ -101,10 +145,7 @@ function CosmeticGrid({
                     ]}
                   >
                     <Text
-                      style={[
-                        styles.costText,
-                        { color: isOwned ? colors.accent : colors.textFaint },
-                      ]}
+                      style={[styles.costText, { color: isOwned ? colors.accent : colors.info }]}
                     >
                       {isOwned ? 'PASS OWNED' : 'PASS REWARD'}
                     </Text>
@@ -153,19 +194,23 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
 
   // Initialise from the persisted equipped look; changes are committed on save.
   const equipped = save?.cosmetics;
+  const player = save?.userPlayerId ? save.players[save.userPlayerId] : undefined;
   const avatar = 'avatar_custom';
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(() =>
-    normalizeAvatarConfig(
-      equipped?.avatarConfig ??
-        avatarFromLegacy(
-          equipped?.avatarCustomization,
-          equipped?.kit,
-          equipped?.profileFrame,
-        ),
-    ),
+    normalizeAvatarConfig({
+      ...(equipped?.avatarConfig ?? {}),
+      ...(equipped?.profileFrame ? { frameId: equipped.profileFrame } : {}),
+    }),
   );
   const [kit, setKit] = useState<string>(equipped?.kit ?? 'kit_white');
   const [celebration, setCelebration] = useState<string>(equipped?.celebration ?? 'cel_wave');
+  const [kitSide, setKitSide] = useState<'front' | 'back'>('front');
+  const [shirtName, setShirtName] = useState<string>(
+    equipped?.shirtName ?? defaultShirtName(player?.name),
+  );
+  const [shirtNumber, setShirtNumber] = useState<string>(
+    String(equipped?.shirtNumber ?? defaultShirtNumber(player?.id)),
+  );
   const [hasChanges, setHasChanges] = useState(false);
 
   const gems = save?.wallet.gems ?? 0;
@@ -182,6 +227,7 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
       </Screen>
     );
   }
+  const sponsorBranding = activeSponsorBranding(save);
 
   const handleSelect = (id: string, cost: number, setter: (id: string) => void) => {
     // Owned premium items (and free items) can always be equipped. Only an
@@ -209,7 +255,8 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
         avatar,
         kit,
         celebration,
-        avatarCustomization: equipped?.avatarCustomization,
+        shirtName: normalizeShirtName(shirtName, player?.name),
+        shirtNumber: normalizeShirtNumber(shirtNumber, player?.id),
         avatarConfig,
         profileFrame: equipped?.profileFrame,
         stadiumTheme: equipped?.stadiumTheme,
@@ -246,83 +293,166 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
         hasChanges ? <Button label="Save My Look" variant="gold" onPress={onSave} /> : undefined
       }
     >
-      <ScreenHeader
-        title="Player Cosmetics"
-        subtitle="Personalise your legend"
-        onBack={() => navigation.goBack()}
-      />
+      <ScreenHeader title="Kit & Look" onBack={() => navigation.goBack()} />
       <WalletBar wallet={save.wallet} />
 
-      {/* Gem note */}
-      <View style={styles.gemNote}>
-        <Text style={styles.gemNoteText}>
-          💎 You have{' '}
-          <Text style={[styles.gemNoteText, { color: colors.info, fontWeight: fontWeight.black }]}>
-            {gems} gems
-          </Text>
-          . Premium cosmetics are gem-exclusive.
-        </Text>
+      <View style={styles.kitHeadingRow}>
+        <Text style={styles.sectionTitle}>Your Kit</Text>
+        <View style={styles.kitSideControl}>
+          {(['front', 'back'] as const).map((side) => (
+            <Pressable
+              key={side}
+              accessibilityRole="button"
+              accessibilityState={{ selected: kitSide === side }}
+              style={[styles.kitSideButton, kitSide === side && styles.kitSideButtonActive]}
+              onPress={() => setKitSide(side)}
+            >
+              <Text style={[styles.kitSideText, kitSide === side && styles.kitSideTextActive]}>
+                {side.toUpperCase()}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+      <SponsoredKitPreview
+        kitColor={kitColorHex(kit) ?? '#F7F7F7'}
+        earned={sponsorBranding.earned}
+        premium={sponsorBranding.premium}
+        side={kitSide}
+        shirtName={normalizeShirtName(shirtName, player?.name)}
+        shirtNumber={normalizeShirtNumber(shirtNumber, player?.id)}
+      />
+
+      <View style={styles.shirtIdentityCard}>
+        <View style={styles.shirtFieldWide}>
+          <Text style={styles.fieldLabel}>BACK NAME</Text>
+          <TextInput
+            value={shirtName}
+            onFocus={() => setKitSide('back')}
+            onChangeText={(value) => {
+              setShirtName(value.toUpperCase().slice(0, SHIRT_NAME_MAX_LENGTH));
+              setHasChanges(true);
+            }}
+            placeholder={defaultShirtName(player?.name)}
+            placeholderTextColor={colors.textFaint}
+            autoCapitalize="characters"
+            maxLength={SHIRT_NAME_MAX_LENGTH}
+            style={styles.shirtInput}
+          />
+        </View>
+        <View style={styles.shirtFieldNumber}>
+          <Text style={styles.fieldLabel}>NUMBER</Text>
+          <TextInput
+            value={shirtNumber}
+            onFocus={() => setKitSide('back')}
+            onChangeText={(value) => {
+              setShirtNumber(value.replace(/\D/g, '').slice(0, 2));
+              setHasChanges(true);
+            }}
+            placeholder="7"
+            placeholderTextColor={colors.textFaint}
+            keyboardType="number-pad"
+            maxLength={2}
+            style={[styles.shirtInput, styles.shirtNumberInput]}
+          />
+        </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Create Your Avatar</Text>
-      <AvatarCustomizer
+      <Text style={styles.sectionTitle}>Portrait</Text>
+      <PortraitPicker
         value={avatarConfig}
         onChange={(next) => {
           setAvatarConfig(next);
           setHasChanges(true);
         }}
         playerName={
-          save.userPlayerId ? (save.players[save.userPlayerId]?.name ?? 'Your Player') : 'Your Player'
+          save.userPlayerId
+            ? (save.players[save.userPlayerId]?.name ?? 'Your Player')
+            : 'Your Player'
         }
-        showOutfits={false}
         testID="player-cosmetics-avatar"
       />
 
       {/* Kit color */}
       <CosmeticGrid
-        title="🎽 Kit Colour"
+        title="Colours"
         options={KIT_COLORS}
         selected={kit}
         gems={gems}
         ownedIds={ownedIds}
-        onSelect={(id, cost) =>
-          handleSelect(id, cost, (nextKit) => {
-            setKit(nextKit);
-            setAvatarConfig((current) =>
-              normalizeAvatarConfig({ ...current, outfitId: outfitForKitId(nextKit) }),
-            );
-          })
-        }
+        onSelect={(id, cost) => handleSelect(id, cost, setKit)}
       />
 
       {/* Celebration */}
       <CosmeticGrid
-        title="🎉 Celebration Style"
+        title="Celebration"
         options={CELEBRATIONS}
         selected={celebration}
         gems={gems}
         ownedIds={ownedIds}
         onSelect={(id, cost) => handleSelect(id, cost, setCelebration)}
       />
-
-      <Text style={styles.footer}>
-        More cosmetics unlock as you progress your career. Reach Legend tier for exclusive looks!
-      </Text>
     </Screen>
   );
 }
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    gemNote: {
-      backgroundColor: colors.surfaceAlt,
-      borderRadius: radius.md,
-      padding: spacing.md,
-      marginTop: spacing.md,
-      borderWidth: 1,
-      borderColor: colors.info + '44',
+    kitHeadingRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      gap: spacing.md,
     },
-    gemNoteText: { color: colors.textMuted, fontSize: fontSize.sm, textAlign: 'center' },
+    kitSideControl: {
+      flexDirection: 'row',
+      padding: 3,
+      backgroundColor: colors.surfaceAlt,
+      marginTop: spacing.md,
+      marginBottom: spacing.sm,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    kitSideButton: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+      borderRadius: radius.pill,
+    },
+    kitSideButtonActive: { backgroundColor: colors.accent },
+    kitSideText: { color: colors.textMuted, fontSize: 10, fontWeight: fontWeight.black },
+    kitSideTextActive: { color: colors.black },
+    shirtIdentityCard: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md,
+      backgroundColor: colors.surface,
+    },
+    shirtFieldWide: { flex: 1 },
+    shirtFieldNumber: { width: 92 },
+    fieldLabel: {
+      color: colors.textFaint,
+      fontSize: 10,
+      fontWeight: fontWeight.black,
+      letterSpacing: 1,
+      marginBottom: 5,
+    },
+    shirtInput: {
+      minHeight: 46,
+      paddingHorizontal: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surfaceAlt,
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.bold,
+    },
+    shirtNumberInput: { textAlign: 'center' },
     sectionTitle: {
       color: colors.textMuted,
       fontSize: fontSize.sm,
@@ -337,8 +467,14 @@ const makeStyles = (colors: ThemeColors) =>
       flexWrap: 'wrap',
       gap: spacing.sm,
     },
+    optionCell: {
+      flexBasis: '30%',
+      flexGrow: 1,
+      maxWidth: '32%',
+    },
     optionCard: {
-      width: 88,
+      width: '100%',
+      minHeight: 146,
       alignItems: 'center',
       padding: spacing.sm,
       borderRadius: radius.lg,
@@ -350,7 +486,10 @@ const makeStyles = (colors: ThemeColors) =>
       borderColor: colors.accent,
       backgroundColor: colors.surfaceAlt,
     },
-    optionCardLocked: { opacity: 0.6 },
+    optionCardLocked: {
+      backgroundColor: colors.surfaceMuted,
+      borderColor: colors.info + '55',
+    },
     previewWrap: {
       width: 52,
       height: 52,
@@ -364,6 +503,12 @@ const makeStyles = (colors: ThemeColors) =>
       overflow: 'hidden',
     },
     previewEmoji: { fontSize: 26 },
+    iconPreview: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     colorPreview: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
     colorCheck: { color: colors.white, fontSize: fontSize.xl, fontWeight: fontWeight.black },
     selectedBadge: {
@@ -378,18 +523,32 @@ const makeStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
     },
     selectedCheck: { color: colors.white, fontSize: 9, fontWeight: fontWeight.black },
+    lockBadge: {
+      position: 'absolute',
+      left: 3,
+      bottom: 3,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.info,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     optionLabel: {
       color: colors.textMuted,
       fontSize: fontSize.xs,
       textAlign: 'center',
       marginTop: 4,
       lineHeight: 14,
+      minHeight: 28,
     },
     costBadge: {
       borderRadius: radius.pill,
       paddingHorizontal: 6,
       paddingVertical: 2,
       marginTop: 4,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
     },
     costText: { fontSize: 9, fontWeight: fontWeight.bold },
     freeBadge: {
@@ -398,15 +557,5 @@ const makeStyles = (colors: ThemeColors) =>
       fontWeight: fontWeight.black,
       marginTop: 4,
       letterSpacing: 0.5,
-    },
-
-    footer: {
-      color: colors.textFaint,
-      fontSize: fontSize.xs,
-      textAlign: 'center',
-      marginTop: spacing.xl,
-      marginBottom: spacing.xxl,
-      lineHeight: 18,
-      paddingHorizontal: spacing.md,
     },
   });

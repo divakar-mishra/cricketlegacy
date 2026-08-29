@@ -8,6 +8,8 @@ import {
   getSupabaseClient,
   isSupabaseBackendEnabled,
 } from './supabaseClient';
+import { isOnline } from './connectivity';
+import { clearPurchaseIdentity } from './purchases';
 
 export type AuthProvider = 'guest' | 'google';
 
@@ -46,8 +48,8 @@ export async function rehydrateAuth(): Promise<AuthUser | null> {
       const session = await currentSupabaseSession();
       if (session) {
         const user: AuthUser = { id: session.userId, provider: 'guest', remoteId: session.userId };
-        setCurrent(user);
         await setJSON(USER_KEY, user);
+        setCurrent(user);
         return user;
       }
     }
@@ -77,19 +79,28 @@ async function signInLocalGuest(): Promise<AuthUser> {
     await setJSON(GUEST_ID_KEY, guestId);
   }
   const user: AuthUser = { id: guestId, provider: 'guest' };
-  setCurrent(user);
   await setJSON(USER_KEY, user);
+  setCurrent(user);
   return user;
 }
 
 export async function signInGuest(): Promise<AuthUser> {
   if (!isSupabaseBackendEnabled()) return signInLocalGuest();
 
-  const session = await ensureAnonymousSupabaseUser();
-  const user: AuthUser = { id: session.userId, provider: 'guest', remoteId: session.userId };
-  setCurrent(user);
-  await setJSON(USER_KEY, user);
-  return user;
+  // Offline play is a core capability. A configured cloud backend must not
+  // turn account creation into a launch gate when the device has no network.
+  if (!(await isOnline())) return signInLocalGuest();
+
+  try {
+    const session = await ensureAnonymousSupabaseUser();
+    const user: AuthUser = { id: session.userId, provider: 'guest', remoteId: session.userId };
+    await setJSON(USER_KEY, user);
+    setCurrent(user);
+    return user;
+  } catch {
+    // Supabase outages should disable cloud identity, not the local career.
+    return signInLocalGuest();
+  }
 }
 
 /** The currently signed-in user, or `null` if signed out. */
@@ -99,6 +110,9 @@ export function currentUser(): AuthUser | null {
 
 /** Signs out. Keeps the stable guest id so a returning guest reuses their id. */
 export async function signOut(): Promise<void> {
+  // Close local purchase/restore access before the Auth session changes. The
+  // provider SDK may still hold a cache, but no call can use the old identity.
+  clearPurchaseIdentity();
   if (isSupabaseBackendEnabled()) {
     try {
       await getSupabaseClient()?.auth.signOut();

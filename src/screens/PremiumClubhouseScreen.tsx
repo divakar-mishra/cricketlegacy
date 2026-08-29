@@ -7,9 +7,7 @@ import { MONTHLY_PASS_CONTENT } from '../data/seasonPassContent';
 import { calculateClubRating, superstarAttractionChance } from '../game/manager';
 import {
   isSeasonPassActive,
-  MONTHLY_COSMETIC_DROPS,
   monthlyBundleForCycle,
-  SEASON_PASS_BENEFITS,
   SEASON_PASS_ITEM_LABELS,
 } from '../game/seasonPass';
 import { ScreenProps } from '../navigation';
@@ -51,6 +49,10 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
   const selectedStadium = experience?.selectedStadiumTheme ?? 'stadium_classic';
   const selectedOffice = experience?.selectedOfficeTheme ?? 'office_classic';
   const selectedFrame = experience?.selectedProfileFrame ?? 'frame_none';
+  const monthlyCollectionLabel =
+    save.mode === 'manager'
+      ? monthlyBundle.office.label
+      : `${monthlyBundle.kit.label} and ${monthlyBundle.celebration.label}`;
 
   const applyPresentation = (input: Parameters<typeof savePresentation>[0]) => {
     const result = savePresentation(input);
@@ -72,11 +74,7 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
 
   return (
     <Screen scroll>
-      <ScreenHeader
-        title="Premium Clubhouse"
-        subtitle="Your active pass benefits"
-        onBack={() => navigation.goBack()}
-      />
+      <ScreenHeader title="Premium Clubhouse" onBack={() => navigation.goBack()} />
 
       <Animated.View entering={FadeInDown.duration(280)} style={styles.hero}>
         <ImageBackground
@@ -88,10 +86,7 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
           <View style={styles.heroShade} />
           <View style={styles.heroCopy}>
             <Text style={styles.eyebrow}>{active ? 'PASS ACTIVE' : 'PREVIEW'}</Text>
-            <Text style={styles.heroTitle}>Make the career yours.</Text>
-            <Text style={styles.heroText}>
-              Cosmetics, fictional scenarios, live analytics and naming tools for both career modes.
-            </Text>
+            <Text style={styles.heroTitle}>Make it yours.</Text>
           </View>
         </ImageBackground>
       </Animated.View>
@@ -99,10 +94,6 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
       {!active && (
         <View style={styles.lockBand}>
           <Text style={styles.lockTitle}>Premium access is inactive</Text>
-          <Text style={styles.muted}>
-            Earned cosmetics remain owned and equippable. Stories, scenarios, naming tools and new
-            monthly claims reactivate on renewal.
-          </Text>
           <Button label="View Season Pass" onPress={() => navigation.navigate('SeasonPass')} />
         </View>
       )}
@@ -111,14 +102,7 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
       <View style={styles.featureRow}>
         <View style={styles.featureCopy}>
           <Text style={styles.featureTitle}>{monthlyBundle.title} collection</Text>
-          <Text style={styles.muted}>
-            {monthlyBundle.kit.label}, {monthlyBundle.celebration.label} and{' '}
-            {monthlyBundle.office.label}.
-          </Text>
-          <Text style={styles.collectionHint}>
-            Unique reward: {monthlyBundle.collectible.label}. All four items remain owned
-            permanently.
-          </Text>
+          <Text style={styles.muted}>{monthlyCollectionLabel}</Text>
         </View>
         <Button
           label={dropClaimed ? 'Claimed' : 'Claim'}
@@ -140,15 +124,11 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
           }}
         />
       </View>
-      <Text style={styles.collectionHint}>
-        Twelve distinct monthly collections contain {MONTHLY_COSMETIC_DROPS.length} non-tier
-        cosmetics. Claimed items stay owned.
-      </Text>
 
       <Text style={styles.section}>Presentation Studio</Text>
       <PresentationRow
         title="Stadium Noir"
-        detail="Cinematic night-match presentation"
+        detail="Night presentation"
         selected={selectedStadium === 'stadium_noir'}
         locked={(inventory.pass_stadium_noir ?? 0) <= 0}
         onPress={() => applyPresentation({ stadiumTheme: 'stadium_noir' })}
@@ -157,7 +137,7 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
         <>
           <PresentationRow
             title="Executive Office"
-            detail="Premium club-office backdrop"
+            detail="Office backdrop"
             selected={selectedOffice === 'office_noir'}
             locked={(inventory.pass_office_noir ?? 0) <= 0}
             onPress={() => applyPresentation({ officeTheme: 'office_noir' })}
@@ -169,7 +149,7 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
             <PresentationRow
               key={content.office.themeId}
               title={content.office.label}
-              detail={`${content.title} Manager presentation`}
+              detail="Manager theme"
               selected={selectedOffice === content.office.themeId}
               locked={(inventory[content.office.inventoryId] ?? 0) <= 0}
               lockLabel="Monthly drop"
@@ -178,13 +158,15 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
           ))}
         </>
       )}
-      <PresentationRow
-        title="Championship Frame"
-        detail="Gold and lime illustrated-avatar frame"
-        selected={selectedFrame === 'frame_gold'}
-        locked={(inventory.pass_frame_gold ?? 0) <= 0}
-        onPress={() => applyPresentation({ profileFrame: 'frame_gold' })}
-      />
+      {save.mode === 'career' ? (
+        <PresentationRow
+          title="Championship Frame"
+          detail="Gold avatar frame"
+          selected={selectedFrame === 'frame_gold'}
+          locked={(inventory.pass_frame_gold ?? 0) <= 0}
+          onPress={() => applyPresentation({ profileFrame: 'frame_gold' })}
+        />
+      ) : null}
       <View style={styles.commandRow}>
         {save.mode === 'career' && (
           <Button
@@ -211,7 +193,6 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
             <View style={styles.scenarioHeader}>
               <View style={styles.featureCopy}>
                 <Text style={styles.featureTitle}>{scenario.title}</Text>
-                <Text style={styles.muted}>{scenario.description}</Text>
               </View>
               {scenario.tournament && <Text style={styles.premiumTag}>TOURNAMENT</Text>}
             </View>
@@ -219,8 +200,7 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
             <ProgressBar value={progressValue} color={colors.accent} />
             <Text style={styles.progressText}>
               {progress?.matches ?? 0}/{scenario.targetMatches} matches · {progress?.wins ?? 0}/
-              {scenario.targetWins} wins · Reward {scenario.rewardCoins} coins +{' '}
-              {scenario.rewardGems} gems
+              {scenario.targetWins} wins · Reward {scenario.rewardCoins} coins
             </Text>
             <Button
               label={
@@ -278,15 +258,6 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
           </>
         )}
       </View>
-      <Text style={styles.analyticsNote}>
-        Premium modifiers: +{Math.round((SEASON_PASS_BENEFITS.trainingGrowthMultiplier - 1) * 100)}%
-        training growth, +
-        {Math.round((SEASON_PASS_BENEFITS.positiveSelectionRepMultiplier - 1) * 100)}% positive
-        selection reputation, +{Math.round(SEASON_PASS_BENEFITS.superstarInterestBonus * 100)}{' '}
-        points elite-player interest, and{' '}
-        {Math.round(SEASON_PASS_BENEFITS.staffSigningDiscount * 100)}% lower staff signing fees.
-        Eligibility, budgets and squad rules still apply.
-      </Text>
 
       <Text style={styles.section}>Stories & Interviews</Text>
       <View style={styles.featureRow}>
@@ -295,11 +266,6 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
             {save.mode === 'manager'
               ? monthlyBundle.managerStory.openingTitle
               : monthlyBundle.playerStory.openingTitle}
-          </Text>
-          <Text style={styles.muted}>
-            A new two-part {save.mode === 'manager' ? 'Manager event' : 'Player story'} is available
-            this cycle. Choices persist through the follow-up and affect relationships, form or
-            reputation, never guaranteed results.
           </Text>
         </View>
       </View>

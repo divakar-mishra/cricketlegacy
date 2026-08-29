@@ -22,6 +22,17 @@ describe('Cricket Academy guidance', () => {
     expect(topic.bullets.join(' ')).toContain('guarantees the next appearance');
   });
 
+  it('uses concise summaries without weakening permanent or temporary rules', () => {
+    expect(getGuidanceTopic('career-path').summary).toBe(
+      'Performance drives every step from Grade A cricket to senior caps.',
+    );
+    expect(getGuidanceTopic('international-caps').summary).toContain('permanently locks');
+    expect(getGuidanceTopic('format-adaptability').summary).toContain('temporarily lower');
+    expect(getGuidanceTopic('player-condition').summary).toBe(
+      'Long formats and heavy workloads require planned recovery.',
+    );
+  });
+
   it('documents the exact manager over-rate threshold', () => {
     const copy = getGuidanceTopic('first-class-over-rate').bullets.join(' ');
     expect(copy).toContain('four or more pace bowlers');

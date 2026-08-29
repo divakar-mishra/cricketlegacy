@@ -2,44 +2,18 @@
  * In-app purchase (IAP) abstraction.
  *
  * RevenueCat is loaded lazily so Expo Go and tests can run without its native
- * module. In {@link MOCK_MODE} (development only) purchases resolve
- * successfully so the entitlement/wallet flow can be exercised end-to-end in
- * development without any store configuration.
- *
- * ---------------------------------------------------------------------------
- * The live provider is implemented below and kept behind this interface.
- * Do NOT import it elsewhere — keep all SDK usage inside this module and flip
- * {@link MOCK_MODE} to `false`.
- *
- *   import Purchases from 'react-native-purchases';
- *
- *   // once at startup:
- *   Purchases.configure({ apiKey: '<public sdk key>' });
- *
- *   getProducts -> const offerings = await Purchases.getOfferings();
- *                  return (offerings.current?.availablePackages ?? []).map(toProduct);
- *   purchase    -> const { customerInfo } = await Purchases.purchasePackage(pkg);
- *                  return { ok: hasEntitlement(customerInfo, productId), productId };
- *   restore     -> const info = await Purchases.restorePurchases();
- *                  return entitlementsToResults(info);
- * ---------------------------------------------------------------------------
+ * module. Development builds use {@link MOCK_MODE}; release builds remain
+ * unavailable until the platform's public SDK key is supplied. All SDK access
+ * stays inside this boundary.
  */
 
 import { Platform } from 'react-native';
 import type { Entitlements, Wallet } from '../domain/types';
+import { currentRecoverableSupabaseUserId } from './supabaseClient';
 
 /**
- * When true, all purchases succeed locally without contacting a store.
- * ─────────────────────────────────────────────────────────────────────
- * PRODUCTION SWITCH:
- *   1. Set MOCK_MODE = false
- *   2. Install: npm install react-native-purchases
- *   3. Configure RevenueCat API keys:
- *        iOS   → info.plist: REVENUECAT_IOS_KEY = 'appl_xxxxxxxxx'
- *        Android → google-services.json or BuildConfig: REVENUECAT_ANDROID_KEY = 'goog_xxxxxxxxx'
- *   4. In App.tsx startup: Purchases.configure({ apiKey: Platform.select({ ios: IOS_KEY, android: ANDROID_KEY }) });
- *   5. Replace the PROVIDER stubs below with real RevenueCat calls.
- * ─────────────────────────────────────────────────────────────────────
+ * Development-only purchase simulation. `__DEV__` is false in release builds,
+ * so this cannot silently grant products in a production binary.
  */
 export const MOCK_MODE = __DEV__; // auto-false in production builds
 
@@ -51,16 +25,18 @@ export const MOCK_MODE = __DEV__; // auto-false in production builds
  * react-native-purchases`). When it's missing we fall back to the local
  * catalog and `purchase()` reports `not_configured` instead of throwing.
  *
- * To go live:
- *   1. npx expo install react-native-purchases
- *   2. Add "react-native-purchases" to app.json → plugins, then EAS dev build.
- *   3. Call configurePurchases({ ios, android }) once at App.tsx startup.
- *   4. Create products in the relevant store console with IDs that match
- *      the `id` fields in CATALOG below, and link them in RevenueCat.
+ * To go live, create products in the relevant store console with IDs matching
+ * the catalog below, map them to RevenueCat entitlements, and provide the
+ * platform public SDK keys through the configured `EXPO_PUBLIC_*` variables.
  * ------------------------------------------------------------------------- */
 type RevenueCatModule = any; // no static types — the dep may be absent
 let _rc: RevenueCatModule | null | undefined;
 let _rcConfigured = false;
+let _rcIdentityReady = false;
+let _rcAppUserId: string | null = null;
+let _rcIdentityEpoch = 0;
+let _rcIdentitySync: Promise<boolean> | null = null;
+let _rcKeys: { ios?: string; android?: string } = {};
 
 function loadRevenueCat(): RevenueCatModule | null {
   if (_rc !== undefined) return _rc;
@@ -75,26 +51,72 @@ function loadRevenueCat(): RevenueCatModule | null {
 }
 
 /**
- * Configure RevenueCat once at app startup. No-ops in {@link MOCK_MODE}, when
- * the SDK isn't installed, or when no key is provided for the platform.
+ * Configure RevenueCat only after Supabase has server-validated a recoverable,
+ * non-anonymous account. Passing `appUserID` on the first configure prevents
+ * the SDK from generating a purchase-capable anonymous customer.
  */
-export function configurePurchases(keys: { ios?: string; android?: string }): void {
-  if (MOCK_MODE || _rcConfigured) return;
-  const RC = loadRevenueCat();
-  if (!RC) return;
-  const apiKey = Platform.OS === 'ios' ? keys.ios : keys.android;
-  if (!apiKey) return;
-  try {
-    RC.configure({ apiKey });
-    _rcConfigured = true;
-  } catch {
-    /* leave unconfigured — purchase() will report not_configured */
+export async function configurePurchases(keys: { ios?: string; android?: string }): Promise<void> {
+  _rcKeys = { ...keys };
+  if (MOCK_MODE) return;
+  await synchronizePurchaseIdentity();
+}
+
+async function synchronizePurchaseIdentityOnce(): Promise<boolean> {
+  if (MOCK_MODE) return false;
+  const identityEpoch = _rcIdentityEpoch;
+  const appUserId = await currentRecoverableSupabaseUserId();
+  if (!appUserId || identityEpoch !== _rcIdentityEpoch) {
+    _rcIdentityReady = false;
+    _rcAppUserId = null;
+    return false;
   }
+  const RC = loadRevenueCat();
+  if (!RC) return false;
+  const apiKey = Platform.OS === 'ios' ? _rcKeys.ios : _rcKeys.android;
+  if (!apiKey) return false;
+  try {
+    if (!_rcConfigured) {
+      RC.configure({ apiKey, appUserID: appUserId });
+      _rcConfigured = true;
+    }
+    if (_rcAppUserId !== appUserId || !_rcIdentityReady) {
+      await RC.logIn(appUserId);
+    }
+    if (identityEpoch !== _rcIdentityEpoch) return false;
+    _rcAppUserId = appUserId;
+    _rcIdentityReady = true;
+    return true;
+  } catch {
+    _rcIdentityReady = false;
+    _rcAppUserId = null;
+    return false;
+  }
+}
+
+/** Re-checks the Supabase account and synchronizes RevenueCat to its UUID. */
+export async function synchronizePurchaseIdentity(): Promise<boolean> {
+  if (_rcIdentitySync) return _rcIdentitySync;
+  _rcIdentitySync = synchronizePurchaseIdentityOnce().finally(() => {
+    _rcIdentitySync = null;
+  });
+  return _rcIdentitySync;
+}
+
+/**
+ * Immediately closes every local paid-provider operation on app sign-out.
+ * RevenueCat recommends not calling `logOut()` in a custom-ID-only design,
+ * because that method creates a new anonymous ID. The next recoverable account
+ * switches safely with `logIn()`; no operation can use the cached old identity.
+ */
+export function clearPurchaseIdentity(): void {
+  _rcIdentityEpoch += 1;
+  _rcIdentityReady = false;
+  _rcAppUserId = null;
 }
 
 /** Whether a live purchase backend is ready (SDK loaded + configured). */
 export function isStoreReady(): boolean {
-  return _rcConfigured && loadRevenueCat() != null;
+  return _rcConfigured && _rcIdentityReady && _rcAppUserId != null && loadRevenueCat() != null;
 }
 
 function describePurchaseError(e: unknown): string {
@@ -106,6 +128,50 @@ function describePurchaseError(e: unknown): string {
 
 export type ProductKind = 'coins' | 'gems' | 'consumable' | 'entitlement';
 export type StoreProductCategory = 'SUBSCRIPTION' | 'NON_SUBSCRIPTION';
+export type SaveSponsorProductId = 'player_save_sponsor' | 'manager_save_sponsor';
+export type RestorableProductId =
+  'remove_ads' | 'bundle_legend' | 'manager_legend_pack' | 'season_pass';
+
+const SAVE_SPONSOR_PRODUCT_IDS = new Set<SaveSponsorProductId>([
+  'player_save_sponsor',
+  'manager_save_sponsor',
+]);
+
+/**
+ * Only durable non-consumables and an active subscription may be restored.
+ * Store-consumed currency, boosts, facility tokens and exact-save sponsors are
+ * intentionally absent: restoring any of them would duplicate a consumed grant
+ * or move a purchase that was explicitly bound to one save.
+ */
+const RESTORABLE_PRODUCT_IDS = new Set<RestorableProductId>([
+  'remove_ads',
+  'bundle_legend',
+  'manager_legend_pack',
+  'season_pass',
+]);
+
+/**
+ * These products are repeat-purchasable consumables because each checkout is
+ * bound to a different save. They must never be treated as account-wide,
+ * restorable entitlements.
+ */
+export function isSaveSponsorProduct(productId: string): productId is SaveSponsorProductId {
+  return SAVE_SPONSOR_PRODUCT_IDS.has(productId as SaveSponsorProductId);
+}
+
+export function isRestorableProduct(productId: string): productId is RestorableProductId {
+  return RESTORABLE_PRODUCT_IDS.has(productId as RestorableProductId);
+}
+
+/**
+ * Release checkout remains closed until an authenticated backend validates the
+ * store receipt and atomically binds its unique transaction to one save. The
+ * current Supabase setup stores client-written save JSON and cannot provide
+ * that trust boundary. Local mock purchases stay enabled for development.
+ */
+export function isSaveSponsorCheckoutReady(): boolean {
+  return MOCK_MODE;
+}
 
 const SUBSCRIPTION_PRODUCT_IDS = new Set(['season_pass']);
 
@@ -191,6 +257,19 @@ function activeProviderEntitlement(customerInfo: unknown, id: string): ProviderE
   return entitlement?.isActive === false ? null : (entitlement ?? null);
 }
 
+/** Extract only the provider entitlements that are safe to restore. */
+export function restorableProductIdsFromCustomerInfo(customerInfo: unknown): RestorableProductId[] {
+  if (!customerInfo || typeof customerInfo !== 'object') return [];
+  const active = (
+    customerInfo as { entitlements?: { active?: Record<string, ProviderEntitlement> } }
+  ).entitlements?.active;
+  if (!active) return [];
+  return Object.keys(active).filter(
+    (productId): productId is RestorableProductId =>
+      isRestorableProduct(productId) && activeProviderEntitlement(customerInfo, productId) != null,
+  );
+}
+
 function providerEntitlementPeriod(
   customerInfo: unknown,
   id: string,
@@ -219,6 +298,7 @@ export type EntitlementSnapshot =
 /** Refresh a provider entitlement without presenting a restore or purchase UI. */
 export async function getEntitlementSnapshot(productId: string): Promise<EntitlementSnapshot> {
   if (MOCK_MODE) return { status: 'UNAVAILABLE' };
+  if (!(await synchronizePurchaseIdentity())) return { status: 'UNAVAILABLE' };
   const RC = loadRevenueCat();
   if (!RC || !_rcConfigured) return { status: 'UNAVAILABLE' };
   try {
@@ -267,7 +347,7 @@ export interface ExtendedProduct extends Product {
 export const STARTER_PACK_OFFER_HOURS = 24;
 
 /** Hardcoded catalog used in mock mode / as a fallback.
- *  India-first pricing: ₹99, ₹299, ₹599, ₹1499 price points.
+ *  RevenueCat/store metadata remains authoritative for production prices.
  *  RevenueCat will provide locale-aware prices in production.
  */
 const CATALOG: readonly ExtendedProduct[] = [
@@ -275,7 +355,7 @@ const CATALOG: readonly ExtendedProduct[] = [
   {
     id: 'starter_pack',
     title: 'Starter Pack',
-    description: '3,000 coins + 50 gems + Remove Ads (7 days)',
+    description: '3,000 coins · 50 gems · 7 ad-free days',
     priceString: '₹99',
     kind: 'consumable',
     badge: 'New Player Offer',
@@ -287,7 +367,7 @@ const CATALOG: readonly ExtendedProduct[] = [
   {
     id: 'coins_medium',
     title: 'Bag of Coins',
-    description: '5,000 coins',
+    description: '10,000 coins',
     priceString: '₹299',
     kind: 'coins',
     badge: 'Good Value',
@@ -295,8 +375,8 @@ const CATALOG: readonly ExtendedProduct[] = [
   {
     id: 'coins_large',
     title: 'Sack of Coins',
-    description: '15,000 coins',
-    priceString: '₹599',
+    description: '20,000 coins',
+    priceString: '₹499',
     kind: 'coins',
     badge: 'Best Value',
   },
@@ -323,8 +403,7 @@ const CATALOG: readonly ExtendedProduct[] = [
   {
     id: 'bundle_legend',
     title: 'Player Legend Edition',
-    description:
-      'Player-career bundle: 20,000 coins, 600 gems, Remove Ads, VIP energy and cosmetics.',
+    description: '40,000 coins · 1,200 gems · No ads · 60 energy · Cosmetics',
     priceString: '₹999',
     kind: 'entitlement',
     badge: 'Best Value',
@@ -334,35 +413,25 @@ const CATALOG: readonly ExtendedProduct[] = [
   {
     id: 'remove_ads',
     title: 'VIP Upgrade + Remove Ads',
-    description: 'Permanent ad removal, a 60-energy cap, and +20% match coins in either mode.',
+    description: 'No ads · 60 energy · +20% match coins',
     priceString: '₹299',
     kind: 'entitlement',
   },
   {
     id: 'season_pass',
     title: 'Season Pass Premium',
-    description:
-      '30 days of cosmetics, scenarios, analytics, themes, bonus rewards and ad-free play.',
+    description: '30 days · Rewards, stories, themes and no ads',
     priceString: '₹299',
     kind: 'entitlement',
     badge: 'Most Popular',
   },
 
-  // --- Energy ---
-  {
-    id: 'energy_refill',
-    title: 'Energy Refill',
-    description: '+30 energy for match play in either mode and Player Career training.',
-    priceString: '₹99',
-    kind: 'consumable',
-  },
   // ── Manager-specific IAP ─────────────────────────────────────────────────
 
   {
     id: 'manager_legend_pack',
     title: 'Manager Legacy Edition',
-    description:
-      'Permanent Manager backing, an exclusive boardroom and a one-time club operations toolkit.',
+    description: 'Permanent backing · Boardroom · Toolkit',
     priceString: '₹599',
     kind: 'entitlement',
     badge: 'Manager',
@@ -370,8 +439,7 @@ const CATALOG: readonly ExtendedProduct[] = [
   {
     id: 'transfer_budget_sm',
     title: 'Transfer Budget Boost',
-    description:
-      'Inject ₹500,000 directly into your transfer budget. The 125% seasonal wage ceiling still applies.',
+    description: '+₹500,000 transfer budget · Once per season',
     priceString: '₹149',
     kind: 'consumable',
     badge: 'Manager',
@@ -379,8 +447,7 @@ const CATALOG: readonly ExtendedProduct[] = [
   {
     id: 'scout_full_reveal',
     title: 'Full Scout Intelligence',
-    description:
-      "Grants one token to reveal a player's true overall, form, fitness, injury and estimated value.",
+    description: 'Reveal OVR, form, fitness, injury and value',
     priceString: '₹49',
     kind: 'consumable',
     badge: 'Manager',
@@ -389,8 +456,8 @@ const CATALOG: readonly ExtendedProduct[] = [
     id: 'facility_upgrade_token',
     title: 'Instant Facility Upgrade',
     description:
-      'Store one token that upgrades any non-maxed facility by one level for no club-budget cost.',
-    priceString: '₹149',
+      'Optional shortcut for one facility level. Club Balance upgrades stay available; normal upkeep still applies.',
+    priceString: '₹199',
     kind: 'consumable',
     badge: 'Manager',
   },
@@ -398,7 +465,7 @@ const CATALOG: readonly ExtendedProduct[] = [
     id: 'recovery_pack',
     title: 'Squad Conditioning Pack',
     description:
-      'Store one token for +20 condition, +20 fitness and +15 morale across non-injured players. Injuries are not healed.',
+      '1 token gives non-injured players +20 condition, +20 fitness and +15 morale. No injury healing.',
     priceString: '₹99',
     kind: 'consumable',
   },
@@ -408,8 +475,7 @@ const CATALOG: readonly ExtendedProduct[] = [
   {
     id: 'contract_boost',
     title: 'Contract Negotiation Boost',
-    description:
-      'Store one token. It automatically raises your next renewal wage and signing bonus by 25%.',
+    description: '+25% next renewal wage and signing bonus',
     priceString: '₹99',
     kind: 'consumable',
     badge: 'Career',
@@ -418,24 +484,46 @@ const CATALOG: readonly ExtendedProduct[] = [
     id: 'form_recovery',
     title: 'Mental Coaching Session',
     description:
-      'Immediately restores form to at least 70 and confidence to at least 65. No attributes are changed.',
+      'Sets form to at least 70 and confidence to at least 65. Attributes stay unchanged.',
     priceString: '₹49',
     kind: 'consumable',
   },
   {
     id: 'training_accelerator',
     title: 'Training Accelerator',
-    description: "Triple your next 3 training sessions' gains and accelerate development.",
+    description: '1.5× gains · Next 3 sessions',
     priceString: '₹149',
     kind: 'consumable',
     badge: 'Popular',
+  },
+  {
+    id: 'player_save_sponsor',
+    title: 'Legacy Crown — Player Sponsor',
+    description: 'Extra kit slot · Weekly Wallet Coins · This save',
+    priceString: '₹499',
+    kind: 'consumable',
+    badge: 'Save Only',
+  },
+  {
+    id: 'manager_save_sponsor',
+    title: 'Legacy Crown — Manager Sponsor',
+    description: 'Extra kit slot · Weekly Club Balance · This save',
+    priceString: '₹499',
+    kind: 'consumable',
+    badge: 'Save Only',
   },
 ];
 
 /** Products intentionally surfaced in each active career mode. */
 export const MODE_STORE_PRODUCT_IDS = {
-  career: ['training_accelerator', 'contract_boost', 'form_recovery'],
-  manager: ['scout_full_reveal', 'facility_upgrade_token', 'recovery_pack', 'transfer_budget_sm'],
+  career: ['training_accelerator', 'contract_boost', 'form_recovery', 'player_save_sponsor'],
+  manager: [
+    'scout_full_reveal',
+    'facility_upgrade_token',
+    'recovery_pack',
+    'transfer_budget_sm',
+    'manager_save_sponsor',
+  ],
 } as const;
 
 /** Account-wide products that remain useful in either career mode. */
@@ -444,14 +532,13 @@ export const SHARED_STORE_PRODUCT_IDS = ['remove_ads'] as const;
 /** What each catalog product grants on success (business-facing, not applied here). */
 export const GRANTS: Readonly<Record<string, PurchaseGrant>> = {
   starter_pack: { coins: 3_000, gems: 50, entitlement: { removeAds: false } },
-  coins_medium: { coins: 5_000 },
-  coins_large: { coins: 15_000 },
+  coins_medium: { coins: 10_000 },
+  coins_large: { coins: 20_000 },
   gems_medium: { gems: 300 },
   gems_large: { gems: 1_200 },
-  bundle_legend: { coins: 20_000, gems: 600, entitlement: { removeAds: true } },
+  bundle_legend: { coins: 40_000, gems: 1_200, entitlement: { removeAds: true } },
   remove_ads: { entitlement: { removeAds: true } },
   season_pass: { entitlement: {} },
-  energy_refill: { energy: 30 },
   // Manager-specific (budget injections handled in store, not wallet)
   transfer_budget_sm: { coins: 0 }, // handled specially in store
   manager_legend_pack: { coins: 0 }, // manager-only entitlement handled in store
@@ -462,6 +549,8 @@ export const GRANTS: Readonly<Record<string, PurchaseGrant>> = {
   contract_boost: { coins: 0 }, // handled specially in store
   form_recovery: { coins: 0 }, // handled specially in store
   training_accelerator: { coins: 0 }, // handled specially in store
+  player_save_sponsor: { coins: 0 }, // verified one-save grant handled in store
+  manager_save_sponsor: { coins: 0 }, // verified one-save grant handled in store
 };
 
 let mockPurchaseSeq = 0;
@@ -475,12 +564,12 @@ export function isProductAvailable(product: Pick<Product, 'priceString'>): boole
 
 /**
  * Returns the purchasable catalog. In production we keep our own catalog
- * metadata (title/description/badges) but overlay the store's localized,
+ * metadata (title/description) but overlay the store's localized,
  * tax-inclusive price strings from RevenueCat so what we display always
  * matches what the store charges.
  */
 export async function getProducts(): Promise<ExtendedProduct[]> {
-  if (!MOCK_MODE && isStoreReady()) {
+  if (!MOCK_MODE && (await synchronizePurchaseIdentity()) && isStoreReady()) {
     try {
       const RC = loadRevenueCat();
       const ids = CATALOG.map((p) => p.id);
@@ -508,6 +597,9 @@ export async function getProducts(): Promise<ExtendedProduct[]> {
 export async function purchase(productId: string): Promise<PurchaseResult> {
   const product = CATALOG.find((p) => p.id === productId);
   if (!product) return { ok: false, productId, error: 'unknown_product' };
+  if (isSaveSponsorProduct(productId) && !isSaveSponsorCheckoutReady()) {
+    return { ok: false, productId, error: 'save_sponsor_checkout_not_ready' };
+  }
 
   if (MOCK_MODE) {
     mockPurchaseSeq += 1;
@@ -530,6 +622,9 @@ export async function purchase(productId: string): Promise<PurchaseResult> {
     };
   }
 
+  if (!(await synchronizePurchaseIdentity())) {
+    return { ok: false, productId, error: 'recoverable_sign_in_required' };
+  }
   const RC = loadRevenueCat();
   if (!RC || !_rcConfigured) return { ok: false, productId, error: 'not_configured' };
 
@@ -567,34 +662,61 @@ export async function purchase(productId: string): Promise<PurchaseResult> {
   }
 }
 
+export type RestoreStatus = 'RESTORED' | 'NOTHING_TO_RESTORE' | 'NOT_CONFIGURED' | 'FAILED';
+
+export interface RestoreResult {
+  status: RestoreStatus;
+  purchases: PurchaseResult[];
+  error?: string;
+}
+
 /**
- * Restores currently-active non-consumable entitlements. Expired product
- * history is deliberately excluded so a lapsed subscription cannot be revived.
- * (For the mapping to line up, configure RevenueCat entitlement identifiers to
- * match the relevant product ids, e.g. `remove_ads`.)
+ * Restores currently-active non-consumable entitlements and subscriptions.
+ * Expired history and every consumable are excluded. For the mapping to line
+ * up, RevenueCat entitlement identifiers must match the durable product ids
+ * (for example `remove_ads`). This must only be called from a user action,
+ * because the platform may present an account sign-in prompt.
  */
-export async function restore(): Promise<PurchaseResult[]> {
-  if (MOCK_MODE) return [];
+export async function restore(): Promise<RestoreResult> {
+  if (MOCK_MODE) return { status: 'NOTHING_TO_RESTORE', purchases: [] };
+  if (!(await synchronizePurchaseIdentity())) {
+    return {
+      status: 'NOT_CONFIGURED',
+      purchases: [],
+      error: 'recoverable_sign_in_required',
+    };
+  }
   const RC = loadRevenueCat();
-  if (!RC || !_rcConfigured) return [];
+  if (!RC || !_rcConfigured) {
+    return { status: 'NOT_CONFIGURED', purchases: [], error: 'not_configured' };
+  }
   try {
     const info = await RC.restorePurchases();
-    const active: string[] = Object.keys(info?.entitlements?.active ?? {});
-    const known = new Set(CATALOG.map((p) => p.id));
-    const ids = Array.from(new Set(active)).filter((id) => known.has(id));
+    const ids = restorableProductIdsFromCustomerInfo(info);
     const now = Date.now();
-    return ids.map((productId) => ({
-      ok: true,
-      productId,
-      purchaseState: 'PURCHASED' as const,
-      verificationState: 'VERIFIED' as const,
-      entitlement:
+    const restored = ids.flatMap((productId): PurchaseResult[] => {
+      const entitlement =
         productId === 'season_pass'
           ? providerEntitlementPeriod(info, 'season_pass', now)
-          : undefined,
-    }));
-  } catch {
-    return [];
+          : undefined;
+      // An active subscription without a valid future period must not unlock
+      // premium access. Permanent products legitimately have no expiry.
+      if (productId === 'season_pass' && !entitlement) return [];
+      return [
+        {
+          ok: true,
+          productId,
+          purchaseState: 'PURCHASED' as const,
+          verificationState: 'VERIFIED' as const,
+          entitlement,
+        },
+      ];
+    });
+    return restored.length > 0
+      ? { status: 'RESTORED', purchases: restored }
+      : { status: 'NOTHING_TO_RESTORE', purchases: [] };
+  } catch (error) {
+    return { status: 'FAILED', purchases: [], error: describePurchaseError(error) };
   }
 }
 

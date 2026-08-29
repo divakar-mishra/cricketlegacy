@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
-import { Button, Screen, ScreenHeader, AppText as Text } from '../components';
+import { AppText as Text, Button, Card, Screen, ScreenHeader } from '../components';
 import { StaffRole } from '../domain/types';
 import { formatClubCurrency } from '../game/finance';
 import {
@@ -9,7 +9,6 @@ import {
   STAFF_ROLES,
   staffByRole,
   staffHireCost,
-  superstarAttractionChance,
 } from '../game/manager';
 import { passStaffSigningMultiplier } from '../game/seasonPass';
 import { ScreenProps } from '../navigation';
@@ -37,9 +36,19 @@ export function StaffRecruitmentScreen({ navigation }: ScreenProps<'StaffRecruit
     );
   }
 
+  if (save.managerCareerLevel === 'NATIONAL') {
+    return (
+      <Screen gradient={gradients.pitch}>
+        <ScreenHeader title="Staff Recruitment" onBack={() => navigation.goBack()} />
+        <Card style={styles.nationalPauseCard}>
+          <Text style={styles.nationalPauseTitle}>Club operations paused</Text>
+        </Card>
+      </Screen>
+    );
+  }
+
   const team = save.teams[save.userTeamId];
   const rating = calculateClubRating(save);
-  const attraction = Math.round(superstarAttractionChance(save) * 100);
   const current = staffByRole(save, role);
 
   const hire = (candidateId: string, name: string) => {
@@ -65,19 +74,10 @@ export function StaffRecruitmentScreen({ navigation }: ScreenProps<'StaffRecruit
           <Text style={styles.metricValue}>{rating.toFixed(1)}</Text>
         </View>
         <View>
-          <Text style={styles.metricLabel}>Elite-player appeal</Text>
-          <Text style={styles.metricValue}>{attraction}%</Text>
-        </View>
-        <View>
           <Text style={styles.metricLabel}>Budget</Text>
           <Text style={styles.metricValueSmall}>{formatClubCurrency(team.budget)}</Text>
         </View>
       </View>
-
-      <Text style={styles.note}>
-        Squad quality drives the club rating. Better coaches, facilities, reputation and commercial
-        leadership add a smaller but visible lift.
-      </Text>
 
       <View accessibilityRole="tablist" style={styles.roleTabs}>
         {STAFF_ROLES.map((entry) => (
@@ -109,12 +109,6 @@ export function StaffRecruitmentScreen({ navigation }: ScreenProps<'StaffRecruit
       {candidates.map((candidate) => {
         const baseCost = staffHireCost(candidate);
         const cost = Math.round(baseCost * passStaffSigningMultiplier(save));
-        const staffCount = Math.max(1, save.staff?.length ?? 1);
-        const projectedLift = ((candidate.quality - (current?.quality ?? 40)) / staffCount) * 0.18;
-        const commercialLift =
-          role === 'MARKETING_DIRECTOR'
-            ? Math.round(((candidate.quality - (current?.quality ?? 40)) / 500) * 100)
-            : 0;
         return (
           <View key={candidate.id} style={styles.candidateRow}>
             <View style={styles.candidateMain}>
@@ -123,17 +117,8 @@ export function StaffRecruitmentScreen({ navigation }: ScreenProps<'StaffRecruit
                 {candidate.quality} rating · {formatClubCurrency(candidate.wage)}/season
               </Text>
               <Text style={styles.candidateEffect}>
-                {candidate.specialty}. Club rating {projectedLift >= 0 ? '+' : ''}
-                {projectedLift.toFixed(1)}
-                {commercialLift
-                  ? ` · Elite appeal ${commercialLift >= 0 ? '+' : ''}${commercialLift}%`
-                  : ''}
+                {candidate.specialty}
               </Text>
-              {cost < baseCost ? (
-                <Text style={styles.passSaving}>
-                  Premium Pass saves {formatClubCurrency(baseCost - cost)} on this signing.
-                </Text>
-              ) : null}
             </View>
             <Button
               label={formatClubCurrency(cost)}
@@ -152,6 +137,13 @@ export function StaffRecruitmentScreen({ navigation }: ScreenProps<'StaffRecruit
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    nationalPauseCard: { marginTop: spacing.md, gap: spacing.sm },
+    nationalPauseTitle: {
+      color: colors.text,
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.heavy,
+    },
+    nationalPauseCopy: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
     ratingBand: {
       marginTop: spacing.md,
       paddingVertical: spacing.md,

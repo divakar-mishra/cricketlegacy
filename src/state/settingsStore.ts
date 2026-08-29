@@ -17,6 +17,7 @@ interface SettingsState {
   hasOnboarded: boolean;
   hasHydrated: boolean;
   playedMatchesAllModes: number;
+  qaUnlimitedEnergy: boolean;
   /** Set of coach tip IDs that have been dismissed. */
   dismissedTips: string[];
 
@@ -30,6 +31,7 @@ interface SettingsState {
   setOnboarded: (v: boolean) => void;
   setHydrated: () => void;
   recordPlayedMatch: () => void;
+  setQaUnlimitedEnergy: (v: boolean) => void;
   dismissTip: (tipId: string) => void;
   replayGuides: () => void;
   reset: () => void;
@@ -45,6 +47,7 @@ const DEFAULTS = {
   language: 'en' as Language,
   hasOnboarded: false,
   playedMatchesAllModes: 0,
+  qaUnlimitedEnergy: false,
   dismissedTips: [] as string[],
 };
 
@@ -63,6 +66,7 @@ export const useSettings = create<SettingsState>()(
       setOnboarded: (hasOnboarded) => set({ hasOnboarded }),
       setHydrated: () => set({ hasHydrated: true }),
       recordPlayedMatch: () => set((s) => ({ playedMatchesAllModes: s.playedMatchesAllModes + 1 })),
+      setQaUnlimitedEnergy: (qaUnlimitedEnergy) => set({ qaUnlimitedEnergy }),
       dismissTip: (tipId) =>
         set((s) => ({
           dismissedTips: s.dismissedTips.includes(tipId)
@@ -85,6 +89,7 @@ export const useSettings = create<SettingsState>()(
         language: s.language,
         hasOnboarded: s.hasOnboarded,
         playedMatchesAllModes: s.playedMatchesAllModes,
+        qaUnlimitedEnergy: s.qaUnlimitedEnergy,
         dismissedTips: s.dismissedTips,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),

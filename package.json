@@ -20,7 +20,7 @@
     "expo-font": "~57.0.1",
     "expo-haptics": "~57.0.1",
     "expo-linear-gradient": "~57.0.1",
-    "expo-notifications": "~57.0.8",
+    "expo-notifications": "~57.0.9",
     "expo-sharing": "~57.0.8",
     "expo-splash-screen": "~57.0.5",
     "expo-status-bar": "~57.0.1",
@@ -48,12 +48,15 @@
     "@types/react": "~19.2.2",
     "eslint": "^9.39.4",
     "eslint-config-expo": "~57.0.1",
+    "pngjs": "^3.4.0",
     "prettier": "^3.9.4",
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "generate:avatars": "node scripts/generate-avatar-registry.mjs",
-    "validate:avatars": "node scripts/validate-avatar-pack.mjs",
+    "generate:portraits": "node scripts/build-portrait-assets.mjs",
+    "validate:portraits": "node scripts/build-portrait-assets.mjs --validate-only",
+    "normalize:portrait-clothing": "node scripts/normalize-portrait-clothing.mjs --write",
+    "validate:portrait-clothing": "node scripts/normalize-portrait-clothing.mjs --check",
     "generate-build-info": "node scripts/writeBuildInfo.js",
     "prestart": "npm run generate-build-info",
     "preandroid": "npm run generate-build-info",
@@ -69,9 +72,21 @@
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
+    "audit:five-seasons": "jest --runInBand --testMatch '<rootDir>/scripts/five-season-career-audit.test.ts'",
+    "audit:full-careers": "CAREER_AUDIT_FULL=1 jest --runInBand --testMatch '<rootDir>/scripts/five-season-career-audit.test.ts'",
+    "audit:monetization-careers": "CAREER_AUDIT_MONETIZATION=1 jest --runInBand --testMatch '<rootDir>/scripts/five-season-career-audit.test.ts'",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "build:legal-site": "node legal-site/build.mjs",
+    "check:legal-site": "node legal-site/build.mjs",
+    "check:legal": "node scripts/check-legal-readiness.mjs",
+    "check:release": "npm run check:legal && npm run check",
+    "eas-build-post-install": "node scripts/eas-build-post-install.mjs",
+    "check": "npm run typecheck && npm run lint -- --quiet && npm test -- --runInBand",
     "format": "prettier --write ."
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  }
 }

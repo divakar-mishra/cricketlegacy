@@ -128,7 +128,13 @@ export const ECONOMY = {
    * by {@link matchReward} in game/economy.ts (previously these values were
    * hardcoded there and drifted from config — keep them here only).
    */
-  matchCoins: { win: 320, tie: 180, loss: 120 },
+  matchCoins: { win: 240, tie: 140, loss: 90 },
+  /**
+   * Manager Wallet Coins fund personal services, not club operations. These
+   * are half the former faucet so a no-spend 25-season career does not build a
+   * largely unusable 290k balance; rewarded ads can still double a fixture.
+   */
+  managerMatchCoins: { win: 160, tie: 90, loss: 60 },
   /** Match-coin multiplier for VIP (permanent removeAds) holders — the
    *  advertised "+20% coins every match" perk. */
   vipCoinMultiplier: 1.2,

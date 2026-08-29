@@ -15,6 +15,8 @@ export * as connectivity from './connectivity';
 export * as purchases from './purchases';
 export * as purchaseLedger from './purchaseLedger';
 export * as accountPurchases from './accountPurchases';
+export * as accountDeletion from './accountDeletion';
+export * as premiumSponsorSave from './premiumSponsorSave';
 export * as ads from './ads';
 export * as cloud from './cloud';
 export * as onlineLeaderboard from './onlineLeaderboard';

@@ -220,9 +220,10 @@ a separate dashboard card.
 
 - A new Rookie manager begins in March at the active T20 block instead of
   watching two full locked blocks simulate before the first decision.
-- The forced pre-match team speech was removed. Optional Match Preparation,
-  Opposition Analysis and the wallet-funded Morale Session remain deliberate
-  choices.
+- The forced pre-match team speech was removed. Opposition Analysis is an
+  optional choice available only inside the Matchday preparation stage, never
+  from Manager Home or Club Office; the wallet-funded Morale Session remains a
+  deliberate optional service.
 - Youth Academy appears once in the persistent footer rather than being
   repeated across Hub and Club Office.
 

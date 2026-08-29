@@ -13,6 +13,7 @@ import { planRain } from './rain';
 import { simulateInnings } from './simulateInnings';
 import { makeRng, Rng } from './rng';
 import { resolveToss, TossCall, TossChoice } from './toss';
+import { DifficultyBalanceProfile, difficultyOutcomeBalance } from './difficulty';
 
 export interface TeamTactics {
   battingBias: number;
@@ -24,6 +25,8 @@ export interface TeamSide {
   teamId: string;
   players: Player[]; // XI in batting order
   tactics?: TeamTactics; // optional; when absent the AI plays a neutral game
+  /** Match-only captaincy effect (0..0.0175), applied only under pressure. */
+  leadershipBonus?: number;
 }
 
 export interface MatchInput {
@@ -34,6 +37,7 @@ export interface MatchInput {
   home: TeamSide;
   away: TeamSide;
   difficulty?: Difficulty;
+  difficultyBalanceProfile?: DifficultyBalanceProfile;
   /** Allow rain (DLS) to shorten the chase — opt-in for the season auto-sim. */
   rain?: boolean;
   /** Career protagonist used for role-fair all-rounder bowling allocation. */
@@ -41,6 +45,57 @@ export interface MatchInput {
   userTeamId?: string;
   tossCall?: TossCall;
   tossChoice?: TossChoice;
+}
+
+function managerRatingAdvantage(input: MatchInput): number {
+  if (input.difficultyBalanceProfile !== 'MANAGER' || !input.userTeamId) return 0;
+  const controlled = [input.home, input.away].find((side) => side.teamId === input.userTeamId);
+  if (!controlled) return 0;
+  const opposition = controlled.teamId === input.home.teamId ? input.away : input.home;
+  const average = (side: TeamSide) =>
+    side.players.length > 0
+      ? side.players.reduce((sum, player) => sum + player.overall, 0) / side.players.length
+      : 0;
+  return average(controlled) - average(opposition);
+}
+
+function inningsBalance(
+  input: MatchInput,
+  batting: TeamSide,
+  bowling: TeamSide,
+  ratingAdvantage: number,
+): {
+  outcomeBalance?: ReturnType<typeof difficultyOutcomeBalance>;
+  outcomeBalanceScope?: 'TEAM' | 'STRIKER' | 'BOWLER';
+  outcomeBalancePlayerId?: string;
+} {
+  if (!input.userTeamId) return {};
+  const balance = difficultyOutcomeBalance(
+    input.difficulty ?? 'NORMAL',
+    batting.teamId === input.userTeamId,
+    input.difficultyBalanceProfile,
+    ratingAdvantage,
+    input.format,
+  );
+  if (input.difficultyBalanceProfile === 'MANAGER') {
+    return { outcomeBalance: balance, outcomeBalanceScope: 'TEAM' };
+  }
+  if (!input.focusPlayerId) return {};
+  if (batting.players.some((player) => player.id === input.focusPlayerId)) {
+    return {
+      outcomeBalance: balance,
+      outcomeBalanceScope: 'STRIKER',
+      outcomeBalancePlayerId: input.focusPlayerId,
+    };
+  }
+  if (bowling.players.some((player) => player.id === input.focusPlayerId)) {
+    return {
+      outcomeBalance: balance,
+      outcomeBalanceScope: 'BOWLER',
+      outcomeBalancePlayerId: input.focusPlayerId,
+    };
+  }
+  return {};
 }
 
 export function pickPlayerOfMatch(innings: Innings[], winnerTeamId?: string): string | undefined {
@@ -144,6 +199,7 @@ function simulateLimited(
   rng: Rng,
 ): MatchState {
   const difficulty = input.difficulty ?? 'NORMAL';
+  const ratingAdvantage = managerRatingAdvantage(input);
   const inn1 = simulateInnings(
     {
       battingTeamId: first.teamId,
@@ -153,12 +209,15 @@ function simulateLimited(
       format: input.format,
       conditions: input.conditions,
       difficulty,
+      ...inningsBalance(input, first, second, ratingAdvantage),
       battingBias: first.tactics?.battingBias,
       bowlerPlan: second.tactics?.bowlerPlan,
       fieldSetting: second.tactics?.field,
       preferredAllRounderId: second.players.some((p) => p.id === input.focusPlayerId)
         ? input.focusPlayerId
         : undefined,
+      battingLeadershipBonus: first.leadershipBonus,
+      fieldingLeadershipBonus: second.leadershipBonus,
     },
     rng,
   );
@@ -177,6 +236,7 @@ function simulateLimited(
       format: input.format,
       conditions: input.conditions,
       difficulty,
+      ...inningsBalance(input, second, first, ratingAdvantage),
       target: rain ? rain.revisedTarget : inn1.runs + 1,
       oversCap: rain ? rain.reducedOvers : undefined,
       battingBias: second.tactics?.battingBias,
@@ -185,6 +245,8 @@ function simulateLimited(
       preferredAllRounderId: first.players.some((p) => p.id === input.focusPlayerId)
         ? input.focusPlayerId
         : undefined,
+      battingLeadershipBonus: second.leadershipBonus,
+      fieldingLeadershipBonus: first.leadershipBonus,
     },
     rng,
   );
@@ -199,6 +261,8 @@ function simulateLimited(
     conditions: input.conditions,
     homeTeamId: input.home.teamId,
     awayTeamId: input.away.teamId,
+    homePlayerIds: input.home.players.map((player) => player.id),
+    awayPlayerIds: input.away.players.map((player) => player.id),
     innings: [inn1, inn2],
     result,
   };
@@ -258,6 +322,7 @@ export function decideTest(first: TeamSide, second: TeamSide, innings: Innings[]
 
 function simulateTest(input: MatchInput, first: TeamSide, second: TeamSide, rng: Rng): MatchState {
   const difficulty = input.difficulty ?? 'NORMAL';
+  const ratingAdvantage = managerRatingAdvantage(input);
   let oversUsed = 0;
   const sim = (
     bat: TeamSide,
@@ -274,6 +339,7 @@ function simulateTest(input: MatchInput, first: TeamSide, second: TeamSide, rng:
         format: 'TEST',
         conditions: input.conditions,
         difficulty,
+        ...inningsBalance(input, bat, field, ratingAdvantage),
         target,
         oversCap: Math.max(1, Math.floor(cap)),
         battingBias: bat.tactics?.battingBias,
@@ -283,6 +349,8 @@ function simulateTest(input: MatchInput, first: TeamSide, second: TeamSide, rng:
         preferredAllRounderId: field.players.some((p) => p.id === input.focusPlayerId)
           ? input.focusPlayerId
           : undefined,
+        battingLeadershipBonus: bat.leadershipBonus,
+        fieldingLeadershipBonus: field.leadershipBonus,
       },
       rng,
     );
@@ -315,6 +383,8 @@ function simulateTest(input: MatchInput, first: TeamSide, second: TeamSide, rng:
     conditions: input.conditions,
     homeTeamId: input.home.teamId,
     awayTeamId: input.away.teamId,
+    homePlayerIds: input.home.players.map((player) => player.id),
+    awayPlayerIds: input.away.players.map((player) => player.id),
     innings,
     result,
   };

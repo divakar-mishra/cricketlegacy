@@ -39,31 +39,31 @@ const SLIDES: Slide[] = [
   {
     icon: 'game-controller-outline',
     title: 'Live Ball-by-Ball Cricket',
-    body: 'Call every shot when you bat. Defend, rotate, attack or go big, then set the plan when you bowl.',
+    body: 'Choose your batting stance and bowling plan.',
     accent: '#31A85A',
   },
   {
     icon: 'trending-up-outline',
     title: 'Build Your Legend',
-    body: 'Train your attributes, fight for your XI place, and build a reputation that can reach the national side.',
+    body: 'Train, earn your place and rise through selection.',
     accent: '#E9B23B',
   },
   {
     icon: 'shield-half-outline',
     title: 'Manage Every Detail',
-    body: 'Change tactics, sign players, develop youth, manage wages, and satisfy your board.',
+    body: 'Shape the squad, tactics and future of the club.',
     accent: '#4C9AFF',
   },
   {
     icon: 'trophy-outline',
     title: 'Achievements & Records',
-    body: 'Centuries, five-fers, trophies, awards, and records are tracked across your career.',
+    body: 'Build a career of records, trophies and defining moments.',
     accent: '#CD7F32',
   },
   {
     icon: 'star-outline',
     title: 'Daily Rewards & Season Pass',
-    body: 'Complete daily quests, earn season XP, and claim rewards as your save grows.',
+    body: 'Complete challenges and claim rewards.',
     accent: '#E9B23B',
   },
 ];

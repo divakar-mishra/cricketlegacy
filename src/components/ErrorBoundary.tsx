@@ -48,7 +48,7 @@ function ErrorFallback({ message, onReset }: { message?: string; onReset: () => 
       <Text style={styles.emoji}>🏏</Text>
       <Text style={styles.title}>Something went wrong</Text>
       <Text style={styles.body}>
-        The game hit an unexpected snag. Your progress is saved — tap below to get back to it.
+        Something went wrong. Your progress is saved.
       </Text>
       {__DEV__ && message ? <Text style={styles.diagnostic}>{message}</Text> : null}
       <Pressable style={styles.button} onPress={onReset} accessibilityRole="button" accessibilityLabel="Try again">

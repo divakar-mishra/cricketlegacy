@@ -264,12 +264,25 @@ export function TransferDeadlineDayScreen({ navigation }: ScreenProps<'TransferD
   const budget = userTeam?.budget ?? 0;
   const windowOpen = save ? isTransferWindowOpen(save) : false;
 
+  if (save?.mode === 'manager' && save.managerCareerLevel === 'NATIONAL') {
+    return (
+      <Screen gradient={['#080808', '#12100A', '#0A0A18'] as any}>
+        <ScreenHeader title="Transfer Deadline" onBack={() => navigation.goBack()} />
+        <View style={styles.content}>
+          <Card style={styles.nationalPauseCard}>
+            <Text style={styles.nationalPauseTitle}>Club operations paused</Text>
+          </Card>
+        </View>
+      </Screen>
+    );
+  }
+
   // When the window is shut there are no signings to make — show an honest closed
   // state instead of a fake deadline clock, and point the manager back to the hub.
   if (save && !deadlineActive) {
     const title = windowOpen ? 'Deadline Day Unavailable' : 'Window Closed';
     const note = windowOpen
-      ? `${transferWindowLabel(save)} Deadline Day appears only near the final hours of the window.`
+      ? `${transferWindowLabel(save)} Deadline Day appears only in the final hours.`
       : transferWindowLabel(save);
     return (
       <Screen gradient={['#080808', '#12100A', '#0A0A18'] as any}>
@@ -282,7 +295,6 @@ export function TransferDeadlineDayScreen({ navigation }: ScreenProps<'TransferD
           <Card style={styles.budgetCard}>
             <Text style={styles.budgetLabel}>{title}</Text>
             <Text style={styles.budgetNote}>{note}</Text>
-            <Text style={styles.budgetNote}>Real signings are made in Scout Market.</Text>
           </Card>
           {windowOpen ? (
             <Button
@@ -322,7 +334,6 @@ export function TransferDeadlineDayScreen({ navigation }: ScreenProps<'TransferD
       >
         <ScreenHeader
           title={userTeam?.name ?? 'Transfer Window'}
-          subtitle="Window closes tonight at midnight"
           onBack={() => navigation.goBack()}
         />
 
@@ -364,7 +375,7 @@ export function TransferDeadlineDayScreen({ navigation }: ScreenProps<'TransferD
             <Card style={styles.budgetCard}>
               <Text style={styles.budgetLabel}>Transfer Budget Remaining</Text>
               <Text style={styles.budgetValue}>{formatClubCurrency(budget)}</Text>
-              <Text style={styles.budgetNote}>Use it or lose it — budget resets next season.</Text>
+              <Text style={styles.budgetNote}>Budget resets next season.</Text>
             </Card>
           </Animated.View>
         )}
@@ -386,15 +397,11 @@ export function TransferDeadlineDayScreen({ navigation }: ScreenProps<'TransferD
             onPress={() => navigation.navigate('Squad')}
           />
         </Animated.View>
-        <Text style={styles.budgetNote}>
-          Real signings are made in Scout Market. The feed below is world transfer news.
-        </Text>
-
         {/* World transfer ticker */}
         <Animated.View entering={FadeInDown.duration(350).delay(400)}>
           <View style={styles.tickerHeader}>
             <View style={styles.liveDot} />
-            <Text style={styles.tickerTitle}>World Transfer News · rumours &amp; done deals</Text>
+            <Text style={styles.tickerTitle}>World Transfer News</Text>
           </View>
           {deals.map((deal, i) => (
             <DealTicker key={deal.id} deal={deal} delay={i * 60} />
@@ -404,7 +411,7 @@ export function TransferDeadlineDayScreen({ navigation }: ScreenProps<'TransferD
         {/* Back button */}
         <Animated.View entering={FadeInDown.duration(300).delay(600)}>
           <Button
-            label="Back to Manager Hub"
+            label="Done"
             variant="ghost"
             style={{ marginTop: spacing.lg }}
             onPress={() => navigation.goBack()}
@@ -432,6 +439,18 @@ const makeStyles = (colors: ThemeColors) =>
     content: {
       padding: spacing.lg,
       paddingBottom: spacing.xxxl,
+    },
+    nationalPauseCard: { marginBottom: spacing.md, gap: spacing.sm },
+    nationalPauseTitle: {
+      color: colors.text,
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.heavy,
+    },
+    nationalPauseCopy: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      lineHeight: 20,
+      textAlign: 'center',
     },
     clockWrap: {
       alignItems: 'center',

@@ -9,13 +9,15 @@ describe('Supabase backend integration source', () => {
     expect(source).toContain('storage: AsyncStorage');
     expect(source).toContain('persistSession: true');
     expect(source).toContain('signInAnonymously');
+    expect(source).toContain('currentRecoverableSupabaseUserId');
+    expect(source).toContain('supabase.auth.getUser()');
     expect(source).toContain("rpc('record_daily_verification'");
     expect(source).not.toContain('SERVICE_ROLE');
     expect(source).not.toContain('sb_secret');
   });
 
-  it('ships RLS-protected cloud, leaderboard, and idempotent reward infrastructure', () => {
-    const sql = fs.readFileSync(
+  it('ships RLS-protected cloud infrastructure and revokes direct economy/ranking writes', () => {
+    const baseSql = fs.readFileSync(
       path.join(
         __dirname,
         '..',
@@ -27,16 +29,29 @@ describe('Supabase backend integration source', () => {
       ),
       'utf8',
     );
+    const hardeningSql = fs.readFileSync(
+      path.join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        'supabase',
+        'migrations',
+        '202608090001_harden_online_writes.sql',
+      ),
+      'utf8',
+    );
 
-    expect(sql).toContain('alter table public.daily_verifications enable row level security');
-    expect(sql).toContain('alter table public.cloud_saves enable row level security');
-    expect(sql).toContain('alter table public.reward_transactions enable row level security');
-    expect(sql).toContain('alter table public.leaderboard enable row level security');
-    expect(sql).toContain('alter table public.shadow_leaderboard enable row level security');
-    expect(sql).toContain('auth.uid() = user_id');
-    expect(sql).toContain('primary key (user_id, transaction_id)');
-    expect(sql).toContain('on conflict (user_id, transaction_id) do nothing');
-    expect(sql).toContain('grant execute on function public.record_daily_verification');
-    expect(sql).toContain('grant execute on function public.claim_reward_once');
+    expect(baseSql).toContain('alter table public.daily_verifications enable row level security');
+    expect(baseSql).toContain('alter table public.cloud_saves enable row level security');
+    expect(baseSql).toContain('alter table public.reward_transactions enable row level security');
+    expect(baseSql).toContain('alter table public.leaderboard enable row level security');
+    expect(baseSql).toContain('alter table public.shadow_leaderboard enable row level security');
+    expect(baseSql).toContain('auth.uid() = user_id');
+    expect(hardeningSql).toContain('revoke insert, update on public.leaderboard');
+    expect(hardeningSql).toContain('revoke insert on public.reward_transactions');
+    expect(hardeningSql).toContain('revoke all on function public.claim_reward_once');
+    expect(hardeningSql).toContain('create or replace function public.submit_leaderboard_score');
+    expect(hardeningSql).toContain('grant execute on function public.submit_leaderboard_score');
   });
 });

@@ -53,6 +53,9 @@ export interface BallContext {
   partnershipRuns?: number;
   /** Difficulty tuning applied only to the user's watched match. */
   outcomeBalance?: DifficultyOutcomeBalance;
+  /** Match-only captaincy bonuses, deliberately tiny and pressure-gated. */
+  battingLeadershipBonus?: number;
+  fieldingLeadershipBonus?: number;
 }
 
 export function isLegalDelivery(outcome: BallOutcome): boolean {
@@ -250,6 +253,18 @@ export function resolveBall(ctx: BallContext, rng: Rng): BallEvent {
   w.DOT *= 1 + pressureTilt * 0.35;
   w['1'] *= 1 - pressureTilt * 0.18;
 
+  // Captaincy never rewrites attributes or OVR. Its small effect appears only
+  // in demanding passages and is identical in watched and simulated matches.
+  const battingLeadership = clamp(ctx.battingLeadershipBonus ?? 0, 0, 0.0175) * ctx.pressure;
+  const fieldingLeadership = clamp(ctx.fieldingLeadershipBonus ?? 0, 0, 0.0175) * ctx.pressure;
+  w.W *= (1 - battingLeadership) * (1 + fieldingLeadership);
+  const leadershipScoring = (1 + battingLeadership * 0.5) * (1 - fieldingLeadership * 0.5);
+  w['1'] *= leadershipScoring;
+  w['2'] *= leadershipScoring;
+  w['3'] *= leadershipScoring;
+  w['4'] *= leadershipScoring;
+  w['6'] *= leadershipScoring;
+
   // Conditions
   const pm = PITCH_MODIFIERS[ctx.conditions.pitch];
   const wm = WEATHER_MODIFIERS[ctx.conditions.weather];
@@ -372,6 +387,16 @@ export function resolveBall(ctx: BallContext, rng: Rng): BallEvent {
     w.DOT *= 0.96;
     w['4'] *= 1.03;
     w['1'] *= 1.02;
+  }
+
+  // Conditions, tactics, fresh-batter risk, traits and difficulty all matter,
+  // but their multiplicative stack must not make sub-70 collapses routine for
+  // evenly matched limited-overs teams. This caps wicket probability rather
+  // than enforcing a score floor, so rare collapses remain possible.
+  if (limitedOvers) {
+    const baseWicketWeight = BALL_WEIGHTS[ctx.format].W;
+    const maxWicketMultiplier = ctx.format === 'ODI' ? 1.6 : 1.75;
+    w.W = Math.min(w.W, baseWicketWeight * maxWicketMultiplier);
   }
 
   for (const k of Object.keys(w)) if (w[k] < 0) w[k] = 0;

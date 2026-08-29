@@ -5,6 +5,7 @@ import {
   ManagerCalendarPhase,
   ManagerCareerLevel,
   ManagerPhaseSummary,
+  MatchState,
   SaveGame,
   SeasonCompetition,
 } from '../domain/types';
@@ -20,8 +21,10 @@ import { addCoins, matchReward, vipCoinMultiplier } from './economy';
 import { domesticLeagueName } from './domesticBranding';
 import { clamp } from '../utils/math';
 import { managerSalaryFor } from './managerJobs';
+import { settleFixtureSponsorship } from './sponsorship';
 import {
   annualInternationalPlans,
+  ensureNationalTeam,
   generateCountryInternationalWindowFixtures,
 } from './intlCalendar';
 
@@ -115,6 +118,7 @@ export function buildManagerSeasonCalendar(
   save: SaveGame,
   year: number,
   startingPhase: ManagerCalendarPhase = 'LIST_A',
+  options: { preserveLeagueTables?: boolean } = {},
 ): void {
   if (save.mode !== 'manager' || !save.currentSeasonId) return;
   const seasonId = save.currentSeasonId;
@@ -215,8 +219,10 @@ export function buildManagerSeasonCalendar(
     currentRound: 1,
     competitions,
   };
-  for (const league of Object.values(save.leagues)) {
-    league.table = emptyTable(league.teamIds);
+  if (!options.preserveLeagueTables) {
+    for (const league of Object.values(save.leagues)) {
+      league.table = emptyTable(league.teamIds);
+    }
   }
   save.managerCalendar = {
     year,
@@ -256,9 +262,21 @@ function regularFixtures(
 function pointsForResult(fixture: Fixture, rowTeamId: string, phase: ManagerCalendarPhase): number {
   const winPoints = phase === 'FIRST_CLASS' ? 4 : 2;
   const drawPoints = phase === 'FIRST_CLASS' ? 2 : 1;
-  if (fixture.winnerTeamId === rowTeamId) return winPoints;
+  if (recordedFixtureWinner(fixture) === rowTeamId) return winPoints;
   if (fixture.resultKind === 'TIE' || fixture.resultKind === 'NO_RESULT') return drawPoints;
   return 0;
+}
+
+function recordedFixtureWinner(fixture: Fixture): string | undefined {
+  if (
+    fixture.winnerTeamId === fixture.homeTeamId ||
+    fixture.winnerTeamId === fixture.awayTeamId
+  ) {
+    return fixture.winnerTeamId;
+  }
+  if (fixture.resultKind === 'HOME_WIN') return fixture.homeTeamId;
+  if (fixture.resultKind === 'AWAY_WIN') return fixture.awayTeamId;
+  return undefined;
 }
 
 /** Competition table derived from fixture results, independent of the T20 UI table. */
@@ -291,10 +309,11 @@ export function managerCompetitionStandings(
     away.played += 1;
     home.points += pointsForResult(fixture, home.teamId, phase) - (fixture.homePointsPenalty ?? 0);
     away.points += pointsForResult(fixture, away.teamId, phase) - (fixture.awayPointsPenalty ?? 0);
-    if (fixture.resultKind === 'HOME_WIN') {
+    const winnerTeamId = recordedFixtureWinner(fixture);
+    if (winnerTeamId === fixture.homeTeamId) {
       home.won += 1;
       away.lost += 1;
-    } else if (fixture.resultKind === 'AWAY_WIN') {
+    } else if (winnerTeamId === fixture.awayTeamId) {
       away.won += 1;
       home.lost += 1;
     } else if (fixture.resultKind === 'TIE') {
@@ -356,6 +375,7 @@ function addKnockout(
     played: false,
     playoff: true,
     competition: 'PLAYOFF',
+    cupRound: input.label,
     competitionId,
     calendarMonth: input.phase === 'LIST_A' ? 11 : 5,
     divisionTier: input.tier,
@@ -602,7 +622,8 @@ function buildPhaseSummary(
   };
 }
 
-export const MANAGER_SALARY_COIN_DIVISOR = 200;
+/** Headline contract salary converts to a restrained personal-coin stipend. */
+export const MANAGER_SALARY_COIN_DIVISOR = 400;
 
 /** Pay one personal-wallet salary at the end of each manager season. */
 export function processManagerSalary(save: SaveGame, year: number): number {
@@ -661,6 +682,12 @@ function applyListAConfidenceCarry(save: SaveGame): void {
 }
 
 function prepareOffSeason(save: SaveGame): void {
+  // National duty must not mutate the retained domestic club. National-camp
+  // recovery has not been approved, so no player condition is reset here.
+  if (save.managerCareerLevel === 'NATIONAL') {
+    if (save.managerCalendar) save.managerCalendar.offSeasonPrepared = true;
+    return;
+  }
   for (const player of Object.values(save.players)) {
     player.condition = 100;
   }
@@ -736,6 +763,21 @@ export function advanceManagerCalendar(
       )[0];
     if (pending) {
       simulate(pending.id);
+      const playedFixture = save.fixtures[pending.id];
+      const managedTeamId = managerControlledTeamId(save, phase);
+      if (playedFixture?.played) {
+        const managerControlsFixture = Boolean(
+          save.managerCareerLevel !== 'NATIONAL' &&
+            managedTeamId &&
+            (playedFixture.homeTeamId === managedTeamId ||
+              playedFixture.awayTeamId === managedTeamId),
+        );
+        settleFixtureSponsorship(save, playedFixture, {
+          selected: true,
+          userWon: managerControlsFixture && playedFixture.winnerTeamId === managedTeamId,
+          managedTeamId: managerControlsFixture ? managedTeamId : undefined,
+        });
+      }
       save.currentMonth = pending.calendarMonth ?? save.currentMonth;
       if (
         !unlocked &&
@@ -745,7 +787,7 @@ export function advanceManagerCalendar(
         const won = pending.winnerTeamId === save.userTeamId;
         const tied = pending.resultKind === 'TIE' || pending.resultKind === 'NO_RESULT';
         const reward = Math.floor(
-          matchReward(won, tied) *
+          matchReward(won, tied, undefined, 'MANAGER') *
             MANAGER_BACKGROUND_REWARD_RATE *
             vipCoinMultiplier(save.entitlements),
         );
@@ -775,20 +817,15 @@ export function advanceManagerCalendar(
   return { kind: 'YEAR_COMPLETE' };
 }
 
-function stableChance(key: string): number {
-  let hash = 2166136261 >>> 0;
-  for (let index = 0; index < key.length; index += 1) {
-    hash ^= key.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0) / 0xffffffff;
-}
-
 /**
- * Apply calendar-specific workload. Condition drives rotation without changing
- * a player's permanent fitness rating.
+ * Apply calendar-specific FC over-rate rules. Workload and recovery are owned
+ * by the canonical Manager training result pipeline.
  */
-export function applyManagerCalendarMatchEffects(save: SaveGame, fixture: Fixture): void {
+export function applyManagerCalendarMatchEffects(
+  save: SaveGame,
+  fixture: Fixture,
+  match: MatchState,
+): void {
   if (!fixture.managerPhase || fixture.managerPhase === 'OFF_SEASON') return;
   for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
     const team = save.teams[teamId];
@@ -800,53 +837,21 @@ export function applyManagerCalendarMatchEffects(save: SaveGame, fixture: Fixtur
         (a, b) =>
           b.overall + (b.condition ?? 100) * 0.12 - (a.overall + (a.condition ?? 100) * 0.12),
       );
-    const selectedIds =
-      team.xi?.length === 11
+    const resolvedIds =
+      teamId === match.homeTeamId
+        ? match.homePlayerIds
+        : teamId === match.awayTeamId
+          ? match.awayPlayerIds
+          : undefined;
+    const selectedIds = resolvedIds?.length
+      ? resolvedIds.filter((playerId) => save.players[playerId])
+      : team.xi?.length === 11
         ? team.xi.filter((playerId) => save.players[playerId])
         : available.slice(0, 11).map((player) => player.id);
     const selected = selectedIds.map((playerId) => save.players[playerId]).filter(Boolean);
 
-    for (const player of available) {
-      if (player.injury) {
-        player.injury.matchesOut -= 1;
-        if (player.injury.matchesOut <= 0) player.injury = undefined;
-      }
-    }
-
-    for (const player of selected) {
-      const recovery =
-        fixture.managerPhase === 'FIRST_CLASS' ? 4 : fixture.managerPhase === 'LIST_A' ? 2 : 1;
-      const baseLoad =
-        fixture.managerPhase === 'FIRST_CLASS'
-          ? player.role === 'BOWLER' || player.role === 'ALLROUNDER'
-            ? 11
-            : 6
-          : fixture.managerPhase === 'LIST_A'
-            ? 7
-            : 7.2;
-      const paceExtra =
-        fixture.managerPhase === 'FIRST_CLASS' && player.bowlingStyle?.includes('PACE') ? 2 : 0;
-      player.condition = clamp(
-        Math.round((player.condition ?? 100) + recovery - baseLoad - paceExtra),
-        0,
-        100,
-      );
-
-      const healthy = team.playerIds.filter((playerId) => !save.players[playerId]?.injury).length;
-      const injuryChance = player.condition < 45 ? 0.035 + (45 - player.condition) / 500 : 0;
-      if (
-        healthy > 15 &&
-        !player.injury &&
-        stableChance(`${save.id}:${fixture.id}:${player.id}:workload`) < injuryChance
-      ) {
-        player.injury = {
-          type: fixture.managerPhase === 'FIRST_CLASS' ? 'Workload strain' : 'Fatigue strain',
-          matchesOut: fixture.managerPhase === 'FIRST_CLASS' ? 2 : 1,
-          severity: 'STRAIN',
-        };
-      }
-    }
-
+    // Readiness, recovery and injuries are settled by managerTraining's single
+    // idempotent post-result path. This helper now owns only FC over-rate rules.
     if (fixture.managerPhase === 'FIRST_CLASS') {
       const paceBowlers = selected.filter(
         (player) =>
@@ -881,20 +886,14 @@ export function managerSquadReadiness(save: SaveGame): {
 
 export function refreshManagerNationalTeams(save: SaveGame): void {
   if (!save.managerCalendar) return;
-  for (const team of Object.values(save.teams)) {
-    if (!team.isNationalTeam) continue;
-    team.playerIds = Object.values(save.players)
-      .filter(
-        (player) =>
-          player.nationality === team.country &&
-          !player.retired &&
-          player.age < 40 &&
-          !save.freeAgents?.includes(player.id),
-      )
-      .sort((a, b) => b.overall - a.overall)
-      .slice(0, 22)
-      .map((player) => player.id);
-    team.xi = undefined;
+  const nationalCountries = Object.values(save.teams)
+    .filter((team) => team.isNationalTeam)
+    .map((team) => team.country);
+  for (const country of nationalCountries) {
+    // International eligibility is independent of a domestic contract. Use
+    // the same squad builder as fixture creation so free agents remain
+    // selectable and a smaller nation can never decay to a one-player XI.
+    ensureNationalTeam(save, country);
   }
 }
 

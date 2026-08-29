@@ -1,11 +1,7 @@
 import { Fixture, SaveGame } from '../domain/types';
 import { isInternationalFixture } from './intlCalendar';
 
-export type MatchAuthorityKind =
-  | 'MANAGER'
-  | 'CLUB_CAPTAIN'
-  | 'NATIONAL_CAPTAIN'
-  | 'PLAYER';
+export type MatchAuthorityKind = 'MANAGER' | 'CLUB_CAPTAIN' | 'NATIONAL_CAPTAIN' | 'PLAYER';
 
 export interface MatchAuthority {
   kind: MatchAuthorityKind;
@@ -29,6 +25,15 @@ export function matchDecisionAuthority(
       canControlTeam: true,
       title: 'Head coach control',
       detail: 'You control the XI, batting order, team tactics, and toss election.',
+    };
+  }
+
+  if (fixture?.competition === 'U19_WORLDCUP') {
+    return {
+      kind: 'PLAYER',
+      canControlTeam: false,
+      title: 'Under-19 national squad role',
+      detail: 'The captain controls the XI and toss. You control your own match decisions.',
     };
   }
 

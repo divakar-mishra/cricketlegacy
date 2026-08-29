@@ -170,9 +170,7 @@ export function NotificationInboxScreen({ navigation }: ScreenProps<'Notificatio
               {filter === 'unread' ? 'All caught up!' : 'Nothing here yet'}
             </Text>
             <Text style={styles.emptyText}>
-              {filter === 'unread'
-                ? 'No unread messages. Check back after your next match.'
-                : 'Important game events — national call-ups, contract alerts, rival news — will appear here.'}
+              {filter === 'unread' ? 'No unread messages.' : 'No messages yet.'}
             </Text>
           </Animated.View>
         ) : (
@@ -231,7 +229,7 @@ export function NotificationInboxScreen({ navigation }: ScreenProps<'Notificatio
           })
         )}
 
-        <Text style={styles.hint}>Long-press a message to delete it.</Text>
+        <Text style={styles.hint}>Long-press to delete.</Text>
       </ScrollView>
     </Screen>
   );

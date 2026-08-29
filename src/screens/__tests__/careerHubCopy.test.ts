@@ -6,7 +6,7 @@ describe('CareerHub story preview copy', () => {
 
   it('uses rendered story text instead of raw event placeholders on the home card', () => {
     expect(source).toContain('storyPreview?.title');
-    expect(source).toContain('storyPreview?.speaker');
+    expect(source).not.toContain('storyPreview?.speaker');
     expect(source).not.toContain('{storyPreview.event.title}');
     expect(source).not.toContain('{storyPreview.event.speaker}');
   });
@@ -18,8 +18,9 @@ describe('CareerHub story preview copy', () => {
     );
     expect(source).toContain('<RewardModal data={rewardModal}');
     expect(source).toContain('PROMOTED TO');
-    expect(source).toContain('Training cap');
-    expect(source).toContain('New competitions: {competitions}');
+    expect(source).toContain('Next · {nextObjective}');
+    expect(source).not.toContain('Training cap');
+    expect(source).not.toContain('New competitions: {competitions}');
     expect(source).toContain('label="Wins" value={String(save.careerWins ?? 0)}');
     expect(source).toContain('label="Losses" value={String(save.careerLosses ?? 0)}');
     expect(source).toContain('label="Draws" value={String(save.careerDraws ?? 0)}');
@@ -28,7 +29,7 @@ describe('CareerHub story preview copy', () => {
   it('surfaces milestone performances through the persistent newspaper scrapbook', () => {
     expect(source).toContain('mediaScrapbook');
     expect(source).toContain('pendingNewspaperId');
-    expect(source).toContain('{latestPress.headline}');
+    expect(source).toContain('styles.scrapbookHeadline}>{story.headline}');
     expect(source).toContain('<NewspaperModal');
     expect(source).toContain('Media Scrapbook');
   });
@@ -38,5 +39,20 @@ describe('CareerHub story preview copy', () => {
     expect(source).not.toContain('🔔 Inbox');
     expect(source).toContain('View Full Profile');
     expect(source).toContain('Records & Hall of Fame');
+  });
+
+  it('keeps the spotlight, wallet and first content card visually separated', () => {
+    expect(source).toContain('<View style={styles.walletSection}>');
+    expect(source).toContain('<View style={styles.pageContent}>{renderPageContent()}</View>');
+    expect(source).toContain('walletSection: { marginTop: spacing.md }');
+    expect(source).toContain('pageContent: { marginTop: spacing.md }');
+  });
+
+  it('shows separate pathway, domestic and international competition records', () => {
+    expect(source).toContain('Career by Competition');
+    expect(source).toContain('CAREER_STAT_GROUPS.map');
+    expect(source).toContain('CAREER_COMPETITION_STAT_LABELS[scope]');
+    expect(source).toContain('user.competitionStats?.[scope]');
+    expect(source).not.toContain('Competition totals are exact from the records update onward');
   });
 });

@@ -31,6 +31,17 @@ export function checksum(input: string): string {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
+/** Canonical JSON representation so object-key ordering cannot invalidate a remote checksum. */
+export function canonicalJSON(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(',')}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJSON(record[key])}`)
+    .join(',')}}`;
+}
+
 function parseSlot(key: string): { slot: number; mode: string } {
   const match = /(?:^|:)(career|manager):(\d+)$/.exec(key);
   if (match) return { mode: match[1], slot: Number(match[2]) };
@@ -72,8 +83,8 @@ export async function pushSave(key: string, json: string): Promise<{ ok: boolean
   const remote = await remoteIdentity();
   if (remote) {
     try {
-      const meta = buildMeta(key, json);
       const saveJson = JSON.parse(json) as Record<string, unknown>;
+      const meta = buildMeta(key, canonicalJSON(saveJson));
       const { error } = await remote.client.from('cloud_saves').upsert(
         {
           user_id: remote.userId,
@@ -114,10 +125,18 @@ export async function pullSave(key: string): Promise<{ ok: boolean; json?: strin
   const remote = await remoteIdentity();
   if (remote) {
     try {
-      const { data, error } = await remote.client.from('cloud_saves').select('save_json').eq('save_key', key).single();
+      const { data, error } = await remote.client
+        .from('cloud_saves')
+        .select('save_json, checksum')
+        .eq('save_key', key)
+        .single();
       if (error || !data) return { ok: false };
-      const row = data as { save_json?: unknown };
-      return row.save_json ? { ok: true, json: JSON.stringify(row.save_json) } : { ok: false };
+      const row = data as { save_json?: unknown; checksum?: unknown };
+      if (!row.save_json || typeof row.checksum !== 'string') return { ok: false };
+      const normalizedJson = JSON.stringify(row.save_json);
+      return checksum(canonicalJSON(row.save_json)) === row.checksum
+        ? { ok: true, json: normalizedJson }
+        : { ok: false };
     } catch {
       return { ok: false };
     }
@@ -126,7 +145,12 @@ export async function pullSave(key: string): Promise<{ ok: boolean; json?: strin
   try {
     const json = await AsyncStorage.getItem(DATA_PREFIX + key);
     if (json == null) return { ok: false };
-    return { ok: true, json };
+    const metaRaw = await AsyncStorage.getItem(META_PREFIX + key);
+    if (!metaRaw) return { ok: false };
+    const meta = JSON.parse(metaRaw) as Partial<CloudSlot>;
+    return typeof meta.checksum === 'string' && checksum(json) === meta.checksum
+      ? { ok: true, json }
+      : { ok: false };
   } catch {
     return { ok: false };
   }

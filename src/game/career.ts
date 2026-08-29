@@ -24,6 +24,8 @@ import { matchImpactScore } from './progression';
 import { passSelectionMultiplier } from './seasonPass';
 import { autoXI, XI_SIZE } from './squad';
 import { careerPlayingTeamId } from './youthFixtures';
+import { isU19WorldCupFixture, u19WorldCupBlocksPromotion } from './u19WorldCup';
+import { isPlayerFranchiseFixture } from './playerAffiliations';
 
 export type CareerTier = 'ACADEMY' | 'DOMESTIC' | 'FRANCHISE' | 'INTERNATIONAL' | 'LEGEND';
 
@@ -35,10 +37,58 @@ export const TIER_LABEL: Record<CareerTier, string> = {
   LEGEND: 'Living Legend',
 };
 
-/** Attribute/cap thresholds that gate a national call-up. */
-export const CALLUP_OVERALL = 70;
+/** Standard senior-call-up thresholds. Earlier selection needs exceptional merit. */
+// A sustained domestic case can earn a senior call-up before the player's
+// long-term training ceiling is reached. Reputation remains output-driven.
+export const CALLUP_OVERALL = 58;
 export const CALLUP_REP = 80;
+export const EXCEPTIONAL_CALLUP_OVERALL = 65;
+export const EXCEPTIONAL_CALLUP_REP = 95;
+export const STANDARD_CALLUP_MIN_AGE = 22;
+export const EXCEPTIONAL_CALLUP_MIN_AGE = 20;
+export const LATE_BLOOMER_CALLUP_MIN_AGE = 27;
 const LEGEND_CAPS = 40;
+
+export interface NationalCallupRequirements {
+  minAge: number;
+  minOverall: number;
+  minReputation: number;
+  route: 'EXCEPTIONAL' | 'STRONG' | 'LATE_BLOOMER';
+}
+
+/** Age changes the available merit route; it never awards a cap by itself. */
+export function nationalCallupRequirements(
+  save: SaveGame,
+  user: Player,
+): NationalCallupRequirements {
+  if (save.experience?.playerArchetype === 'LATE_BLOOMER') {
+    return {
+      minAge: LATE_BLOOMER_CALLUP_MIN_AGE,
+      minOverall: 70,
+      minReputation: CALLUP_REP,
+      route: 'LATE_BLOOMER',
+    };
+  }
+  if (
+    user.age >= EXCEPTIONAL_CALLUP_MIN_AGE &&
+    user.age < STANDARD_CALLUP_MIN_AGE &&
+    user.overall >= EXCEPTIONAL_CALLUP_OVERALL &&
+    (save.nationalRep ?? 0) >= EXCEPTIONAL_CALLUP_REP
+  ) {
+    return {
+      minAge: EXCEPTIONAL_CALLUP_MIN_AGE,
+      minOverall: EXCEPTIONAL_CALLUP_OVERALL,
+      minReputation: EXCEPTIONAL_CALLUP_REP,
+      route: 'EXCEPTIONAL',
+    };
+  }
+  return {
+    minAge: STANDARD_CALLUP_MIN_AGE,
+    minOverall: CALLUP_OVERALL,
+    minReputation: CALLUP_REP,
+    route: 'STRONG',
+  };
+}
 
 export interface NationalState {
   caps: number;
@@ -114,7 +164,13 @@ export function accrueNationalRep(
     passSelectionMultiplier(save, rawDelta);
   const rep = clamp(before + delta, 0, 100);
   save.nationalRep = Math.round(rep);
-  if (!save.capped && user.overall >= CALLUP_OVERALL && rep >= CALLUP_REP) {
+  const callup = nationalCallupRequirements(save, user);
+  if (
+    !save.capped &&
+    user.age >= callup.minAge &&
+    user.overall >= callup.minOverall &&
+    rep >= callup.minReputation
+  ) {
     save.capped = true;
     return { calledUp: true, rep: save.nationalRep };
   }
@@ -133,7 +189,9 @@ export function nationsWithPool(save: SaveGame, minPlayers = XI_SIZE): string[] 
 
 /** Best XI available to a nation (optionally guaranteeing a player is included). */
 export function buildNationalXI(save: SaveGame, country: string, mustIncludeId?: string): Player[] {
-  const pool = Object.values(save.players).filter((p) => p.nationality === country && !p.retired);
+  const pool = Object.values(save.players).filter(
+    (p) => p.nationality === country && !p.retired && p.age < 40,
+  );
   const ranked = [...pool].sort((a, b) => b.overall - a.overall);
   const picked: Player[] = [];
   const forced = mustIncludeId ? save.players[mustIncludeId] : undefined;
@@ -384,11 +442,16 @@ export function careerSelectionDecision(
         !player.injury,
       ),
     );
-  const rivalScore = rivals.reduce((best, player) => {
-    const trust = clamp(45 + player.meta.confidence * 0.1, 45, 55);
-    const fit = (rivalFormatScore(player, format) - 50) * 0.08;
-    return Math.max(best, player.overall * 0.4 + player.meta.form * 0.35 + trust * 0.25 + fit);
-  }, 0);
+  const strongestRival = rivals.reduce<{ player: Player; score: number } | undefined>(
+    (best, player) => {
+      const trust = clamp(45 + player.meta.confidence * 0.1, 45, 55);
+      const fit = (rivalFormatScore(player, format) - 50) * 0.08;
+      const score = player.overall * 0.4 + player.meta.form * 0.35 + trust * 0.25 + fit;
+      return !best || score > best.score ? { player, score } : best;
+    },
+    undefined,
+  );
+  const rivalScore = strongestRival?.score ?? 0;
 
   if (user.injury) {
     return { selected: false, userScore, rivalScore, reason: `Unavailable: ${user.injury.type}.` };
@@ -398,6 +461,14 @@ export function careerSelectionDecision(
   }
   if (resources.playerCondition < 18) {
     return { selected: false, userScore, rivalScore, reason: 'Rested: condition is too low.' };
+  }
+  if (isU19WorldCupFixture(fixtureId ? save.fixtures[fixtureId] : undefined)) {
+    return {
+      selected: true,
+      userScore,
+      rivalScore,
+      reason: 'Selected in the U19 World Cup XI on tournament merit.',
+    };
   }
   if ((resources.selectionGuaranteeMatches ?? 0) > 0) {
     return {
@@ -417,12 +488,12 @@ export function careerSelectionDecision(
       reason: 'Selected in the development XI.',
     };
   }
-  if (level === 'U19' && user.meta.form < 40) {
+  if (level === 'U19' && user.meta.form < 35) {
     return {
       selected: false,
       userScore,
       rivalScore,
-      reason: 'Benched: U19 form is below the selector target of 40.',
+      reason: 'Benched: U19 form is below the selector target of 35.',
     };
   }
 
@@ -443,7 +514,7 @@ export function careerSelectionDecision(
     rivalScore,
     reason: selected
       ? `Selected on role merit for ${format}.`
-      : `Benched: a same-role rival leads the ${format} selection score.`,
+      : `Benched: ${strongestRival?.player.name ?? 'a same-role rival'} leads the ${format} role score ${Math.round(rivalScore)}–${Math.round(userScore)}.`,
   };
 }
 
@@ -464,7 +535,14 @@ export function selectCareerXI(
   const team = save.teams[activeTeamId];
   const resources = ensurePlayerCareerResources(save);
   const decision = careerSelectionDecision(save, format, fixtureId);
-  const squad = team.playerIds
+  const fixture = fixtureId ? save.fixtures[fixtureId] : undefined;
+  const rosterIds =
+    decision.selected &&
+    isPlayerFranchiseFixture(fixture) &&
+    !team.playerIds.includes(save.userPlayerId)
+      ? [...team.playerIds, save.userPlayerId]
+      : team.playerIds;
+  const squad = rosterIds
     .map((id) => save.players[id])
     .filter((player): player is Player =>
       Boolean(player && (decision.selected || player.id !== save.userPlayerId)),
@@ -562,6 +640,14 @@ export function applyCareerMatchReadiness(
     const recovery = user.age <= 22 ? 28 : user.age <= 29 ? 24 : user.age <= 32 ? 20 : 16;
     resources.playerCondition = clamp(resources.playerCondition + recovery, 0, 100);
     resources.consecutiveMatches = 0;
+    // A player outside the XI still trains with the squad. Without a bounded
+    // form recovery, one drop becomes permanent because form previously moved
+    // only when the player appeared. Youth players recover a little faster so
+    // one poor spell cannot erase an entire short development campaign.
+    const formRecovery =
+      save.careerPathLevel === 'SCHOOL' || save.careerPathLevel === 'U19' ? 6 : 3;
+    user.meta.form = clamp(user.meta.form + formRecovery, 1, 99);
+    resources.form = user.meta.form;
     if (resources.requestedRestFixtureId !== input.fixtureId) {
       resources.coachTrust = clamp(resources.coachTrust - 1, 0, 100);
     }
@@ -817,15 +903,12 @@ export function weeklyWage(annualWage: number): number {
  * alone can never promote you — you must actually perform. This means an average
  * player can be stuck at a level for years, while a genuine prodigy fast-tracks.
  *
- *   SCHOOL  → U19      : readiness ≥ 0.75 over ≥ 5 matches, OR overall ≥ 62
- *   U19     → DOMESTIC : readiness ≥ 0.75 over ≥ 6 matches, OR overall ≥ 65
+ *   SCHOOL  → U19      : archetype readiness over its match gate, OR OVR fast-track
+ *   U19     → DOMESTIC : archetype readiness over its match gate, OR OVR fast-track
  *   DOMESTIC→ INTERNATIONAL : national call-up (accrueNationalRep — perf-driven)
  *
  * All transitions are idempotent and mutate the save.
  */
-
-/** Readiness threshold — deliberately above the 0.25 rating ceiling so output is required. */
-const PATH_READY = 0.75;
 
 interface PathBench {
   minMatches: number;
@@ -844,8 +927,12 @@ export function resolveCareerStageForAge(
   capped = false,
 ): CareerPathLevel {
   if (capped && age >= 20) return 'INTERNATIONAL';
-  const ageFloor: CareerPathLevel = age <= 15 ? 'SCHOOL' : age <= 19 ? 'U19' : 'DOMESTIC';
+  const ageFloor: CareerPathLevel = age <= 16 ? 'SCHOOL' : age <= 19 ? 'U19' : 'DOMESTIC';
   if (!current) return ageFloor;
+  // Grade A is an open-age club pathway. A player who misses U19 selection
+  // stays there until their performances earn either U19 (through age 18) or
+  // a direct senior domestic contract (age 19+).
+  if (current === 'SCHOOL') return current;
   const rank: Record<CareerPathLevel, number> = {
     SCHOOL: 0,
     U19: 1,
@@ -862,6 +949,9 @@ export function validateAgeEligibility(save: SaveGame): CareerPathLevel | undefi
   const user = save.players[save.userPlayerId];
   if (!user) return undefined;
   const next = resolveCareerStageForAge(user.age, save.careerPathLevel, Boolean(save.capped));
+  if (save.careerPathLevel === 'U19' && next === 'DOMESTIC' && u19WorldCupBlocksPromotion(save)) {
+    return 'U19';
+  }
   if (save.careerPathLevel !== next) promoteTo(save, next);
   return next;
 }
@@ -963,12 +1053,8 @@ export function checkPathPromotion(save: SaveGame, _avgRating?: number): Promoti
   const matches = save.careerPathMatches ?? 0;
   const policy = archetypePathPolicy(save);
 
-  if (level === 'SCHOOL' && user.age >= 16) {
-    promoteTo(save, 'U19');
-    return { promoted: true, from: 'SCHOOL', to: 'U19' };
-  }
-
   if (level === 'U19' && user.age >= 20) {
+    if (u19WorldCupBlocksPromotion(save)) return { promoted: false };
     promoteTo(save, 'DOMESTIC');
     return { promoted: true, from: 'U19', to: 'DOMESTIC' };
   }
@@ -980,8 +1066,9 @@ export function checkPathPromotion(save: SaveGame, _avgRating?: number): Promoti
       pathReadiness(save, user) >= policy.readiness;
     const prodigy = user.overall >= bench.fastTrackOverall + policy.fastTrackAdjustment;
     if (earned || prodigy) {
-      promoteTo(save, 'U19');
-      return { promoted: true, from: 'SCHOOL', to: 'U19' };
+      const destination: CareerPathLevel = user.age <= 18 ? 'U19' : 'DOMESTIC';
+      promoteTo(save, destination);
+      return { promoted: true, from: 'SCHOOL', to: destination };
     }
   }
 
@@ -991,6 +1078,7 @@ export function checkPathPromotion(save: SaveGame, _avgRating?: number): Promoti
       matches >= Math.max(2, bench.minMatches + policy.matchAdjustment) &&
       pathReadiness(save, user) >= policy.readiness;
     const prodigy = user.overall >= bench.fastTrackOverall + policy.fastTrackAdjustment;
+    if (u19WorldCupBlocksPromotion(save)) return { promoted: false };
     if (earned || prodigy) {
       promoteTo(save, 'DOMESTIC');
       return { promoted: true, from: 'U19', to: 'DOMESTIC' };
@@ -1007,7 +1095,7 @@ export function checkPathPromotion(save: SaveGame, _avgRating?: number): Promoti
 
 /** Human-readable label for each career path level. */
 export const CAREER_PATH_LABEL: Record<CareerPathLevel, string> = {
-  SCHOOL: 'School Cricket',
+  SCHOOL: 'Grade A Cricket',
   U19: 'Under-19',
   DOMESTIC: 'Domestic Professional',
   INTERNATIONAL: 'International',
@@ -1034,39 +1122,85 @@ export function careerPathProgress(save: SaveGame, user: Player): number {
   // or the prodigy fast-track, whichever is further along.
   const bench = PATH_BENCH[level];
   if (!bench) return 1;
-  const readiness = pathReadiness(save, user) / PATH_READY; // 1.0 = ready
+  const readiness = pathReadiness(save, user) / archetypePathPolicy(save).readiness;
   const prodigy = clamp((user.overall - 40) / (bench.fastTrackOverall - 40), 0, 1);
   return clamp(Math.max(readiness, prodigy), 0, 1);
 }
 
 /* ===================================================================
  * AGE-TRIGGERED RETIREMENT
- * ===================================================================
- * At each season rollover, if the player is 34+ and was previously
- * capped but hasn't played an international in 2 consecutive seasons,
- * the game triggers a "twilight" flag. One more missed season → the
- * retirement inbox message fires automatically.
+ * =================================================================== */
+
+export const PLAYER_RETIREMENT_OPTIONAL_AGE = 33;
+export const PLAYER_RETIREMENT_REVIEW_AGE = 35;
+export const PLAYER_RETIREMENT_EXPECTED_AGE = 38;
+export const PLAYER_RETIREMENT_MAX_AGE = 40;
+
+export interface PlayerRetirementAssessment {
+  age: number;
+  declineSignals: number;
+  recommended: boolean;
+  mandatory: boolean;
+  reasons: string[];
+}
+
+/**
+ * Retirement is player-controlled from 33. From 35 the game recommends it
+ * progressively sooner when form, fitness and selection have all declined;
+ * every career receives the normal prompt by 38 and closes at 40 at the latest.
  */
+export function playerRetirementAssessment(
+  save: SaveGame,
+  ageOverride?: number,
+): PlayerRetirementAssessment {
+  const user = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
+  const age = ageOverride ?? user?.age ?? 0;
+  if (!user || save.mode !== 'career' || user.retired) {
+    return { age, declineSignals: 0, recommended: false, mandatory: false, reasons: [] };
+  }
+
+  const resources = ensurePlayerCareerResources(save);
+  const reasons: string[] = [];
+  if (user.meta.form < 40) reasons.push('recent form');
+  if ((resources?.playerCondition ?? user.condition ?? user.meta.fitness) < 25 || user.injury) {
+    reasons.push('fitness and availability');
+  }
+  if (!save.capped || (save.intlDroppedSeasons ?? 0) >= 2) {
+    reasons.push('current selection outlook');
+  }
+
+  const declineSignals = reasons.length;
+  const recommended =
+    age >= PLAYER_RETIREMENT_EXPECTED_AGE ||
+    (age >= PLAYER_RETIREMENT_REVIEW_AGE && declineSignals >= 3) ||
+    (age >= PLAYER_RETIREMENT_REVIEW_AGE + 1 && declineSignals >= 2) ||
+    (age >= PLAYER_RETIREMENT_REVIEW_AGE + 2 && declineSignals >= 1);
+  return {
+    age,
+    declineSignals,
+    recommended,
+    mandatory: age >= PLAYER_RETIREMENT_MAX_AGE,
+    reasons,
+  };
+}
 
 /**
  * Track whether the player qualified for international cricket this season.
  * Call at season end BEFORE resetting caps. Returns true if auto-retirement
- * should now be suggested (34+, missed intl for 2 seasons).
+ * should now be recommended under the 35-38 retirement curve.
  */
 export function checkAgeRetirement(save: SaveGame, capsThisSeason: number): boolean {
   if (save.mode !== 'career' || !save.userPlayerId) return false;
   const user = save.players[save.userPlayerId];
-  if (!user || user.retired || (user.age ?? 0) < 34) return false;
-  // Only applies to previously capped players
-  if (!save.capped) return false;
+  if (!user || user.retired) return false;
 
-  if (capsThisSeason === 0) {
+  if (save.capped && capsThisSeason === 0) {
     save.intlDroppedSeasons = (save.intlDroppedSeasons ?? 0) + 1;
-  } else {
+  } else if (save.capped) {
     save.intlDroppedSeasons = 0;
   }
 
-  return (save.intlDroppedSeasons ?? 0) >= 2;
+  return playerRetirementAssessment(save, user.age + 1).recommended;
 }
 
 /** Close the international season and advance the lifetime-cap baseline. */
@@ -1115,59 +1249,9 @@ export function managerRepFromCareer(stats: CareerStats): number {
 }
 
 /* ===================================================================
- * PERSONAL FINANCE — stocks + cricket academy
+ * PERSONAL FINANCE — cricket academy (company portfolios live in stockMarket.ts)
  * ===================================================================
  */
-
-export const STOCK_MIN_INVEST = 500; // coins
-export const STOCK_MAX_INVEST = 50_000; // coins
-
-/** Invest coins in the stock market. Mutates wallet and creates/updates the position. */
-export function investInStocks(save: SaveGame, coins: number): { ok: boolean; reason?: string } {
-  const toInvest = Math.round(coins);
-  if (toInvest < STOCK_MIN_INVEST)
-    return { ok: false, reason: `Minimum investment is ${STOCK_MIN_INVEST} coins.` };
-  if (save.wallet.coins < toInvest)
-    return { ok: false, reason: 'Not enough coins in your wallet.' };
-  save.wallet = { ...save.wallet, coins: save.wallet.coins - toInvest };
-  if (!save.stockInvestment) {
-    save.stockInvestment = { invested: toInvest, currentValue: toInvest, totalWithdrawn: 0 };
-  } else {
-    save.stockInvestment.invested += toInvest;
-    save.stockInvestment.currentValue += toInvest;
-  }
-  return { ok: true };
-}
-
-/** Withdraw all stock value back into the wallet. */
-export function withdrawStocks(save: SaveGame): number {
-  const inv = save.stockInvestment;
-  if (!inv || inv.currentValue <= 0) return 0;
-  const value = Math.round(inv.currentValue);
-  save.wallet = { ...save.wallet, coins: save.wallet.coins + value };
-  inv.totalWithdrawn += value;
-  inv.currentValue = 0;
-  inv.invested = 0;
-  return value;
-}
-
-/**
- * Fluctuate stock value at season end: ±10% based on win rate this season
- * and a random component. A dominant season = markets reward it.
- */
-export function tickStockMarket(save: SaveGame, winRate: number): void {
-  const inv = save.stockInvestment;
-  if (!inv || inv.currentValue <= 0) return;
-  // Win rate 50% = ±0%; higher = positive drift; market noise ±5%
-  const drift = (winRate - 0.5) * 0.14;
-  const noise = Math.random() * 0.1 - 0.05;
-  const multiplier = 1 + drift + noise;
-  inv.currentValue = Math.max(0, Math.round(inv.currentValue * multiplier));
-  // Record the value for the sparkline chart (keep last 8 values).
-  if (!inv.history) inv.history = [];
-  inv.history.push(inv.currentValue);
-  if (inv.history.length > 8) inv.history = inv.history.slice(-8);
-}
 
 // Academy setup costs per tier.
 export const ACADEMY_COSTS: Record<1 | 2 | 3, number> = {

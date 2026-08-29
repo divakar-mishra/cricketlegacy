@@ -17,7 +17,7 @@ import {
   TEST_INNINGS_CAP,
   testRemaining,
 } from './simulateMatch';
-import { difficultyOutcomeBalance } from './difficulty';
+import { DifficultyBalanceProfile, difficultyOutcomeBalance } from './difficulty';
 import { resolveToss, TossCall, TossChoice, TossDecision } from './toss';
 
 export interface LiveMatchInput {
@@ -28,6 +28,8 @@ export interface LiveMatchInput {
   home: TeamSide;
   away: TeamSide;
   difficulty?: Difficulty;
+  /** Player Career can be forgiving; Manager Career stays team-rating led. */
+  difficultyBalanceProfile?: DifficultyBalanceProfile;
   userTeamId?: string;
   /**
    * Team allowed to make captain-level toss decisions. `null` explicitly
@@ -67,6 +69,7 @@ export class LiveMatch {
   private readonly input: LiveMatchInput;
   private rng: Rng;
   private readonly difficulty: Difficulty;
+  private readonly managerRatingAdvantage: number;
   private first: TeamSide;
   private second: TeamSide;
   private readonly completed: Innings[] = [];
@@ -88,6 +91,20 @@ export class LiveMatch {
     this.awayTeamId = input.away.teamId;
     this.controlledTeamId = input.userTeamId;
     this.difficulty = input.difficulty ?? 'NORMAL';
+    const averageOverall = (side: TeamSide): number =>
+      side.players.length > 0
+        ? side.players.reduce((sum, player) => sum + player.overall, 0) / side.players.length
+        : 0;
+    const controlledSide = input.userTeamId
+      ? [input.home, input.away].find((side) => side.teamId === input.userTeamId)
+      : undefined;
+    const oppositionSide = controlledSide
+      ? (controlledSide.teamId === input.home.teamId ? input.away : input.home)
+      : undefined;
+    this.managerRatingAdvantage =
+      input.difficultyBalanceProfile === 'MANAGER' && controlledSide && oppositionSide
+        ? averageOverall(controlledSide) - averageOverall(oppositionSide)
+        : 0;
     this.rng = makeRng(input.seed);
     this.isTest = input.format === 'TEST';
 
@@ -153,6 +170,32 @@ export class LiveMatch {
     return true;
   }
 
+  /**
+   * Replace the controlled side from a fresh, match-only snapshot before play
+   * starts. Rebuilding from the original seed preserves the resolved toss and
+   * avoids multiplying ratings already present in this LiveMatch.
+   */
+  replaceControlledTeamBeforeStart(side: TeamSide): boolean {
+    if (
+      !this.input.userTeamId ||
+      side.teamId !== this.input.userTeamId ||
+      side.players.length < 2 ||
+      this.done ||
+      this.index !== 0 ||
+      this.completed.length > 0 ||
+      this.current.scoreState.legalBalls > 0
+    ) {
+      return false;
+    }
+
+    if (this.input.home.teamId === side.teamId) this.input.home = side;
+    else if (this.input.away.teamId === side.teamId) this.input.away = side;
+    else return false;
+
+    this.rebuildOpeningInnings();
+    return true;
+  }
+
   private rebuildOpeningInnings(): void {
     this.rng = makeRng(this.seed);
     this.tossState = resolveToss({
@@ -191,6 +234,15 @@ export class LiveMatch {
     target?: number,
     oversCap?: number,
   ): LiveInnings {
+    const focusPlayerId = this.input.interactiveBatterId;
+    const balanceScope =
+      this.input.difficultyBalanceProfile === 'MANAGER'
+        ? 'TEAM'
+        : focusPlayerId && bat.players.some((player) => player.id === focusPlayerId)
+          ? 'STRIKER'
+          : focusPlayerId && field.players.some((player) => player.id === focusPlayerId)
+            ? 'BOWLER'
+            : undefined;
     return new LiveInnings(
       {
         battingTeamId: bat.teamId,
@@ -205,15 +257,31 @@ export class LiveMatch {
         interactiveBatterId: this.interactiveFor(bat),
         interactiveBowlerId: this.interactiveFor(field),
         battingBias:
-          bat.teamId === this.input.userTeamId ? this.input.tactics?.battingBias : undefined,
+          bat.teamId === this.input.userTeamId
+            ? this.input.tactics?.battingBias
+            : bat.tactics?.battingBias,
         defaultBowlerPlan:
-          field.teamId === this.input.userTeamId ? this.input.tactics?.bowlingPlan : undefined,
+          field.teamId === this.input.userTeamId
+            ? this.input.tactics?.bowlingPlan
+            : field.tactics?.bowlerPlan,
         fieldSetting:
-          field.teamId === this.input.userTeamId ? this.input.tactics?.field : undefined,
+          field.teamId === this.input.userTeamId
+            ? this.input.tactics?.field
+            : field.tactics?.field,
         matchOversOffset: this.isTest ? this.oversUsed : undefined,
-        outcomeBalance: this.input.userTeamId
-          ? difficultyOutcomeBalance(this.difficulty, bat.teamId === this.input.userTeamId)
+        outcomeBalance: this.input.userTeamId && balanceScope
+          ? difficultyOutcomeBalance(
+              this.difficulty,
+              bat.teamId === this.input.userTeamId,
+              this.input.difficultyBalanceProfile,
+              this.managerRatingAdvantage,
+              this.format,
+            )
           : undefined,
+        outcomeBalanceScope: balanceScope,
+        outcomeBalancePlayerId: balanceScope === 'TEAM' ? undefined : focusPlayerId,
+        battingLeadershipBonus: bat.leadershipBonus,
+        fieldingLeadershipBonus: field.leadershipBonus,
       },
       this.rng,
     );
@@ -386,6 +454,8 @@ export class LiveMatch {
       conditions: this.conditions,
       homeTeamId: this.homeTeamId,
       awayTeamId: this.awayTeamId,
+      homePlayerIds: this.input.home.players.map((player) => player.id),
+      awayPlayerIds: this.input.away.players.map((player) => player.id),
       innings: this.completed,
       result,
     };

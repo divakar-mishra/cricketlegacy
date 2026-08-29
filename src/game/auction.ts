@@ -1,15 +1,14 @@
 /**
  * Franchise auction (Player Career): at the start of a season, rival clubs in
- * your division bid for your signature. Bids scale with your rating, form, brand
- * and caps; accepting one moves you to that club (within your division, so the
- * league/fixtures stay coherent) for a signing bonus and a brand bump. Pure /
- * mutating helpers, unit-tested.
+ * your division bid for your T20 affiliation. The domestic First-Class/List A
+ * contract is independent and is handled by the domestic-offer helpers below.
  */
 import { AuctionOffer, Player, SaveGame } from '../domain/types';
 import { Rng } from '../engine/rng';
 import { addCoins } from './economy';
 import { boardTargetFor, computeValue, MAX_SQUAD, WAGE_RATE } from './finance';
-import { rebuildDomesticSeasonForUserTeam } from './season';
+import { buildPlayerSeasonCalendar } from './playerCalendar';
+import { matchImpactScore } from './progression';
 import { autoXI } from './squad';
 
 const MIN_AUCTION_DOMESTIC_SEASONS = 2;
@@ -35,9 +34,15 @@ export function auctionEligible(save: SaveGame, user: Player): boolean {
 }
 
 /** Team ids in the user's current division (league-1). */
-function userDivisionTeamIds(save: SaveGame): string[] {
+function divisionTeamIdsFor(save: SaveGame, teamId?: string): string[] {
   if (save.divisions) {
-    const tier = save.userDivision ?? 1;
+    const tier = save.divisions.tier1.includes(teamId ?? '')
+      ? 1
+      : save.divisions.tier2.includes(teamId ?? '')
+        ? 2
+        : save.divisions.tier3?.includes(teamId ?? '')
+          ? 3
+          : save.userDivision ?? 1;
     if (tier === 1) return save.divisions.tier1;
     if (tier === 2) return save.divisions.tier2;
     return save.divisions.tier3 ?? [];
@@ -57,12 +62,13 @@ export function generateAuctionOffers(save: SaveGame, rng: Rng): AuctionOffer[] 
   if (!auctionEligible(save, user)) return [];
 
   const value = starValue(save, user);
-  const pool = userDivisionTeamIds(save)
-    .filter((id) => id !== save.userTeamId)
+  const currentFranchiseId = save.franchiseTeamId ?? save.userTeamId;
+  const pool = divisionTeamIdsFor(save, currentFranchiseId)
+    .filter((id) => id !== currentFranchiseId)
     .map((id) => save.teams[id])
     .filter(Boolean);
 
-  const currentWage = user.contract?.wage ?? Math.round(computeValue(user) * WAGE_RATE);
+  const currentWage = save.franchiseContract?.wage ?? 0;
 
   const offers: AuctionOffer[] = [];
   for (const team of pool) {
@@ -91,6 +97,69 @@ export function generateAuctionOffers(save: SaveGame, rng: Rng): AuctionOffer[] 
   return offers.sort((a, b) => b.fee - a.fee).slice(0, 2);
 }
 
+/** Domestic-only value: international caps never gate a First-Class career. */
+export function domesticClubValue(_save: SaveGame, user: Player): number {
+  const listA = user.competitionStats?.LIST_A;
+  const firstClass = user.competitionStats?.FIRST_CLASS;
+  const appearances = (listA?.matches ?? 0) + (firstClass?.matches ?? 0);
+  const domesticPerformance =
+    appearances > 0
+      ? matchImpactScore(
+          {
+            runs: ((listA?.runs ?? 0) + (firstClass?.runs ?? 0)) / appearances,
+            wickets: ((listA?.wickets ?? 0) + (firstClass?.wickets ?? 0)) / appearances,
+          },
+          user.role,
+        ) * 100
+      : user.meta.form ?? 60;
+  return Math.round(
+    user.overall * 1.6 +
+      domesticPerformance * 0.4 +
+      Math.min(appearances, 50) * 0.8,
+  );
+}
+
+/**
+ * Two or three First-Class/List A approaches after a completed senior season.
+ * Interest and terms use domestic appearances, form and ability—not caps—so an
+ * uncapped player can still build a valuable long domestic career.
+ */
+export function generateDomesticClubOffers(save: SaveGame, rng: Rng): AuctionOffer[] {
+  if (save.mode !== 'career' || !save.userPlayerId) return [];
+  const level = save.careerPathLevel ?? 'DOMESTIC';
+  if (level === 'SCHOOL' || level === 'U19') return [];
+  const user = save.players[save.userPlayerId];
+  if (!user || user.retired) return [];
+
+  const value = domesticClubValue(save, user);
+  const currentWage = user.contract?.wage ?? Math.round(computeValue(user) * WAGE_RATE);
+  const appearances =
+    (user.competitionStats?.LIST_A?.matches ?? 0) +
+    (user.competitionStats?.FIRST_CLASS?.matches ?? 0);
+  if (appearances === 0) return [];
+  const offerCount = appearances >= MIN_AUCTION_MATCHES ? 3 : 2;
+
+  return divisionTeamIdsFor(save, save.userTeamId)
+    .filter((id) => id !== save.userTeamId)
+    .map((id) => save.teams[id])
+    .filter(Boolean)
+    .map((team) => ({
+      teamId: team.id,
+      fee: Math.round(
+        computeValue(user) * (0.8 + team.reputation / 120) * (0.9 + rng() * 0.3),
+      ),
+      signingBonus: Math.round(300 + value * 6 + team.reputation * 8),
+      wagePromise: Math.round(
+        Math.max(
+          currentWage * (1.2 + team.reputation / 300),
+          computeValue(user) * WAGE_RATE * (1.3 + team.reputation / 200),
+        ),
+      ),
+    }))
+    .sort((left, right) => right.fee - left.fee)
+    .slice(0, offerCount);
+}
+
 export interface AcceptResult {
   ok: boolean;
   reason?: string;
@@ -98,7 +167,7 @@ export interface AcceptResult {
   toTeamId?: string;
 }
 
-/** Accept a bid: move the user to the club, pay the bonus, refresh XI + board. */
+/** Accept a T20 bid without changing the First-Class/List A club. */
 export function acceptAuctionOffer(save: SaveGame, teamId: string): AcceptResult {
   if (!save.userPlayerId) return { ok: false, reason: 'No player.' };
   const user = save.players[save.userPlayerId];
@@ -106,6 +175,35 @@ export function acceptAuctionOffer(save: SaveGame, teamId: string): AcceptResult
   const newTeam = save.teams[teamId];
   if (!user || !offer || !newTeam) return { ok: false, reason: 'Offer no longer available.' };
 
+  const fromTeamId = save.franchiseTeamId ?? save.userTeamId;
+  save.franchiseTeamId = teamId;
+
+  save.wallet = addCoins(save.wallet, offer.signingBonus);
+  // The promised salary becomes the user's REAL contract wage — a genuine raise,
+  // on a fresh multi-year deal. Never a downgrade from their current terms.
+  save.franchiseContract = {
+    wage: Math.max(offer.wagePromise, save.franchiseContract?.wage ?? 0),
+    yearsLeft: Math.max(3, save.franchiseContract?.yearsLeft ?? 0),
+    releaseClause: save.franchiseContract?.releaseClause,
+  };
+  save.brand = Math.min(100, (save.brand ?? 20) + 4);
+  const year = save.currentSeasonId ? (save.seasons[save.currentSeasonId]?.year ?? 2026) : 2026;
+  save.auctionOffers = undefined;
+  (save.timeline ??= []).push({
+    year,
+    kind: 'TRANSFER',
+    text: `Signed a separate T20 deal with ${newTeam.name}.`,
+  });
+  buildPlayerSeasonCalendar(save);
+
+  return { ok: true, fromTeamId, toTeamId: teamId };
+}
+
+export function declineAuction(save: SaveGame): void {
+  save.auctionOffers = undefined;
+}
+
+function moveDomesticRoster(save: SaveGame, user: Player, teamId: string): string | undefined {
   const fromTeamId = save.userTeamId;
   if (fromTeamId && save.teams[fromTeamId]) {
     const old = save.teams[fromTeamId];
@@ -113,48 +211,62 @@ export function acceptAuctionOffer(save: SaveGame, teamId: string): AcceptResult
     old.isUserTeam = false;
     if (old.xi) old.xi = old.xi.filter((id) => id !== user.id);
   }
-
-  if (!newTeam.playerIds.includes(user.id)) {
-    if (newTeam.playerIds.length >= MAX_SQUAD) {
-      const sameRole = newTeam.playerIds
+  const next = save.teams[teamId];
+  if (!next.playerIds.includes(user.id)) {
+    if (next.playerIds.length >= MAX_SQUAD) {
+      const sameRole = next.playerIds
         .map((id) => save.players[id])
-        .filter((p): p is Player => Boolean(p) && p.role === user.role)
-        .sort((a, b) => a.overall - b.overall);
+        .filter((player): player is Player => Boolean(player) && player.role === user.role)
+        .sort((left, right) => left.overall - right.overall);
       const victim =
         sameRole[0] ??
-        newTeam.playerIds
+        next.playerIds
           .map((id) => save.players[id])
-          .filter(Boolean)
-          .sort((a, b) => a.overall - b.overall)[0];
-      if (victim) newTeam.playerIds = newTeam.playerIds.filter((id) => id !== victim.id);
+          .filter((player): player is Player => Boolean(player))
+          .sort((left, right) => left.overall - right.overall)[0];
+      if (victim) next.playerIds = next.playerIds.filter((id) => id !== victim.id);
     }
-    newTeam.playerIds.push(user.id);
+    next.playerIds.push(user.id);
   }
-  newTeam.isUserTeam = true;
+  next.isUserTeam = true;
+  next.xi = autoXI(
+    next.playerIds.map((id) => save.players[id]).filter((player): player is Player => Boolean(player)),
+    user.id,
+  ).map((player) => player.id);
   save.userTeamId = teamId;
+  return fromTeamId;
+}
 
-  const squad = newTeam.playerIds
-    .map((id) => save.players[id])
-    .filter((p): p is Player => Boolean(p));
-  newTeam.xi = autoXI(squad, user.id).map((p) => p.id);
+/** Accept a rival domestic offer without changing the T20 franchise. */
+export function acceptDomesticClubOffer(save: SaveGame, teamId: string): AcceptResult {
+  if (!save.userPlayerId) return { ok: false, reason: 'No player.' };
+  const user = save.players[save.userPlayerId];
+  const offer = (save.domesticClubOffers ?? []).find((item) => item.teamId === teamId);
+  const newTeam = save.teams[teamId];
+  if (!user || !offer || !newTeam) {
+    return { ok: false, reason: 'Domestic offer no longer available.' };
+  }
 
-  save.wallet = addCoins(save.wallet, offer.signingBonus);
-  // The promised salary becomes the user's REAL contract wage — a genuine raise,
-  // on a fresh multi-year deal. Never a downgrade from their current terms.
+  const fromTeamId = moveDomesticRoster(save, user, teamId);
   user.contract = {
     wage: Math.max(offer.wagePromise, user.contract?.wage ?? 0),
     yearsLeft: Math.max(3, user.contract?.yearsLeft ?? 0),
     releaseClause: user.contract?.releaseClause,
   };
+  save.wallet = addCoins(save.wallet, offer.signingBonus);
   save.brand = Math.min(100, (save.brand ?? 20) + 4);
   const year = save.currentSeasonId ? (save.seasons[save.currentSeasonId]?.year ?? 2026) : 2026;
   save.boardObjective = { year, targetPosition: boardTargetFor(newTeam.reputation) };
-  save.auctionOffers = undefined;
-  rebuildDomesticSeasonForUserTeam(save);
-
+  save.domesticClubOffers = undefined;
+  (save.timeline ??= []).push({
+    year,
+    kind: 'TRANSFER',
+    text: `Joined ${newTeam.name} for First-Class and List A cricket.`,
+  });
+  buildPlayerSeasonCalendar(save);
   return { ok: true, fromTeamId, toTeamId: teamId };
 }
 
-export function declineAuction(save: SaveGame): void {
-  save.auctionOffers = undefined;
+export function declineDomesticClubOffers(save: SaveGame): void {
+  save.domesticClubOffers = undefined;
 }

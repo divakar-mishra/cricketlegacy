@@ -6,7 +6,6 @@ import {
   PlayerLifeState,
   PlayerPerformanceAnalysis,
   SaveGame,
-  Sponsor,
 } from '../domain/types';
 import { computeOverall } from '../engine/rating';
 import { clamp } from '../utils/math';
@@ -36,7 +35,6 @@ export interface PersonalCoachOffer {
   cost: number;
 }
 
-export type SponsorApproach = 'SAFE' | 'BALANCED' | 'BOLD';
 export type SocialTone = 'HUMBLE' | 'CONFIDENT' | 'TEAM_FIRST';
 export type CaptainResolution = 'SUPPORT' | 'MEDIATE' | 'DISCIPLINE';
 
@@ -46,17 +44,6 @@ export interface PlayerLifeOutcome {
   detail?: string;
   coins?: number;
   followers?: number;
-}
-
-export interface SponsorNegotiationPreview {
-  approach: SponsorApproach;
-  brand: string;
-  tier: Sponsor['tier'];
-  chance: number;
-  signingBonus: number;
-  perMatchCoins: number;
-  seasons: number;
-  minForm: number;
 }
 
 export const PLAYER_PROPERTIES: readonly PlayerLifeAsset[] = [
@@ -177,15 +164,6 @@ export function playerLifeYear(save: SaveGame): number {
   return save.currentSeasonId ? (save.seasons[save.currentSeasonId]?.year ?? 2026) : 2026;
 }
 
-function stableHash(value: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
 export function ensurePlayerLifeState(save: SaveGame): PlayerLifeState {
   if (!save.playerLife) {
     const user = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
@@ -199,8 +177,6 @@ export function ensurePlayerLifeState(save: SaveGame): PlayerLifeState {
       bankCoins: 0,
       propertyIds: [],
       businessIds: [],
-      legacyTokenUnits: 0,
-      legacyTokenCostBasis: 0,
       personalCoaches: {},
       equipmentIds: [],
       physioVisitsThisSeason: 0,
@@ -215,8 +191,6 @@ export function ensurePlayerLifeState(save: SaveGame): PlayerLifeState {
   state.bankCoins = Math.max(0, Math.round(state.bankCoins ?? 0));
   state.propertyIds ??= [];
   state.businessIds ??= [];
-  state.legacyTokenUnits = Math.max(0, Math.round(state.legacyTokenUnits ?? 0));
-  state.legacyTokenCostBasis = Math.max(0, Math.round(state.legacyTokenCostBasis ?? 0));
   state.personalCoaches ??= {};
   state.equipmentIds ??= [];
   state.physioVisitsThisSeason = Math.max(0, Math.round(state.physioVisitsThisSeason ?? 0));
@@ -292,52 +266,6 @@ export function buyPlayerAsset(
     ok: true,
     coins: asset.cost,
     detail: `${asset.name} purchased. It will pay ${asset.seasonalIncome.toLocaleString()} coins into your bank each season.`,
-  };
-}
-
-export function legacyTokenPrice(save: SaveGame): number {
-  const year = playerLifeYear(save);
-  const seed = stableHash(`${save.id}:${year}:legacy-exchange`);
-  return 280 + ((seed % 11) - 5) * 16;
-}
-
-export function tradeLegacyToken(
-  save: SaveGame,
-  direction: 'BUY' | 'SELL',
-  units: number,
-): PlayerLifeOutcome {
-  if (!financialFeaturesUnlocked(save)) {
-    return { ok: false, reason: 'The Legacy Exchange unlocks at age 18 in senior cricket.' };
-  }
-  const quantity = Math.max(0, Math.floor(units));
-  if (quantity < 1) return { ok: false, reason: 'Choose at least one token.' };
-  const life = ensurePlayerLifeState(save);
-  const price = legacyTokenPrice(save);
-  const total = price * quantity;
-  if (direction === 'BUY') {
-    if (!spendWallet(save, total)) return { ok: false, reason: 'Not enough Wallet Coins.' };
-    life.legacyTokenUnits += quantity;
-    life.legacyTokenCostBasis += total;
-    return {
-      ok: true,
-      coins: total,
-      detail: `Bought ${quantity} fictional Legacy Token${quantity === 1 ? '' : 's'} for ${total.toLocaleString()} coins.`,
-    };
-  }
-  if (life.legacyTokenUnits < quantity) {
-    return { ok: false, reason: 'You do not own that many Legacy Tokens.' };
-  }
-  const previousUnits = life.legacyTokenUnits;
-  life.legacyTokenUnits -= quantity;
-  life.legacyTokenCostBasis =
-    life.legacyTokenUnits === 0
-      ? 0
-      : Math.round(life.legacyTokenCostBasis * (life.legacyTokenUnits / previousUnits));
-  addWallet(save, total);
-  return {
-    ok: true,
-    coins: total,
-    detail: `Sold ${quantity} fictional Legacy Token${quantity === 1 ? '' : 's'} for ${total.toLocaleString()} coins.`,
   };
 }
 
@@ -596,84 +524,6 @@ export function buyPerformanceAnalysis(
     ok: true,
     coins: ANALYST_COST,
     detail: `${analysis.opponentName} report ready. ${analysis.matchAdvice} Actual preparation gains: +3 confidence and +2 coach trust.`,
-  };
-}
-
-function sponsorOffer(save: SaveGame): Sponsor {
-  const year = playerLifeYear(save);
-  const brand = save.brand ?? 20;
-  const tier: Sponsor['tier'] = brand >= 70 ? 'GLOBAL' : brand >= 42 ? 'NATIONAL' : 'LOCAL';
-  const multiplier = tier === 'GLOBAL' ? 3 : tier === 'NATIONAL' ? 2 : 1;
-  return {
-    id: `negotiated-${year}-${tier.toLowerCase()}`,
-    brand:
-      tier === 'GLOBAL' ? 'Apex Global' : tier === 'NATIONAL' ? 'Summit Sports' : 'Boundary Local',
-    tier,
-    perMatchCoins: 90 * multiplier,
-    signingBonus: 800 * multiplier,
-    seasonsLeft: 2,
-    minForm: tier === 'GLOBAL' ? 55 : tier === 'NATIONAL' ? 45 : 35,
-    requiresIntegrity: tier !== 'LOCAL',
-  };
-}
-
-export function sponsorNegotiationChance(save: SaveGame, approach: SponsorApproach): number {
-  if (approach === 'SAFE') return 100;
-  const base = Math.round(((save.brand ?? 20) + (save.integrity ?? 80)) / 2);
-  return clamp(base + (approach === 'BALANCED' ? 10 : -10), 25, 90);
-}
-
-export function sponsorNegotiationPreview(
-  save: SaveGame,
-  approach: SponsorApproach,
-): SponsorNegotiationPreview {
-  const offer = sponsorOffer(save);
-  const approachMultiplier = approach === 'BOLD' ? 1.35 : approach === 'BALANCED' ? 1.15 : 0.85;
-  return {
-    approach,
-    brand: offer.brand,
-    tier: offer.tier,
-    chance: sponsorNegotiationChance(save, approach),
-    signingBonus: Math.round(offer.signingBonus * approachMultiplier),
-    perMatchCoins: Math.round(offer.perMatchCoins * approachMultiplier),
-    seasons: offer.seasonsLeft,
-    minForm: offer.minForm ?? 0,
-  };
-}
-
-export function negotiatePlayerSponsor(
-  save: SaveGame,
-  approach: SponsorApproach,
-): PlayerLifeOutcome {
-  const life = ensurePlayerLifeState(save);
-  const year = playerLifeYear(save);
-  if (life.sponsorNegotiatedYear === year) {
-    return { ok: false, reason: 'You have already completed a sponsor negotiation this season.' };
-  }
-  const existing = save.sponsors ?? [];
-  if (existing.length >= 2) {
-    return { ok: false, reason: 'Two active sponsor slots are already occupied.' };
-  }
-  const preview = sponsorNegotiationPreview(save, approach);
-  const chance = preview.chance;
-  const roll = stableHash(`${save.id}:${year}:${approach}:sponsor`) % 100;
-  const success = approach === 'SAFE' || roll < chance;
-  life.sponsorNegotiatedYear = year;
-  if (!success) {
-    return {
-      ok: false,
-      reason: `The ambitious demand was rejected (${chance}% success chance). Try again next season.`,
-    };
-  }
-  const offer = sponsorOffer(save);
-  offer.perMatchCoins = preview.perMatchCoins;
-  offer.signingBonus = preview.signingBonus;
-  save.sponsors = [...existing, offer];
-  addWallet(save, offer.signingBonus);
-  return {
-    ok: true,
-    coins: offer.signingBonus,
-    detail: `${offer.brand} signed: ${offer.signingBonus.toLocaleString()} now and ${offer.perMatchCoins} per match for two seasons.`,
   };
 }
 

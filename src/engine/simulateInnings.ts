@@ -12,7 +12,7 @@ import {
 } from '../domain/types';
 import { clamp } from '../utils/math';
 import { battingAggression, requiredAllRounderBowler, selectBowler } from './ai';
-import { BowlerPlan, FieldSetting } from './intent';
+import { BowlerPlan, FieldSetting, legalFieldSetting } from './intent';
 import { canBowl } from './rating';
 import { chance, pick, Rng } from './rng';
 import {
@@ -23,6 +23,7 @@ import {
   resolveBall,
   runOutFieldingQualityOf,
 } from './resolveBall';
+import { DifficultyOutcomeBalance } from './difficulty';
 
 export interface InningsInput {
   battingTeamId: string;
@@ -32,6 +33,14 @@ export interface InningsInput {
   format: Format;
   conditions: Conditions;
   difficulty: Difficulty;
+  /** Optional user-side balance adjustment for controlled-team simulations. */
+  outcomeBalance?: DifficultyOutcomeBalance;
+  /**
+   * Manager balance applies to the whole XI. Player Career assistance applies
+   * only while the protagonist is batting or bowling, never to ten teammates.
+   */
+  outcomeBalanceScope?: 'TEAM' | 'STRIKER' | 'BOWLER';
+  outcomeBalancePlayerId?: string;
   target?: number; // chase target (win when runs >= target)
   oversCap?: number; // optional override (e.g. Test innings cap)
   /** Team batting tactic bias added to every batter's aggression (default 0 = no-op). */
@@ -44,6 +53,9 @@ export interface InningsInput {
   matchOversOffset?: number;
   /** Career protagonist who must receive the all-rounder role's minimum spell. */
   preferredAllRounderId?: string;
+  /** Match-only captaincy effects; zero outside high-pressure passages. */
+  battingLeadershipBonus?: number;
+  fieldingLeadershipBonus?: number;
 }
 
 function computePressure(
@@ -181,13 +193,27 @@ export function simulateInnings(input: InningsInput, rng: Rng): Innings {
         pressure,
         aggression,
         bowlerPlan: input.bowlerPlan,
-        fieldSetting: input.fieldSetting,
+        // Background simulation must obey the same over-by-over field
+        // restrictions as LiveInnings. Illegal saved/legacy plans are
+        // normalized for the current powerplay phase instead of receiving an
+        // engine effect that the watched match could never use.
+        fieldSetting: legalFieldSetting(input.fieldSetting, input.format, over),
         strikerBallsFaced: batting[strikerIdx].balls,
         fieldingQuality,
         fieldingRunOutQuality,
         keeperQuality,
         chasing,
         matchOversOffset: input.matchOversOffset,
+        battingLeadershipBonus: input.battingLeadershipBonus,
+        fieldingLeadershipBonus: input.fieldingLeadershipBonus,
+        outcomeBalance:
+          input.outcomeBalanceScope === 'TEAM' ||
+          (input.outcomeBalanceScope === 'STRIKER' &&
+            striker.id === input.outcomeBalancePlayerId) ||
+          (input.outcomeBalanceScope === 'BOWLER' &&
+            bowler.id === input.outcomeBalancePlayerId)
+            ? input.outcomeBalance
+            : undefined,
       };
 
       const ev = resolveBall(ctx, rng);

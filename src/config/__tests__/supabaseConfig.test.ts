@@ -13,10 +13,14 @@ describe('Supabase configuration', () => {
     expect(source).toContain('EXPO_PUBLIC_SUPABASE_URL');
     expect(source).toContain('EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
     expect(source).toContain('EXPO_PUBLIC_SUPABASE_ENABLED');
+    expect(source).toContain('EXPO_PUBLIC_LEADERBOARDS_ENABLED');
     expect(source).not.toContain('SERVICE_ROLE');
     expect(source).not.toContain('sb_secret');
     expect(envExample).toContain('EXPO_PUBLIC_SUPABASE_ENABLED=false');
-    expect(leaderboardSource).toContain('SUPABASE_CONFIG.enabled');
+    expect(envExample).toContain('EXPO_PUBLIC_LEADERBOARDS_ENABLED=false');
+    expect(leaderboardSource).toContain('SUPABASE_CONFIG.leaderboardsEnabled');
+    expect(leaderboardSource).toContain("rpc('submit_leaderboard_score'");
+    expect(leaderboardSource).not.toContain("from('leaderboard').upsert");
     expect(leaderboardSource).toContain('getSupabaseClient');
   });
 });

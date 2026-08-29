@@ -5,19 +5,19 @@ import {
   CountryFlag,
   PlayerAvatar,
   ProgressBar,
-  RadarChart,
   Screen,
   ScreenHeader,
+  SponsorBrandRow,
   AppText as Text,
 } from '../components';
 import { ATTR_GROUPS, ATTR_META } from '../data/attributes';
-import { kitColorHex } from '../data/cosmetics';
 import { getCountry } from '../data/countries';
 import { PlayerStats } from '../domain/types';
 import { battingMean, bowlingMean, computeOverall, metaMean } from '../engine/rating';
 import { baseAttributeProgress, baseAttributeValue } from '../game/attributeDisplay';
 import { formatClubCurrency } from '../game/finance';
 import { injuryLabel } from '../game/injuries';
+import { activeSponsorBranding } from '../game/sponsorship';
 import { emptyStats } from '../game/stats';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
@@ -75,6 +75,9 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
     save.userTeamId && save.teams[save.userTeamId]?.playerIds.includes(player.id),
   );
   const scoutRep = save.scoutReports?.find((r) => r.playerId === player.id);
+  const isExternalManagerPlayer = save.mode === 'manager' && !inSquad;
+  const hasFullScoutReport = Boolean(scoutRep && scoutRep.uncertainty <= 0);
+  const showPrivateRatings = !isExternalManagerPlayer || hasFullScoutReport;
   const relationships = isUser ? Object.values(save.relationships ?? {}) : [];
   const timeline = isUser ? (save.timeline ?? []) : [];
   const overall = computeOverall(player);
@@ -84,6 +87,9 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
   const team = Object.values(save.teams).find((candidate) =>
     candidate.playerIds.includes(player.id),
   );
+  const sponsorBranding = isUser
+    ? activeSponsorBranding(save)
+    : { earned: undefined, premium: undefined };
 
   return (
     <Screen scroll>
@@ -99,14 +105,19 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
           role={player.role}
           primaryColor={team?.primaryColor}
           secondaryColor={team?.secondaryColor}
-          kitColor={isUser ? kitColorHex(save.cosmetics?.kit) : team?.primaryColor}
-          customization={isUser ? save.cosmetics?.avatarCustomization : undefined}
           config={isUser ? save.cosmetics?.avatarConfig : undefined}
           profileFrame={isUser ? save.cosmetics?.profileFrame : undefined}
+          earnedSponsor={sponsorBranding.earned}
+          premiumSponsor={sponsorBranding.premium}
           size="lg"
           showRole
         />
         <View style={styles.heroContent}>
+          <SponsorBrandRow
+            earned={sponsorBranding.earned}
+            premium={sponsorBranding.premium}
+            compact
+          />
           {country ? (
             <View style={styles.countryRow}>
               <CountryFlag countryId={country.id} flag={country.flag} size={18} />
@@ -114,24 +125,52 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
             </View>
           ) : null}
           <View style={styles.heroRatings}>
-            <Badge value={overall} label="OVR" big />
-            <Badge value={baseAttributeValue(player.meta.form)} label="FORM" />
+            <Badge
+              value={
+                showPrivateRatings ? overall : scoutRep ? `~${scoutRep.knownOverall}` : '?'
+              }
+              label="OVR"
+              big
+            />
+            <Badge
+              value={showPrivateRatings ? baseAttributeValue(player.meta.form) : '?'}
+              label="FORM"
+            />
           </View>
         </View>
       </Card>
 
-      <Card style={styles.radarCard}>
-        <RadarChart
-          size={250}
-          data={[
-            { label: 'Batting', value: baseAttributeValue(battingMean(player)) },
-            { label: 'Bowling', value: baseAttributeValue(bowlingMean(player)) },
-            { label: 'Mental', value: baseAttributeValue(metaMean(player)) },
-          ]}
-        />
-      </Card>
+      {showPrivateRatings ? (
+        <Card style={styles.coreRatingsCard}>
+          <Text style={styles.coreRatingsTitle}>Core ratings</Text>
+          <RatingRow
+            label="Batting"
+            value={baseAttributeValue(battingMean(player))}
+            color={colors.primary}
+          />
+          <RatingRow
+            label="Bowling"
+            value={baseAttributeValue(bowlingMean(player))}
+            color={colors.info}
+          />
+          <RatingRow
+            label="Mental"
+            value={baseAttributeValue(metaMean(player))}
+            color={colors.accent}
+          />
+        </Card>
+      ) : (
+        <Card style={styles.scoutLockedCard}>
+          <Text style={styles.scoutTitle}>Private ratings hidden</Text>
+          <Text style={styles.scoutText}>
+            {scoutRep
+              ? 'Estimated report · Full scout reveals exact status.'
+              : 'Public record only.'}
+          </Text>
+        </Card>
+      )}
 
-      {player.traits.length ? (
+      {showPrivateRatings && player.traits.length ? (
         <View style={styles.traits}>
           {player.traits.map((t) => (
             <View key={t} style={styles.traitPill}>
@@ -141,7 +180,7 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
         </View>
       ) : null}
 
-      {player.injury ? (
+      {showPrivateRatings && player.injury ? (
         <Card style={styles.injuryCard}>
           <Text style={styles.injuryText}>🩹 Injured — {injuryLabel(player.injury)}</Text>
         </Card>
@@ -209,7 +248,7 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
         </View>
       ) : null}
 
-      {visibleAttributeGroups.map((group) => {
+      {showPrivateRatings && visibleAttributeGroups.map((group) => {
         const obj = player[group.id] as unknown as Record<string, number>;
         return (
           <View key={group.id} style={{ marginTop: spacing.lg }}>
@@ -236,9 +275,13 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
         );
       })}
 
-      <Text style={styles.groupTitle}>Career</Text>
+      <Text style={styles.groupTitle}>
+        {isExternalManagerPlayer ? 'Public career record' : 'Career'}
+      </Text>
       <StatsCard s={career} />
-      <Text style={styles.groupTitle}>This season</Text>
+      <Text style={styles.groupTitle}>
+        {isExternalManagerPlayer ? 'Public season record' : 'This season'}
+      </Text>
       <StatsCard s={season} />
 
       {isUser && relationships.length ? (
@@ -290,6 +333,17 @@ function Life({ label, value, color }: { label: string; value: number; color: st
   );
 }
 
+function RatingRow({ label, value, color }: { label: string; value: number; color: string }) {
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.ratingRow}>
+      <Text style={styles.ratingLabel}>{label}</Text>
+      <ProgressBar value={baseAttributeProgress(value)} color={color} style={styles.ratingBar} />
+      <Text style={[styles.ratingValue, { color }]}>{value}</Text>
+    </View>
+  );
+}
+
 function StatsCard({ s }: { s: PlayerStats }) {
   const styles = useThemedStyles(makeStyles);
   const batAvg = div(s.runs, Math.max(1, s.matches - s.notOuts));
@@ -330,7 +384,7 @@ function Stat({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-function Badge({ value, label, big }: { value: number; label: string; big?: boolean }) {
+function Badge({ value, label, big }: { value: number | string; label: string; big?: boolean }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   return (
@@ -361,7 +415,26 @@ const makeStyles = (colors: ThemeColors) =>
       justifyContent: 'space-around',
       alignItems: 'center',
     },
-    radarCard: { alignItems: 'center', marginTop: spacing.lg },
+    coreRatingsCard: { marginTop: spacing.lg, gap: spacing.md },
+    coreRatingsTitle: {
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.heavy,
+    },
+    ratingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    ratingLabel: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.semibold,
+      width: 62,
+    },
+    ratingBar: { flex: 1 },
+    ratingValue: {
+      width: 34,
+      textAlign: 'right',
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.black,
+    },
     badge: { alignItems: 'center' },
     badgeValue: { color: colors.text, fontSize: fontSize.xxl, fontWeight: fontWeight.black },
     badgeLabel: { color: colors.textMuted, fontSize: 10, letterSpacing: 1 },
@@ -435,6 +508,7 @@ const makeStyles = (colors: ThemeColors) =>
       textAlign: 'center',
     },
     scoutCard: { marginTop: spacing.md },
+    scoutLockedCard: { marginTop: spacing.lg, borderColor: colors.accent, borderWidth: 1 },
     scoutTitle: { color: colors.accent, fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
     scoutText: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 4, lineHeight: 18 },
     focusChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

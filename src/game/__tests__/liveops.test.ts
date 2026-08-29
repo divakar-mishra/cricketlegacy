@@ -3,6 +3,7 @@ import {
   applyQuestEvent,
   claimablePassRewards,
   claimQuest,
+  crateContents,
   DAILY_CHALLENGE_REWARDS,
   DAILY_QUESTS,
   DailyState,
@@ -11,16 +12,20 @@ import {
   isQuestComplete,
   MANAGER_DAILY_QUESTS,
   MANAGER_WEEKLY_QUESTS,
+  PASS_BALANCE_VERSION,
   PASS_TIERS,
   PassState,
   passLevel,
   pickDailyQuests,
   QuestProgress,
-  STREAK_MAX_WEEK_MULTIPLIER,
   streakReward,
+  synchronizePassBalance,
   WEEKLY_QUESTS,
   weeklyQuestsForMode,
   XP_PER_MATCH,
+  XP_PER_QUEST,
+  XP_PER_WEEKLY_QUEST,
+  XP_PER_WIN,
   xpForTier,
 } from '../liveops';
 
@@ -58,18 +63,22 @@ describe('streakReward', () => {
     expect(streakReward(2).coins).toBeGreaterThan(streakReward(1).coins);
     expect(streakReward(7).coins).toBeGreaterThan(streakReward(6).coins);
     expect(streakReward(1).gems).toBe(0);
-    expect(streakReward(7).gems).toBe(10);
+    expect(streakReward(7).gems).toBe(5);
   });
 
-  it('keeps rising across weeks but caps the multiplier', () => {
-    // Week 2 day-1 pays more than week 1 day-1.
-    expect(streakReward(8).coins).toBeGreaterThan(streakReward(1).coins);
-    // Same day-of-cycle in two very deep weeks is identical (multiplier capped).
-    expect(streakReward(29).coins).toBe(streakReward(71).coins);
-    // Day-1 coins concretely cap at the base (100) times the max multiplier.
-    expect(streakReward(29).coins).toBe(100 * STREAK_MAX_WEEK_MULTIPLIER);
-    // Nothing ever exceeds the biggest base (day 7 = 600) times the cap.
-    expect(streakReward(1000).coins).toBeLessThanOrEqual(600 * STREAK_MAX_WEEK_MULTIPLIER);
+  it('keeps Player and Manager rewards flat across later weeks', () => {
+    expect(streakReward(8)).toEqual(streakReward(1));
+    expect(streakReward(29)).toEqual(streakReward(1));
+    expect(streakReward(8, 'manager')).toEqual(streakReward(1, 'manager'));
+    expect(streakReward(29, 'manager').coins).toBe(streakReward(71, 'manager').coins);
+    expect(streakReward(29, 'manager').coins).toBe(75);
+    expect(streakReward(7, 'manager').coins).toBe(400);
+    expect(
+      Array.from({ length: 7 }, (_, index) => streakReward(index + 1, 'manager').coins).reduce(
+        (total, coins) => total + coins,
+        0,
+      ),
+    ).toBe(1_500);
   });
 });
 
@@ -89,6 +98,10 @@ describe('quests', () => {
     ).toBe(true);
     expect(weekly.every((q) => !q.rewardGems)).toBe(true);
     expect(WEEKLY_QUESTS.every((q) => !q.rewardGems)).toBe(true);
+    expect(pickDailyQuests(0, undefined, 'manager')).toHaveLength(2);
+    expect(MANAGER_WEEKLY_QUESTS.reduce((total, quest) => total + quest.rewardCoins, 0)).toBe(
+      1_750,
+    );
   });
 
   it('repeatable challenge and quest rewards do not mint gems', () => {
@@ -103,7 +116,7 @@ describe('quests', () => {
     const a1 = pickDailyQuests(10);
     const a2 = pickDailyQuests(10);
     expect(a1.map((q) => q.id)).toEqual(a2.map((q) => q.id)); // deterministic
-    expect(a1).toHaveLength(3); // default count
+    expect(a1).toHaveLength(2); // Player Career default count
 
     const nextDay = pickDailyQuests(11);
     expect(nextDay.map((q) => q.id)).not.toEqual(a1.map((q) => q.id)); // rotates
@@ -170,12 +183,59 @@ describe('battle pass', () => {
     expect(xpForTier(999)).toBe(0); // out of range
   });
 
-  it('keeps the 30-day pass gem faucet bounded', () => {
-    const freeGems = PASS_TIERS.reduce((sum, tier) => sum + (tier.freeReward.gems ?? 0), 0);
-    const premiumGems = PASS_TIERS.reduce((sum, tier) => sum + (tier.premiumReward.gems ?? 0), 0);
-    expect(freeGems).toBe(8);
-    expect(premiumGems).toBe(85);
-    expect(freeGems + premiumGems).toBe(93);
+  it('never grants gems from the Season Pass reward track or legacy crates', () => {
+    expect(PASS_TIERS.every((tier) => !('gems' in tier.freeReward))).toBe(true);
+    expect(PASS_TIERS.every((tier) => !('gems' in tier.premiumReward))).toBe(true);
+    expect(crateContents('crate_t20')).not.toHaveProperty('gems');
+  });
+
+  it('paces tier 20 beyond a few high-volume sessions', () => {
+    const threeBusyDays =
+      3 * 12 * (XP_PER_MATCH + XP_PER_WIN) +
+      3 * 3 * XP_PER_QUEST +
+      WEEKLY_QUESTS.length * XP_PER_WEEKLY_QUEST;
+    expect(PASS_TIERS[PASS_TIERS.length - 1].xpRequired).toBe(11_020);
+    expect(passLevel(threeBusyDays)).toBeLessThan(PASS_TIERS.length);
+  });
+
+  it.each([
+    ['pure bowler', 42, 56],
+    ['pure batter', 52, 70],
+    ['Manager', 50, 67],
+  ])(
+    'places realistic %s completion near week four despite unavailable quests',
+    (_profile, threeWeekDailies, fourWeekDailies) => {
+      const threeWeeks =
+        threeWeekDailies * XP_PER_QUEST +
+        9 * XP_PER_WEEKLY_QUEST +
+        30 * XP_PER_MATCH +
+        15 * XP_PER_WIN;
+      const fourWeeks =
+        fourWeekDailies * XP_PER_QUEST +
+        12 * XP_PER_WEEKLY_QUEST +
+        40 * XP_PER_MATCH +
+        20 * XP_PER_WIN;
+
+      expect(passLevel(threeWeeks)).toBeLessThan(PASS_TIERS.length);
+      expect(passLevel(fourWeeks)).toBe(PASS_TIERS.length);
+    },
+  );
+
+  it('remaps the old curve without losing an earned tier or duplicating claims', () => {
+    const legacyTierElevenXp = 80 * 11 + (16 * 10 * 11) / 2;
+    const upgraded = synchronizePassBalance({
+      seasonId: 'pass-7',
+      balanceVersion: 1,
+      xp: legacyTierElevenXp,
+      premium: true,
+      claimedFree: [1, 11, 11, 99],
+      claimedPremium: [1, 11],
+    });
+
+    expect(upgraded.balanceVersion).toBe(PASS_BALANCE_VERSION);
+    expect(passLevel(upgraded.xp)).toBe(11);
+    expect(upgraded.claimedFree).toEqual([1, 11]);
+    expect(upgraded.claimedPremium).toEqual([1, 11]);
   });
 
   it('addPassXp is pure, accumulates, and ignores negative xp', () => {

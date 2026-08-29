@@ -22,16 +22,18 @@ describe('mode hub guides', () => {
     expect(careerHubScreen).toContain('career_hub_guide');
     expect(careerHubScreen).toContain('Train with a purpose');
     expect(careerHubScreen).toContain('Earn selection and progress');
+    expect(careerHubScreen).toContain("body: 'Your next step.'");
+    expect(careerHubScreen).toContain("body: 'Develop your role.'");
     expect(careerHubScreen).toContain('modeLabel="Player Career"');
+    expect(guideModal).not.toContain('YOUR NEXT ACTION');
   });
 
   it('shows a dismissible manager career guide in the manager hub', () => {
     expect(guideModal).toContain('{modeLabel.toUpperCase()} GUIDE');
     expect(managerHubScreen).toContain('manager_hub_guide');
     expect(managerHubScreen).toContain('Recruit with evidence');
-    expect(managerHubScreen).toContain(
-      'Records tracks real results, finishes, trophies and legends produced.',
-    );
+    expect(managerHubScreen).toContain("body: 'Scout before signing.'");
+    expect(managerHubScreen).toContain("body: 'Facilities, staff and academy.'");
     expect(managerHubScreen).toContain('modeLabel="Manager Career"');
   });
 

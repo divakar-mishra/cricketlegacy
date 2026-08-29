@@ -26,7 +26,7 @@ export function metaMean(p: Player): number {
   return mean([m.fitness, m.form, m.confidence, m.aggression, m.discipline]);
 }
 
-export function computeOverall(p: Player): number {
+export function computeOverallRaw(p: Player): number {
   const bat = battingMean(p);
   const bowl = bowlingMean(p);
   const field = fieldingMean(p);
@@ -49,7 +49,11 @@ export function computeOverall(p: Player): number {
     default:
       v = mean([bat, bowl, field, meta]);
   }
-  return Math.round(v);
+  return v;
+}
+
+export function computeOverall(p: Player): number {
+  return Math.round(computeOverallRaw(p));
 }
 
 /** True if the player can be used as a bowler in the sim. */

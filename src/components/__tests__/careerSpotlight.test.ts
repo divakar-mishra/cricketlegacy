@@ -20,10 +20,11 @@ describe('career hub spotlight', () => {
     expect(spotlight).toContain('accessibilityRole="header"');
   });
 
-  it('is shared by both career modes', () => {
+  it('remains available on Player depth tabs while both Home screens use cricket mastheads', () => {
     expect(playerHub).toContain('<CareerSpotlight');
     expect(playerHub).toContain('mode="player"');
-    expect(managerHub).toContain('<CareerSpotlight');
-    expect(managerHub).toContain('mode="manager"');
+    expect(playerHub).toContain('styles.playerMasthead');
+    expect(managerHub).not.toContain('<CareerSpotlight');
+    expect(managerHub).toContain('styles.managerMasthead');
   });
 });

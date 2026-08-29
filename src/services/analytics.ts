@@ -1,5 +1,5 @@
 /**
- * Typed analytics facade — wired to Firebase Analytics.
+ * Typed analytics facade with optional Firebase Analytics forwarding.
  *
  * Uses a lazy require() so the native module is only loaded in EAS Dev/Prod
  * builds. Falls back to console-only logging in Expo Go, web, and Jest — the
@@ -57,6 +57,7 @@ export const EVT = {
   OFFER_ACCEPTED: 'offer_accepted',
   OFFER_DISMISSED: 'offer_dismissed',
   SHARE_NEWSPAPER: 'share_newspaper',
+  NEWSPAPER_TEMPLATE_SELECTED: 'newspaper_template_selected',
   LEGACY_CONTRIBUTION: 'legacy_contribution',
 } as const;
 

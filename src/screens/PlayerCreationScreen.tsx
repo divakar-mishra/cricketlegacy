@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import {
-  AvatarCustomizer,
+  PortraitPicker,
   Button,
   Card,
-  CountryFlag,
+  CountrySelect,
   ProgressBar,
   Screen,
   ScreenHeader,
@@ -16,14 +16,8 @@ import {
 import { ATTR_META, CREATION } from '../data/attributes';
 import { DEFAULT_AVATAR_CONFIG } from '../avatar';
 import type { AvatarConfig } from '../avatar';
-import { COUNTRIES, getCountry } from '../data/countries';
-import {
-  BattingStyle,
-  BowlingStyle,
-  CareerArchetype,
-  Difficulty,
-  Role,
-} from '../domain/types';
+import { getCountry } from '../data/countries';
+import { BattingStyle, BowlingStyle, CareerArchetype, Difficulty, Role } from '../domain/types';
 import { buildUserPlayer, createCareerSave } from '../game/createGame';
 import { playerDomesticBlueprints } from '../game/domesticBranding';
 import {
@@ -83,13 +77,13 @@ const DIFFICULTIES: { value: Difficulty; label: string }[] = [
 
 const STEP_TITLES = ['Identity & Avatar', 'Pathway & Attributes', 'Club', 'Review'];
 
-/** Career starts in one school-level pathway to keep onboarding focused. */
+/** Career starts in one Grade A pathway to keep onboarding focused. */
 const CAREER_START_OPTIONS = [
   {
     value: 'u14' as const,
-    label: 'Under-14',
-    desc: 'Age 14 - School cricket. Build your game from the first step.',
-    ageOverride: 14,
+    label: 'Grade A Cricket',
+    desc: 'Age 16 · Local first-team cricket.',
+    ageOverride: 16,
     attrScale: 0.52,
   },
 ] as const;
@@ -126,6 +120,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
   const [careerStart, setCareerStart] = useState<CareerStart>('u14');
   const [archetype, setArchetype] = useState<CareerArchetype>('SPECIALIST');
   const [ironman, setIronman] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(() => ({
     ...DEFAULT_AVATAR_CONFIG,
   }));
@@ -179,7 +174,8 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
   }, [role]);
 
   const countryTeams = useMemo(
-    () => (nationality ? playerDomesticBlueprints(nationality).filter((team) => team.tier === 3) : []),
+    () =>
+      nationality ? playerDomesticBlueprints(nationality).filter((team) => team.tier === 3) : [],
     [nationality],
   );
 
@@ -241,51 +237,71 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
   }, [step, name, nationality, teamId]);
 
   const isLast = step === STEP_TITLES.length - 1;
+  const proceedHint =
+    step === 0
+      ? name.trim().length < 2
+        ? 'Enter at least 2 characters for your player name.'
+        : !nationality
+          ? 'Choose your country to continue.'
+          : null
+      : step === 2 && !teamId
+        ? 'Choose a Tier 3 club to start your career.'
+        : null;
   const onBack = () => (step === 0 ? navigation.goBack() : setStep((s) => s - 1));
   const create = async () => {
-    if (!nationality || !teamId) return;
-    const player = buildUserPlayer({
-      name: name.trim(),
-      nationality,
-      role,
-      battingStyle,
-      bowlingStyle: roleBowls ? bowlingStyle : undefined,
-      batting: attrs.batting,
-      bowling: attrs.bowling,
-      fielding: attrs.fielding,
-      meta: attrs.meta,
-      age: careerStartOpt.ageOverride,
-      attrScale: careerStartOpt.attrScale,
-    });
-    const slots = await listSlots('career');
-    const slot = route?.params?.slot ?? firstFreeSlot(slots);
-    if (!slot) {
-      Alert.alert('All slots full', 'Delete a career from Saved Games to start a new one.', [
-        { text: 'OK', onPress: () => navigation.navigate('SavedGames') },
-      ]);
-      return;
+    if (!nationality || !teamId || creating) return;
+    setCreating(true);
+    try {
+      const player = buildUserPlayer({
+        name: name.trim(),
+        nationality,
+        role,
+        battingStyle,
+        bowlingStyle: roleBowls ? bowlingStyle : undefined,
+        batting: attrs.batting,
+        bowling: attrs.bowling,
+        fielding: attrs.fielding,
+        meta: attrs.meta,
+        age: careerStartOpt.ageOverride,
+        attrScale: careerStartOpt.attrScale,
+      });
+      const slots = await listSlots('career');
+      const slot = route?.params?.slot ?? firstFreeSlot(slots);
+      if (!slot) {
+        Alert.alert('All slots full', 'Delete a career from Saved Games to start a new one.', [
+          { text: 'OK', onPress: () => navigation.navigate('SavedGames') },
+        ]);
+        return;
+      }
+      const save = createCareerSave({
+        player,
+        teamId,
+        difficulty,
+        format: 'T20',
+        newGamePlus: route?.params?.legacy,
+        legacyScore: route?.params?.legacyScore,
+        archetype,
+        ironman,
+        avatarConfig,
+      });
+      await writeSave('career', slot, save);
+      await setLastPlayed('career', slot);
+      setActive(save, 'career', slot);
+      analytics.setUserProperty('mode', 'career');
+      analytics.logEvent(analytics.EVT.CAREER_START, {
+        mode: 'career',
+        difficulty,
+        new_game_plus: Boolean(route?.params?.legacy),
+      });
+      navigation.reset({ index: 1, routes: [{ name: 'MainMenu' }, { name: 'CareerHub' }] });
+    } catch {
+      Alert.alert(
+        'Career not created',
+        'The device did not confirm the first save. Check available storage and try again.',
+      );
+    } finally {
+      setCreating(false);
     }
-    const save = createCareerSave({
-      player,
-      teamId,
-      difficulty,
-      format: 'T20',
-      newGamePlus: route?.params?.legacy,
-      legacyScore: route?.params?.legacyScore,
-      archetype,
-      ironman,
-      avatarConfig,
-    });
-    await writeSave('career', slot, save);
-    await setLastPlayed('career', slot);
-    setActive(save, 'career', slot);
-    analytics.setUserProperty('mode', 'career');
-    analytics.logEvent(analytics.EVT.CAREER_START, {
-      mode: 'career',
-      difficulty,
-      new_game_plus: Boolean(route?.params?.legacy),
-    });
-    navigation.reset({ index: 1, routes: [{ name: 'MainMenu' }, { name: 'CareerHub' }] });
   };
 
   const onNext = () => (isLast ? void create() : setStep((s) => s + 1));
@@ -293,23 +309,28 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
   return (
     <Screen
       scroll
+      scrollResetKey={step}
       footer={
-        <View style={styles.footerRow}>
-          <Button
-            label="Back"
-            variant="ghost"
-            fullWidth={false}
-            style={styles.flex}
-            onPress={onBack}
-          />
-          <Button
-            label={isLast ? 'Start Career' : 'Next'}
-            variant={isLast ? 'gold' : 'primary'}
-            fullWidth={false}
-            style={styles.flex}
-            disabled={!canProceed}
-            onPress={onNext}
-          />
+        <View>
+          {proceedHint ? <Text style={styles.footerHint}>{proceedHint}</Text> : null}
+          <View style={styles.footerRow}>
+            <Button
+              label="Back"
+              variant="ghost"
+              fullWidth={false}
+              style={styles.flex}
+              onPress={onBack}
+            />
+            <Button
+              label={isLast ? 'Start Career' : 'Next'}
+              variant={isLast ? 'gold' : 'primary'}
+              fullWidth={false}
+              style={styles.flex}
+              disabled={!canProceed || creating}
+              loading={creating}
+              onPress={onNext}
+            />
+          </View>
         </View>
       }
     >
@@ -337,25 +358,13 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
           />
 
           <Label text="Nationality" style={{ marginTop: spacing.lg }} />
-          <View style={styles.grid}>
-            {COUNTRIES.map((c) => {
-              const sel = nationality === c.id;
-              return (
-                <Pressable
-                  key={c.id}
-                  onPress={() => changeNationality(c.id)}
-                  style={[styles.tile, sel && styles.tileActive]}
-                >
-                  <CountryFlag countryId={c.id} flag={c.flag} size={24} />
-                  <Text style={[styles.tileText, sel && { color: colors.white }]} numberOfLines={1}>
-                    {c.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <CountrySelect
+            value={nationality}
+            onChange={changeNationality}
+            testID="player-country-select"
+          />
 
-          <AvatarCustomizer
+          <PortraitPicker
             value={avatarConfig}
             onChange={setAvatarConfig}
             playerName={name.trim() || 'Your Player'}
@@ -375,30 +384,27 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
           ))}
 
           <Label text="Career identity" style={{ marginTop: spacing.lg }} />
-          <Text style={styles.identityHint}>
-            This shapes story tone and how your journey is remembered, never your paid progression.
-          </Text>
           {(
             [
               {
                 value: 'PRODIGY',
                 label: 'Prodigy',
-                desc: 'Expectation arrives before experience.',
+                desc: 'High expectations.',
               },
               {
                 value: 'LATE_BLOOMER',
                 label: 'Late Bloomer',
-                desc: 'Earn every step after being overlooked.',
+                desc: 'Prove them wrong.',
               },
               {
                 value: 'SPECIALIST',
                 label: 'Specialist',
-                desc: 'Build a reputation around one defining skill.',
+                desc: 'One defining skill.',
               },
               {
                 value: 'COMEBACK',
                 label: 'Comeback Story',
-                desc: 'Turn setbacks into the heart of the career.',
+                desc: 'A second chance.',
               },
             ] as const
           ).map((option) => (
@@ -414,9 +420,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
           <View style={styles.ironmanRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.ironmanTitle}>Ironman career</Text>
-              <Text style={styles.ironmanDesc}>
-                Autosave every consequence. This identity cannot be switched off later.
-              </Text>
+              <Text style={styles.ironmanDesc}>Permanent autosave.</Text>
             </View>
             <Switch
               value={ironman}
@@ -480,7 +484,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
           <Card style={[styles.summary, { marginTop: spacing.lg }]}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryValue}>{preview.overall}</Text>
-              <Text style={styles.summaryLabel}>Active School OVR</Text>
+              <Text style={styles.summaryLabel}>Active Grade A OVR</Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
@@ -495,11 +499,6 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
               <Text style={styles.summaryLabel}>Points left</Text>
             </View>
           </Card>
-          <Text style={styles.roleHint}>
-            The large number beside each skill is its active School rating. Allocation points are
-            shown underneath; youth scaling is already applied, so these are the exact ratings used
-            in your first match.
-          </Text>
           <Card style={styles.attrDashboard}>
             <View style={styles.attrDashHeader}>
               <View>
@@ -519,17 +518,6 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
             </View>
           </Card>
 
-          {/* Role hint */}
-          <Text style={styles.roleHint}>
-            {role === 'BATTER'
-              ? 'Specialist batters receive 150 points and bat in the top four.'
-              : role === 'BOWLER'
-                ? 'Specialist bowlers receive 150 points and bat with the lower order.'
-                : role === 'WK_BATTER'
-                  ? 'Wicket-keepers receive 230 points across batting and keeping, and bat around 4 to 6.'
-                  : 'All-rounders receive 230 points and bat in the middle order.'}
-          </Text>
-
           {attrSections.map((section) => (
             <View key={section.id} style={{ marginTop: spacing.lg }}>
               <Text style={styles.groupTitle}>{section.label}</Text>
@@ -543,7 +531,6 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
                     value={value}
                     displayValue={activeValue}
                     progressValue={activeValue}
-                    description={`Active School rating ${activeValue} | Allocation ${value}`}
                     max={CREATION.maxPerAttr}
                     canDec={value > CREATION.base}
                     canInc={remaining > 0 && value < CREATION.maxPerAttr}
@@ -564,7 +551,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
             <Text
               style={{ color: colors.textFaint, fontSize: fontSize.xs, marginBottom: spacing.sm }}
             >
-              Showing all clubs — pick your nationality in step 1 to filter by country.
+              Choose a nationality in step 1 to filter clubs.
             </Text>
           )}
           {countryTeams.map((t) => (
@@ -578,11 +565,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
           ))}
           <Card style={{ marginTop: spacing.lg }}>
             <Text style={styles.groupTitle}>Starting pathway</Text>
-            <Text style={styles.reviewLabel}>
-              You begin in a separate School XI, not this senior squad. This club reserves your Tier
-              3 destination; the contract starts only after you earn promotion through School and
-              Under-19 cricket.
-            </Text>
+            <Text style={styles.reviewLabel}>Grade A → Under-19 → senior domestic</Text>
           </Card>
         </View>
       )}
@@ -629,7 +612,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
             }
           />
           <ReviewRow label="Save rules" value={ironman ? 'Ironman autosave' : 'Standard'} />
-          <ReviewRow label="Active School OVR" value={String(preview.overall)} highlight />
+          <ReviewRow label="Active Grade A OVR" value={String(preview.overall)} highlight />
           {remaining > 0 && (
             <Text style={styles.warn}>You still have {remaining} unspent points.</Text>
           )}
@@ -705,6 +688,12 @@ function ReviewRow({
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    footerHint: {
+      color: colors.warning,
+      fontSize: fontSize.xs,
+      marginBottom: spacing.sm,
+      textAlign: 'center',
+    },
     label: {
       color: colors.textMuted,
       fontSize: fontSize.sm,
@@ -749,21 +738,6 @@ const makeStyles = (colors: ThemeColors) =>
       fontSize: fontSize.lg,
       fontWeight: fontWeight.semibold,
     },
-    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    tile: {
-      flexBasis: '31%',
-      flexGrow: 1,
-      minWidth: 96,
-      alignItems: 'center',
-      paddingVertical: spacing.md,
-      backgroundColor: colors.surface,
-      borderRadius: radius.md,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      gap: 4,
-    },
-    tileActive: { borderColor: colors.primary, backgroundColor: colors.surfaceAlt },
-    tileText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.semibold },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     chip: {
       paddingHorizontal: spacing.lg,

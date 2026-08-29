@@ -1,17 +1,28 @@
-/**
- * InvestmentScreen — personal stock portfolio manager.
- * Feature 2: shows portfolio, sparkline history, invest/withdraw actions.
- */
-import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { GlassAlert as Alert } from '../components/GlassAlertModal';
+import { useMemo, useState } from 'react';
+import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Button, Card, Screen, ScreenHeader } from '../components';
 import { AppText as Text } from '../components/AppText';
 import { Sparkline } from '../components/charts/Sparkline';
+import { GlassAlert as Alert } from '../components/GlassAlertModal';
+import {
+  STOCK_COMPANIES,
+  STOCK_RISK_LABELS,
+  STOCK_SECTOR_LABELS,
+  STOCK_SECTORS,
+  stockCompany,
+} from '../data/stockCompanies';
 import { LEGACY_TIERS, legacyRank } from '../data/legacy';
-import { STOCK_MAX_INVEST, STOCK_MIN_INVEST } from '../game/career';
+import type { StockHolding, StockSector } from '../domain/types';
 import { stockMarketUnlocked } from '../game/readiness';
+import {
+  ensureStockPortfolio,
+  holdingDisplayName,
+  LEGACY_MARKET_INDEX_ID,
+  STOCK_MAX_INVEST,
+  STOCK_MIN_INVEST,
+  STOCK_RISK_RANGES,
+  stockPortfolioTotals,
+} from '../game/stockMarket';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import {
@@ -24,110 +35,108 @@ import {
   useThemedStyles,
 } from '../theme';
 
+type SectorFilter = 'ALL' | StockSector;
+type TradeIntent = { kind: 'BUY'; companyId: string } | { kind: 'SELL'; companyId: string };
+
+function signedPercent(value: number): string {
+  return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
+}
+
 export function InvestmentScreen({ navigation }: ScreenProps<'InvestmentScreen'>) {
-  const save = useCareer((s) => s.save);
-  const investStocksAction = useCareer((s) => s.investStocksAction);
-  const withdrawStocksAction = useCareer((s) => s.withdrawStocksAction);
-  const contributeLegacy = useCareer((s) => s.contributeLegacy);
+  const save = useCareer((state) => state.save);
+  const investStocksAction = useCareer((state) => state.investStocksAction);
+  const withdrawStocksAction = useCareer((state) => state.withdrawStocksAction);
+  const contributeLegacy = useCareer((state) => state.contributeLegacy);
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const [sector, setSector] = useState<SectorFilter>('ALL');
+  const [trade, setTrade] = useState<TradeIntent | null>(null);
   const [amount, setAmount] = useState('');
 
-  if (!save) {
+  const filteredCompanies = useMemo(
+    () =>
+      sector === 'ALL'
+        ? STOCK_COMPANIES
+        : STOCK_COMPANIES.filter((company) => company.sector === sector),
+    [sector],
+  );
+
+  if (!save || save.mode !== 'career') {
     return (
       <Screen>
         <ScreenHeader title="Investment Portfolio" onBack={() => navigation.goBack()} />
-        <Text style={styles.msg}>No active save.</Text>
+        <Text style={styles.message}>Open a Player Career to use the portfolio.</Text>
       </Screen>
     );
   }
 
-  // Defense-in-depth: youth pathways (School/U14, U19) can never open the market,
-  // regardless of how this screen was reached.
   const userAge = save.userPlayerId ? (save.players[save.userPlayerId]?.age ?? 0) : 0;
-  if (save.mode === 'career' && !stockMarketUnlocked(save.careerPathLevel, userAge)) {
+  if (!stockMarketUnlocked(save.careerPathLevel, userAge)) {
     return (
       <Screen>
         <ScreenHeader title="Investment Portfolio" onBack={() => navigation.goBack()} />
-        <Text style={styles.msg}>
-          The stock market unlocks once you turn 18 and reach domestic cricket. Keep developing your
-          career first.
-        </Text>
+        <Text style={styles.message}>Unlocks at 18 in senior domestic cricket.</Text>
       </Screen>
     );
   }
 
-  const inv = save.stockInvestment;
-  const invested = inv?.invested ?? 0;
-  const currentValue = inv?.currentValue ?? 0;
-  const totalWithdrawn = inv?.totalWithdrawn ?? 0;
-  const history = inv?.history ?? [];
-  const pnl = currentValue - invested;
-  const pnlPct = invested > 0 ? ((pnl / invested) * 100).toFixed(1) : '0.0';
-  const pnlColor = pnl >= 0 ? colors.success : colors.danger;
-
-  const handleInvest = () => {
-    const coins = parseInt(amount.replace(/[^0-9]/g, ''), 10);
-    if (isNaN(coins) || coins < STOCK_MIN_INVEST) {
-      Alert.alert(
-        'Invalid amount',
-        `Minimum investment is ${STOCK_MIN_INVEST.toLocaleString()} coins.`,
-      );
-      return;
-    }
-    if (coins > STOCK_MAX_INVEST) {
-      Alert.alert(
-        'Invalid amount',
-        `Maximum investment is ${STOCK_MAX_INVEST.toLocaleString()} coins.`,
-      );
-      return;
-    }
-    const res = investStocksAction(coins);
-    if (!res.ok) {
-      Alert.alert('Investment failed', res.reason ?? 'Unknown error.');
-      return;
-    }
-    setAmount('');
-    Alert.alert('Invested!', `${coins.toLocaleString()} coins are now in the market.`);
-  };
-
-  const handleWithdraw = () => {
-    if (currentValue <= 0) {
-      Alert.alert('No position', 'You have no active investment to withdraw.');
-      return;
-    }
-    Alert.alert(
-      'Withdraw all funds?',
-      `You will receive ${currentValue.toLocaleString()} coins back into your wallet.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Withdraw',
-          onPress: () => {
-            const withdrawn = withdrawStocksAction();
-            if (withdrawn > 0) {
-              Alert.alert('Withdrawn', `${withdrawn.toLocaleString()} coins added to your wallet.`);
-            }
-          },
-        },
-      ],
-    );
-  };
-
+  const portfolio = ensureStockPortfolio(save);
+  const holdings = Object.values(portfolio.holdings).sort((left, right) =>
+    holdingDisplayName(left).localeCompare(holdingDisplayName(right)),
+  );
+  const totals = stockPortfolioTotals(portfolio);
+  const pnlPct = totals.costBasis > 0 ? (totals.profitLoss / totals.costBasis) * 100 : 0;
+  const pnlColor = totals.profitLoss >= 0 ? colors.success : colors.danger;
   const legacyPoints = save.legacyPoints ?? 0;
   const legacyRankTitle = legacyRank(legacyPoints);
-  const handleContribute = (tier: (typeof LEGACY_TIERS)[number]) => {
+
+  const closeTrade = () => {
+    setTrade(null);
+    setAmount('');
+  };
+  const parsedAmount = Math.max(0, parseInt(amount.replace(/[^0-9]/g, ''), 10) || 0);
+  const tradeHolding = trade?.kind === 'SELL' ? portfolio.holdings[trade.companyId] : undefined;
+  const tradeCompany = trade ? stockCompany(trade.companyId) : undefined;
+  const tradeName = tradeHolding
+    ? holdingDisplayName(tradeHolding)
+    : (tradeCompany?.name ?? 'Company');
+  const buyShortfall = trade?.kind === 'BUY' ? Math.max(0, parsedAmount - save.wallet.coins) : 0;
+  const sellExcess =
+    trade?.kind === 'SELL' ? Math.max(0, parsedAmount - (tradeHolding?.currentValue ?? 0)) : 0;
+
+  const buy = () => {
+    if (!trade || trade.kind !== 'BUY') return;
+    const result = investStocksAction(trade.companyId, parsedAmount);
+    if (!result.ok) {
+      Alert.alert('Investment unavailable', result.reason ?? 'Please try again.');
+      return;
+    }
+    closeTrade();
+    Alert.alert('Investment complete', `${parsedAmount.toLocaleString()} coins invested.`);
+  };
+
+  const sell = (all = false) => {
+    if (!trade || trade.kind !== 'SELL') return;
+    const result = withdrawStocksAction(trade.companyId, all ? undefined : parsedAmount);
+    if (!result.ok) {
+      Alert.alert('Sale unavailable', result.reason ?? 'Please try again.');
+      return;
+    }
+    closeTrade();
+    Alert.alert('Sale complete', `${(result.coins ?? 0).toLocaleString()} coins returned.`);
+  };
+
+  const fundLegacy = (tier: (typeof LEGACY_TIERS)[number]) => {
     Alert.alert(
-      `Fund: ${tier.label}?`,
-      `Spend ${tier.coinCost.toLocaleString()} coins for +${tier.points} legacy. This is a prestige contribution — it builds your legacy rank and cannot be undone.`,
+      `Fund ${tier.label}?`,
+      `Spend ${tier.coinCost.toLocaleString()} coins for +${tier.points} legacy.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Fund',
           onPress: () => {
-            const res = contributeLegacy(tier.id);
-            if (!res.ok) Alert.alert('Cannot fund', res.reason ?? 'Please try again.');
-            else Alert.alert('Legacy grows', `${tier.label} funded. Your legacy rank is updated.`);
+            const result = contributeLegacy(tier.id);
+            if (!result.ok) Alert.alert('Cannot fund', result.reason ?? 'Please try again.');
           },
         },
       ],
@@ -135,243 +144,515 @@ export function InvestmentScreen({ navigation }: ScreenProps<'InvestmentScreen'>
   };
 
   return (
-    <Screen scroll>
-      <ScreenHeader title="Investment Portfolio" onBack={() => navigation.goBack()} />
+    <>
+      <Screen scroll>
+        <ScreenHeader
+          title="Investment Portfolio"
+          subtitle={`${holdings.length} active holding${holdings.length === 1 ? '' : 's'}`}
+          onBack={() => navigation.goBack()}
+        />
 
-      {/* Current portfolio card */}
-      <Animated.View entering={FadeInDown.duration(300)}>
-        <Card style={styles.portfolioCard}>
-          <Text style={styles.sectionLabel}>CURRENT POSITION</Text>
-          <View style={styles.valueRow}>
-            <View>
-              <Text style={styles.valueLabel}>Current Value</Text>
-              <Text style={[styles.valueAmount, { color: colors.accent }]}>
-                {currentValue.toLocaleString()} coins
+        <Card style={styles.summaryCard}>
+          <Text style={styles.eyebrow}>MY PORTFOLIO</Text>
+          <View style={styles.summaryTop}>
+            <View style={styles.summaryValueWrap}>
+              <Text style={styles.summaryLabel}>Current value</Text>
+              <Text style={styles.summaryValue}>{totals.currentValue.toLocaleString()}</Text>
+            </View>
+            <View style={styles.pnlWrap}>
+              <Text style={[styles.pnlValue, { color: pnlColor }]}>
+                {totals.profitLoss >= 0 ? '+' : ''}
+                {totals.profitLoss.toLocaleString()}
               </Text>
-            </View>
-            <View style={styles.pnlBox}>
-              <Text style={[styles.pnlAmount, { color: pnlColor }]}>
-                {pnl >= 0 ? '+' : ''}
-                {pnl.toLocaleString()}
-              </Text>
-              <Text style={[styles.pnlPct, { color: pnlColor }]}>({pnlPct}%)</Text>
+              <Text style={[styles.pnlPercent, { color: pnlColor }]}>{signedPercent(pnlPct)}</Text>
             </View>
           </View>
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Text style={styles.metaLabel}>Invested</Text>
-              <Text style={styles.metaValue}>{invested.toLocaleString()}</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Text style={styles.metaLabel}>Total Withdrawn</Text>
-              <Text style={styles.metaValue}>{totalWithdrawn.toLocaleString()}</Text>
-            </View>
+          <View style={styles.summaryMeta}>
+            <Metric label="Cost basis" value={totals.costBasis} />
+            <Metric label="Withdrawn" value={portfolio.totalWithdrawn} />
+            <Metric label="Wallet" value={save.wallet.coins} />
           </View>
-
-          {/* Sparkline chart */}
-          {history.length >= 2 && (
-            <View style={styles.chartRow}>
-              <Sparkline
-                values={history}
-                width={280}
-                height={52}
-                color={pnl >= 0 ? colors.success : colors.danger}
-              />
-              <Text style={styles.chartCaption}>Last {history.length} seasons</Text>
-            </View>
-          )}
         </Card>
-      </Animated.View>
 
-      {/* Invest input */}
-      <Animated.View entering={FadeInDown.duration(350).delay(80)}>
-        <Card style={styles.inputCard}>
-          <Text style={styles.sectionLabel}>INVEST COINS</Text>
-          <Text style={styles.note}>
-            Min {STOCK_MIN_INVEST.toLocaleString()} · Max {STOCK_MAX_INVEST.toLocaleString()} coins
-          </Text>
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="number-pad"
-              placeholder="Enter amount"
-              placeholderTextColor={colors.textFaint}
+        <Text style={styles.sectionTitle}>Holdings</Text>
+        {holdings.length ? (
+          holdings.map((holding) => (
+            <HoldingCard
+              key={holding.companyId}
+              holding={holding}
+              onSell={() => setTrade({ kind: 'SELL', companyId: holding.companyId })}
             />
-            <Button
-              label="Invest"
-              size="sm"
-              fullWidth={false}
-              onPress={handleInvest}
-              style={styles.investBtn}
+          ))
+        ) : (
+          <Card style={styles.emptyCard}>
+            <Text style={styles.emptyText}>Choose a company below to start your portfolio.</Text>
+          </Card>
+        )}
+
+        <View style={styles.marketHeader}>
+          <Text style={styles.sectionTitle}>Company Market</Text>
+          <Text style={styles.marketYear}>
+            {portfolio.lastUpdatedYear ? `Season ${portfolio.lastUpdatedYear}` : 'Opening board'}
+          </Text>
+        </View>
+        <View style={styles.filters}>
+          <FilterChip label="All" active={sector === 'ALL'} onPress={() => setSector('ALL')} />
+          {STOCK_SECTORS.map((item) => (
+            <FilterChip
+              key={item}
+              label={STOCK_SECTOR_LABELS[item]}
+              active={sector === item}
+              onPress={() => setSector(item)}
             />
-          </View>
-          <Text style={styles.walletLine}>
-            Wallet: {save.wallet.coins.toLocaleString()} coins available
-          </Text>
+          ))}
+        </View>
+
+        <Card style={styles.marketCard}>
+          {filteredCompanies.map((company, index) => {
+            const movement = portfolio.lastReturns[company.id];
+            const owns = Boolean(portfolio.holdings[company.id]);
+            return (
+              <View
+                key={company.id}
+                style={[
+                  styles.companyRow,
+                  index === filteredCompanies.length - 1 && styles.lastRow,
+                ]}
+              >
+                <View style={styles.companyMark}>
+                  <Text style={styles.companyMarkText}>
+                    {company.name.slice(0, 2).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.companyCopy}>
+                  <Text style={styles.companyName}>{company.name}</Text>
+                  <Text style={styles.companyMeta}>
+                    {STOCK_SECTOR_LABELS[company.sector]} · {STOCK_RISK_LABELS[company.risk]}
+                  </Text>
+                </View>
+                <View style={styles.companyAction}>
+                  <Text
+                    style={[
+                      styles.marketMove,
+                      movement !== undefined && {
+                        color: movement >= 0 ? colors.success : colors.danger,
+                      },
+                    ]}
+                  >
+                    {movement === undefined ? '—' : signedPercent(movement)}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[styles.investAction, owns && styles.investActionOwned]}
+                    onPress={() => setTrade({ kind: 'BUY', companyId: company.id })}
+                  >
+                    <Text
+                      style={[
+                        styles.investActionText,
+                        owns && styles.investActionTextOwned,
+                      ]}
+                    >
+                      {owns ? 'Add' : 'Invest'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })}
         </Card>
-      </Animated.View>
 
-      {/* Withdraw */}
-      {currentValue > 0 && (
-        <Animated.View entering={FadeInDown.duration(380).delay(120)}>
-          <Button
-            label={`Withdraw all (${currentValue.toLocaleString()} coins)`}
-            variant="secondary"
-            style={styles.withdrawBtn}
-            onPress={handleWithdraw}
-          />
-        </Animated.View>
-      )}
+        <Text style={styles.riskLine}>Company values update once at each season end.</Text>
 
-      {/* Risk disclosure */}
-      <Animated.View entering={FadeInDown.duration(400).delay(160)}>
-        <Card style={styles.riskCard}>
-          <Text style={styles.sectionLabel}>RISK DISCLOSURE</Text>
-          <Text style={styles.riskText}>
-            Your stock portfolio fluctuates ±10% each season, influenced by your team's win rate and
-            general market noise. A dominant season drives positive drift; a losing run weighs on
-            returns. Past performance does not guarantee future results. All investments can lose
-            value.
-          </Text>
-        </Card>
-      </Animated.View>
-
-      {/* ── Legacy Fund (late-game coin sink) ── */}
-      <Animated.View entering={FadeInDown.duration(420).delay(200)}>
         <Card style={styles.legacyCard}>
           <View style={styles.legacyHeader}>
-            <Text style={styles.sectionLabel}>LEGACY FUND</Text>
-            <View style={styles.legacyRankPill}>
-              <Text style={styles.legacyRankText}>
-                {legacyRankTitle} · {legacyPoints} pts
-              </Text>
+            <View>
+              <Text style={styles.eyebrow}>LEGACY FUND</Text>
+              <Text style={styles.legacyTitle}>{legacyRankTitle}</Text>
             </View>
+            <Text style={styles.legacyPoints}>{legacyPoints} pts</Text>
           </View>
-          <Text style={styles.riskText}>
-            Put your career fortune to work off the field. Legacy contributions are pure prestige —
-            they build your permanent Legacy rank and never expire, but grant no in-game advantage.
-          </Text>
-          {LEGACY_TIERS.map((t) => {
-            const owned = (save.inventory?.[t.id] ?? 0) > 0;
-            const affordable = save.wallet.coins >= t.coinCost;
+          {LEGACY_TIERS.map((tier, index) => {
+            const owned = (save.inventory?.[tier.id] ?? 0) > 0;
             return (
-              <View key={t.id} style={styles.legacyRow}>
-                <Text style={styles.legacyIcon}>{t.icon}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.legacyLabel}>{t.label}</Text>
-                  <Text style={styles.legacyDesc}>{t.description}</Text>
-                  <Text style={styles.legacyPts}>+{t.points} legacy</Text>
+              <View
+                key={tier.id}
+                style={[styles.legacyRow, index === LEGACY_TIERS.length - 1 && styles.lastRow]}
+              >
+                <View style={styles.companyCopy}>
+                  <Text style={styles.companyName}>{tier.label}</Text>
+                  <Text style={styles.companyMeta}>+{tier.points} legacy</Text>
                 </View>
                 <Button
-                  label={owned ? 'Funded ✓' : t.coinCost.toLocaleString()}
+                  label={owned ? 'Funded' : tier.coinCost.toLocaleString()}
                   size="sm"
                   variant={owned ? 'secondary' : 'gold'}
                   fullWidth={false}
-                  disabled={owned || !affordable}
-                  onPress={() => handleContribute(t)}
+                  disabled={owned || save.wallet.coins < tier.coinCost}
+                  onPress={() => fundLegacy(tier)}
                 />
               </View>
             );
           })}
-          <Text style={styles.walletLine}>Wallet: {save.wallet.coins.toLocaleString()} coins</Text>
         </Card>
-      </Animated.View>
-    </Screen>
+      </Screen>
+
+      <Modal transparent visible={Boolean(trade)} animationType="fade" onRequestClose={closeTrade}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeTrade} />
+          <View style={styles.tradeSheet}>
+            <Text style={styles.tradeKicker}>
+              {trade?.kind === 'SELL' ? 'SELL HOLDING' : 'INVEST'}
+            </Text>
+            <Text style={styles.tradeTitle}>{tradeName}</Text>
+            {tradeCompany ? (
+              <>
+                <Text style={styles.tradeMeta}>
+                  {STOCK_SECTOR_LABELS[tradeCompany.sector]} ·{' '}
+                  {STOCK_RISK_LABELS[tradeCompany.risk]}
+                </Text>
+                <Text style={styles.tradeRange}>
+                  Season range {STOCK_RISK_RANGES[tradeCompany.risk].min}% to +
+                  {STOCK_RISK_RANGES[tradeCompany.risk].max}%
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.tradeMeta}>Sell-only position from the previous market</Text>
+            )}
+            {tradeHolding && tradeHolding.history.length >= 2 ? (
+              <View style={styles.tradeChart}>
+                <Sparkline
+                  values={tradeHolding.history}
+                  width={280}
+                  height={52}
+                  color={
+                    tradeHolding.currentValue >= tradeHolding.costBasis
+                      ? colors.success
+                      : colors.danger
+                  }
+                />
+              </View>
+            ) : null}
+            <TextInput
+              style={styles.tradeInput}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="number-pad"
+              placeholder={
+                trade?.kind === 'SELL'
+                  ? `Up to ${(tradeHolding?.currentValue ?? 0).toLocaleString()}`
+                  : `${STOCK_MIN_INVEST.toLocaleString()}–${STOCK_MAX_INVEST.toLocaleString()} coins`
+              }
+              placeholderTextColor={colors.textFaint}
+            />
+            <Text
+              style={[
+                styles.tradeFunds,
+                (buyShortfall > 0 || sellExcess > 0) && styles.tradeFundsError,
+              ]}
+            >
+              {trade?.kind === 'SELL'
+                ? sellExcess > 0
+                  ? `Exceeds holding by ${sellExcess.toLocaleString()} coins`
+                  : `Holding value ${(tradeHolding?.currentValue ?? 0).toLocaleString()} coins`
+                : buyShortfall > 0
+                  ? `Need ${buyShortfall.toLocaleString()} more coins`
+                  : `Wallet ${save.wallet.coins.toLocaleString()} coins`}
+            </Text>
+            {trade?.kind === 'SELL' ? (
+              <View style={styles.tradeButtons}>
+                <Button
+                  label="Sell amount"
+                  fullWidth={false}
+                  style={styles.tradeButton}
+                  disabled={parsedAmount < 1 || sellExcess > 0}
+                  onPress={() => sell(false)}
+                />
+                <Button
+                  label="Sell all"
+                  variant="secondary"
+                  fullWidth={false}
+                  style={styles.tradeButton}
+                  onPress={() => sell(true)}
+                />
+              </View>
+            ) : (
+              <Button
+                label="Confirm investment"
+                variant="gold"
+                disabled={
+                  parsedAmount < STOCK_MIN_INVEST ||
+                  parsedAmount > STOCK_MAX_INVEST ||
+                  buyShortfall > 0
+                }
+                onPress={buy}
+              />
+            )}
+            <Button label="Cancel" variant="ghost" onPress={closeTrade} />
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value.toLocaleString()}</Text>
+    </View>
+  );
+}
+
+function HoldingCard({ holding, onSell }: { holding: StockHolding; onSell: () => void }) {
+  const company = stockCompany(holding.companyId);
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const pnl = holding.currentValue - holding.costBasis;
+  const pnlColor = pnl >= 0 ? colors.success : colors.danger;
+  return (
+    <Card style={styles.holdingCard}>
+      <View style={styles.holdingTop}>
+        <View style={styles.companyCopy}>
+          <Text style={styles.holdingName}>{holdingDisplayName(holding)}</Text>
+          <Text style={styles.companyMeta}>
+            {holding.companyId === LEGACY_MARKET_INDEX_ID
+              ? 'Sell only · Previous market position'
+              : `${company ? STOCK_SECTOR_LABELS[company.sector] : 'Market'} · ${
+                  company ? STOCK_RISK_LABELS[company.risk] : 'Retired'
+                }`}
+          </Text>
+        </View>
+        <View style={styles.holdingValueWrap}>
+          <Text style={styles.holdingValue}>{holding.currentValue.toLocaleString()}</Text>
+          <Text style={[styles.holdingPnl, { color: pnlColor }]}>
+            {pnl >= 0 ? '+' : ''}
+            {pnl.toLocaleString()}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.holdingBottom}>
+        <Text style={styles.costBasis}>Cost {holding.costBasis.toLocaleString()}</Text>
+        <Button label="Sell" size="sm" variant="secondary" fullWidth={false} onPress={onSell} />
+      </View>
+    </Card>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      style={[styles.filterChip, active && styles.filterChipActive]}
+      onPress={onPress}
+    >
+      <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    msg: { color: colors.textMuted, fontSize: fontSize.md, margin: spacing.lg },
-    sectionLabel: {
-      color: colors.textFaint,
+    message: { color: colors.textMuted, fontSize: fontSize.md, margin: spacing.lg },
+    summaryCard: { marginTop: spacing.md, borderColor: colors.accent, borderTopWidth: 2 },
+    eyebrow: {
+      color: colors.accent,
       fontSize: 10,
       fontWeight: fontWeight.bold,
-      textTransform: 'uppercase',
       letterSpacing: 1,
-      marginBottom: spacing.sm,
     },
-    portfolioCard: { marginTop: spacing.lg },
-    valueRow: {
+    summaryTop: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: spacing.md,
+      alignItems: 'flex-end',
+      marginTop: spacing.sm,
     },
-    valueLabel: { color: colors.textMuted, fontSize: fontSize.xs },
-    valueAmount: { fontSize: fontSize.xxl, fontWeight: fontWeight.black, marginTop: 2 },
-    pnlBox: { alignItems: 'flex-end' },
-    pnlAmount: { fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
-    pnlPct: { fontSize: fontSize.xs, marginTop: 2 },
-    metaRow: {
+    summaryValueWrap: { flex: 1 },
+    summaryLabel: { color: colors.textMuted, fontSize: fontSize.xs },
+    summaryValue: { color: colors.text, fontSize: fontSize.xxl, fontWeight: fontWeight.black },
+    pnlWrap: { alignItems: 'flex-end' },
+    pnlValue: { fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+    pnlPercent: { fontSize: fontSize.xs, marginTop: 2 },
+    summaryMeta: {
       flexDirection: 'row',
-      gap: spacing.xl,
-      paddingTop: spacing.sm,
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
     },
-    metaItem: {},
-    metaLabel: { color: colors.textFaint, fontSize: fontSize.xs },
-    metaValue: {
+    metric: { flex: 1, minWidth: 0 },
+    metricLabel: { color: colors.textFaint, fontSize: 10 },
+    metricValue: {
       color: colors.text,
       fontSize: fontSize.sm,
       fontWeight: fontWeight.bold,
       marginTop: 2,
     },
-    chartRow: { marginTop: spacing.md, alignItems: 'flex-start' },
-    chartCaption: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: spacing.xs },
-    inputCard: { marginTop: spacing.md },
-    note: { color: colors.textFaint, fontSize: fontSize.xs, marginBottom: spacing.sm },
-    inputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    input: {
-      flex: 1,
-      height: 44,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: radius.md,
-      paddingHorizontal: spacing.md,
+    sectionTitle: {
       color: colors.text,
-      fontSize: fontSize.md,
-      backgroundColor: colors.surfaceAlt,
-    },
-    investBtn: { flexShrink: 0 },
-    walletLine: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: spacing.sm },
-    withdrawBtn: { marginTop: spacing.md },
-    riskCard: { marginTop: spacing.md, borderColor: colors.warning + '55', borderWidth: 1 },
-    riskText: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 18 },
-    legacyCard: { marginTop: spacing.md, borderColor: colors.accent + '55', borderWidth: 1 },
-    legacyHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.heavy,
+      marginTop: spacing.xl,
       marginBottom: spacing.sm,
     },
-    legacyRankPill: {
-      backgroundColor: colors.accent + '22',
-      borderRadius: radius.pill,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
-      borderWidth: 1,
-      borderColor: colors.accent + '55',
-    },
-    legacyRankText: { color: colors.accent, fontSize: 10, fontWeight: fontWeight.bold },
-    legacyRow: {
+    emptyCard: { paddingVertical: spacing.lg },
+    emptyText: { color: colors.textMuted, fontSize: fontSize.sm, textAlign: 'center' },
+    holdingCard: { marginBottom: spacing.sm },
+    holdingTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+    holdingName: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+    holdingValueWrap: { alignItems: 'flex-end' },
+    holdingValue: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+    holdingPnl: { fontSize: fontSize.xs, fontWeight: fontWeight.bold, marginTop: 2 },
+    holdingBottom: {
       flexDirection: 'row',
+      justifyContent: 'space-between',
       alignItems: 'center',
-      gap: spacing.md,
-      paddingVertical: spacing.sm,
+      marginTop: spacing.md,
+      paddingTop: spacing.sm,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
     },
-    legacyIcon: { fontSize: 24, width: 32, textAlign: 'center' },
-    legacyLabel: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
-    legacyDesc: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 1, lineHeight: 15 },
-    legacyPts: {
-      color: colors.accent,
+    costBasis: { color: colors.textMuted, fontSize: fontSize.xs },
+    marketHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+    marketYear: { color: colors.textMuted, fontSize: fontSize.xs },
+    filters: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      paddingBottom: spacing.sm,
+      maxWidth: '100%',
+    },
+    filterChip: {
+      minHeight: 36,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+    },
+    filterChipActive: { borderColor: colors.accent, backgroundColor: colors.accent + '18' },
+    filterText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.bold },
+    filterTextActive: { color: colors.accent },
+    marketCard: { paddingVertical: 0 },
+    companyRow: {
+      minHeight: 68,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    lastRow: { borderBottomWidth: 0 },
+    companyMark: {
+      width: 38,
+      height: 38,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    companyMarkText: { color: colors.accent, fontSize: 10, fontWeight: fontWeight.black },
+    companyCopy: { flex: 1, minWidth: 0 },
+    companyName: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+    companyMeta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+    companyAction: { alignItems: 'flex-end', gap: 4 },
+    marketMove: { color: colors.textFaint, fontSize: 10, fontWeight: fontWeight.bold },
+    investAction: {
+      minWidth: 62,
+      minHeight: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.sm,
+      borderRadius: radius.sm,
+      backgroundColor: colors.accent,
+    },
+    investActionOwned: {
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.accent,
+    },
+    investActionText: { color: colors.bg, fontSize: fontSize.xs, fontWeight: fontWeight.heavy },
+    investActionTextOwned: { color: colors.accent },
+    riskLine: {
+      color: colors.textFaint,
       fontSize: fontSize.xs,
-      fontWeight: fontWeight.bold,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+    },
+    legacyCard: { marginTop: spacing.xl, marginBottom: spacing.xxl },
+    legacyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    legacyTitle: {
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.heavy,
       marginTop: 2,
     },
+    legacyPoints: { color: colors.accent, fontSize: fontSize.md, fontWeight: fontWeight.heavy },
+    legacyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.sm,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+      marginTop: spacing.sm,
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'center',
+      padding: spacing.lg,
+      backgroundColor: 'rgba(0,0,0,0.72)',
+    },
+    tradeSheet: {
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      backgroundColor: colors.bgElevated,
+      padding: spacing.lg,
+    },
+    tradeKicker: {
+      color: colors.accent,
+      fontSize: 10,
+      fontWeight: fontWeight.bold,
+      letterSpacing: 1,
+    },
+    tradeTitle: {
+      color: colors.text,
+      fontSize: fontSize.xl,
+      fontWeight: fontWeight.heavy,
+      marginTop: 4,
+    },
+    tradeMeta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+    tradeRange: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: spacing.xs },
+    tradeChart: { marginTop: spacing.md },
+    tradeInput: {
+      height: 48,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surfaceAlt,
+      color: colors.text,
+      fontSize: fontSize.md,
+      paddingHorizontal: spacing.md,
+      marginTop: spacing.md,
+    },
+    tradeFunds: { color: colors.textMuted, fontSize: fontSize.xs, marginVertical: spacing.sm },
+    tradeFundsError: { color: colors.danger },
+    tradeButtons: { flexDirection: 'row', gap: spacing.sm },
+    tradeButton: { flex: 1 },
   });

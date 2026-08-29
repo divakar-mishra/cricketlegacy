@@ -1,4 +1,5 @@
 import { SaveGame, SeasonPassScenarioProgress } from '../domain/types';
+import { PASS_BALANCE_VERSION, synchronizePassBalance } from './liveops';
 import {
   MONTHLY_PASS_CONTENT,
   MONTHLY_PASS_ITEM_LABELS,
@@ -35,7 +36,6 @@ export interface SeasonPassScenario {
   targetRuns: number;
   targetWickets: number;
   rewardCoins: number;
-  rewardGems: number;
   tournament: boolean;
 }
 
@@ -61,9 +61,16 @@ export const SEASON_PASS_ITEM_LABELS: Readonly<Record<string, string>> = {
 
 export function seasonPassPeriod(now: number): PassPeriod {
   const safeNow = Number.isFinite(now) ? now : PASS_PERIOD_ANCHOR;
-  const index = Math.max(0, Math.floor((safeNow - PASS_PERIOD_ANCHOR) / SEASON_PASS_PERIOD_MS));
-  const startsAt = PASS_PERIOD_ANCHOR + index * SEASON_PASS_PERIOD_MS;
-  return { id: `pass-${index}`, startsAt, endsAt: startsAt + SEASON_PASS_PERIOD_MS };
+  const date = new Date(safeNow);
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const startsAt = Date.UTC(year, month, 1, 0, 0, 0, 0);
+  const endsAt = Date.UTC(year, month + 1, 1, 0, 0, 0, 0);
+  return {
+    id: `pass-${year}-${String(month + 1).padStart(2, '0')}`,
+    startsAt,
+    endsAt,
+  };
 }
 
 export function isSeasonPassActive(save: SaveGame | undefined, now: number = Date.now()): boolean {
@@ -96,24 +103,60 @@ export function ensureSeasonPassExperience(save: SaveGame, cycleId?: string): vo
   }
 }
 
-/** Keep the 30-day live-ops cycle and subscription access in sync. */
+function canCarryLegacyRollingCycle(pass: NonNullable<SaveGame['pass']>, now: number): boolean {
+  if (!/^pass-\d+$/.test(pass.seasonId)) return false;
+  if (pass.periodStartedAt == null || pass.periodEndsAt == null) return true;
+  return now >= pass.periodStartedAt && now < pass.periodEndsAt;
+}
+
+function carryLegacyExperienceCycle(save: SaveGame, fromCycleId: string, toCycleId: string): void {
+  const experience = save.seasonPassExperience;
+  if (!experience || fromCycleId === toCycleId) return;
+  if (experience.monthlyDropCycleId === fromCycleId) {
+    experience.monthlyDropCycleId = toCycleId;
+  }
+  if (experience.scenarioCycleId === fromCycleId) {
+    experience.scenarioCycleId = toCycleId;
+  }
+  if (experience.playerStoryCycleId === fromCycleId) {
+    experience.playerStoryCycleId = toCycleId;
+  }
+  if (experience.managerStoryCycleId === fromCycleId) {
+    experience.managerStoryCycleId = toCycleId;
+  }
+}
+
+/** Keep the UTC calendar-month reward cycle and subscription access in sync. */
 export function synchronizeSeasonPassState(save: SaveGame, now: number = Date.now()): void {
   const period = seasonPassPeriod(now);
   const active = isSeasonPassActive(save, now);
-  if (!save.pass || save.pass.seasonId !== period.id) {
+  const previous = save.pass ? synchronizePassBalance(save.pass) : undefined;
+  const carryLegacyProgress = Boolean(
+    previous && previous.seasonId !== period.id && canCarryLegacyRollingCycle(previous, now),
+  );
+  if (!previous || (previous.seasonId !== period.id && !carryLegacyProgress)) {
     save.pass = {
       seasonId: period.id,
       periodStartedAt: period.startsAt,
       periodEndsAt: period.endsAt,
+      balanceVersion: PASS_BALANCE_VERSION,
       xp: 0,
       premium: active,
       claimedFree: [],
       claimedPremium: [],
     };
   } else {
-    save.pass.periodStartedAt = period.startsAt;
-    save.pass.periodEndsAt = period.endsAt;
-    save.pass.premium = active;
+    save.pass = {
+      ...previous,
+      seasonId: period.id,
+      periodStartedAt: period.startsAt,
+      periodEndsAt: period.endsAt,
+      balanceVersion: PASS_BALANCE_VERSION,
+      premium: active,
+    };
+  }
+  if (carryLegacyProgress && previous) {
+    carryLegacyExperienceCycle(save, previous.seasonId, period.id);
   }
   if (save.entitlements.seasonPass) {
     save.entitlements.seasonPass.premium = active;
@@ -169,7 +212,8 @@ export function claimMonthlyCosmeticDrop(
     return { ok: false, reason: "This cycle's cosmetic drop is already claimed." };
   }
   const bundle = monthlyBundleForCycle(cycleId);
-  const items = [bundle.kit.id, bundle.celebration.id, bundle.office.inventoryId];
+  const items =
+    save.mode === 'manager' ? [bundle.office.inventoryId] : [bundle.kit.id, bundle.celebration.id];
   const inventory = { ...(save.inventory ?? {}) };
   for (const item of [...items, bundle.collectible.id]) inventory[item] = 1;
   save.inventory = inventory;
@@ -235,20 +279,19 @@ export function claimSeasonPassScenarioReward(
   save: SaveGame,
   scenarioId: string,
   now: number = Date.now(),
-): { ok: boolean; coins: number; gems: number; reason?: string } {
+): { ok: boolean; coins: number; reason?: string } {
   synchronizeSeasonPassState(save, now);
   const definition = SEASON_PASS_SCENARIOS.find((scenario) => scenario.id === scenarioId);
   const progress = save.seasonPassExperience?.scenarios[scenarioId];
   if (!definition || !progress?.completed) {
-    return { ok: false, coins: 0, gems: 0, reason: 'Complete the scenario first.' };
+    return { ok: false, coins: 0, reason: 'Complete the scenario first.' };
   }
   if (progress.rewardClaimed) {
-    return { ok: false, coins: 0, gems: 0, reason: 'Reward already claimed.' };
+    return { ok: false, coins: 0, reason: 'Reward already claimed.' };
   }
   progress.rewardClaimed = true;
   save.wallet.coins += definition.rewardCoins;
-  save.wallet.gems += definition.rewardGems;
-  return { ok: true, coins: definition.rewardCoins, gems: definition.rewardGems };
+  return { ok: true, coins: definition.rewardCoins };
 }
 
 export function passTrainingMultiplier(save: SaveGame, now: number = Date.now()): number {

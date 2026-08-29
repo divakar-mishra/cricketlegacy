@@ -1,37 +1,21 @@
 export type AvatarSex = 'male' | 'female';
 
-export type AvatarRigId = 'narrow' | 'medium' | 'wide';
+export type AvatarToneBand = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-export type AvatarLayerRole =
-  'hairBack' | 'outfit' | 'base' | 'eyes' | 'hairFront' | 'beard' | 'moustache' | 'headwear';
-
-export type AvatarAssetCategory =
-  'base' | 'eyes' | 'hair' | 'beards' | 'moustaches' | 'headwear' | 'outfits';
-
-/** Stable IDs only. Image modules and paths are intentionally never persisted. */
+/**
+ * Persisted avatar identity. Only stable portrait IDs are stored; image modules
+ * and asset paths stay in the generated registry.
+ */
 export interface AvatarConfig {
   sex: AvatarSex;
-  rigId: AvatarRigId;
-  baseFaceId: string;
-  eyeColorId: string;
-  hairBackId: string;
-  hairFrontId: string;
-  beardId: string;
-  moustacheId: string;
-  headwearId: string;
-  outfitId: string;
+  portraitId: string;
   frameId?: string;
 }
 
-export interface AvatarPreset extends AvatarConfig {
+export interface PortraitAssetMetadata {
   id: string;
-}
-
-export interface AvatarAssetMetadata {
-  id: string;
-  category: AvatarAssetCategory;
-  layer: AvatarLayerRole;
-  sex?: AvatarSex;
-  rig?: AvatarRigId;
-  hidesHair?: boolean;
+  sex: AvatarSex;
+  toneBand: AvatarToneBand;
+  /** One-based position within the 64 portraits for this sex. */
+  index: number;
 }

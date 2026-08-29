@@ -142,7 +142,7 @@ export function CommentaryArchive({
             <View style={styles.empty}>
               <Icon name="radio-outline" size={28} color={colors.textFaint} />
               <Text style={styles.emptyTitle}>No deliveries yet</Text>
-              <Text style={styles.emptyText}>This view will fill as the innings develops.</Text>
+            <Text style={styles.emptyText}>No commentary yet.</Text>
             </View>
           }
           renderItem={({ item, index }) => (

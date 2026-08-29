@@ -2,9 +2,11 @@ import { useCallback, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { playHaptic } from '../audio';
+import { PlayerDevelopmentPanel } from '../components/PlayerDevelopmentPanel';
 import {
   Button,
   Card,
+  Icon,
   ProgressBar,
   Screen,
   ScreenHeader,
@@ -15,15 +17,18 @@ import {
   WalletBar,
 } from '../components';
 import { ATTR_META, TRAINING } from '../data/attributes';
-import { computeOverall } from '../engine/rating';
+import { computeOverall, computeOverallRaw } from '../engine/rating';
 import { baseAttributeValue } from '../game/attributeDisplay';
+import { resolveNextCareerStep } from '../game/careerStep';
 import {
   canTrain,
   sessionsDone,
   TrainGain,
   TrainGroup,
   trainingCost,
+  trainingFocusSessionLimit,
   trainingFocusesForRole,
+  trainingSessionLimit,
 } from '../game/progression';
 import { nextUserFixtureId } from '../game/season';
 import { trainingAttributeCeiling } from '../game/youthBalance';
@@ -40,41 +45,54 @@ import {
   useTheme,
   useThemedStyles,
 } from '../theme';
+import { ManagerTrainingScreen } from './ManagerTrainingScreen';
 
 interface GainPopup {
   id: number;
   gains: TrainGain[];
   newOverall: number;
   oldOverall: number;
-}
-
-function capReason(level: string | undefined): string {
-  if (level === 'SCHOOL') return 'School-level coaching cap';
-  if (level === 'U19') return 'Under-19 coaching cap';
-  return 'Senior professional cap';
-}
-
-function capRequirement(level: string | undefined): string {
-  if (level === 'SCHOOL') return 'Earn an Under-19 call-up to raise this cap.';
-  if (level === 'U19') return 'Earn a domestic contract to raise this cap.';
-  return 'Keep form, fitness and coaching high to sustain long-term development.';
+  newDevelopment: number;
+  oldDevelopment: number;
 }
 
 export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
   const save = useCareer((s) => s.save);
   const train = useCareer((s) => s.train);
+  const advanceSeason = useCareer((s) => s.advanceSeason);
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [flash, setFlash] = useState<string | null>(null);
   const [popup, setPopup] = useState<GainPopup | null>(null);
   const [busyGroup, setBusyGroup] = useState<TrainGroup | null>(null);
+  const [showDevelopment, setShowDevelopment] = useState(false);
   const popupCounter = useRef(0);
 
-  const showPopup = useCallback((gains: TrainGain[], newOvr: number, oldOvr: number) => {
-    popupCounter.current += 1;
-    const id = popupCounter.current;
-    setPopup({ id, gains, newOverall: newOvr, oldOverall: oldOvr });
-  }, []);
+  const showPopup = useCallback(
+    (
+      gains: TrainGain[],
+      newOvr: number,
+      oldOvr: number,
+      newDevelopment: number,
+      oldDevelopment: number,
+    ) => {
+      popupCounter.current += 1;
+      const id = popupCounter.current;
+      setPopup({
+        id,
+        gains,
+        newOverall: newOvr,
+        oldOverall: oldOvr,
+        newDevelopment,
+        oldDevelopment,
+      });
+    },
+    [],
+  );
+
+  if (save?.mode === 'manager') {
+    return <ManagerTrainingScreen navigation={navigation} />;
+  }
 
   if (!save || !save.userPlayerId) {
     return (
@@ -88,22 +106,31 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
 
   const player = save.players[save.userPlayerId];
   const overall = computeOverall(player);
+  const development = computeOverallRaw(player);
   const done = sessionsDone(player);
   const visibleGroups = trainingFocusesForRole(player.role);
-  const totalAllowedSessions = TRAINING.maxSessionsPerSeason;
+  const totalAllowedSessions = trainingSessionLimit(save.careerPathLevel);
   const left = Math.max(0, totalAllowedSessions - done);
   const progressPct = done / totalAllowedSessions;
+  const overallProgress = Math.max(0, Math.min(1, development - (overall - 0.5)));
   const acceleratorCharges = Math.max(0, save.inventory?.training_accelerator ?? 0);
+  const activeCoachCount = Object.values(save.playerLife?.personalCoaches ?? {}).filter(
+    (coach) => (coach?.seasonsRemaining ?? 0) > 0,
+  ).length;
+  const ownedEquipmentCount = save.playerLife?.equipmentIds?.length ?? 0;
   const nextFixtureId = nextUserFixtureId(save);
   const activeAnalysis =
     nextFixtureId && save.playerLife?.lastAnalysisReport?.fixtureId === nextFixtureId
       ? save.playerLife.lastAnalysisReport
       : undefined;
+  const canContinueWithoutTraining =
+    resolveNextCareerStep(save).action === 'ADVANCE_CAREER_CALENDAR';
 
   const onTrain = async (group: TrainGroup) => {
     if (busyGroup) return;
     setBusyGroup(group);
     const oldOvr = computeOverall(player);
+    const oldDevelopment = computeOverallRaw(player);
     const res = await train(group);
     setBusyGroup(null);
 
@@ -122,17 +149,63 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
 
     const trainedPlayer = save.players[save.userPlayerId!];
     const newOvr = trainedPlayer ? computeOverall(trainedPlayer) : oldOvr;
-    showPopup(res.gains, newOvr, oldOvr);
+    const newDevelopment = trainedPlayer ? computeOverallRaw(trainedPlayer) : oldDevelopment;
+    showPopup(res.gains, newOvr, oldOvr, newDevelopment, oldDevelopment);
   };
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        canContinueWithoutTraining ? (
+          <Button
+            label="Continue without training"
+            variant="gold"
+            onPress={() => {
+              advanceSeason();
+              navigation.goBack();
+            }}
+          />
+        ) : undefined
+      }
+    >
       <ScreenHeader
         title="Training Ground"
-        subtitle={`Season ${save.currentSeasonId ? '' : ''}· ${left} session${left === 1 ? '' : 's'} left`}
+        subtitle={`${left} session${left === 1 ? '' : 's'} left`}
         onBack={() => navigation.goBack()}
       />
       <WalletBar wallet={save.wallet} />
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          showDevelopment ? 'Return to training sessions' : 'Open Development Centre'
+        }
+        style={({ pressed }) => [
+          styles.supportStrip,
+          showDevelopment && styles.supportStripActive,
+          pressed && styles.supportStripPressed,
+        ]}
+        onPress={() => setShowDevelopment((current) => !current)}
+      >
+        <View style={styles.supportIcon}>
+          <Icon name="fitness-outline" size={24} color={colors.accent} />
+        </View>
+        <View style={styles.supportCopy}>
+          <Text style={styles.supportTitle}>Development Centre</Text>
+          <Text style={styles.supportStatus}>
+            {activeCoachCount} coach{activeCoachCount === 1 ? '' : 'es'} · Equipment{' '}
+            {ownedEquipmentCount}/4
+          </Text>
+        </View>
+        <View style={styles.supportAction}>
+          <Text style={styles.supportActionText}>{showDevelopment ? 'SESSIONS' : 'OPEN'}</Text>
+          <Icon
+            name={showDevelopment ? 'chevron-back' : 'chevron-forward'}
+            size={18}
+            color={colors.accent}
+          />
+        </View>
+      </Pressable>
 
       {activeAnalysis ? (
         <View style={styles.analystBanner}>
@@ -140,7 +213,6 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
             <Text style={styles.analystTitle}>
               Analyst focus: {activeAnalysis.recommendedTrainingGroup.replace('_', ' ')}
             </Text>
-            <Text style={styles.analystText}>{activeAnalysis.trainingReason}</Text>
           </View>
         </View>
       ) : null}
@@ -152,7 +224,7 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
         >
           <Text style={styles.acceleratorTitle}>Training Accelerator active</Text>
           <Text style={styles.acceleratorText}>
-            Next session earns 3x gains · {acceleratorCharges} charge
+            1.5× gains · {acceleratorCharges} charge
             {acceleratorCharges === 1 ? '' : 's'} remaining
           </Text>
         </View>
@@ -160,9 +232,7 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
         <View style={styles.acceleratorOffer}>
           <View style={styles.acceleratorOfferCopy}>
             <Text style={styles.acceleratorTitle}>Accelerate this season</Text>
-            <Text style={styles.acceleratorText}>
-              Three sessions at 3x gains. Training limits still apply.
-            </Text>
+            <Text style={styles.acceleratorText}>3 boosted sessions</Text>
           </View>
           <Button
             label="View boost"
@@ -177,7 +247,7 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
       {/* Sessions progress bar */}
       <Animated.View entering={FadeInDown.duration(300)} style={styles.progressBox}>
         <View style={styles.progressRow}>
-          <Text style={styles.progressLabel}>Training sessions this season</Text>
+          <Text style={styles.progressLabel}>Sessions</Text>
           <Text style={styles.progressCount}>
             {done} / {totalAllowedSessions}
           </Text>
@@ -193,6 +263,15 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
             <Text style={styles.sub}>
               Form {player.meta.form} · Fitness {player.meta.fitness} · Age {player.age}
             </Text>
+            <View style={styles.ovrProgressRow}>
+              <Text style={styles.ovrProgressText}>Development {development.toFixed(2)}</Text>
+              <Text style={styles.ovrProgressText}>Next OVR {Math.min(99, overall + 1)}</Text>
+            </View>
+            <ProgressBar
+              value={overall >= 99 ? 1 : overallProgress}
+              color={colors.accent}
+              style={styles.ovrProgressBar}
+            />
             {left === 0 && (
               <Text style={styles.maxNote}>Max sessions reached — resets next season</Text>
             )}
@@ -217,7 +296,10 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
 
       {/* Attribute groups */}
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-        {visibleGroups.map((group, idx) => {
+        {showDevelopment ? (
+          <PlayerDevelopmentPanel />
+        ) : (
+          visibleGroups.map((group, idx) => {
           const obj = player[group.sourceGroup] as unknown as Record<string, number>;
           const labels = new Map(
             ATTR_META[group.sourceGroup].map(([key, label]) => [key as string, label]),
@@ -232,10 +314,10 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
           const groupDone = sessionsDone(player, group.id);
           const groupLeft = Math.max(
             0,
-            Math.min(Math.ceil(TRAINING.maxSessionsPerSeason / 2) - groupDone, left),
+            Math.min(trainingFocusSessionLimit(save.careerPathLevel) - groupDone, left),
           );
-          const groupCost = trainingCost(done);
-          const groupTrainable = canTrain(player, group.id);
+          const groupCost = trainingCost(done, overall);
+          const groupTrainable = canTrain(player, group.id, save.careerPathLevel);
           const canAfford = save.wallet.coins >= groupCost;
           const cost = groupCost;
           const trainable = groupTrainable;
@@ -244,8 +326,6 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
             trainingAttributeCeiling(save.careerPathLevel),
           );
           const improvableCount = attrs.filter((attr) => attr.val < cap).length;
-          const possibleGain =
-            trainable && improvableCount > 0 ? `+1 to +${TRAINING.gainMax}` : 'No gain available';
           const blockedByCap = improvableCount === 0;
           const analystRecommended = activeAnalysis?.recommendedTrainingGroup === group.id;
 
@@ -258,42 +338,28 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
                     {analystRecommended ? (
                       <Text style={styles.recommendedLabel}>Analyst recommendation</Text>
                     ) : null}
-                    <Text style={styles.groupAvg}>
-                      Avg: {groupAvg} · {groupLeft} left
-                    </Text>
-                    <Text style={styles.capLine}>
-                      Possible gain: {possibleGain} · Cost: {cost.toLocaleString()} coins
-                    </Text>
+                    <Text style={styles.groupAvg}>Avg {groupAvg} · {groupLeft} left</Text>
                   </View>
                   <Button
                     label={
                       isBusy
                         ? 'Training...'
-                        : trainable
-                          ? canAfford
-                            ? `Train · ${cost}`
-                            : `Need ${cost}`
-                          : 'Maxed'
+                        : blockedByCap
+                          ? 'Stage cap reached'
+                          : trainable
+                            ? canAfford
+                              ? `Train · ${cost}`
+                              : `Need ${cost}`
+                            : 'Season limit reached'
                     }
                     size="sm"
-                    variant={groupTrainable ? 'primary' : 'secondary'}
+                    variant={groupTrainable && !blockedByCap ? 'primary' : 'secondary'}
                     fullWidth={false}
                     loading={isBusy}
-                    disabled={!groupTrainable || !canAfford || !!busyGroup}
+                    disabled={!groupTrainable || blockedByCap || !canAfford || !!busyGroup}
                     onPress={() => void onTrain(group.id)}
                   />
                 </View>
-                <View style={styles.capBox}>
-                  <Text style={styles.capText}>
-                    Current cap: {cap} - {capReason(save.careerPathLevel)}
-                  </Text>
-                  <Text style={[styles.capText, blockedByCap && styles.capWarn]}>
-                    {blockedByCap
-                      ? capRequirement(save.careerPathLevel)
-                      : `${improvableCount} attribute${improvableCount === 1 ? '' : 's'} can still improve in this focus.`}
-                  </Text>
-                </View>
-
                 {attrs.map((attr) => (
                   <View key={attr.key} style={styles.attrRow}>
                     <Text style={styles.attrLabel}>{attr.label}</Text>
@@ -308,13 +374,8 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
               </Card>
             </Animated.View>
           );
-        })}
-
-        <Text style={styles.note}>
-          School, Under-19, Domestic and International careers use the same seasonal price curve:
-          250, 400, 550, 700, 850 and 1,000 coins. Choose up to six sessions per season, with no
-          more than three in one focus. Each session improves the two weakest eligible attributes.
-        </Text>
+          })
+        )}
       </ScrollView>
 
       {/* Gain popup overlay */}
@@ -325,39 +386,46 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
             exiting={SMOOTH_MODAL_EXIT}
             style={styles.popupOverlay}
           >
-            <Animated.View entering={SMOOTH_CARD_ZOOM} style={[styles.popupCard, shadow.card]}>
-              <View style={styles.popupHeader}>
-                <Text style={styles.popupTitle}>Training Complete!</Text>
-                {popup.newOverall !== popup.oldOverall && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss training result"
+              style={styles.popupDismissSurface}
+              onPress={() => setPopup(null)}
+            >
+              <Animated.View entering={SMOOTH_CARD_ZOOM} style={[styles.popupCard, shadow.card]}>
+                <View style={styles.popupHeader}>
+                  <Text style={styles.popupTitle}>Training Complete!</Text>
                   <View style={styles.ovrChangeBadge}>
                     <Text style={styles.ovrChangeText}>
-                      OVR {popup.oldOverall} → {popup.newOverall}
+                      {popup.newOverall !== popup.oldOverall
+                        ? `OVR ${popup.oldOverall} → ${popup.newOverall}`
+                        : `OVR progress ${popup.oldDevelopment.toFixed(2)} → ${popup.newDevelopment.toFixed(2)}`}
                     </Text>
                     <Text style={styles.ovrChangeDelta}>
-                      +{popup.newOverall - popup.oldOverall}
+                      +{popup.gains.reduce((total, gain) => total + gain.to - gain.from, 0)} growth
                     </Text>
                   </View>
-                )}
-              </View>
+                </View>
 
-              {popup.gains.map((g) => (
-                <View key={g.key} style={styles.gainRow}>
-                  <Text style={styles.gainLabel}>{g.label}</Text>
-                  <View style={styles.gainRight}>
-                    <Text style={styles.gainFrom}>{g.from}</Text>
-                    <Text style={styles.gainArrow}> → </Text>
-                    <Text style={styles.gainTo}>{g.to}</Text>
-                    <View style={styles.gainDeltaBadge}>
-                      <Text style={styles.gainDelta}>+{g.to - g.from}</Text>
+                {popup.gains.map((g) => (
+                  <View key={g.key} style={styles.gainRow}>
+                    <Text style={styles.gainLabel}>{g.label}</Text>
+                    <View style={styles.gainRight}>
+                      <Text style={styles.gainFrom}>{g.from}</Text>
+                      <Text style={styles.gainArrow}> → </Text>
+                      <Text style={styles.gainTo}>{g.to}</Text>
+                      <View style={styles.gainDeltaBadge}>
+                        <Text style={styles.gainDelta}>+{g.to - g.from}</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                ))}
 
-              <Pressable onPress={() => setPopup(null)} style={styles.popupDismiss}>
-                <Text style={styles.popupDismissText}>Tap to dismiss</Text>
-              </Pressable>
-            </Animated.View>
+                <View style={styles.popupDismiss}>
+                  <Text style={styles.popupDismissText}>Tap to close</Text>
+                </View>
+              </Animated.View>
+            </Pressable>
           </Animated.View>
         </Modal>
       ) : null}
@@ -368,6 +436,45 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     msg: { color: colors.textMuted, fontSize: fontSize.md, marginBottom: spacing.lg },
+    supportStrip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 2,
+      borderColor: colors.accent,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      marginTop: spacing.md,
+      marginBottom: spacing.xs,
+    },
+    supportStripActive: { backgroundColor: colors.accent + '12' },
+    supportStripPressed: { opacity: 0.82 },
+    supportIcon: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.accent + '18',
+      borderWidth: 1,
+      borderColor: colors.accent,
+    },
+    supportCopy: { flex: 1, minWidth: 0 },
+    supportTitle: {
+      color: colors.accent,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.heavy,
+      fontFamily: fonts.display,
+    },
+    supportStatus: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+    supportAction: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    supportActionText: {
+      color: colors.accent,
+      fontSize: 10,
+      fontWeight: fontWeight.black,
+      letterSpacing: 0.8,
+    },
     analystBanner: {
       flexDirection: 'row',
       borderWidth: 1,
@@ -439,6 +546,14 @@ const makeStyles = (colors: ThemeColors) =>
       fontFamily: fonts.display,
     },
     sub: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+    ovrProgressRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: spacing.sm,
+      marginRight: spacing.sm,
+    },
+    ovrProgressText: { color: colors.textMuted, fontSize: fontSize.xs },
+    ovrProgressBar: { marginTop: 4, marginRight: spacing.sm },
     maxNote: { color: colors.warning, fontSize: fontSize.xs, marginTop: 4 },
     ovrBadge: {
       width: 62,
@@ -489,18 +604,6 @@ const makeStyles = (colors: ThemeColors) =>
       textTransform: 'uppercase',
     },
     groupAvg: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 2 },
-    capLine: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 16, marginTop: 4 },
-    capBox: {
-      backgroundColor: colors.surfaceMuted,
-      borderColor: colors.border,
-      borderRadius: radius.sm,
-      borderWidth: 1,
-      marginBottom: spacing.sm,
-      marginTop: spacing.sm,
-      padding: spacing.sm,
-    },
-    capText: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 16 },
-    capWarn: { color: colors.warning, fontWeight: fontWeight.semibold },
     attrRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -530,21 +633,15 @@ const makeStyles = (colors: ThemeColors) =>
       width: 26,
       textAlign: 'right',
     },
-    note: {
-      color: colors.textFaint,
-      fontSize: fontSize.xs,
-      marginTop: spacing.lg,
-      marginBottom: spacing.xxl,
-      lineHeight: 18,
-      paddingHorizontal: spacing.sm,
-    },
-
     // Gain popup
     popupOverlay: {
       flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.62)',
+    },
+    popupDismissSurface: {
+      flex: 1,
       justifyContent: 'center',
       paddingHorizontal: spacing.lg,
-      backgroundColor: 'rgba(0,0,0,0.62)',
     },
     popupCard: {
       backgroundColor: colors.bgElevated,
@@ -554,9 +651,7 @@ const makeStyles = (colors: ThemeColors) =>
       padding: spacing.lg,
     },
     popupHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      gap: spacing.sm,
       marginBottom: spacing.md,
     },
     popupTitle: {
@@ -568,6 +663,8 @@ const makeStyles = (colors: ThemeColors) =>
     ovrChangeBadge: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
       gap: spacing.xs,
       backgroundColor: colors.accent,
       paddingHorizontal: spacing.sm,

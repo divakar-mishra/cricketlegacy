@@ -14,7 +14,15 @@ import {
 import { CountUp } from './CountUp';
 import { Icon, IconName } from './Icon';
 
-export const WalletBar = React.memo(function WalletBar({ wallet }: { wallet: Wallet }) {
+type WalletBarProps = {
+  wallet: Wallet;
+  showEnergy?: boolean;
+};
+
+export const WalletBar = React.memo(function WalletBar({
+  wallet,
+  showEnergy = true,
+}: WalletBarProps) {
   const styles = useThemedStyles(makeStyles);
   const colors = useColors();
   return (
@@ -26,12 +34,14 @@ export const WalletBar = React.memo(function WalletBar({ wallet }: { wallet: Wal
         format={(n) => n.toLocaleString()}
       />
       <Item icon="diamond" color={colors.info} value={wallet.gems} />
-      <Item
-        icon="flash"
-        color={colors.warning}
-        value={wallet.energy}
-        suffix={`/${ECONOMY.energyMax}`}
-      />
+      {showEnergy ? (
+        <Item
+          icon="flash"
+          color={colors.warning}
+          value={wallet.energy}
+          suffix={`/${ECONOMY.energyMax}`}
+        />
+      ) : null}
     </View>
   );
 });

@@ -1,12 +1,12 @@
 /**
  * Youth cricket system — proper career-level gating.
  *
- * SCHOOL (U14): plays 6 inter-district school fixtures
+ * SCHOOL (legacy internal key; Grade A in the UI): plays 6 district fixtures
  * U19:          plays 8 inter-zone U19 fixtures
  *
  * The professional league runs in the background (auto-sim); the user
  * exclusively plays these dedicated youth fixtures until they earn promotion.
- * Opponents are generated youth teams scoped to the player's nationality.
+ * Opponents are generated pathway teams scoped to the player's nationality.
  * Pure functions / mutating helpers, unit-tested.
  */
 
@@ -16,6 +16,8 @@ import { makeRng } from '../engine/rng';
 import { youthOpponentQuality } from './youthBalance';
 import { getCountry } from '../data/countries';
 import { autoXI } from './squad';
+import { isU19WorldCupFixture, u19WorldCupControlledTeamId } from './u19WorldCup';
+import { isPlayerFranchiseFixture } from './playerAffiliations';
 
 export const YOUTH_COMP_SCHOOL = 'youth-u14' as const;
 export const YOUTH_COMP_U19 = 'youth-u19' as const;
@@ -82,7 +84,7 @@ function removePlayerFromTeam(team: Team, playerId: string): void {
 }
 
 /**
- * A School/U19 player must not occupy a senior roster slot before earning a
+ * A Grade A/U19 player must not occupy a senior roster slot before earning a
  * domestic contract. Existing saves receive a deterministic replacement so
  * the background senior club keeps a valid squad and XI.
  */
@@ -116,7 +118,7 @@ export function detachCareerPlayerFromSenior(save: SaveGame): void {
 }
 
 /**
- * Build the user's real active School/U19 XI. The senior destination remains
+ * Build the user's real active Grade A/U19 XI. The senior destination remains
  * in the 24-club world and continues to simulate in the background.
  */
 export function ensureCareerPathTeam(save: SaveGame, level: 'SCHOOL' | 'U19'): string | undefined {
@@ -134,7 +136,7 @@ export function ensureCareerPathTeam(save: SaveGame, level: 'SCHOOL' | 'U19'): s
     const rng = makeRng(hashSeed(`${save.id}:${id}:squad`));
     const squad = generateSquad({ nationality, quality, idPrefix: id, rng });
     for (const player of squad) {
-      player.age = level === 'SCHOOL' ? 14 + Math.floor(rng() * 2) : 16 + Math.floor(rng() * 4);
+      player.age = level === 'SCHOOL' ? 16 + Math.floor(rng() * 13) : 16 + Math.floor(rng() * 4);
       save.players[player.id] = player;
     }
     const sameRole = squad
@@ -146,8 +148,8 @@ export function ensureCareerPathTeam(save: SaveGame, level: 'SCHOOL' | 'U19'): s
     const place = destination?.name.split(/\s+/)[0] ?? getCountry(nationality)?.name ?? 'Local';
     team = {
       id,
-      name: level === 'SCHOOL' ? `${place} School XI` : `${place} Under-19`,
-      shortName: level === 'SCHOOL' ? 'SCH' : 'U19',
+      name: level === 'SCHOOL' ? `${place} Grade A XI` : `${place} Under-19`,
+      shortName: level === 'SCHOOL' ? 'GRA' : 'U19',
       country: nationality,
       primaryColor: destination?.primaryColor ?? '#315A86',
       secondaryColor: destination?.secondaryColor ?? '#F2F4F7',
@@ -255,12 +257,18 @@ export function activateSeniorDomesticContract(save: SaveGame): string | undefin
 /** Team actually controlled in a fixture; youth uses its dedicated pathway XI. */
 export function careerPlayingTeamId(save: SaveGame, fixtureId?: string): string | undefined {
   const fixture = fixtureId ? save.fixtures[fixtureId] : undefined;
+  if (save.mode === 'career' && isU19WorldCupFixture(fixture)) {
+    return u19WorldCupControlledTeamId(save);
+  }
   if (
     save.mode === 'career' &&
     activeYouthLevel(save.careerPathLevel) &&
     (!fixture || isYouthFixture(fixture))
   ) {
     return save.careerPathTeamId ?? save.userTeamId;
+  }
+  if (save.mode === 'career' && isPlayerFranchiseFixture(fixture)) {
+    return save.franchiseTeamId ?? save.userTeamId;
   }
   return save.userTeamId;
 }
@@ -280,12 +288,43 @@ export function ensureYouthTeams(save: SaveGame, level: 'SCHOOL' | 'U19'): strin
   const cityCount = country?.cities.length ?? 0;
   const quality = youthOpponentQuality(level); // youth teams are weaker than professional sides
   const teamIds: string[] = [];
+  const reservedNames = new Set<string>();
+  const activePathName = save.careerPathTeamId
+    ? save.teams[save.careerPathTeamId]?.name.toLocaleLowerCase()
+    : undefined;
 
   for (let index = 0; index < defs.length; index += 1) {
     const def = defs[index];
     const teamId = `youth-${nationality}-${def.shortId}`;
     teamIds.push(teamId);
-    if (save.teams[teamId]) continue; // already created
+
+    const city = index < cityCount ? country?.cities[index]?.name : undefined;
+    const cityName = city
+      ? level === 'SCHOOL'
+        ? `${city} District XI`
+        : `${city} Under-19`
+      : undefined;
+    // The reserved senior destination can share a city with the youth pool.
+    // Fall back to a unique zone identity instead of displaying "Delhi v Delhi".
+    const localizedName =
+      cityName &&
+      cityName.toLocaleLowerCase() !== activePathName &&
+      !reservedNames.has(cityName.toLocaleLowerCase())
+        ? cityName
+        : def.name;
+    reservedNames.add(localizedName.toLocaleLowerCase());
+
+    const existing = save.teams[teamId];
+    if (existing) {
+      // Repair duplicate city labels in existing saves without replacing the
+      // squad or touching any completed results.
+      existing.name = localizedName;
+      existing.shortName = def.shortName;
+      existing.xi = autoXI(
+        existing.playerIds.map((playerId) => save.players[playerId]).filter(Boolean),
+      ).map((player) => player.id);
+      continue;
+    }
 
     const rng = makeRng(hashSeed(`youth:${teamId}:${nationality}`));
     const squad = generateSquad({ nationality, quality, idPrefix: teamId, rng });
@@ -294,12 +333,6 @@ export function ensureYouthTeams(save: SaveGame, level: 'SCHOOL' | 'U19'): strin
       save.players[p.id] = p;
       playerIds.push(p.id);
     }
-    const city = cityCount > 0 ? country?.cities[index % cityCount]?.name : undefined;
-    const localizedName = city
-      ? level === 'SCHOOL'
-        ? `${city} District XI`
-        : `${city} Under-19`
-      : def.name;
     (save.teams as Record<string, Team>)[teamId] = {
       id: teamId,
       name: localizedName,
@@ -308,11 +341,85 @@ export function ensureYouthTeams(save: SaveGame, level: 'SCHOOL' | 'U19'): strin
       primaryColor: '#3a5f8a',
       secondaryColor: '#e8e8e8',
       playerIds,
+      xi: autoXI(playerIds.map((playerId) => save.players[playerId]).filter(Boolean)).map(
+        (player) => player.id,
+      ),
       budget: 0,
       reputation: quality,
     };
   }
   return teamIds;
+}
+
+interface YouthFixtureSpec {
+  round: number;
+  homeTeamId: string;
+  awayTeamId: string;
+  id: string;
+}
+
+function fixturePairKey(homeTeamId: string, awayTeamId: string): string {
+  return [homeTeamId, awayTeamId].sort().join(':');
+}
+
+/**
+ * Complete single round robin with the user's bye in the middle. Placing the
+ * bye there gives U19 players four 50-over fixtures, then four T20 fixtures,
+ * while every AI team still plays the same eight-match season.
+ */
+function youthRoundRobin(
+  activeTeamId: string,
+  opponentIds: string[],
+  level: 'SCHOOL' | 'U19',
+  year: number,
+): YouthFixtureSpec[] {
+  const bye = '__youth_bye__';
+  const byeIndex = Math.floor(opponentIds.length / 2);
+  const userSequence = [...opponentIds.slice(0, byeIndex), bye, ...opponentIds.slice(byeIndex)];
+  // In the circle method the fixed first team meets the rotating list from
+  // right to left. Reversing the desired sequence preserves fixture order.
+  let rotation = [activeTeamId, ...[...userSequence].reverse()];
+  const specs: YouthFixtureSpec[] = [];
+  const userFixtureIndex = new Map(opponentIds.map((teamId, index) => [teamId, index + 1]));
+
+  for (let round = 1; round < rotation.length; round += 1) {
+    let matchNumber = 0;
+    for (let index = 0; index < rotation.length / 2; index += 1) {
+      const left = rotation[index];
+      const right = rotation[rotation.length - 1 - index];
+      if (left === bye || right === bye) continue;
+      matchNumber += 1;
+
+      const opponentId = left === activeTeamId ? right : right === activeTeamId ? left : undefined;
+      if (opponentId) {
+        const fixtureIndex = userFixtureIndex.get(opponentId)!;
+        const homeFirst = fixtureIndex % 2 === 1;
+        specs.push({
+          round,
+          homeTeamId: homeFirst ? activeTeamId : opponentId,
+          awayTeamId: homeFirst ? opponentId : activeTeamId,
+          id: `youth-fx-${year}-${level.toLowerCase()}-${fixtureIndex}`,
+        });
+      } else {
+        const swap = (round + matchNumber) % 2 === 0;
+        specs.push({
+          round,
+          homeTeamId: swap ? right : left,
+          awayTeamId: swap ? left : right,
+          id: `youth-fx-${year}-${level.toLowerCase()}-r${round}-m${matchNumber}`,
+        });
+      }
+    }
+    rotation = [rotation[0], rotation[rotation.length - 1], ...rotation.slice(1, -1)];
+  }
+
+  return specs.sort(
+    (left, right) =>
+      left.round - right.round ||
+      fixturePairKey(left.homeTeamId, left.awayTeamId).localeCompare(
+        fixturePairKey(right.homeTeamId, right.awayTeamId),
+      ),
+  );
 }
 
 // ── Fixture generation ─────────────────────────────────────────────────────
@@ -339,42 +446,70 @@ export function generateYouthFixtures(save: SaveGame): string[] {
     return Math.min(5, 3 + Math.floor((round - 5) / 2));
   };
 
-  // Idempotency check — return existing fixtures for this season.
+  const opponentIds = ensureYouthTeams(save, level);
+  const expected = youthRoundRobin(activeTeamId, opponentIds, level, year);
   const existing = Object.values(save.fixtures).filter(
     (fx) => fx.competitionId === compId && fx.seasonId === seasonId,
   );
-  if (existing.length > 0) {
-    for (const fixture of existing) {
-      fixture.format = formatForRound(fixture.round);
-      fixture.calendarMonth = monthForRound(fixture.round);
-    }
-    return existing.sort((a, b) => a.round - b.round).map((fixture) => fixture.id);
+  const existingByPair = new Map<string, Fixture>();
+  for (const fixture of existing.sort(
+    (left, right) => Number(right.played) - Number(left.played),
+  )) {
+    if (fixture.homeTeamId === fixture.awayTeamId) continue;
+    const key = fixturePairKey(fixture.homeTeamId, fixture.awayTeamId);
+    if (!existingByPair.has(key)) existingByPair.set(key, fixture);
   }
 
-  const opponentIds = ensureYouthTeams(save, level);
+  const retainedIds = new Set<string>();
   const fixtureIds: string[] = [];
-  const userTeamName = save.teams[activeTeamId]?.name ?? 'Home Ground';
-
-  for (let i = 0; i < opponentIds.length; i++) {
-    const id = `youth-fx-${year}-${i + 1}`;
-    const homeFirst = i % 2 === 0; // alternate home/away
-    const opponentId = opponentIds[i];
-    save.fixtures[id] = {
+  for (const spec of expected) {
+    const key = fixturePairKey(spec.homeTeamId, spec.awayTeamId);
+    const previous = existingByPair.get(key);
+    const id = previous?.id ?? spec.id;
+    const fixture: Fixture = previous ?? {
       id,
       seasonId,
-      format: formatForRound(i + 1),
-      homeTeamId: homeFirst ? activeTeamId : opponentId,
-      awayTeamId: homeFirst ? opponentId : activeTeamId,
-      venue: homeFirst ? userTeamName : (save.teams[opponentId]?.name ?? 'Neutral ground'),
-      round: i + 1,
+      format: formatForRound(spec.round),
+      homeTeamId: spec.homeTeamId,
+      awayTeamId: spec.awayTeamId,
+      venue: save.teams[spec.homeTeamId]?.name ?? 'Neutral ground',
+      round: spec.round,
       played: false,
       competitionId: compId,
-      calendarMonth: monthForRound(i + 1),
-    } satisfies Fixture;
-    fixtureIds.push(id);
+      calendarMonth: monthForRound(spec.round),
+    };
+    fixture.id = id;
+    fixture.seasonId = seasonId;
+    fixture.format = formatForRound(spec.round);
+    fixture.homeTeamId = spec.homeTeamId;
+    fixture.awayTeamId = spec.awayTeamId;
+    fixture.venue = save.teams[spec.homeTeamId]?.name ?? fixture.venue;
+    fixture.round = spec.round;
+    fixture.competitionId = compId;
+    fixture.calendarMonth = monthForRound(spec.round);
+    save.fixtures[id] = fixture;
+    retainedIds.add(id);
+    if (spec.homeTeamId === activeTeamId || spec.awayTeamId === activeTeamId) fixtureIds.push(id);
   }
 
-  return fixtureIds;
+  // Keep completed legacy pairings, but remove malformed or duplicate youth
+  // fixtures after their canonical counterpart has been retained.
+  for (const fixture of existing) {
+    if (!retainedIds.has(fixture.id)) delete save.fixtures[fixture.id];
+  }
+  const season = save.seasons[seasonId];
+  if (season) {
+    const previousYouthIds = new Set(existing.map((fixture) => fixture.id));
+    const youthIds = Object.values(save.fixtures)
+      .filter((fixture) => fixture.seasonId === seasonId && fixture.competitionId === compId)
+      .map((fixture) => fixture.id);
+    season.fixtureIds = [
+      ...season.fixtureIds.filter((id) => !previousYouthIds.has(id)),
+      ...youthIds,
+    ];
+  }
+
+  return fixtureIds.sort((left, right) => save.fixtures[left].round - save.fixtures[right].round);
 }
 
 // ── Query helpers ──────────────────────────────────────────────────────────
@@ -389,13 +524,15 @@ export function nextYouthFixtureId(save: SaveGame): string | undefined {
   const seasonId = save.currentSeasonId;
   const t = save.careerPathTeamId ?? save.userTeamId;
 
-  return Object.values(save.fixtures).find(
-    (fx) =>
-      !fx.played &&
-      fx.competitionId === compId &&
-      fx.seasonId === seasonId &&
-      (fx.homeTeamId === t || fx.awayTeamId === t),
-  )?.id;
+  return Object.values(save.fixtures)
+    .filter(
+      (fx) =>
+        !fx.played &&
+        fx.competitionId === compId &&
+        fx.seasonId === seasonId &&
+        (fx.homeTeamId === t || fx.awayTeamId === t),
+    )
+    .sort((left, right) => left.round - right.round || left.id.localeCompare(right.id))[0]?.id;
 }
 
 /** True when all youth fixtures for the current season have been played. */

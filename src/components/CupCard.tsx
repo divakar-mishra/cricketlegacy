@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SaveGame } from '../domain/types';
 import { CUP_NAME, cupChampionId, userCupStatus, userCupTieInfo } from '../game/cup';
 import { fontSize, fontWeight, spacing, ThemeColors, useThemedStyles } from '../theme';
@@ -29,11 +29,15 @@ export function CupCard({ save, canPlay, onPlay }: Props) {
         {status === 'PLAYING' && tie ? (
           <>
             <Text style={styles.round}>{tie.round}</Text>
-            <Text style={styles.vs}>
-              {save.teams[save.userTeamId ?? '']?.shortName} v{' '}
-              {save.teams[tie.opponentId]?.shortName}
-            </Text>
-            <Text style={styles.opp}>vs {teamName(tie.opponentId)}</Text>
+            <View style={styles.fixtureRow}>
+              <Text style={styles.team} numberOfLines={2}>
+                {teamName(save.userTeamId)}
+              </Text>
+              <Text style={styles.vs}>VS</Text>
+              <Text style={styles.team} numberOfLines={2}>
+                {teamName(tie.opponentId)}
+              </Text>
+            </View>
             <Button
               label={canPlay ? 'Play cup tie' : 'Not enough energy'}
               variant="gold"
@@ -72,8 +76,20 @@ const makeStyles = (colors: ThemeColors) =>
       textTransform: 'uppercase',
       letterSpacing: 1,
     },
-    vs: { color: colors.text, fontSize: fontSize.xxl, fontWeight: fontWeight.black, marginTop: 2 },
-    opp: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 2 },
+    fixtureRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    team: {
+      flex: 1,
+      color: colors.text,
+      fontSize: fontSize.lg,
+      lineHeight: 24,
+      fontWeight: fontWeight.heavy,
+    },
+    vs: { color: colors.accent, fontSize: fontSize.sm, fontWeight: fontWeight.black },
     won: { color: colors.accent, fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
     out: { color: colors.textMuted, fontSize: fontSize.sm },
   });

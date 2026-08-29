@@ -1,11 +1,13 @@
 import type { MatchState, SaveGame } from '../../domain/types';
 import {
   annualInternationalPlans,
+  generateInternationalAssignmentFixtures,
   generateInternationalWindowFixtures,
   internationalSelectionDecision,
   internationalWindowFixtureIds,
   internationalWindowPlan,
   recordWtcFixtureResult,
+  releaseFromInternationalTourIfOutOfForm,
   wtcStandings,
 } from '../intlCalendar';
 import { applyResult, resolveNationalDutyConflict } from '../season';
@@ -60,7 +62,7 @@ function completeInternationalFixture(
 }
 
 describe('year-round international calendar', () => {
-  it('keeps the four-year ICC rotation while making WTC a single final', () => {
+  it('keeps the four-year ICC rotation and budgets exactly 10 Tests, 25 ODIs and 15 T20Is', () => {
     expect(internationalWindowPlan(2026)).toMatchObject({
       cycleYear: 1,
       kind: 'T20_WORLD_CUP',
@@ -85,50 +87,92 @@ describe('year-round international calendar', () => {
       teamCount: 10,
       groupMatches: 9,
     });
-    expect(annualInternationalPlans(2029).map((plan) => plan.kind)).toEqual([
-      'BILATERAL',
-      'BILATERAL',
-      'ODI_WORLD_CUP',
-      'WORLD_TEST_CHAMPIONSHIP',
-    ]);
+    const successfulSeasonMatches = (year: number, format: 'TEST' | 'ODI' | 'T20') =>
+      annualInternationalPlans(year)
+        .filter((plan) => plan.format === format)
+        .reduce((total, plan) => {
+          if (plan.kind === 'BILATERAL') return total + plan.groupMatches;
+          if (plan.kind === 'WORLD_TEST_CHAMPIONSHIP') return total + 1;
+          return total + plan.groupMatches + 2;
+        }, 0);
+    for (const year of [2026, 2027, 2028, 2029]) {
+      expect(successfulSeasonMatches(year, 'TEST')).toBe(10);
+      expect(successfulSeasonMatches(year, 'ODI')).toBe(25);
+      expect(successfulSeasonMatches(year, 'T20')).toBe(15);
+      expect(
+        annualInternationalPlans(year)
+          .flatMap((plan) => plan.slots ?? [])
+          .some((slot) => slot.month === 4 || slot.month === 5),
+      ).toBe(false);
+    }
   });
 
-  it('schedules tours over domestic months and reserves June-August for marquee events', () => {
+  it('schedules the full programme without using the April-May franchise window', () => {
     const save = cappedCareerForYear(2026);
     const ids = generateInternationalWindowFixtures(save);
     const fixtures = ids.map((id) => save.fixtures[id]);
 
-    expect(ids).toHaveLength(9);
-    expect(fixtures.filter((fixture) => fixture.competitionId?.startsWith('autumn-'))).toHaveLength(
-      3,
-    );
-    expect(
-      fixtures.filter((fixture) => fixture.competitionId === 'wtc-test-series-2026'),
-    ).toHaveLength(2);
+    expect(ids).toHaveLength(48);
+    expect(fixtures.filter((fixture) => fixture.format === 'TEST')).toHaveLength(10);
+    expect(fixtures.filter((fixture) => fixture.format === 'ODI')).toHaveLength(25);
+    expect(fixtures.filter((fixture) => fixture.format === 'T20')).toHaveLength(13);
     expect(
       fixtures.filter((fixture) => fixture.competitionId === 't20-world-cup-2026'),
     ).toHaveLength(4);
     expect(fixtures.some((fixture) => fixture.cupRound === 'Semi-Final')).toBe(false);
     expect(fixtures.some((fixture) => fixture.cupRound === 'Final')).toBe(false);
-    expect(new Set(fixtures.map((fixture) => fixture.calendarMonth))).toEqual(
-      new Set([10, 11, 1, 2, 6, 7]),
-    );
+    expect(fixtures.every((fixture) => fixture.calendarMonth !== 4)).toBe(true);
+    expect(fixtures.every((fixture) => fixture.calendarMonth !== 5)).toBe(true);
     expect(fixtures.every((fixture) => fixture.homeTeamId === 'national-india')).toBe(true);
     expect(fixtures.every((fixture) => save.teams[fixture.awayTeamId].playerIds.length >= 11)).toBe(
       true,
     );
   });
 
-  it('persists format-specific drops when form falls below 40', () => {
+  it('re-evaluates current merit when each assignment arrives', () => {
+    const save = cappedCareerForYear(2026);
+    const assignment = annualInternationalPlans(2026)[0];
+    save.players[save.userPlayerId!].meta.form = 29;
+
+    const dropped = generateInternationalAssignmentFixtures(save, assignment.id)!;
+    expect(dropped.decision.selected).toBe(false);
+    expect(dropped.fixtureIds).toEqual([]);
+
+    save.players[save.userPlayerId!].meta.form = 90;
+    const recalled = generateInternationalAssignmentFixtures(save, assignment.id)!;
+    expect(recalled.decision.selected).toBe(true);
+    expect(recalled.fixtureIds).toHaveLength(2);
+  });
+
+  it('persists format-specific drops only after form genuinely collapses', () => {
     const save = cappedCareerForYear(2028);
-    save.players[save.userPlayerId!].meta.form = 39;
+    save.players[save.userPlayerId!].meta.form = 29;
     const autumn = annualInternationalPlans(2028)[0];
     const decision = internationalSelectionDecision(save, autumn.id, autumn.format);
 
     expect(decision.selected).toBe(false);
-    expect(decision.reason).toContain('below 40');
+    expect(decision.reason).toContain('below 30');
     expect(generateInternationalWindowFixtures(save)).toHaveLength(0);
     expect(save.playerCareerResources?.internationalSelections?.[autumn.id]).toEqual(decision);
+  });
+
+  it('does not erase a whole tour after one poor international match', () => {
+    const save = cappedCareerForYear(2028);
+    const assignment = annualInternationalPlans(2028).find(
+      (plan) => plan.kind === 'BILATERAL' && plan.groupMatches >= 5,
+    )!;
+    const generated = generateInternationalAssignmentFixtures(save, assignment.id)!;
+    const fixtures = generated.fixtureIds.map((id) => save.fixtures[id]);
+    save.players[save.userPlayerId!].meta.form = 20;
+
+    fixtures[0].played = true;
+    expect(releaseFromInternationalTourIfOutOfForm(save, fixtures[0])).toEqual([]);
+    fixtures[1].played = true;
+    expect(releaseFromInternationalTourIfOutOfForm(save, fixtures[1])).toEqual([]);
+    fixtures[2].played = true;
+    expect(releaseFromInternationalTourIfOutOfForm(save, fixtures[2])).toHaveLength(
+      assignment.groupMatches - 3,
+    );
   });
 
   it('awards WTC points from bilateral Tests exactly once', () => {
@@ -155,10 +199,17 @@ describe('year-round international calendar', () => {
     const initial = generateInternationalWindowFixtures(save);
     const tests = initial
       .map((id) => save.fixtures[id])
-      .filter((fixture) => fixture.competitionId === 'wtc-test-series-2027');
+      .filter((fixture) => fixture.wtcCycleId && fixture.competition === 'BILATERAL_SERIES');
 
-    expect(initial).toHaveLength(5);
-    expect(tests).toHaveLength(2);
+    expect(initial).toHaveLength(49);
+    expect(tests).toHaveLength(9);
+    const cycle = save.wtcCycles?.['wtc-2026-2027'];
+    expect(cycle).toBeDefined();
+    for (const [countryId, row] of Object.entries(cycle!.standings)) {
+      if (countryId === 'india') continue;
+      row.points = 0;
+      row.won = 0;
+    }
     for (const fixture of tests) {
       fixture.played = true;
       fixture.resultKind = 'HOME_WIN';
@@ -208,7 +259,7 @@ describe('year-round international calendar', () => {
         (fixture) => fixture.competitionId === 'bilateral-window-2028',
       ),
     ).toHaveLength(0);
-    expect(yearRoundIds).toHaveLength(8);
+    expect(yearRoundIds).toHaveLength(48);
   });
 
   it('auto-simulates a clashing domestic fixture without the player on national duty', () => {
@@ -227,7 +278,7 @@ describe('year-round international calendar', () => {
     generateInternationalWindowFixtures(save);
     const international = Object.values(save.fixtures).find(
       (fixture) =>
-        fixture.competitionId?.startsWith('autumn-') &&
+        fixture.competitionId === 'odi-series-2026-3' &&
         fixture.calendarMonth === 10 &&
         fixture.calendarWeek === 3,
     )!;
@@ -256,7 +307,7 @@ describe('year-round international calendar', () => {
     const second = generateInternationalWindowFixtures(save);
 
     expect(second).toEqual(first);
-    expect(internationalWindowFixtureIds(save)).toHaveLength(8);
+    expect(internationalWindowFixtureIds(save)).toHaveLength(48);
   });
 
   it('creates each World Cup knockout only after its feeder result qualifies the user', () => {
@@ -340,7 +391,17 @@ describe('year-round international calendar', () => {
     const exitStory = save.experience?.mediaScrapbook?.find(
       (story) => story.kind === 'ELIMINATION',
     );
-    expect(exitStory?.headline).toContain('ELIMINATED FROM T20 WORLD CUP');
+    expect(exitStory).toMatchObject({
+      kind: 'ELIMINATION',
+      newspaperCategory: 'ELIMINATION',
+    });
+    expect(exitStory?.templateId).toMatch(/^EX-/);
+    expect(`${exitStory?.headline} ${exitStory?.subheadline} ${exitStory?.body}`).toContain(
+      'T20 World Cup',
+    );
+    expect(`${exitStory?.headline} ${exitStory?.subheadline} ${exitStory?.body}`).not.toMatch(
+      /\[[A-Z_]+\]/,
+    );
     expect(save.experience?.pendingNewspaperId).toBe(exitStory?.id);
   });
 });

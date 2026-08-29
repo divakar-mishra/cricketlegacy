@@ -3,7 +3,6 @@ import { Animated, StyleSheet, View } from 'react-native';
 import { Emblem, Screen, AppText as Text } from '../components';
 import { APP_NAME, APP_TAGLINE } from '../config/app';
 import { ScreenProps } from '../navigation';
-import { sessionGate } from '../services';
 import {
   fonts,
   fontSize,
@@ -26,18 +25,9 @@ export function SplashScreen({ navigation }: ScreenProps<'Splash'>) {
       Animated.timing(scale, { toValue: 1, duration: 220, useNativeDriver: true }),
     ]).start();
 
-    let alive = true;
-    void (async () => {
-      const status = await sessionGate.dailySessionStatus();
-      if (!alive) return;
-      if (status.allowed) {
-        navigation.replace('MainMenu');
-      } else {
-        navigation.replace('Login', { gate: 'daily' });
-      }
-    })();
+    const routeTimer = setTimeout(() => navigation.replace('MainMenu'), 260);
     return () => {
-      alive = false;
+      clearTimeout(routeTimer);
     };
   }, [navigation, opacity, scale]);
 

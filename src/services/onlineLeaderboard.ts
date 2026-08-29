@@ -49,45 +49,35 @@ interface LeaderboardRow {
  * whenever the score improves.
  */
 export async function submitScore(params: {
-  userId: string;
   playerName: string;
   scoreType: ScoreType;
   score: number;
   country?: string;
   sanity?: Partial<LeaderboardSanityInput>;
 }): Promise<void> {
+  if (!SUPABASE_CONFIG.leaderboardsEnabled) return;
   const client = getSupabaseClient();
   if (!client) return;
 
   try {
-    const verdict = leaderboardSanityCheck({
+    // Keep the client check for immediate diagnostics, but never use it as the
+    // authority. The hardened RPC independently validates and routes the row.
+    leaderboardSanityCheck({
       scoreType: params.scoreType,
       score: params.score,
       ...params.sanity,
     });
-    if (verdict.severity === 'shadowban') {
-      await client.from('shadow_leaderboard').insert({
-        user_id: params.userId,
-        player_name: params.playerName,
-        score_type: params.scoreType,
-        score: params.score,
-        country: params.country,
-        reasons: verdict.reasons,
-      });
-      return;
-    }
-
-    const { error } = await client.from('leaderboard').upsert(
-      {
-        user_id: params.userId,
-        player_name: params.playerName,
-        score_type: params.scoreType,
-        score: params.score,
-        country: params.country,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,score_type', ignoreDuplicates: false },
-    );
+    const { error } = await client.rpc('submit_leaderboard_score', {
+      p_player_name: params.playerName,
+      p_score_type: params.scoreType,
+      p_score: params.score,
+      p_country: params.country ?? null,
+      p_seasons: params.sanity?.seasonsCompleted ?? params.sanity?.season ?? 0,
+      p_matches: params.sanity?.matchesPlayed ?? 0,
+      p_wins: params.sanity?.wins ?? 0,
+      p_wallet_coins: params.sanity?.walletCoins ?? 0,
+      p_wallet_gems: params.sanity?.walletGems ?? 0,
+    });
 
     if (error) {
       captureException(error, { context: 'leaderboard.submit' });
@@ -113,6 +103,7 @@ export async function fetchLeaderboard(
     totalPlayers: 0,
   };
 
+  if (!SUPABASE_CONFIG.leaderboardsEnabled) return empty;
   const client = getSupabaseClient();
   if (!client) return empty;
 
@@ -179,5 +170,5 @@ export async function fetchLeaderboard(
 }
 
 export function isOnlineLeaderboardEnabled(): boolean {
-  return SUPABASE_CONFIG.enabled;
+  return SUPABASE_CONFIG.leaderboardsEnabled;
 }

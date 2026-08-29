@@ -1,0 +1,11 @@
+[functions.delete-account]
+verify_jwt = true
+
+[functions.premium-sponsor-create-intent]
+verify_jwt = true
+
+[functions.premium-sponsor-reconcile]
+verify_jwt = true
+
+[functions.revenuecat-sponsor-webhook]
+verify_jwt = false

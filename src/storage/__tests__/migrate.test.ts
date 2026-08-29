@@ -1,6 +1,7 @@
 import { Player, SAVE_SCHEMA_VERSION } from '../../domain/types';
 import { computeOverall } from '../../engine/rating';
 import { makeCareerSave, makeManagerSave } from '../../game/__tests__/_depthHelpers';
+import { PASS_BALANCE_VERSION, passLevel, xpForTier } from '../../game/liveops';
 import { runMigrations } from '../migrate';
 
 function player(overall: number): Player {
@@ -233,10 +234,26 @@ describe('save migrations', () => {
     };
 
     const migrated = runMigrations(JSON.parse(JSON.stringify(legacy)));
+    const legacyTierEightFloor = 1_088;
+    const legacyTierNineGate = 1_296;
+    const legacyFraction =
+      (legacy.pass.xp - legacyTierEightFloor) / (legacyTierNineGate - legacyTierEightFloor);
+    const expectedRemappedXp = Math.round(
+      xpForTier(8) + (xpForTier(9) - xpForTier(8)) * legacyFraction,
+    );
 
     expect(migrated?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
-    expect(migrated?.pass?.xp).toBe(1_250);
+    expect(migrated?.pass?.balanceVersion).toBe(PASS_BALANCE_VERSION);
+    expect(migrated?.pass?.xp).toBe(expectedRemappedXp);
+    expect(expectedRemappedXp).toBe(3_460);
+    expect(passLevel(migrated?.pass?.xp ?? 0)).toBe(8);
+    expect(((migrated?.pass?.xp ?? 0) - xpForTier(8)) / (xpForTier(9) - xpForTier(8))).toBeCloseTo(
+      legacyFraction,
+      2,
+    );
     expect(migrated?.pass?.claimedFree).toEqual([1, 2]);
+    expect(migrated?.pass?.claimedPremium).toEqual([1]);
+    expect(migrated?.entitlements.seasonPass?.premium).toBe(true);
     expect(migrated?.entitlements.seasonPass?.provider).toBe('LEGACY_MIGRATION');
     expect(migrated?.entitlements.seasonPass?.expiresAt).toBeGreaterThan(
       migrated?.entitlements.seasonPass?.periodStartedAt ?? Number.MAX_SAFE_INTEGER,
@@ -399,6 +416,30 @@ describe('save migrations', () => {
     expect(migrated?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     expect(migratedPlayer?.seasonStats).toMatchObject({ matches: 8, runs: 412, wickets: 9 });
     expect(migratedPlayer?.seasonFormatStats).toEqual({});
+  });
+
+  it('replaces generated numeric team codes in v30 saves and their branding snapshots', () => {
+    const legacy = makeManagerSave(83);
+    legacy.schemaVersion = 30;
+    const teamId = Object.keys(legacy.teams).find((id) => id.startsWith('manager_'))!;
+    legacy.teams[teamId].shortName = 'KS32';
+    legacy.seasonPassBranding = {
+      customTeamNames: {},
+      customLeagueNames: {},
+      originalTeamNames: {
+        [teamId]: { name: legacy.teams[teamId].name, shortName: 'KS32' },
+      },
+      originalLeagueNames: {},
+      applied: false,
+    };
+
+    const migrated = runMigrations(JSON.parse(JSON.stringify(legacy)));
+
+    expect(migrated?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(migrated?.teams[teamId].shortName).toMatch(/^[A-Z]{2,4}$/);
+    expect(migrated?.seasonPassBranding?.originalTeamNames[teamId].shortName).toBe(
+      migrated?.teams[teamId].shortName,
+    );
   });
 
   it('rejects an unsupported migration gap instead of relabelling the save', () => {

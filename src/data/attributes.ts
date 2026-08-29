@@ -40,12 +40,15 @@ export const CREATION = {
 
 /** Training (career mode): a coin sink that steadily improves a chosen discipline. */
 export const TRAINING = {
-  baseCost: 250, // coins for the first session of a season
+  baseCost: 300, // coins for the first session of a season before the OVR multiplier
   costGrowth: 150, // added per session already done this season
-  maxSessionsPerSeason: 6,
-  gainMin: 1,
-  gainMax: 3,
-  attrsPerSession: 2, // improves the 2 weakest attributes in the focus group
+  maxSessionsPerSeason: 18,
+  // Direct movement must remain visible throughout a free career. Combined
+  // with the existing rising coin cost and stage caps, 2-4 keeps every paid
+  // session rewarding without reintroducing hidden automatic growth.
+  gainMin: 2,
+  gainMax: 4,
+  attrsPerSession: 3, // improves the 3 weakest attributes in the focus group
   attrCeiling: 99,
 };
 

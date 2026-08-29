@@ -8,6 +8,7 @@ describe('just-in-time guidance wiring', () => {
   const academy = read('CricketAcademyScreen.tsx');
   const careerHub = read('CareerHubScreen.tsx');
   const managerHub = read('ManagerHubScreen.tsx');
+  const managerTraining = read('ManagerTrainingScreen.tsx');
   const squad = read('SquadScreen.tsx');
   const transfers = read('TransfersScreen.tsx');
 
@@ -25,7 +26,7 @@ describe('just-in-time guidance wiring', () => {
     expect(managerHub).toContain('topicId="board-grace"');
     expect(careerHub).toContain('topicId="selection-formula"');
     expect(careerHub).toContain('topicId="u19-readiness"');
-    expect(managerHub).toContain('topicId="first-class-stamina"');
+    expect(managerTraining).toContain('topicId="manager-training"');
   });
 
   it('keeps hub guidance on demand instead of overlaying persistent coach cards', () => {

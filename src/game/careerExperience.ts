@@ -112,15 +112,17 @@ export interface ExperienceSnapshot {
 }
 
 function currentLeaguePosition(save: SaveGame): number | undefined {
-  if (!save.userTeamId) return undefined;
+  const teamId =
+    save.mode === 'career' ? (save.franchiseTeamId ?? save.userTeamId) : save.userTeamId;
+  if (!teamId) return undefined;
   const league = Object.values(save.leagues).find((item) =>
-    item.teamIds.includes(save.userTeamId!),
+    item.teamIds.includes(teamId),
   );
   if (!league) return undefined;
   const sorted = [...league.table].sort(
     (a, b) => b.points - a.points || b.netRunRate - a.netRunRate,
   );
-  const index = sorted.findIndex((row) => row.teamId === save.userTeamId);
+  const index = sorted.findIndex((row) => row.teamId === teamId);
   return index >= 0 ? index + 1 : undefined;
 }
 

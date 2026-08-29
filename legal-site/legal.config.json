@@ -1,0 +1,48 @@
+{
+  "appName": "Cricket Legacy",
+  "site": {
+    "tagline": "Independent games and apps from Navi Mumbai.",
+    "description": "Sunlight creates thoughtful games and useful apps with clear support and transparent policies."
+  },
+  "products": [
+    {
+      "slug": "cricket-legacy",
+      "name": "Cricket Legacy",
+      "kind": "Cricket career game",
+      "status": "In development",
+      "platforms": ["Android"],
+      "summary": "Build a complete cricket life as a player or lead a club as a manager in a deep, fictional career simulation.",
+      "headline": "Two careers. One cricket world.",
+      "description": "Cricket Legacy is a fictional single-player simulation built around meaningful cricket decisions, long-term progression and seasons that remember what happened.",
+      "highlights": [
+        {
+          "title": "Player Career",
+          "description": "Start in Grade A cricket, earn selection through performance and shape a career across youth, domestic and international levels."
+        },
+        {
+          "title": "Manager Career",
+          "description": "Run squads, tactics, transfers, facilities and matchdays while building a club over multiple seasons."
+        }
+      ]
+    }
+  ],
+  "publisher": {
+    "legalName": "Divakar Mishra",
+    "tradingName": "Sunlight",
+    "entityType": "individual developer",
+    "location": "Navi Mumbai, Maharashtra, India",
+    "email": "devsunlightpvt@gmail.com"
+  },
+  "effectiveDate": "2026-08-20",
+  "agePolicy": "india_18_elsewhere_13",
+  "compliance": {
+    "verifiedParentalConsentFlow": false
+  },
+  "retention": {
+    "activeDataDeletionDays": 7,
+    "deletionRequestAuditDays": 30,
+    "backupRotationDays": 7,
+    "securityAndSupportDays": 90,
+    "purchaseAuditDays": 365
+  }
+}

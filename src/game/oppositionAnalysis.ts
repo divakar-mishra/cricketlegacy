@@ -1,5 +1,7 @@
 import { Fixture, Player, SaveGame, Tactics } from '../domain/types';
+import { legalFieldSetting } from '../engine/intent';
 import { managerControlledTeamId } from './managerCalendar';
+import { careerPlayingTeamId } from './youthFixtures';
 
 export interface OppositionThreat {
   playerId: string;
@@ -98,6 +100,8 @@ function controlledTeamForFixture(save: SaveGame, fixture: Fixture): string | un
   }
 
   const fixtureTeamIds = [fixture.homeTeamId, fixture.awayTeamId];
+  const careerTeamId = careerPlayingTeamId(save, fixture.id);
+  if (careerTeamId && fixtureTeamIds.includes(careerTeamId)) return careerTeamId;
   if (save.userPlayerId) {
     const playerTeamId = fixtureTeamIds.find((teamId) => {
       const team = save.teams[teamId];
@@ -105,9 +109,7 @@ function controlledTeamForFixture(save: SaveGame, fixture: Fixture): string | un
     });
     if (playerTeamId) return playerTeamId;
   }
-  return fixtureTeamIds.find(
-    (teamId) => teamId === save.careerPathTeamId || teamId === save.userTeamId,
-  );
+  return fixtureTeamIds.find((teamId) => teamId === careerTeamId);
 }
 
 export function buildOppositionReport(
@@ -177,6 +179,12 @@ export function buildOppositionReport(
         ? `Their bowling unit rates ${bowling}. Preserve wickets against ${topBowler.name} and target the support overs.`
         : `The matchup is balanced. Keep wickets in hand and change plans around the two named threats.`;
 
+  // Recommendations are applied before the first ball, so expose the same
+  // legal opening field that the live engine will use. Without this, a neutral
+  // BALANCED recommendation in limited-overs cricket appeared selected but
+  // disabled while the engine silently substituted ATTACKING in the powerplay.
+  const openingField = legalFieldSetting(field, fixture.format, 0) ?? 'ATTACKING';
+
   return {
     fixtureId: fixture.id,
     opponentTeamId,
@@ -189,7 +197,7 @@ export function buildOppositionReport(
     topBowler,
     attackShape: `${paceCount} pace option${paceCount === 1 ? '' : 's'} and ${spinCount} spin option${spinCount === 1 ? '' : 's'} in the selected attack.`,
     weakness,
-    recommendedTactics: { batting: battingPlan, bowling: bowlingPlan, field },
+    recommendedTactics: { batting: battingPlan, bowling: bowlingPlan, field: openingField },
     recommendation,
   };
 }

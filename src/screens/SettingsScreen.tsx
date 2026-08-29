@@ -1,5 +1,6 @@
-import { StyleSheet, Switch, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { setMusicEnabled } from '../audio';
+import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import {
   AppText as Text,
   Button,
@@ -10,8 +11,16 @@ import {
   SelectableCard,
 } from '../components';
 import { BUILD_INFO } from '../config/buildInfo';
+import { QA_TOOLS_ENABLED, QA_WHALE_CLUB_BUDGET, QA_WHALE_COINS } from '../config/qa';
+import {
+  PUBLIC_RESOURCE_LABELS,
+  PUBLIC_RESOURCE_READINESS,
+  PUBLIC_RESOURCES,
+  PublicResourceKey,
+} from '../config/legal';
 import { LANGUAGE_OPTIONS, useT } from '../i18n';
 import { ScreenProps } from '../navigation';
+import { useCareer } from '../state/careerStore';
 import { GraphicsQuality, ThemeMode, useSettings } from '../state/settingsStore';
 import { fontSize, fontWeight, spacing, ThemeColors, useTheme, useThemedStyles } from '../theme';
 
@@ -25,12 +34,21 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
   const s = useSettings();
   const t = useT();
   const styles = useThemedStyles(makeStyles);
+  const activeSave = useCareer((state) => state.save);
+  const qaGrantWhaleCoins = useCareer((state) => state.qaGrantWhaleCoins);
+  const qaGrantClubBudget = useCareer((state) => state.qaGrantClubBudget);
+  const qaRefillEnergy = useCareer((state) => state.qaRefillEnergy);
 
   const themeOptions: { id: ThemeMode; label: string }[] = [
     { id: 'dark', label: t('settings.themeDark') },
     { id: 'light', label: t('settings.themeLight') },
     { id: 'system', label: t('settings.themeSystem') },
   ];
+
+  const nonReleaseBuild = typeof __DEV__ !== 'undefined' && __DEV__;
+  const publicResourceRows = (Object.keys(PUBLIC_RESOURCE_LABELS) as PublicResourceKey[]).filter(
+    (key) => PUBLIC_RESOURCES[key] || nonReleaseBuild,
+  );
 
   return (
     <Screen scroll>
@@ -60,6 +78,82 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
           onChange={s.setNotifications}
         />
       </Card>
+
+      {QA_TOOLS_ENABLED ? (
+        <>
+          <Text style={styles.section}>QA Tools</Text>
+          <Card style={styles.group}>
+            <ToggleRow
+              label="Unlimited energy"
+              value={s.qaUnlimitedEnergy}
+              onChange={(enabled) => {
+                s.setQaUnlimitedEnergy(enabled);
+                if (enabled) qaRefillEnergy();
+              }}
+            />
+            <Divider />
+            <View style={styles.qaCoinsRow}>
+              <View style={styles.qaCoinsCopy}>
+                <Text style={styles.rowLabel}>Whale Simulator</Text>
+                <Text style={styles.qaBalance}>
+                  {activeSave
+                    ? `${activeSave.mode === 'manager' ? 'Manager' : 'Player'} · ${activeSave.wallet.coins.toLocaleString()} coins`
+                    : 'Open a save first'}
+                </Text>
+              </View>
+              <Button
+                label="+10M coins"
+                size="sm"
+                fullWidth={false}
+                disabled={!activeSave}
+                style={styles.qaCoinsButton}
+                onPress={async () => {
+                  const result = await qaGrantWhaleCoins();
+                  if (!result.ok) {
+                    Alert.alert('QA tools', result.reason ?? 'Coins could not be added.');
+                    return;
+                  }
+                  Alert.alert(
+                    'All save balances ready',
+                    `${QA_WHALE_COINS.toLocaleString()} coins added to ${result.savesUpdated ?? 0} saves (${result.playerSavesUpdated ?? 0} Player, ${result.managerSavesUpdated ?? 0} Manager). Active balance: ${(result.balance ?? 0).toLocaleString()}.`,
+                  );
+                }}
+              />
+            </View>
+            <Divider />
+            <View style={styles.qaCoinsRow}>
+              <View style={styles.qaCoinsCopy}>
+                <Text style={styles.rowLabel}>Club Budget Simulator</Text>
+                <Text style={styles.qaBalance}>
+                  {activeSave?.mode === 'manager' && activeSave.userTeamId
+                    ? `$${activeSave.teams[activeSave.userTeamId]?.budget.toLocaleString() ?? '0'}`
+                    : 'Open a Manager Career first'}
+                </Text>
+              </View>
+              <Button
+                label="+1B budget"
+                size="sm"
+                fullWidth={false}
+                disabled={
+                  activeSave?.mode !== 'manager' || activeSave.managerCareerLevel === 'NATIONAL'
+                }
+                style={styles.qaCoinsButton}
+                onPress={async () => {
+                  const result = await qaGrantClubBudget();
+                  if (!result.ok) {
+                    Alert.alert('QA tools', result.reason ?? 'Club budget could not be added.');
+                    return;
+                  }
+                  Alert.alert(
+                    'Club budget ready',
+                    `$${QA_WHALE_CLUB_BUDGET.toLocaleString()} added. Balance: $${(result.balance ?? 0).toLocaleString()}.`,
+                  );
+                }}
+              />
+            </View>
+          </Card>
+        </>
+      ) : null}
 
       <Text style={styles.section}>{t('settings.theme')}</Text>
       <View style={styles.optionList}>
@@ -109,7 +203,6 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
           </View>
           <View style={styles.academyCopy}>
             <Text style={styles.academyTitle}>Cricket Academy</Text>
-            <Text style={styles.academySubtitle}>Career, match, club and physicality rules</Text>
           </View>
           <Icon name="chevron-forward" size={20} />
         </View>
@@ -127,6 +220,20 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
         onPress={s.reset}
       />
 
+      {publicResourceRows.length > 0 ? (
+        <>
+          <Text style={styles.section}>Legal & Support</Text>
+          <Card style={styles.group}>
+            {publicResourceRows.map((key, index) => (
+              <View key={key}>
+                {index > 0 ? <Divider /> : null}
+                <PublicResourceRow resourceKey={key} />
+              </View>
+            ))}
+          </Card>
+        </>
+      ) : null}
+
       <Text style={styles.section}>Build Information</Text>
       <Card style={styles.group}>
         <InfoRow label="Version" value={BUILD_INFO.appVersion} />
@@ -139,30 +246,44 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
               : BUILD_INFO.iosBuildNumber
           }
         />
-        <Divider />
-        <InfoRow
-          label="Commit"
-          value={`${BUILD_INFO.gitCommit}${BUILD_INFO.gitDirty ? ' (dirty)' : ''}`}
-        />
-        <Divider />
-        <InfoRow label="Built" value={formatBuiltAt(BUILD_INFO.builtAt)} />
-        <Divider />
-        <InfoRow label="Environment" value={BUILD_INFO.environment} />
-        <Divider />
-        <InfoRow label="Save schema" value={BUILD_INFO.saveSchemaVersion} />
-        <Divider />
-        <InfoRow label="Data config" value={BUILD_INFO.dataConfigVersion} />
-        <Divider />
-        <InfoRow label="Platform" value={BUILD_INFO.platform} />
       </Card>
     </Screen>
   );
 }
 
-function formatBuiltAt(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+function PublicResourceRow({ resourceKey }: { resourceKey: PublicResourceKey }) {
+  const styles = useThemedStyles(makeStyles);
+  const url = PUBLIC_RESOURCES[resourceKey];
+  const invalid = PUBLIC_RESOURCE_READINESS.invalid.includes(resourceKey);
+  const label = PUBLIC_RESOURCE_LABELS[resourceKey];
+
+  const onOpen = async () => {
+    if (!url) return;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert(`Cannot open ${label}`, 'Check your connection and try again.');
+    }
+  };
+
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !url }}
+      disabled={!url}
+      onPress={() => void onOpen()}
+      style={({ pressed }) => [styles.publicResourceRow, pressed && styles.rowPressed]}
+    >
+      <Text style={[styles.publicResourceLabel, !url && styles.unavailableLabel]}>{label}</Text>
+      {!url ? (
+        <Text style={styles.resourceStatus}>
+          {invalid ? 'Invalid release URL' : 'Not configured'}
+        </Text>
+      ) : null}
+      <Icon name={url ? 'open-outline' : 'alert-circle-outline'} size={18} />
+    </Pressable>
+  );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -226,6 +347,32 @@ const makeStyles = (colors: ThemeColors) =>
       paddingVertical: spacing.sm,
     },
     rowLabel: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.medium },
+    qaCoinsRow: {
+      minHeight: 64,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    qaCoinsCopy: { flex: 1, minWidth: 0 },
+    qaBalance: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 3 },
+    qaCoinsButton: { width: 124 },
+    publicResourceRow: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.xs,
+    },
+    publicResourceLabel: {
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.medium,
+      flex: 1,
+    },
+    unavailableLabel: { color: colors.textMuted },
+    resourceStatus: { color: colors.textFaint, fontSize: fontSize.xs },
+    rowPressed: { opacity: 0.72 },
     infoRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',

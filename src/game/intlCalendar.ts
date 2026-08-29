@@ -3,8 +3,9 @@
  *
  * Capped players retain their domestic contract. National assignments are
  * scheduled over the domestic calendar and take priority only when dates clash.
- * Global tournaments remain in June-August, while bilateral white-ball tours
- * and WTC Test series run during the domestic List A and First-Class blocks.
+ * International assignments are spread across the season, while April and May
+ * remain clear for franchise cricket. National duty takes priority over a
+ * clashing domestic fixture only while the player is selected.
  */
 
 import {
@@ -22,8 +23,9 @@ import {
   WtcStanding,
 } from '../domain/types';
 import { COUNTRIES, getCountry } from '../data/countries';
-import { generateRoster } from '../generation/players';
+import { generateManagerRoster } from '../generation/players';
 import { makeRng } from '../engine/rng';
+import { computeOverall } from '../engine/rating';
 import { clamp } from '../utils/math';
 import { addPassXp } from './liveops';
 import { archiveNewspaperStory, buildTournamentEliminationNewspaperStory } from './newspaper';
@@ -35,6 +37,7 @@ import {
   nationsWithPool,
 } from './career';
 import { autoXI } from './squad';
+import { nationalReplacementQuality, nationalReplacementQualityFloor } from './nationalTalent';
 
 const INTERNATIONAL_CYCLE_BASE_YEAR = 2026;
 const WTC_CYCLE_YEARS = 2;
@@ -60,6 +63,7 @@ export interface InternationalWindowPlan {
   slots?: InternationalCalendarSlot[];
   fixtureFormats?: Format[];
   wtcPointsSeries?: boolean;
+  wtcRound?: number;
 }
 
 export interface InternationalWindowOptions {
@@ -101,11 +105,76 @@ function wtcFinalPlan(year: number): InternationalWindowPlan {
     name: `World Test Championship Final ${year}`,
     kind: 'WORLD_TEST_CHAMPIONSHIP',
     format: 'TEST',
-    months: [6],
+    months: [8],
     teamCount: 2,
     groupMatches: 0,
-    slots: [{ month: 6, week: 1 }],
+    slots: [{ month: 8, week: 4 }],
   };
+}
+
+function bilateralSlots(month: number, matches: number): InternationalCalendarSlot[] {
+  return Array.from({ length: matches }, (_, index) => ({
+    month,
+    week: Math.min(4, Math.floor((index * 4) / Math.max(1, matches)) + 1),
+  }));
+}
+
+function bilateralPlan(
+  year: number,
+  format: Format,
+  series: number,
+  matches: number,
+  month: number,
+  options: Pick<InternationalWindowPlan, 'wtcPointsSeries' | 'wtcRound'> = {},
+): InternationalWindowPlan {
+  const formatId = format === 'T20' ? 't20i' : format.toLowerCase();
+  const id =
+    format === 'TEST' && series === 1
+      ? `wtc-test-series-${year}`
+      : `${formatId}-series-${year}-${series}`;
+  return {
+    year,
+    cycleYear: cycleYearFor(year),
+    id,
+    name: `${format === 'T20' ? 'T20I' : format === 'TEST' ? 'Test' : 'ODI'} Series ${series}`,
+    kind: 'BILATERAL',
+    format,
+    months: [month],
+    teamCount: 2,
+    groupMatches: matches,
+    slots: bilateralSlots(month, matches),
+    ...options,
+  };
+}
+
+function testSeriesPlans(year: number): InternationalWindowPlan[] {
+  const finalYear = cycleYearFor(year) === 2 || cycleYearFor(year) === 4;
+  const counts = finalYear ? [2, 2, 2, 2, 1] : [2, 2, 2, 2, 2];
+  const months = finalYear ? [9, 11, 1, 3, 6] : [6, 8, 10, 12, 2];
+  return counts.map((matches, index) =>
+    bilateralPlan(year, 'TEST', index + 1, matches, months[index], {
+      wtcPointsSeries: true,
+      wtcRound: index,
+    }),
+  );
+}
+
+function odiSeriesPlans(year: number): InternationalWindowPlan[] {
+  const cycleYear = cycleYearFor(year);
+  const counts = cycleYear === 3 ? [5, 5, 5, 5] : cycleYear === 4 ? [5, 5, 4] : [5, 5, 5, 5, 5];
+  const months = cycleYear === 3 ? [9, 11, 1, 3] : cycleYear === 4 ? [10, 1, 3] : [6, 8, 10, 12, 2];
+  return counts.map((matches, index) =>
+    bilateralPlan(year, 'ODI', index + 1, matches, months[index]),
+  );
+}
+
+function t20iSeriesPlans(year: number): InternationalWindowPlan[] {
+  const t20WorldCupYear = cycleYearFor(year) === 1;
+  const counts = t20WorldCupYear ? [5, 4] : [5, 5, 5];
+  const months = t20WorldCupYear ? [11, 3] : [7, 11, 3];
+  return counts.map((matches, index) =>
+    bilateralPlan(year, 'T20', index + 1, matches, months[index]),
+  );
 }
 
 /** The marquee June-August event in the established four-year rotation. */
@@ -173,42 +242,11 @@ export function internationalWindowPlan(year: number): InternationalWindowPlan {
 }
 
 export function annualInternationalPlans(year: number): InternationalWindowPlan[] {
-  const cycleYear = cycleYearFor(year);
-  const autumnFormat: Format = cycleYear === 1 || cycleYear === 3 ? 'T20' : 'ODI';
   const marquee = internationalWindowPlan(year);
   const plans: InternationalWindowPlan[] = [
-    {
-      year,
-      cycleYear,
-      id: `autumn-${autumnFormat.toLowerCase()}-tour-${year}`,
-      name: `${autumnFormat} Bilateral Tour ${year}`,
-      kind: 'BILATERAL',
-      format: autumnFormat,
-      months: [10, 11],
-      teamCount: 2,
-      groupMatches: 3,
-      slots: [
-        { month: 10, week: 1 },
-        { month: 10, week: 3 },
-        { month: 11, week: 2 },
-      ],
-    },
-    {
-      year,
-      cycleYear,
-      id: `wtc-test-series-${year}`,
-      name: `WTC Test Series ${year}`,
-      kind: 'BILATERAL',
-      format: 'TEST',
-      months: [1, 2],
-      teamCount: 2,
-      groupMatches: 2,
-      slots: [
-        { month: 1, week: 1 },
-        { month: 2, week: 1 },
-      ],
-      wtcPointsSeries: true,
-    },
+    ...testSeriesPlans(year),
+    ...odiSeriesPlans(year),
+    ...t20iSeriesPlans(year),
     marquee,
   ];
   const bounds = wtcCycleBounds(year);
@@ -222,7 +260,7 @@ function availableCountries(save: SaveGame, controlledCountry?: string): string[
   const nationalCountries = Object.values(save.teams)
     .filter((team) => team.isNationalTeam && team.country)
     .map((team) => team.country);
-  return [
+  const countries = [
     ...new Set([
       ...(controlledCountry ? [controlledCountry] : []),
       ...nationsWithPool(save, 11),
@@ -230,6 +268,79 @@ function availableCountries(save: SaveGame, controlledCountry?: string): string[
       ...COUNTRIES.map((country) => country.id),
     ]),
   ];
+  // Player counts are an implementation detail, not an international ranking.
+  // Compact countries used to jump ahead whenever an ageing squad was refreshed,
+  // which could leave a major nation playing almost every tour and knockout
+  // against low-ranked opposition. Keep the controlled nation first, then seed
+  // the calendar by the explicit country-strength model.
+  return countries.sort((left, right) => {
+    if (left === controlledCountry) return -1;
+    if (right === controlledCountry) return 1;
+    return (
+      (getCountry(right)?.strength ?? 0) - (getCountry(left)?.strength ?? 0) ||
+      left.localeCompare(right)
+    );
+  });
+}
+
+function teamXiOverall(save: SaveGame, teamId: string): number {
+  const team = save.teams[teamId];
+  if (!team) return 0;
+  const ids = team.xi?.length ? team.xi : team.playerIds.slice(0, 11);
+  if (!ids.length) return 0;
+  return (
+    ids.reduce((sum, playerId) => sum + (save.players[playerId]?.overall ?? 0), 0) / ids.length
+  );
+}
+
+/**
+ * A National Manager can arrive with a highly developed domestic core. Peer
+ * countries must be able to field a comparable generation rather than remain
+ * frozen at new-save strength for the rest of a 25-season career. Country
+ * strength still creates real gaps: one strength point is about two OVR.
+ */
+function managerNationalOpponentFloor(
+  save: SaveGame,
+  controlledTeamId: string,
+  controlledCountry: string,
+  opponentCountry: string,
+): number | undefined {
+  if (save.mode !== 'manager' || save.managerCareerLevel !== 'NATIONAL') return undefined;
+  const controlledOverall = teamXiOverall(save, controlledTeamId);
+  if (!controlledOverall) return undefined;
+  const controlledStrength = getCountry(controlledCountry)?.strength ?? 2;
+  const opponentStrength = getCountry(opponentCountry)?.strength ?? 2;
+  return clamp(controlledOverall + (opponentStrength - controlledStrength) * 2, 64, 99);
+}
+
+function liftGeneratedNationalCohort(
+  players: ReturnType<typeof generateManagerRoster>,
+  floor: number,
+) {
+  if (floor <= 0) return;
+  const adjustableGroups = ['batting', 'bowling', 'fielding'] as const;
+  const adjustableMeta = ['fitness', 'confidence', 'aggression', 'discipline', 'form'] as const;
+  // Quality 99 still leaves role-balanced All-Rounders several points below a
+  // mature 95+ domestic core. Raise cricket attributes a point at a time while
+  // preserving role balance, then stop as soon as the XI reaches the requested
+  // standard (or the attributes genuinely cap out). Every meta rating which
+  // contributes to overall must rise too; otherwise a nominal 99 target still
+  // produces a hidden peer-XI gap.
+  for (let pass = 0; pass < 24; pass += 1) {
+    const xi = autoXI(players);
+    const average = xi.reduce((sum, player) => sum + player.overall, 0) / xi.length;
+    if (average >= floor) return;
+    for (const player of players) {
+      for (const group of adjustableGroups) {
+        const attributes = player[group] as unknown as Record<string, number>;
+        for (const key of Object.keys(attributes)) {
+          attributes[key] = clamp(attributes[key] + 1, 1, 99);
+        }
+      }
+      for (const key of adjustableMeta) player.meta[key] = clamp(player.meta[key] + 1, 1, 99);
+      player.overall = computeOverall(player);
+    }
+  }
 }
 
 function countryForTeam(save: SaveGame, teamId: string): string | undefined {
@@ -306,19 +417,34 @@ export function ensureNationalTeam(
   save: SaveGame,
   countryId: string,
   mustIncludeId?: string,
+  minimumXiOverall = 0,
 ): string {
   const id = `national-${countryId}`;
   const localPool = Object.values(save.players).filter(
-    (player) => player.nationality === countryId && !player.retired,
+    (player) => player.nationality === countryId && !player.retired && player.age < 40,
   );
-  if (localPool.length < 11) {
-    const country = getCountry(countryId);
-    const generated = generateRoster({
+  const currentXI = localPool.length >= 11 ? buildNationalXI(save, countryId) : [];
+  const currentXiOverall = currentXI.length
+    ? currentXI.reduce((sum, player) => sum + player.overall, 0) / currentXI.length
+    : 0;
+  if (
+    localPool.length < 11 ||
+    currentXiOverall < Math.max(nationalReplacementQualityFloor(countryId), minimumXiOverall)
+  ) {
+    const year = currentSeasonYear(save);
+    const requestedQuality = Math.min(
+      99,
+      Math.max(nationalReplacementQuality(countryId), Math.ceil(minimumXiOverall + 3)),
+    );
+    const generated = generateManagerRoster({
       nationality: countryId,
-      quality: 56 + (country?.strength ?? 2) * 5,
-      idPrefix: `national-pool-${countryId}`,
-      rng: makeRng(stableNumber(`${save.id}:national-pool:${countryId}`)),
+      quality: requestedQuality,
+      idPrefix: `national-refresh-${countryId}-${year}-${requestedQuality}`,
+      rng: makeRng(
+        stableNumber(`${save.id}:national-refresh:${countryId}:${year}:${requestedQuality}`),
+      ),
     });
+    liftGeneratedNationalCohort(generated, minimumXiOverall);
     for (const player of generated) {
       if (!save.players[player.id]) save.players[player.id] = player;
     }
@@ -376,23 +502,26 @@ function removeLegacyCompressedWtc(
 }
 
 function removeUnplayedLegacyBilateralWindow(save: SaveGame, year: number): void {
-  const competitionId = `bilateral-window-${year}`;
+  const legacyCompetitionIds = new Set([
+    `bilateral-window-${year}`,
+    `autumn-t20-tour-${year}`,
+    `autumn-odi-tour-${year}`,
+  ]);
+  const legacyFixtures = Object.values(save.fixtures).filter(
+    (fixture) =>
+      fixture.seasonId === save.currentSeasonId &&
+      Boolean(fixture.competitionId && legacyCompetitionIds.has(fixture.competitionId)),
+  );
+  const competitionsWithPlayedFixtures = new Set(
+    legacyFixtures.filter((fixture) => fixture.played).map((fixture) => fixture.competitionId),
+  );
   const legacyIds = new Set(
-    Object.values(save.fixtures)
-      .filter(
-        (fixture) =>
-          fixture.seasonId === save.currentSeasonId &&
-          fixture.competitionId === competitionId &&
-          !fixture.played,
-      )
+    legacyFixtures
+      .filter((fixture) => !competitionsWithPlayedFixtures.has(fixture.competitionId))
       .map((fixture) => fixture.id),
   );
   if (!legacyIds.size) return;
-  for (const fixtureId of legacyIds) delete save.fixtures[fixtureId];
-  const season = save.currentSeasonId ? save.seasons[save.currentSeasonId] : undefined;
-  if (season) {
-    season.fixtureIds = season.fixtureIds.filter((fixtureId) => !legacyIds.has(fixtureId));
-  }
+  for (const fixtureId of legacyIds) removeFixture(save, fixtureId);
 }
 
 function isDynamicTournamentPlan(plan: InternationalWindowPlan): boolean {
@@ -459,10 +588,17 @@ function createWindowFixtures(
   }
 
   const countries = availableCountries(save, countryId).slice(0, Math.max(2, plan.teamCount));
-  const opponents = [
-    ...(options.opponentCountries ?? []),
-    ...countries.filter((country) => country !== countryId),
-  ].filter((country, index, list) => country !== countryId && list.indexOf(country) === index);
+  const availableOpponents = countries.filter((country) => country !== countryId);
+  const opponentOffset = availableOpponents.length
+    ? stableNumber(`${save.id}:${plan.id}:opponent`) % availableOpponents.length
+    : 0;
+  const rotatedOpponents = [
+    ...availableOpponents.slice(opponentOffset),
+    ...availableOpponents.slice(0, opponentOffset),
+  ];
+  const opponents = [...(options.opponentCountries ?? []), ...rotatedOpponents].filter(
+    (country, index, list) => country !== countryId && list.indexOf(country) === index,
+  );
   if (!opponents.length) return [];
 
   const controlledTeamId =
@@ -478,7 +614,12 @@ function createWindowFixtures(
       week: (round % 4) + 1,
     };
     round += 1;
-    const opponentTeamId = ensureNationalTeam(save, opponentCountry);
+    const opponentTeamId = ensureNationalTeam(
+      save,
+      opponentCountry,
+      undefined,
+      managerNationalOpponentFloor(save, controlledTeamId, countryId, opponentCountry),
+    );
     const id = `intl-${plan.year}-${slug}-${round}`;
     save.fixtures[id] = {
       id,
@@ -526,6 +667,7 @@ function createWindowFixtures(
 function emptyTournamentStanding(
   countryId: string,
   competitionId: string,
+  saveId: string,
 ): InternationalTournamentStanding {
   return {
     countryId,
@@ -534,19 +676,28 @@ function emptyTournamentStanding(
     tied: 0,
     lost: 0,
     points: 0,
-    tiebreak: stableNumber(`${competitionId}:tiebreak:${countryId}`),
+    tiebreak: stableNumber(`${saveId}:${competitionId}:tiebreak:${countryId}`),
   };
 }
 
 function applyTournamentOutcome(
   standings: Record<string, InternationalTournamentStanding>,
   competitionId: string,
+  saveId: string,
   homeCountry: string,
   awayCountry: string,
   outcome: 'HOME_WIN' | 'AWAY_WIN' | 'TIE',
 ): void {
-  const home = (standings[homeCountry] ??= emptyTournamentStanding(homeCountry, competitionId));
-  const away = (standings[awayCountry] ??= emptyTournamentStanding(awayCountry, competitionId));
+  const home = (standings[homeCountry] ??= emptyTournamentStanding(
+    homeCountry,
+    competitionId,
+    saveId,
+  ));
+  const away = (standings[awayCountry] ??= emptyTournamentStanding(
+    awayCountry,
+    competitionId,
+    saveId,
+  ));
   home.played += 1;
   away.played += 1;
   if (outcome === 'HOME_WIN') {
@@ -577,7 +728,7 @@ function tournamentStandings(
 ): InternationalTournamentStanding[] {
   const standings: Record<string, InternationalTournamentStanding> = {};
   for (const countryId of state.groupCountryIds) {
-    standings[countryId] = emptyTournamentStanding(countryId, state.id);
+    standings[countryId] = emptyTournamentStanding(countryId, state.id, save.id);
   }
 
   for (const fixtureId of state.groupFixtureIds) {
@@ -589,6 +740,7 @@ function tournamentStandings(
     applyTournamentOutcome(
       standings,
       state.id,
+      save.id,
       homeCountry,
       awayCountry,
       tournamentFixtureOutcome(fixture),
@@ -602,10 +754,11 @@ function tournamentStandings(
     for (let awayIndex = homeIndex + 1; awayIndex < aiCountries.length; awayIndex += 1) {
       const homeCountry = aiCountries[homeIndex];
       const awayCountry = aiCountries[awayIndex];
-      const roll = stableNumber(`${state.id}:group:${homeCountry}:${awayCountry}`) % 7;
+      const roll = stableNumber(`${save.id}:${state.id}:group:${homeCountry}:${awayCountry}`) % 7;
       applyTournamentOutcome(
         standings,
         state.id,
+        save.id,
         homeCountry,
         awayCountry,
         roll === 0 ? 'TIE' : roll % 2 === 0 ? 'HOME_WIN' : 'AWAY_WIN',
@@ -696,6 +849,7 @@ function tournamentPlan(
 }
 
 function tournamentOpponent(
+  save: SaveGame,
   state: InternationalTournamentState,
   stage: 'Semi-Final' | 'Final',
   excluded: string[] = [],
@@ -711,7 +865,7 @@ function tournamentOpponent(
   );
   const candidates = outsideGroup.length ? outsideGroup : fallback;
   if (!candidates.length) return undefined;
-  return candidates[stableNumber(`${state.id}:${stage}:opponent`) % candidates.length];
+  return candidates[stableNumber(`${save.id}:${state.id}:${stage}:opponent`) % candidates.length];
 }
 
 function stageTournamentFixture(
@@ -734,7 +888,17 @@ function stageTournamentFixture(
   };
   const slug = plan.id.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
   const id = `intl-${plan.year}-${slug}-${stage === 'Semi-Final' ? 'semi-final' : 'final'}`;
-  const opponentTeamId = ensureNationalTeam(save, opponentCountry);
+  const opponentTeamId = ensureNationalTeam(
+    save,
+    opponentCountry,
+    undefined,
+    managerNationalOpponentFloor(
+      save,
+      state.controlledTeamId,
+      state.controlledCountryId,
+      opponentCountry,
+    ),
+  );
   const fixture: Fixture = {
     id,
     seasonId: save.currentSeasonId ?? `season-${plan.year}`,
@@ -768,7 +932,7 @@ function controlledCountryWon(
       ? countryForTeam(save, fixture.homeTeamId)
       : fixture.resultKind === 'AWAY_WIN'
         ? countryForTeam(save, fixture.awayTeamId)
-        : stableNumber(`${fixture.id}:knockout-tiebreak`) % 2 === 0
+        : stableNumber(`${save.id}:${fixture.id}:knockout-tiebreak`) % 2 === 0
           ? countryForTeam(save, fixture.homeTeamId)
           : countryForTeam(save, fixture.awayTeamId);
   return winnerCountry === state.controlledCountryId;
@@ -823,7 +987,7 @@ function progressInternationalTournament(save: SaveGame, competitionId: string):
       return;
     }
 
-    const opponent = tournamentOpponent(state, 'Semi-Final');
+    const opponent = tournamentOpponent(save, state, 'Semi-Final');
     if (!opponent) return;
     state.semiFinalFixtureId = stageTournamentFixture(save, state, plan, 'Semi-Final', opponent);
     state.stage = 'SEMI_FINAL';
@@ -841,7 +1005,7 @@ function progressInternationalTournament(save: SaveGame, competitionId: string):
       return;
     }
     const semiOpponent = countryForTeam(save, semiFinal.awayTeamId);
-    const opponent = tournamentOpponent(state, 'Final', semiOpponent ? [semiOpponent] : []);
+    const opponent = tournamentOpponent(save, state, 'Final', semiOpponent ? [semiOpponent] : []);
     if (!opponent) return;
     state.finalFixtureId = stageTournamentFixture(save, state, plan, 'Final', opponent);
     state.stage = 'FINAL';
@@ -900,6 +1064,16 @@ function selectionThreshold(format: Format): number {
   return 64;
 }
 
+/** Calendar time between assignments restores availability, not attributes. */
+function recoverBetweenInternationalAssignments(save: SaveGame): void {
+  if (save.mode !== 'career' || !save.userPlayerId) return;
+  const user = save.players[save.userPlayerId];
+  const resources = ensurePlayerCareerResources(save);
+  if (!user || !resources) return;
+  resources.playerCondition = clamp(resources.playerCondition + 35, 0, 100);
+  user.condition = resources.playerCondition;
+}
+
 /** Format-specific national selection, persisted independently per assignment. */
 export function internationalSelectionDecision(
   save: SaveGame,
@@ -938,9 +1112,9 @@ export function internationalSelectionDecision(
   } else if (user.injury) {
     selected = false;
     reason = `Unavailable for ${format}: ${user.injury.type}.`;
-  } else if (user.meta.form < 40) {
+  } else if (user.meta.form < 30) {
     selected = false;
-    reason = `Dropped from the ${format} squad because international form is below 40.`;
+    reason = `Dropped from the ${format} squad because international form is below 30.`;
   } else if (resources.playerCondition < 25) {
     selected = false;
     reason = `Rested from the ${format} squad because condition is below 25.`;
@@ -1030,13 +1204,18 @@ function applyWtcOutcome(
   }
 }
 
-function wtcPairings(countries: string[], year: number, cycle: WtcCycleState): [string, string][] {
+function wtcPairings(
+  countries: string[],
+  year: number,
+  cycle: WtcCycleState,
+  round = 0,
+): [string, string][] {
   const unique = [...new Set(countries)].slice(0, 8);
   if (unique.length % 2 === 1) unique.pop();
   if (unique.length < 2) return [];
   const anchor = unique[0];
   const rotating = unique.slice(1);
-  const shift = Math.max(0, year - cycle.startYear) % rotating.length;
+  const shift = (Math.max(0, year - cycle.startYear) * 5 + Math.max(0, round)) % rotating.length;
   const shifted = [anchor, ...rotating.slice(shift), ...rotating.slice(0, shift)];
   const pairings: [string, string][] = [];
   for (let index = 0; index < shifted.length / 2; index += 1) {
@@ -1046,15 +1225,16 @@ function wtcPairings(countries: string[], year: number, cycle: WtcCycleState): [
 }
 
 function simulateWtcSeries(
+  saveId: string,
   cycle: WtcCycleState,
-  year: number,
+  seriesId: string,
   homeCountry: string,
   awayCountry: string,
+  matchCount: number,
 ): void {
-  const seriesId = wtcSeriesId(year, homeCountry, awayCountry);
   if (cycle.processedSeriesIds.includes(seriesId)) return;
-  for (let match = 1; match <= 2; match += 1) {
-    const roll = stableNumber(`${seriesId}:${match}`) % 5;
+  for (let match = 1; match <= matchCount; match += 1) {
+    const roll = stableNumber(`${saveId}:${seriesId}:${match}`) % 5;
     applyWtcOutcome(
       cycle,
       homeCountry,
@@ -1065,8 +1245,73 @@ function simulateWtcSeries(
   cycle.processedSeriesIds.push(seriesId);
 }
 
-function wtcSeriesId(year: number, countryA: string, countryB: string): string {
-  return `wtc-series-${year}-${[countryA, countryB].sort().join('-')}`;
+function reopenSimulatedWtcSeries(
+  save: SaveGame,
+  cycle: WtcCycleState,
+  seriesId: string,
+  homeCountry: string,
+  awayCountry: string,
+  matchCount: number,
+): void {
+  if (!cycle.processedSeriesIds.includes(seriesId)) return;
+  const home = cycle.standings[homeCountry];
+  const away = cycle.standings[awayCountry];
+  if (!home || !away) return;
+  for (let match = 1; match <= matchCount; match += 1) {
+    const roll = stableNumber(`${save.id}:${seriesId}:${match}`) % 5;
+    const result = roll === 0 ? 'DRAW' : roll % 2 === 0 ? 'HOME_WIN' : 'AWAY_WIN';
+    home.played = Math.max(0, home.played - 1);
+    away.played = Math.max(0, away.played - 1);
+    if (result === 'HOME_WIN') {
+      home.won = Math.max(0, home.won - 1);
+      away.lost = Math.max(0, away.lost - 1);
+      home.points = Math.max(0, home.points - 12);
+    } else if (result === 'AWAY_WIN') {
+      away.won = Math.max(0, away.won - 1);
+      home.lost = Math.max(0, home.lost - 1);
+      away.points = Math.max(0, away.points - 12);
+    } else {
+      home.drawn = Math.max(0, home.drawn - 1);
+      away.drawn = Math.max(0, away.drawn - 1);
+      home.points = Math.max(0, home.points - 4);
+      away.points = Math.max(0, away.points - 4);
+    }
+  }
+  cycle.processedSeriesIds = cycle.processedSeriesIds.filter((id) => id !== seriesId);
+}
+
+function wtcSeriesId(assignmentId: string, countryA: string, countryB: string): string {
+  return `wtc-series-${assignmentId}-${[countryA, countryB].sort().join('-')}`;
+}
+
+function processWtcAssignmentBackground(
+  save: SaveGame,
+  plan: InternationalWindowPlan,
+  countries: string[],
+  controlledCountry: string,
+  controlledSeriesPlayable: boolean,
+): { cycle: WtcCycleState; opponent?: string } {
+  const cycle = ensureWtcCycle(save, plan.year, countries);
+  let opponent: string | undefined;
+  for (const [homeCountry, awayCountry] of wtcPairings(
+    countries,
+    plan.year,
+    cycle,
+    plan.wtcRound,
+  )) {
+    const controlledPair = homeCountry === controlledCountry || awayCountry === controlledCountry;
+    if (controlledPair) opponent = homeCountry === controlledCountry ? awayCountry : homeCountry;
+    if (controlledPair && controlledSeriesPlayable) continue;
+    simulateWtcSeries(
+      save.id,
+      cycle,
+      wtcSeriesId(plan.id, homeCountry, awayCountry),
+      homeCountry,
+      awayCountry,
+      plan.groupMatches,
+    );
+  }
+  return { cycle, opponent };
 }
 
 function processWtcBackgroundYear(
@@ -1074,17 +1319,26 @@ function processWtcBackgroundYear(
   year: number,
   countries: string[],
   controlledCountry: string,
-  controlledSeriesPlayable: boolean,
-): { cycle: WtcCycleState; opponent?: string } {
-  const cycle = ensureWtcCycle(save, year, countries);
-  let opponent: string | undefined;
-  for (const [homeCountry, awayCountry] of wtcPairings(countries, year, cycle)) {
-    const controlledPair = homeCountry === controlledCountry || awayCountry === controlledCountry;
-    if (controlledPair) opponent = homeCountry === controlledCountry ? awayCountry : homeCountry;
-    if (controlledPair && controlledSeriesPlayable) continue;
-    simulateWtcSeries(cycle, year, homeCountry, awayCountry);
+): void {
+  for (const plan of annualInternationalPlans(year).filter(
+    (candidate) => candidate.wtcPointsSeries,
+  )) {
+    processWtcAssignmentBackground(save, plan, countries, controlledCountry, false);
   }
-  return { cycle, opponent };
+}
+
+function allWtcAssignmentsResolved(save: SaveGame, year: number): boolean {
+  if (save.mode !== 'career') return true;
+  const selections = save.playerCareerResources?.internationalSelections ?? {};
+  return annualInternationalPlans(year)
+    .filter((plan) => plan.wtcPointsSeries)
+    .every((plan) => Boolean(selections[plan.id]));
+}
+
+function managerPhaseForFormat(format: Format): ManagerCalendarPhase {
+  if (format === 'TEST') return 'FIRST_CLASS';
+  if (format === 'ODI') return 'LIST_A';
+  return 'T20';
 }
 
 function controlledInternationalCountry(save: SaveGame): string | undefined {
@@ -1121,7 +1375,7 @@ function stageWtcFinal(
   const plan = wtcFinalPlan(year);
 
   if (!topTwo.includes(controlledCountry)) {
-    cycle.championCountryId = topTwo[stableNumber(`${cycle.id}:final`) % topTwo.length];
+    cycle.championCountryId = topTwo[stableNumber(`${save.id}:${cycle.id}:final`) % topTwo.length];
     save.internationalCalendar = buildIntlCalendar(year, save);
     return [];
   }
@@ -1130,7 +1384,7 @@ function stageWtcFinal(
     const decision = internationalSelectionDecision(save, plan.id, 'TEST');
     if (!decision.selected) {
       cycle.championCountryId =
-        topTwo[stableNumber(`${cycle.id}:final-unselected`) % topTwo.length];
+        topTwo[stableNumber(`${save.id}:${cycle.id}:final-unselected`) % topTwo.length];
       save.internationalCalendar = buildIntlCalendar(year, save);
       return [];
     }
@@ -1167,7 +1421,7 @@ export function recordWtcFixtureResult(save: SaveGame, fixture: Fixture): void {
         ? homeCountry
         : fixture.resultKind === 'AWAY_WIN'
           ? awayCountry
-          : [homeCountry, awayCountry][stableNumber(`${cycle.id}:drawn-final`) % 2];
+          : [homeCountry, awayCountry][stableNumber(`${save.id}:${cycle.id}:drawn-final`) % 2];
     fixture.wtcPointsRecorded = true;
     if (!cycle.recordedFixtureIds.includes(fixture.id)) {
       cycle.recordedFixtureIds.push(fixture.id);
@@ -1188,19 +1442,144 @@ export function recordWtcFixtureResult(save: SaveGame, fixture: Fixture): void {
   );
   fixture.wtcPointsRecorded = true;
   if (!cycle.recordedFixtureIds.includes(fixture.id)) cycle.recordedFixtureIds.push(fixture.id);
-  const seriesId = wtcSeriesId(currentSeasonYear(save), homeCountry, awayCountry);
+  const seriesId = wtcSeriesId(
+    fixture.competitionId ?? `legacy-${currentSeasonYear(save)}`,
+    homeCountry,
+    awayCountry,
+  );
   if (!cycle.processedSeriesIds.includes(seriesId)) cycle.processedSeriesIds.push(seriesId);
   const controlledCountry = controlledInternationalCountry(save);
-  if (controlledCountry) {
+  if (controlledCountry && allWtcAssignmentsResolved(save, currentSeasonYear(save))) {
     stageWtcFinal(save, currentSeasonYear(save), controlledCountry, {
       controlledTeamId: save.mode === 'manager' ? save.managerNationalTeamId : undefined,
       mustIncludePlayerId: save.mode === 'career' ? save.userPlayerId : undefined,
-      managerPhase: save.mode === 'manager' ? 'OFF_SEASON' : undefined,
+      managerPhase: save.mode === 'manager' ? 'FIRST_CLASS' : undefined,
     });
   }
 }
 
-/** Generate all selected Player Career assignments for the current year. */
+/** Prepare assignment metadata without locking selection or creating fixtures early. */
+export function prepareInternationalCalendar(save: SaveGame): void {
+  if (!save.capped || !save.userPlayerId) return;
+  const year = currentSeasonYear(save);
+  removeUnplayedLegacyBilateralWindow(save, year);
+  save.internationalCalendar = buildIntlCalendar(year, save);
+}
+
+function clearUnplayedInternationalAssignment(save: SaveGame, assignmentId: string): void {
+  const removed = Object.values(save.fixtures)
+    .filter(
+      (fixture) =>
+        fixture.seasonId === save.currentSeasonId &&
+        fixture.competitionId === assignmentId &&
+        !fixture.played,
+    )
+    .map((fixture) => fixture.id);
+  for (const fixtureId of removed) removeFixture(save, fixtureId);
+  if (!removed.length) return;
+  const playedAssignment = Object.values(save.fixtures).some(
+    (fixture) => fixture.competitionId === assignmentId && fixture.played,
+  );
+  if (!playedAssignment && save.internationalTournaments?.[assignmentId]) {
+    delete save.internationalTournaments[assignmentId];
+  }
+  for (const cycle of Object.values(save.wtcCycles ?? {})) {
+    if (cycle.finalFixtureId && removed.includes(cycle.finalFixtureId)) {
+      cycle.finalFixtureId = undefined;
+      cycle.championCountryId = undefined;
+    }
+  }
+}
+
+/**
+ * Re-evaluate one assignment when its calendar week arrives and create only
+ * that assignment's fixtures. This prevents September form from deciding an
+ * entire international year.
+ */
+export function generateInternationalAssignmentFixtures(
+  save: SaveGame,
+  assignmentId: string,
+): { decision: InternationalSelectionDecision; fixtureIds: string[] } | undefined {
+  if (!save.capped || !save.userPlayerId) return undefined;
+  const user = save.players[save.userPlayerId];
+  if (!user) return undefined;
+  const resources = ensurePlayerCareerResources(save);
+  const countryId = resources?.cappedCountry ?? resources?.declaredCountry ?? user.nationality;
+  const year = currentSeasonYear(save);
+  const plan = annualInternationalPlans(year).find((candidate) => candidate.id === assignmentId);
+  if (!plan) return undefined;
+  const countries = availableCountries(save, countryId).slice(0, 8);
+  if (countries.length < 2) return undefined;
+
+  removeUnplayedLegacyBilateralWindow(save, year);
+  clearUnplayedInternationalAssignment(save, assignmentId);
+  recoverBetweenInternationalAssignments(save);
+  const decision = internationalSelectionDecision(save, plan.id, plan.format, true);
+  const fixtureIds: string[] = [];
+
+  if (plan.wtcPointsSeries) {
+    const currentBounds = wtcCycleBounds(year);
+    if (year === currentBounds.endYear) {
+      processWtcBackgroundYear(save, year - 1, countries, countryId);
+    }
+    const cycle = ensureWtcCycle(save, year, countries);
+    const controlledPair = wtcPairings(countries, year, cycle, plan.wtcRound).find(
+      ([home, away]) => home === countryId || away === countryId,
+    );
+    if (controlledPair && decision.selected) {
+      const seriesId = wtcSeriesId(plan.id, controlledPair[0], controlledPair[1]);
+      const alreadyRecorded = cycle.recordedFixtureIds.some(
+        (fixtureId) => save.fixtures[fixtureId]?.competitionId === plan.id,
+      );
+      if (!alreadyRecorded) {
+        reopenSimulatedWtcSeries(
+          save,
+          cycle,
+          seriesId,
+          controlledPair[0],
+          controlledPair[1],
+          plan.groupMatches,
+        );
+      }
+    }
+    const background = processWtcAssignmentBackground(
+      save,
+      plan,
+      countries,
+      countryId,
+      decision.selected,
+    );
+    if (decision.selected && background.opponent) {
+      fixtureIds.push(
+        ...createWindowFixtures(save, countryId, plan, {
+          mustIncludePlayerId: save.userPlayerId,
+          opponentCountries: [background.opponent],
+          wtcCycleId: background.cycle.id,
+        }),
+      );
+    }
+  } else if (plan.kind === 'WORLD_TEST_CHAMPIONSHIP') {
+    fixtureIds.push(...stageWtcFinal(save, year, countryId));
+  } else if (decision.selected) {
+    fixtureIds.push(
+      ...createWindowFixtures(save, countryId, plan, {
+        mustIncludePlayerId: save.userPlayerId,
+      }),
+    );
+  }
+
+  save.internationalCalendar = buildIntlCalendar(year, save);
+  return {
+    decision,
+    fixtureIds: fixtureIds.length
+      ? fixtureIds
+      : internationalWindowFixtureIds(save).filter(
+          (fixtureId) => save.fixtures[fixtureId]?.competitionId === assignmentId,
+        ),
+  };
+}
+
+/** Generate all selected Player Career assignments for audits and legacy callers. */
 export function generateInternationalWindowFixtures(save: SaveGame): string[] {
   if (!save.capped || !save.userPlayerId) return [];
   const user = save.players[save.userPlayerId];
@@ -1212,53 +1591,38 @@ export function generateInternationalWindowFixtures(save: SaveGame): string[] {
   const plans = annualInternationalPlans(year);
   const countries = availableCountries(save, countryId).slice(0, 8);
   if (countries.length < 2) return [];
-  const added: string[] = [];
-
-  const autumn = plans[0];
-  const autumnSelection = internationalSelectionDecision(save, autumn.id, autumn.format);
-  if (autumnSelection.selected) {
-    added.push(
-      ...createWindowFixtures(save, countryId, autumn, {
-        mustIncludePlayerId: save.userPlayerId,
-      }),
-    );
-  }
-
-  const winter = plans[1];
-  const winterSelection = internationalSelectionDecision(save, winter.id, 'TEST');
   const currentBounds = wtcCycleBounds(year);
   if (year === currentBounds.endYear) {
-    processWtcBackgroundYear(save, year - 1, countries, countryId, false);
-  }
-  const { cycle, opponent } = processWtcBackgroundYear(
-    save,
-    year,
-    countries,
-    countryId,
-    winterSelection.selected,
-  );
-  if (winterSelection.selected && opponent) {
-    added.push(
-      ...createWindowFixtures(save, countryId, winter, {
-        mustIncludePlayerId: save.userPlayerId,
-        opponentCountries: [opponent],
-        wtcCycleId: cycle.id,
-      }),
-    );
+    processWtcBackgroundYear(save, year - 1, countries, countryId);
   }
 
-  for (const marquee of plans.slice(2)) {
-    if (marquee.kind === 'WORLD_TEST_CHAMPIONSHIP') {
-      added.push(...stageWtcFinal(save, year, countryId));
-    } else {
-      const marqueeSelection = internationalSelectionDecision(save, marquee.id, marquee.format);
-      if (marqueeSelection.selected) {
-        added.push(
-          ...createWindowFixtures(save, countryId, marquee, {
-            mustIncludePlayerId: save.userPlayerId,
-          }),
-        );
+  for (const plan of plans) {
+    if (plan.kind === 'WORLD_TEST_CHAMPIONSHIP') {
+      stageWtcFinal(save, year, countryId);
+      continue;
+    }
+    const decision = internationalSelectionDecision(save, plan.id, plan.format);
+    if (plan.wtcPointsSeries) {
+      const { cycle, opponent } = processWtcAssignmentBackground(
+        save,
+        plan,
+        countries,
+        countryId,
+        decision.selected,
+      );
+      if (decision.selected && opponent) {
+        createWindowFixtures(save, countryId, plan, {
+          mustIncludePlayerId: save.userPlayerId,
+          opponentCountries: [opponent],
+          wtcCycleId: cycle.id,
+        });
       }
+      continue;
+    }
+    if (decision.selected) {
+      createWindowFixtures(save, countryId, plan, {
+        mustIncludePlayerId: save.userPlayerId,
+      });
     }
   }
 
@@ -1276,50 +1640,42 @@ export function generateCountryInternationalWindowFixtures(
   const plans = annualInternationalPlans(year);
   const countries = availableCountries(save, countryId).slice(0, 8);
   if (countries.length < 2) return [];
-  const added: string[] = [];
-
-  const autumn = plans[0];
-  added.push(
-    ...createWindowFixtures(save, countryId, autumn, {
-      ...options,
-      managerPhase: 'LIST_A',
-    }),
-  );
-
-  const winter = plans[1];
   const currentBounds = wtcCycleBounds(year);
   if (year === currentBounds.endYear) {
-    processWtcBackgroundYear(save, year - 1, countries, countryId, false);
-  }
-  const { cycle, opponent } = processWtcBackgroundYear(save, year, countries, countryId, true);
-  if (opponent) {
-    added.push(
-      ...createWindowFixtures(save, countryId, winter, {
-        ...options,
-        managerPhase: 'FIRST_CLASS',
-        opponentCountries: [opponent],
-        wtcCycleId: cycle.id,
-      }),
-    );
+    processWtcBackgroundYear(save, year - 1, countries, countryId);
   }
 
-  for (const marquee of plans.slice(2)) {
-    if (marquee.kind === 'WORLD_TEST_CHAMPIONSHIP') {
-      added.push(
-        ...stageWtcFinal(save, year, countryId, {
-          ...options,
-          managerPhase: 'OFF_SEASON',
-          wtcCycleId: cycle.id,
-        }),
-      );
-    } else {
-      added.push(
-        ...createWindowFixtures(save, countryId, marquee, {
-          ...options,
-          managerPhase: 'OFF_SEASON',
-        }),
-      );
+  for (const plan of plans) {
+    const managerPhase = managerPhaseForFormat(plan.format);
+    if (plan.kind === 'WORLD_TEST_CHAMPIONSHIP') {
+      stageWtcFinal(save, year, countryId, {
+        ...options,
+        managerPhase,
+      });
+      continue;
     }
+    if (plan.wtcPointsSeries) {
+      const { cycle, opponent } = processWtcAssignmentBackground(
+        save,
+        plan,
+        countries,
+        countryId,
+        true,
+      );
+      if (opponent) {
+        createWindowFixtures(save, countryId, plan, {
+          ...options,
+          managerPhase,
+          opponentCountries: [opponent],
+          wtcCycleId: cycle.id,
+        });
+      }
+      continue;
+    }
+    createWindowFixtures(save, countryId, plan, {
+      ...options,
+      managerPhase,
+    });
   }
 
   save.internationalCalendar = buildIntlCalendar(year, save);
@@ -1345,7 +1701,7 @@ export function nextInternationalFixtureId(save: SaveGame): string | undefined {
   return internationalWindowFixtureIds(save).find((id) => !save.fixtures[id]?.played);
 }
 
-/** Mark the rest of a tour for AI simulation when international form collapses. */
+/** Mark the rest of a tour for AI simulation after a sustained form collapse. */
 export function releaseFromInternationalTourIfOutOfForm(
   save: SaveGame,
   completedFixture: Fixture,
@@ -1359,12 +1715,20 @@ export function releaseFromInternationalTourIfOutOfForm(
     return [];
   }
   const user = save.players[save.userPlayerId];
-  if (!user || user.meta.form >= 40) return [];
+  const assignmentAppearances = Object.values(save.fixtures).filter(
+    (fixture) =>
+      fixture.seasonId === save.currentSeasonId &&
+      fixture.competitionId === completedFixture.competitionId &&
+      fixture.played,
+  ).length;
+  // A single failure cannot erase a full tour. Selectors act only after at
+  // least three appearances and genuinely collapsed form.
+  if (!user || user.meta.form >= 30 || assignmentAppearances < 3) return [];
   const resources = ensurePlayerCareerResources(save);
   const decision = resources?.internationalSelections?.[completedFixture.competitionId];
   if (decision) {
     decision.selected = false;
-    decision.reason = `Released to domestic cricket after international form fell below 40.`;
+    decision.reason = `Released to domestic cricket after sustained international form fell below 30.`;
   }
   return Object.values(save.fixtures)
     .filter(
@@ -1374,13 +1738,4 @@ export function releaseFromInternationalTourIfOutOfForm(
         !fixture.played,
     )
     .map((fixture) => fixture.id);
-}
-
-/** Top-N teams by ICC ranking points. */
-export function topIccTeams(save: SaveGame, n = 5): { teamId: string; points: number }[] {
-  const rankings = save.iccRankings ?? {};
-  return Object.entries(rankings)
-    .map(([teamId, points]) => ({ teamId, points }))
-    .sort((left, right) => right.points - left.points)
-    .slice(0, n);
 }

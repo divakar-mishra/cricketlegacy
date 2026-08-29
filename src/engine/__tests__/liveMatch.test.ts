@@ -32,4 +32,37 @@ describe('LiveMatch (full match orchestration)', () => {
       expect(live.result).toEqual(auto.result);
     }
   });
+
+  it('keeps Manager difficulty balance identical in watched, key-moment and instant paths', () => {
+    const tacticalHome = {
+      ...home,
+      tactics: { battingBias: 0, bowlerPlan: 'CONTAIN' as const, field: 'BALANCED' as const },
+    };
+    const tacticalAway = {
+      ...away,
+      tactics: { battingBias: 0.12, bowlerPlan: 'ATTACK' as const },
+    };
+    for (let i = 1; i <= 8; i += 1) {
+      const seed = seedFor(20 + i);
+      const input = {
+        id: 'manager-parity',
+        seed,
+        format: 'T20' as const,
+        conditions: NEUTRAL_CONDITIONS,
+        home: tacticalHome,
+        away: tacticalAway,
+        difficulty: 'HARD' as const,
+        difficultyBalanceProfile: 'MANAGER' as const,
+        userTeamId: home.teamId,
+        tactics: { battingBias: 0, bowlingPlan: 'CONTAIN' as const, field: 'BALANCED' as const },
+      };
+      const auto = simulateMatch(input);
+      const liveMatch = new LiveMatch(input);
+      while (!liveMatch.matchDone) liveMatch.nextBall();
+      const watched = liveMatch.finalizeMatch();
+
+      expect(JSON.stringify(watched.innings)).toBe(JSON.stringify(auto.innings));
+      expect(watched.result).toEqual(auto.result);
+    }
+  });
 });

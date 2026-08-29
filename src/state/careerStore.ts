@@ -1,28 +1,36 @@
 import { create } from 'zustand';
 import { normalizeAvatarConfig } from '../avatar';
+import { QA_TOOLS_ENABLED, QA_WHALE_CLUB_BUDGET, QA_WHALE_COINS } from '../config/qa';
 import { ECONOMY } from '../data/gameConfig';
 import { seniorProfessionalFeaturesUnlocked } from '../game/readiness';
 import {
   DailyChallenge,
   Facilities,
   Fixture,
+  Format,
   GameMode,
   MatchImpactSummary,
   MatchState,
+  ManagerCareerLevel,
   ManagerResourceAction,
+  ManagerTrainingFocus,
+  ManagerTrainingIntensity,
   PersonalCoachDiscipline,
   PlayerCaptainIssue,
   SaveGame,
   StaffRole,
   Tactics,
+  TicketPreset,
   Wallet,
 } from '../domain/types';
 import { LiveMatch } from '../engine/liveMatch';
+import { computeOverall } from '../engine/rating';
 import { makeRng } from '../engine/rng';
 import {
   accrueNationalRep,
   applyCareerMatchReadiness,
   applyNearRecordSelectionBoost,
+  careerSelectionDecision,
   checkAgeRetirement,
   closeInternationalCapSeason,
   checkPathPromotion,
@@ -36,12 +44,12 @@ import {
   ensureUserContract,
   fundPersonalAcademy,
   holdOut,
-  investInStocks,
   isCareerToManagerEligible,
   maybeNationalCaptaincy,
   negotiateContract,
   NegotiationResult,
   prepareCareerFormat,
+  playerRetirementAssessment,
   PromotionResult,
   recordPathPerformance,
   recoverCareerOffSeason,
@@ -49,18 +57,20 @@ import {
   setCareerRestRequest,
   signUserContract,
   tickCareerPathMatch,
-  tickStockMarket,
   tickUserContract,
   userContractExpiring,
-  withdrawStocks,
 } from '../game/career';
+import { investInStockCompany, sellStockCompany, tickStockMarket } from '../game/stockMarket';
 import { synchronizeCareerPromotion } from '../game/careerTransition';
 import {
   addCoins,
   addGems,
+  convertPlayerGemsToCoins,
   fixtureEnergyCost,
   matchEnergyCost,
   matchReward,
+  PLAYER_GEM_CONVERSION_PRESETS,
+  playerGemConversionCoins,
   refillEnergyWithGems,
   regenEnergy,
   spendEnergy,
@@ -77,7 +87,7 @@ import {
   initQuestProgress,
   isQuestComplete,
   PASS_ITEM_LABELS,
-  PASS_TIERS,
+  passTiersForMode,
   pickDailyQuests,
   QuestDef,
   QuestMetric,
@@ -121,9 +131,12 @@ import {
 } from '../game/newspaper';
 import { ensureRival, settleRivalrySeason } from '../game/rivalry';
 import {
+  acceptDomesticClubOffer as applyAcceptDomesticClubOffer,
   acceptAuctionOffer as applyAcceptOffer,
+  declineDomesticClubOffers as applyDeclineDomesticClubOffers,
   declineAuction as applyDeclineAuction,
   generateAuctionOffers,
+  generateDomesticClubOffers,
 } from '../game/auction';
 import {
   canRetire,
@@ -131,9 +144,10 @@ import {
   ChoiceResult,
   maybeQueueMatchStory,
   nextPendingEvent,
-  paySponsorsForMatch,
+  normalizePendingStoryQueue,
   pendingEventCount,
   queueStoryForTrigger,
+  releaseDeferredStoryAfterMatch,
   RenderedEvent,
   resolveStoryChoice,
   rolloverSponsors,
@@ -143,14 +157,13 @@ import {
   ensureManagerDepth,
   facilityMaintenance,
   FacilityOutcome,
+  FacilityUpgradePaymentMethod,
   FreeAgentContractOutcome,
-  gateReceipts,
   hireStaff as hireStaffPure,
   investInStaff,
   LoanOutcome,
   MAX_FACILITY,
   loanPlayer as loanPlayerPure,
-  medicalBonus,
   offerFreeAgentContract as offerFreeAgentContractPure,
   promoteProspect,
   PromoteOutcome,
@@ -166,9 +179,23 @@ import {
   StaffOutcome,
   upgradeFacility,
 } from '../game/manager';
+import {
+  StadiumUpgradeOutcome,
+  stadiumSeasonUpkeep,
+  setClubTicketPreset,
+  upgradeMatchdayExperience,
+  upgradeStadiumCapacity,
+} from '../game/stadiumManagement';
 import { executeManagerResourceAction, ManagerResourceOutcome } from '../game/managerResources';
+import { managerClubOperationsPaused, persistActiveManagerClub } from '../game/managerClubState';
+import { setManagerPlayerTrainingOverride, setManagerTeamTraining } from '../game/managerTraining';
+import {
+  appointManagerLeader as appointManagerLeaderPure,
+  ensureManagerLeadership,
+  ManagerLeadershipRole,
+} from '../game/leadership';
 import { transferWindowClosedReason } from '../game/transferMarket';
-import { applyManagerLevelPromotion, checkManagerLevelPromotion } from '../game/managerCareer';
+import { checkManagerLevelPromotion, updateManagerReputation } from '../game/managerCareer';
 import {
   acceptManagerJob,
   applyManagerAppointment,
@@ -203,6 +230,8 @@ import {
   finishSeason,
   nextUserFixtureId,
   playUserFixture,
+  reconcilePlayedCompetitionRounds,
+  simulateFixtureWithoutCareerPlayer,
   resolveNationalDutyConflict,
   seasonComplete,
   simulateInternationalFixturesWithoutUser,
@@ -213,9 +242,9 @@ import {
   validateSeasonState,
 } from '../game/season';
 import {
-  generateInternationalWindowFixtures,
   isInternationalFixture,
   nextInternationalFixtureId,
+  prepareInternationalCalendar,
   releaseFromInternationalTourIfOutOfForm,
 } from '../game/intlCalendar';
 import {
@@ -232,7 +261,6 @@ import {
   CaptainResolution,
   ensureCaptainIssue,
   hirePersonalCoach,
-  negotiatePlayerSponsor,
   personalCoachTrainingMultiplier,
   PlayerLifeOutcome,
   processPlayerLifeSeason,
@@ -240,8 +268,6 @@ import {
   recordPlayerLifeMatch,
   resolveCaptainIssue,
   SocialTone,
-  SponsorApproach,
-  tradeLegacyToken,
   transferPlayerBank,
 } from '../game/playerLife';
 import { AdvanceManagerCalendarResult, managerControlledTeamId } from '../game/managerCalendar';
@@ -249,6 +275,15 @@ import { updateRecords } from '../game/records';
 import { applyMatchToStats } from '../game/stats';
 import { careerPlayingTeamId, generateYouthFixtures } from '../game/youthFixtures';
 import { matchDecisionAuthority } from '../game/matchAuthority';
+import {
+  acceptSponsorshipOffer,
+  ensureSponsorshipState,
+  grantPremiumSponsorToCurrentSave,
+  premiumSponsorStoreUnlocked,
+  rolloverSponsorship,
+  settleFixtureSponsorship,
+  SponsorActionResult,
+} from '../game/sponsorship';
 import {
   achievementGemReward,
   checkCareerStateAchievements,
@@ -258,10 +293,16 @@ import {
   checkStreakAchievements,
   getAchievement,
 } from '../game/achievements';
-import { InteractionManager } from 'react-native';
-import { accountPurchases, analytics, notifications, purchaseLedger, purchases } from '../services';
+import {
+  accountPurchases,
+  analytics,
+  crash,
+  notifications,
+  purchaseLedger,
+  purchases,
+} from '../services';
 import { maybeRequestReview } from '../services/storeReview';
-import { setLastPlayed, writeSave } from '../storage/saveGames';
+import { listAllSaves, setLastPlayed, writeSave } from '../storage/saveGames';
 import { runMigrations } from '../storage/migrate';
 import { synchronizeSchema14State } from '../storage/schema14';
 import { synchronizeSchema15State } from '../storage/schema15';
@@ -277,7 +318,11 @@ import { synchronizeSchema26State } from '../storage/schema26';
 import { synchronizeSchema27State } from '../storage/schema27';
 import { synchronizeSchema28State } from '../storage/schema28';
 import { synchronizeSchema29State } from '../storage/schema29';
-import { synchronizeSchema30State } from '../storage/schema30';
+import { synchronizeSchema32State } from '../storage/schema32';
+import { synchronizeSchema33State } from '../storage/schema33';
+import { synchronizeSchema35State } from '../storage/schema35';
+import { synchronizeSchema40PlayerAffiliations } from '../storage/schema40';
+import { synchronizeSchema42Portfolio } from '../storage/schema42';
 import {
   buildMatchImpactSummary,
   captureExperienceSnapshot,
@@ -301,8 +346,15 @@ import {
   isSeasonPassActive,
   passTrainingMultiplier,
   recordSeasonPassScenarioMatch,
+  seasonPassPeriod,
   synchronizeSeasonPassState,
 } from '../game/seasonPass';
+import {
+  autoSettleU19WorldCupAI,
+  isU19WorldCupFixture,
+  recordU19WorldCupMerit,
+  synchronizeU19WorldCupState,
+} from '../game/u19WorldCup';
 
 interface ActiveRef {
   mode: GameMode;
@@ -326,9 +378,10 @@ export interface DailyRewardClaim extends RewardBalanceChange {
   items: string[];
 }
 
-export interface PassRewardClaim extends RewardBalanceChange {
+export interface PassRewardClaim {
+  previousCoins: number;
+  newCoins: number;
   coins: number;
-  gems: number;
   count: number;
   items: string[];
 }
@@ -350,6 +403,13 @@ export interface PlayResult {
   /** A new injury picked up this match (drives the post-match Injury Report). */
   injury?: { playerId: string; playerName: string; matchesOut: number };
   impact?: MatchImpactSummary;
+}
+
+export interface BenchedAdvanceOutcome {
+  ok: boolean;
+  simulated: number;
+  reason?: string;
+  nextFixtureId?: string;
 }
 
 export interface TrainOutcome {
@@ -379,7 +439,7 @@ export interface SquadRecoveryOutcome extends PremiumActionOutcome {
   preview?: SquadRecoveryPreview;
 }
 
-const dayIndex = (): number => Math.floor(Date.now() / 86_400_000);
+const dayIndex = (now: number = Date.now()): number => Math.floor(now / 86_400_000);
 const STANDARD_RECOVERY_GEMS = 79;
 const FULL_FITNESS_RECOVERY_GEMS = 149;
 const STANDARD_RECOVERY_FITNESS_CAP = 95;
@@ -422,6 +482,15 @@ function recordSaveResult(save: SaveGame, matchId: string, userWon: boolean, tie
   }
 }
 
+/** A completed match without a winner is neutral: a tie, Test draw or no result. */
+function matchHasNeutralResult(match: MatchState): boolean {
+  return Boolean(match.result && (match.result.tie || !match.result.winnerTeamId));
+}
+
+function hasRecordedSaveResult(save: SaveGame, matchId: string): boolean {
+  return Boolean(save.flags?.[`resultCount:${matchId}`]);
+}
+
 function isManagerDerby(save: SaveGame, fixture: Fixture | undefined): boolean {
   if (!fixture) return false;
   const league = Object.values(save.leagues).find(
@@ -458,6 +527,7 @@ function recordPremiumAssistance(save: SaveGame, kind: string, transactionId?: s
     seasonId: save.currentSeasonId,
     transactionId,
   });
+  updateManagerReputation(save);
 }
 
 function applyManagerLegendBacking(save: SaveGame): void {
@@ -534,6 +604,23 @@ function ingestHallOfFame(save: SaveGame): void {
     });
 }
 
+function finalizePlayerRetirement(save: SaveGame, year: number): { epitaph: string } | null {
+  const user = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
+  if (!user || user.retired) return null;
+  user.retired = true;
+  save.flags.retired = true;
+  save.flags.playerRetirementRecommended = false;
+  const epitaph = careerEpitaph(save);
+  addTimeline(save, {
+    year,
+    kind: 'RETIREMENT',
+    text: `Called time on a storied career — ${epitaph}.`,
+  });
+  analytics.logEvent(analytics.EVT.SEASON_ROLLOVER, { retired: true, age: user.age });
+  ingestHallOfFame(save);
+  return { epitaph };
+}
+
 /** Schedule an "energy full" reminder (no-op without permission/native module). */
 function scheduleEnergyNotif(wallet: Wallet): void {
   try {
@@ -546,17 +633,75 @@ function scheduleEnergyNotif(wallet: Wallet): void {
   }
 }
 
+function qaUnlimitedEnergyEnabled(): boolean {
+  return QA_TOOLS_ENABLED && useSettings.getState().qaUnlimitedEnergy;
+}
+
+function visibleEnergyCap(save: SaveGame): number {
+  return save.entitlements.removeAds ? ECONOMY.vipEnergyMax : ECONOMY.energyMax;
+}
+
+function refillQaEnergy(save: SaveGame): boolean {
+  if (!qaUnlimitedEnergyEnabled() || save.mode !== 'career') return false;
+  const cap = visibleEnergyCap(save);
+  const changed = save.wallet.energy !== cap;
+  save.wallet = { ...save.wallet, energy: cap, energyUpdatedAt: Date.now() };
+  return changed;
+}
+
+function spendSaveEnergy(save: SaveGame, amount: number): Wallet {
+  if (!qaUnlimitedEnergyEnabled()) return spendEnergy(save.wallet, amount);
+  return {
+    ...save.wallet,
+    energy: visibleEnergyCap(save),
+    energyUpdatedAt: Date.now(),
+  };
+}
+
+function synchronizeWeeklyQuestCycle(save: SaveGame, now: number, forceReset = false): void {
+  const period = seasonPassPeriod(now);
+  const passCycleId = save.pass?.seasonId ?? period.id;
+  const passStartedAt = save.pass?.periodStartedAt ?? period.startsAt;
+  const week = Math.max(0, Math.floor((now - passStartedAt) / (7 * 86_400_000)));
+  const weekly = save.weeklyQuests;
+  if (!weekly || forceReset || (weekly.passCycleId != null && weekly.passCycleId !== passCycleId)) {
+    save.weeklyQuests = {
+      week,
+      passCycleId,
+      items: initQuestProgress(weeklyQuestsForMode(save.mode)),
+    };
+    return;
+  }
+  if (weekly.passCycleId == null) {
+    // Stamp legacy in-progress weeks without discarding them, and translate
+    // the old global week number onto this pass's seven-day cadence.
+    weekly.passCycleId = passCycleId;
+    weekly.week = week;
+    return;
+  }
+  if (weekly.week !== week) {
+    save.weeklyQuests = {
+      week,
+      passCycleId,
+      items: initQuestProgress(weeklyQuestsForMode(save.mode)),
+    };
+  }
+}
+
 /** Ensure the daily/weekly quest sets + season pass exist and match the current day/week/season. */
-function ensureLiveops(save: SaveGame): void {
-  const day = dayIndex();
+function ensureLiveops(save: SaveGame, now: number = Date.now(), forceWeeklyReset = false): void {
+  const previousPassCycleId = save.pass?.seasonId;
+  synchronizeSeasonPassState(save, now);
+  const day = dayIndex(now);
   if (!save.quests || save.quests.day !== day) {
     save.quests = { day, items: initQuestProgress(pickDailyQuests(day, undefined, save.mode)) };
   }
-  const week = Math.floor(day / 7);
-  if (!save.weeklyQuests || save.weeklyQuests.week !== week) {
-    save.weeklyQuests = { week, items: initQuestProgress(weeklyQuestsForMode(save.mode)) };
-  }
-  synchronizeSeasonPassState(save);
+  synchronizeWeeklyQuestCycle(
+    save,
+    now,
+    forceWeeklyReset ||
+      (previousPassCycleId != null && previousPassCycleId !== save.pass?.seasonId),
+  );
 }
 
 function questDefs(save: SaveGame): QuestDef[] {
@@ -636,9 +781,28 @@ function recordMetricLiveops(save: SaveGame, metric: QuestMetric, amount: number
   );
 }
 
+export type RestorePurchasesStatus =
+  | 'RESTORED'
+  | 'NOTHING_TO_RESTORE'
+  | 'NOTHING_APPLICABLE'
+  | 'NOT_CONFIGURED'
+  | 'FAILED'
+  | 'NO_SAVE'
+  | 'ACTIVE_SAVE_CHANGED'
+  | 'PERSISTENCE_FAILED';
+
+export interface RestorePurchasesOutcome {
+  status: RestorePurchasesStatus;
+  count: number;
+  productIds: string[];
+  error?: string;
+}
+
 interface CareerState {
   save: SaveGame | null;
   ref: ActiveRef | null;
+  /** Last background/autosave failure. Cleared by the next successful write. */
+  persistenceError: string | null;
   /** Transient: a specific fixture to play next (e.g. a cup tie) instead of the league queue. */
   targetFixtureId?: string;
   /** Transient: newly-unlocked achievement ids waiting for a toast. Cleared by UI after display. */
@@ -647,15 +811,22 @@ interface CareerState {
   setActive: (save: SaveGame, mode: GameMode, slot: number) => void;
   playCupTie: () => boolean;
   refreshEnergy: () => void;
+  /** Reconcile a UTC pass boundary or premium expiry and persist once. */
+  synchronizeSeasonPassClock: (now?: number) => Promise<boolean>;
+  /** Best-effort autosave. Failures are captured in state instead of becoming unhandled rejections. */
   persist: () => Promise<void>;
+  /** User-visible/transactional save. Rejects when durable storage does not confirm the write. */
+  persistCritical: (immediate?: boolean) => Promise<void>;
   scheduleReminders: () => void;
   playNext: () => PlayResult | null;
+  /** Simulate consecutive team fixtures while the career player is not in the XI. */
+  advanceWhileBenched: () => BenchedAdvanceOutcome;
   beginLiveMatch: () => { fixtureId: string; live: LiveMatch } | null;
   commitLiveMatch: (match: MatchState) => PlayResult | null;
   beginInternational: () => { live: LiveMatch } | null;
   commitInternational: (match: MatchState) => PlayResult | null;
   train: (group: TrainGroup) => Promise<TrainOutcome>;
-  setTactics: (tactics: Tactics) => void;
+  setTactics: (tactics: Tactics, fixtureId?: string) => void;
   reorderXI: (playerIds: string[]) => void;
   setXI: (ids: string[]) => void;
   signPlayer: (playerId: string, feeOverride?: number) => SignOutcome;
@@ -676,12 +847,30 @@ interface CareerState {
     action: ManagerResourceAction,
     targetPlayerId?: string,
   ) => ManagerResourceOutcome;
-  upgradeFacilityLevel: (kind: keyof Facilities) => FacilityOutcome;
+  upgradeFacilityLevel: (
+    kind: keyof Facilities,
+    paymentMethod: FacilityUpgradePaymentMethod,
+  ) => FacilityOutcome;
+  setTicketPreset: (format: Format, preset: TicketPreset) => boolean;
+  upgradeStadium: () => StadiumUpgradeOutcome;
+  upgradeMatchday: () => StadiumUpgradeOutcome;
   scout: (playerId: string) => ScoutOutcome;
   promoteYouth: (playerId: string) => PromoteOutcome;
   releaseYouth: (playerId: string) => PromoteOutcome;
   renewDeal: (playerId: string, years?: number) => RenewOutcome;
   setTrainFocus: (playerId: string, group: 'batting' | 'bowling' | 'fielding' | 'meta') => void;
+  setManagerTrainingPlan: (update: {
+    focus?: ManagerTrainingFocus;
+    intensity?: ManagerTrainingIntensity;
+  }) => boolean;
+  setManagerTrainingOverride: (playerId: string, focus?: ManagerTrainingFocus) => boolean;
+  appointManagerLeader: (
+    role: ManagerLeadershipRole,
+    playerId: string,
+  ) => {
+    ok: boolean;
+    reason?: string;
+  };
   talkToPlayer: (playerId: string, kind: PlayerTalkKind) => TalkResult;
   markFlagSeen: (key: string) => void;
   takeNewJob: (teamId: string) => void;
@@ -691,6 +880,8 @@ interface CareerState {
   newSeason: () => void;
   acceptAuctionOffer: (teamId: string) => { ok: boolean; reason?: string };
   declineAuction: () => void;
+  acceptDomesticClubOffer: (teamId: string) => { ok: boolean; reason?: string };
+  declineDomesticClubOffers: () => void;
   claimDaily: () => DailyRewardClaim;
   pendingStory: () => RenderedEvent | null;
   storyCount: () => number;
@@ -705,6 +896,16 @@ interface CareerState {
   claimWeeklyReward: (id: string) => { ok: boolean; coins: number; gems: number };
   grantAdReward: (coins: number, transactionId: string) => { ok: boolean; reason?: string };
   grantAdEnergy: (energy: number, transactionId: string) => { ok: boolean; reason?: string };
+  qaGrantWhaleCoins: () => Promise<{
+    ok: boolean;
+    balance?: number;
+    savesUpdated?: number;
+    playerSavesUpdated?: number;
+    managerSavesUpdated?: number;
+    reason?: string;
+  }>;
+  qaGrantClubBudget: () => Promise<{ ok: boolean; balance?: number; reason?: string }>;
+  qaRefillEnergy: () => boolean;
   claimPass: () => PassRewardClaim;
   claimMonthlyPassDrop: () => {
     ok: boolean;
@@ -717,7 +918,6 @@ interface CareerState {
   claimPassScenario: (scenarioId: string) => {
     ok: boolean;
     coins: number;
-    gems: number;
     reason?: string;
   };
   savePassPresentation: (input: {
@@ -731,6 +931,9 @@ interface CareerState {
   }) => { ok: boolean; reason?: string };
   dismissStarterPack: () => void;
   refillEnergy: () => { ok: boolean };
+  convertPlayerGems: (
+    gems: number,
+  ) => Promise<{ ok: boolean; gems?: number; coins?: number; reason?: string }>;
   applySquadRecovery: (
     payment: 'token' | 'gems' | 'full_fitness',
     transactionId?: string,
@@ -741,7 +944,7 @@ interface CareerState {
     transactionId?: string,
   ) => ScoutOutcome;
   purchaseProduct: (productId: string) => Promise<{ ok: boolean; error?: string }>;
-  restorePurchases: () => Promise<number>;
+  restorePurchases: () => Promise<RestorePurchasesOutcome>;
   /** Called by UI after achievement toasts are shown. */
   clearPendingAchievements: () => void;
   clear: () => void;
@@ -778,18 +981,23 @@ interface CareerState {
   declareInternationalCountry: (countryId: string) => { ok: boolean; reason?: string };
   requestDomesticCountryMove: (countryId: string) => { ok: boolean; reason?: string };
   // Personal finance
-  investStocksAction: (coins: number) => { ok: boolean; reason?: string };
-  withdrawStocksAction: () => number;
+  investStocksAction: (
+    companyId: string,
+    coins: number,
+  ) => { ok: boolean; reason?: string; coins?: number };
+  withdrawStocksAction: (
+    companyId: string,
+    coins?: number,
+  ) => { ok: boolean; reason?: string; coins?: number };
   contributeLegacy: (tierId: string) => { ok: boolean; reason?: string };
   fundAcademy: (tier: 1 | 2 | 3, name: string) => { ok: boolean; reason?: string };
   transferPlayerBank: (direction: 'DEPOSIT' | 'WITHDRAW', amount: number) => PlayerLifeOutcome;
   buyPlayerAsset: (kind: 'PROPERTY' | 'BUSINESS', assetId: string) => PlayerLifeOutcome;
-  tradeLegacyToken: (direction: 'BUY' | 'SELL', units: number) => PlayerLifeOutcome;
   hirePersonalCoach: (discipline: PersonalCoachDiscipline) => PlayerLifeOutcome;
   buyPlayerEquipment: (equipmentId: string) => PlayerLifeOutcome;
   bookPersonalPhysio: () => PlayerLifeOutcome;
   buyPerformanceAnalysis: () => PlayerLifeOutcome;
-  negotiatePlayerSponsor: (approach: SponsorApproach) => PlayerLifeOutcome;
+  acceptEarnedSponsorOffer: (offerId: string) => SponsorActionResult;
   publishPlayerSocialPost: (tone: SocialTone) => PlayerLifeOutcome;
   prepareCaptainIssue: () => PlayerCaptainIssue | undefined;
   resolveCaptainIssue: (resolution: CaptainResolution) => PlayerLifeOutcome;
@@ -827,19 +1035,58 @@ function claimRewardTransaction(save: SaveGame, transactionId: string): boolean 
   return true;
 }
 
+function persistenceErrorMessage(error: unknown): string {
+  return error instanceof Error && error.message
+    ? error.message
+    : 'The device did not confirm the save write.';
+}
+
+async function persistActiveSave(save: SaveGame, ref: ActiveRef, immediate = false): Promise<void> {
+  synchronizeSchema14State(save);
+  synchronizeSchema15State(save);
+  synchronizeSchema18State(save);
+  synchronizeSchema20State(save);
+  synchronizeSchema24State(save);
+  synchronizeSchema25State(save);
+  synchronizeSchema26State(save);
+  synchronizeSchema27State(save);
+  synchronizeSchema28State(save);
+  synchronizeSchema29State(save);
+  synchronizeSchema32State(save);
+  synchronizeSchema33State(save);
+  synchronizeSchema35State(save);
+  synchronizeSchema40PlayerAffiliations(save);
+  synchronizeSchema42Portfolio(save);
+
+  // Enqueue the write as soon as the state change asks for it. Deferring this
+  // until after UI interactions allowed an older autosave to enter the slot
+  // queue after a newer match-result write and roll the fixture back to
+  // `played: false`. `writeSave` already serializes each slot, so immediate
+  // enqueueing preserves mutation order without blocking callers that use the
+  // normal fire-and-forget autosave path.
+  void immediate;
+  await writeSave(ref.mode, ref.slot, save);
+  await setLastPlayed(ref.mode, ref.slot);
+}
+
 export const useCareer = create<CareerState>((set, get) => ({
   save: null,
   ref: null,
+  persistenceError: null,
   pendingAchievementIds: [],
   lastPromotion: null,
 
   setActive: (save, mode, slot) => {
+    const liveopsNow = Date.now();
+    const loadedPassCycleId = save.pass?.seasonId;
+    const loadedCalendarPassCycle = /^pass-\d{4}-\d{2}$/.test(loadedPassCycleId ?? '');
     validateSeasonState(save);
     save.wallet = regenEnergy(save.wallet);
+    refillQaEnergy(save);
     synchronizeSchema14State(save, save.updatedAt);
     synchronizeSchema15State(save);
     synchronizeSchema16State(save);
-    synchronizeSchema17State(save, Date.now());
+    synchronizeSchema17State(save, liveopsNow);
     synchronizeSchema18State(save);
     synchronizeSchema19State(save);
     synchronizeSchema20State(save);
@@ -850,19 +1097,34 @@ export const useCareer = create<CareerState>((set, get) => ({
     synchronizeSchema27State(save);
     synchronizeSchema28State(save);
     synchronizeSchema29State(save);
-    synchronizeSchema30State(save);
-    ensureLiveops(save);
+    synchronizeSchema32State(save);
+    synchronizeSchema33State(save);
+    synchronizeSchema35State(save);
+    synchronizeSchema40PlayerAffiliations(save);
+    synchronizeSchema42Portfolio(save);
+    ensureLiveops(
+      save,
+      liveopsNow,
+      loadedCalendarPassCycle && loadedPassCycleId !== save.pass?.seasonId,
+    );
     if (mode === 'career') {
       ensureCareerDepth(save);
+      normalizePendingStoryQueue(save);
       ensureCareerPathLevel(save);
       ensureUserContract(save);
-      ensureRival(save);
       // Self-heal: a youth-level career (SCHOOL/U19) must always have youth
       // fixtures for the current season, or the matchday would dead-end.
       // generateYouthFixtures is idempotent, so this is a safe no-op otherwise.
       const lvl = save.careerPathLevel;
       if (lvl === 'SCHOOL' || lvl === 'U19') generateYouthFixtures(save);
-    } else ensureManagerDepth(save);
+      synchronizeU19WorldCupState(save);
+      autoSettleU19WorldCupAI(save);
+      ensureRival(save);
+    } else {
+      ensureManagerDepth(save);
+      ensureManagerLeadership(save);
+    }
+    reconcilePlayedCompetitionRounds(save);
     if (!save.managerCalendar) ensureCup(save);
     // First-ever manager press beat (the unveiling).
     if (
@@ -872,7 +1134,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     ) {
       queueManagerEvent(save, 'PRE_SEASON', storyRng(save, 1));
     }
-    set({ save, ref: { mode, slot }, targetFixtureId: undefined });
+    set({ save, ref: { mode, slot }, targetFixtureId: undefined, persistenceError: null });
     const loadedSaveId = save.id;
     void purchases.getEntitlementSnapshot('season_pass').then((snapshot) => {
       const current = get().save;
@@ -932,46 +1194,76 @@ export const useCareer = create<CareerState>((set, get) => ({
     const save = get().save;
     if (!save) return;
     save.wallet = regenEnergy(save.wallet);
+    refillQaEnergy(save);
     ensureLiveops(save);
     if (save.mode === 'career') {
       ensureCareerDepth(save);
       // Self-heal youth fixtures so the matchday never dead-ends.
       const lvl = save.careerPathLevel;
       if (lvl === 'SCHOOL' || lvl === 'U19') generateYouthFixtures(save);
-    } else ensureManagerDepth(save);
+    } else {
+      ensureManagerDepth(save);
+      ensureManagerLeadership(save);
+    }
+    reconcilePlayedCompetitionRounds(save);
     set({ save: { ...save } });
+  },
+
+  synchronizeSeasonPassClock: async (now = Date.now()) => {
+    const save = get().save;
+    if (!save) return false;
+    const period = seasonPassPeriod(now);
+    const premiumActive = isSeasonPassActive(save, now);
+    if (
+      save.pass?.seasonId === period.id &&
+      save.pass.periodStartedAt === period.startsAt &&
+      save.pass.periodEndsAt === period.endsAt &&
+      save.pass.premium === premiumActive &&
+      (!save.entitlements.seasonPass || save.entitlements.seasonPass.premium === premiumActive)
+    ) {
+      return false;
+    }
+    const previousPassCycleId = save.pass?.seasonId;
+    synchronizeSeasonPassState(save, now);
+    synchronizeWeeklyQuestCycle(
+      save,
+      now,
+      previousPassCycleId != null && previousPassCycleId !== save.pass?.seasonId,
+    );
+    set({ save: { ...save } });
+    await get().persist();
+    return true;
   },
 
   persist: async () => {
     const { save, ref } = get();
     if (!save || !ref) return;
-    synchronizeSchema14State(save);
-    synchronizeSchema15State(save);
-    synchronizeSchema18State(save);
-    synchronizeSchema20State(save);
-    synchronizeSchema24State(save);
-    synchronizeSchema25State(save);
-    synchronizeSchema26State(save);
-    synchronizeSchema27State(save);
-    synchronizeSchema28State(save);
-    synchronizeSchema29State(save);
-    synchronizeSchema30State(save);
-    // Defer write until after JS animations complete AND the call stack unwinds.
-    // This prevents AsyncStorage writes from competing with the JS thread mid-animation.
-    await new Promise<void>((resolve, reject) => {
-      InteractionManager.runAfterInteractions(() => {
-        // Additional yield via setTimeout so animation callbacks finish first.
-        setTimeout(async () => {
-          try {
-            await writeSave(ref.mode, ref.slot, save);
-            await setLastPlayed(ref.mode, ref.slot);
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        }, 32); // ~2 frames of headroom
+    try {
+      await persistActiveSave(save, ref);
+      set({ persistenceError: null });
+    } catch (error) {
+      const message = persistenceErrorMessage(error);
+      set({ persistenceError: message });
+      crash.captureException(error, { context: 'save.autosave', mode: ref.mode, slot: ref.slot });
+    }
+  },
+
+  persistCritical: async (immediate = false) => {
+    const { save, ref } = get();
+    if (!save || !ref) return;
+    try {
+      await persistActiveSave(save, ref, immediate);
+      set({ persistenceError: null });
+    } catch (error) {
+      const message = persistenceErrorMessage(error);
+      set({ persistenceError: message });
+      crash.captureException(error, {
+        context: 'save.critical',
+        mode: ref.mode,
+        slot: ref.slot,
       });
-    });
+      throw error;
+    }
   },
 
   /** Schedule re-engagement reminders (daily/streak/match-ready/season). Best-effort. */
@@ -990,8 +1282,11 @@ export const useCareer = create<CareerState>((set, get) => ({
           save.mode !== 'career' ||
           save.wallet.energy >= (fixture ? fixtureEnergyCost(fixture) : ECONOMY.energyPerMatch);
         if (hasFixture && canAfford) void notifications.scheduleMatchReady();
-        // "Event ending" when a battle pass is active with rewards still to earn.
-        if (save.pass && save.pass.xp >= 0) void notifications.scheduleSeasonEnding();
+        // Schedule against the persisted UTC month boundary, not three days
+        // after whichever moment the player happens to exit the hub.
+        if (save.pass?.periodEndsAt != null) {
+          void notifications.scheduleSeasonEnding(save.pass.periodEndsAt);
+        }
       }
     } catch {
       /* notifications are best-effort */
@@ -1007,15 +1302,37 @@ export const useCareer = create<CareerState>((set, get) => ({
 
     const match = playUserFixture(save, fixtureId);
     const userWon = match.result?.winnerTeamId === careerPlayingTeamId(save, fixtureId);
-    const tie = Boolean(match.result?.tie);
+    const tie = matchHasNeutralResult(match);
     recordSaveResult(save, match.id, userWon, tie);
+    if (save.mode === 'career' && save.userPlayerId) {
+      const user = userPerformance(match, save.userPlayerId);
+      const selected =
+        user.batted ||
+        user.bowled ||
+        [match.homeTeamId, match.awayTeamId].some((teamId) => {
+          const team = save.teams[teamId];
+          const xi = team?.xi?.length ? team.xi : team?.playerIds.slice(0, 11);
+          return xi?.includes(save.userPlayerId!);
+        });
+      settleFixtureSponsorship(save, fixture, { selected, userWon });
+    } else if (save.mode === 'manager') {
+      const managedTeamId = fixture?.managerPhase
+        ? managerControlledTeamId(save, fixture.managerPhase)
+        : save.userTeamId;
+      settleFixtureSponsorship(save, fixture, {
+        selected: true,
+        userWon,
+        managedTeamId,
+      });
+    }
     const coinsAwarded = Math.round(
-      matchReward(userWon, tie) * vipCoinMultiplier(save.entitlements),
+      matchReward(userWon, tie, undefined, save.mode === 'manager' ? 'MANAGER' : 'PLAYER') *
+        vipCoinMultiplier(save.entitlements),
     );
 
     if (get().ref?.mode === 'career') {
-      save.wallet = spendEnergy(
-        save.wallet,
+      save.wallet = spendSaveEnergy(
+        save,
         fixture ? fixtureEnergyCost(fixture) : matchEnergyCost(match.format),
       );
     }
@@ -1026,30 +1343,114 @@ export const useCareer = create<CareerState>((set, get) => ({
     return { match, fixtureId, userWon, tie, coinsAwarded };
   },
 
+  advanceWhileBenched: () => {
+    const save = get().save;
+    if (!save || save.mode !== 'career' || !save.userPlayerId) {
+      return { ok: false, simulated: 0, reason: 'No active player career.' };
+    }
+
+    let simulated = 0;
+    let guard = 0;
+    while (guard++ < 40) {
+      const fixtureId = nextUserFixtureId(save);
+      const fixture = fixtureId ? save.fixtures[fixtureId] : undefined;
+      if (!fixtureId || !fixture) break;
+      const decision = careerSelectionDecision(save, fixture.format, fixtureId);
+      if (decision.selected) break;
+
+      // A benched appearance still belongs to a complete competition round.
+      // Catch up every AI-only fixture through this round before settling the
+      // user's club, otherwise only their row advances in the visible table.
+      simulateUnplayedBefore(save, fixtureId);
+      // Remove the protagonist from the simulated fixture roster itself. A
+      // merely persisted XI can become invalid after an injury and resolveXI
+      // may then rebuild it with the player included.
+      const match = simulateFixtureWithoutCareerPlayer(save, fixture);
+      const playingTeamId = careerPlayingTeamId(save, fixtureId);
+      const userWon = match.result?.winnerTeamId === playingTeamId;
+      const tie = matchHasNeutralResult(match);
+      recordSaveResult(save, match.id, userWon, tie);
+      // Being outside the XI never consumes energy or earns appearance-based
+      // sponsorship, but the contract's retained-squad fee still pays the
+      // same explicit 35% used by the ordinary completed-match settlement.
+      const retainedFee = Math.round(
+        matchReward(userWon, tie, undefined, 'PLAYER') *
+          0.35 *
+          vipCoinMultiplier(save.entitlements),
+      );
+      save.wallet = addCoins(save.wallet, retainedFee);
+      applyCareerMatchReadiness(save, {
+        fixtureId,
+        format: fixture.format,
+        selected: false,
+      });
+      tickInjuries(save);
+      simulated += 1;
+    }
+
+    const nextFixtureId = nextUserFixtureId(save);
+    set({ save: { ...save } });
+    void get().persist();
+    return simulated > 0
+      ? { ok: true, simulated, nextFixtureId }
+      : {
+          ok: false,
+          simulated: 0,
+          nextFixtureId,
+          reason: nextFixtureId
+            ? 'You are selected for the next fixture.'
+            : 'There is no team fixture to simulate.',
+        };
+  },
+
   beginLiveMatch: () => {
     const { save, ref } = get();
     if (!save) return null;
+    if (save.mode === 'manager' && save.managerRetired) return null;
+    // Treat the completed-result ledger as authoritative immediately, not only
+    // when a save is loaded. This repairs an in-session stale `played` bit
+    // before Matchday can reopen the same fixture.
+    validateSeasonState(save);
     const target = get().targetFixtureId;
-    const fixtureId = target ?? nextUserFixtureId(save);
+    let fixtureId = target;
+    if (fixtureId && (!save.fixtures[fixtureId] || save.fixtures[fixtureId].played)) {
+      fixtureId = undefined;
+      set({ targetFixtureId: undefined });
+    }
+    fixtureId ??= nextUserFixtureId(save);
     if (!fixtureId || !save.fixtures[fixtureId]) return null;
     const fx = save.fixtures[fixtureId];
     const isCup = fx?.competition === 'CUP';
     const isYouth = fx?.competitionId?.startsWith('youth-') ?? false;
+    const isU19WorldCup = isU19WorldCupFixture(fx);
     const isInternational = isInternationalFixture(fx);
     if (ref?.mode === 'career' && !isCup && !playerCalendarAllowsFixture(save, fixtureId)) {
       return null;
     }
-    // Only the primary T20 league keeps a chronological table, so only catch up
-    // when playing a T20-league fixture. Playing List A / First-Class / Cup /
-    // youth / international fixtures must NOT auto-simulate the T20 season.
+    if (
+      ref?.mode === 'career' &&
+      save.userPlayerId &&
+      !isInternational &&
+      !careerSelectionDecision(save, fx.format, fixtureId).selected
+    ) {
+      // A benched player advances this fixture from the career hub. Never open
+      // a spectator match that can look like an appearance or update form.
+      selectCareerXI(save, fx.format, fixtureId);
+      set({ save: { ...save }, targetFixtureId: undefined });
+      void get().persist();
+      return null;
+    }
+    // Catch up only the target competition. Youth resolves its AI-only games;
+    // it still never advances the unrelated professional T20 league.
     const isPrimaryLeague = !fx.competitionId || fx.competitionId === 't20-league';
     const shouldCatchUpManagerPhase = ref?.mode === 'manager' && Boolean(fx.managerPhase);
-    if (
+    if (isYouth || isU19WorldCup) {
+      simulateUnplayedBefore(save, fixtureId);
+    } else if (
       (isPrimaryLeague ||
         fx.managerPhase ||
         ['list-a', 'first-class'].includes(fx.competitionId ?? '')) &&
       !isCup &&
-      !isYouth &&
       (!isInternational || shouldCatchUpManagerPhase)
     ) {
       simulateUnplayedBefore(save, fixtureId);
@@ -1079,12 +1480,35 @@ export const useCareer = create<CareerState>((set, get) => ({
   commitLiveMatch: (match) => {
     const { save, ref } = get();
     if (!save) return null;
+    const scheduledFixture = save.fixtures[match.id];
+    // Overlapping UI completion callbacks must not award the same fixture's
+    // coins, form, progression or story twice.
+    if (!scheduledFixture || scheduledFixture.played || hasRecordedSaveResult(save, match.id)) {
+      if (scheduledFixture && hasRecordedSaveResult(save, match.id)) {
+        scheduledFixture.played = true;
+        scheduledFixture.resultMatchId ??= match.id;
+      }
+      return null;
+    }
     const experienceBefore = captureExperienceSnapshot(save);
     applyResult(save, match);
     useSettings.getState().recordPlayedMatch();
     // If that was a cup tie, progress the knockout bracket.
     if (save.fixtures[match.id]?.competition === 'CUP') advanceCup(save);
     const resultFixture = save.fixtures[match.id];
+    const isU19WorldCup = isU19WorldCupFixture(resultFixture);
+    if (
+      isU19WorldCup &&
+      resultFixture?.winnerTeamId &&
+      (!match.result?.winnerTeamId || match.result.tie)
+    ) {
+      match.result = {
+        ...match.result,
+        tie: false,
+        winnerTeamId: resultFixture.winnerTeamId,
+        margin: 'Won the tied knockout by the tournament tiebreak',
+      };
+    }
     const isInternational = isInternationalFixture(resultFixture);
     const resultUserTeamId = isInternational
       ? resultFixture.homeTeamId
@@ -1092,9 +1516,14 @@ export const useCareer = create<CareerState>((set, get) => ({
         ? managerControlledTeamId(save, resultFixture.managerPhase)
         : careerPlayingTeamId(save, match.id);
     const userWon = match.result?.winnerTeamId === resultUserTeamId;
-    const tie = Boolean(match.result?.tie);
+    const tie = matchHasNeutralResult(match);
     recordSaveResult(save, match.id, userWon, tie);
-    let coinsAwarded = matchReward(userWon, tie);
+    let coinsAwarded = matchReward(
+      userWon,
+      tie,
+      undefined,
+      ref?.mode === 'manager' ? 'MANAGER' : 'PLAYER',
+    );
 
     let rating: number | undefined;
     let objectiveText: string | undefined;
@@ -1106,7 +1535,15 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (ref?.mode === 'career' && save.userPlayerId) {
       const player = save.players[save.userPlayerId];
       const perf = userPerformance(match, save.userPlayerId);
-      selected = perf.batted || perf.bowled;
+      const resolvedMatchXI = [...(match.homePlayerIds ?? []), ...(match.awayPlayerIds ?? [])];
+      const selectedInXi = resolvedMatchXI.length
+        ? resolvedMatchXI.includes(save.userPlayerId)
+        : [match.homeTeamId, match.awayTeamId].some((teamId) => {
+            const team = save.teams[teamId];
+            const xi = team?.xi?.length ? team.xi : team?.playerIds.slice(0, 11);
+            return xi?.includes(save.userPlayerId!);
+          });
+      selected = selectedInXi || perf.batted || perf.bowled;
       if (selected) {
         rating = matchRating(perf);
         updateFormAfterMatch(player, perf);
@@ -1116,12 +1553,27 @@ export const useCareer = create<CareerState>((set, get) => ({
         if (metObjective) bonus = objective.reward;
         // Call-up + path progression are driven by genuine output (75%) not just rating.
         const output = { runs: perf.runs, wickets: perf.wickets };
-        calledUp = accrueNationalRep(save, player, rating, output).calledUp;
-        recordPathPerformance(save, output, rating);
+        const levelAtMatch = save.careerPathLevel ?? 'DOMESTIC';
+        const canEarnSeniorCallUp =
+          !isU19WorldCup && (levelAtMatch === 'DOMESTIC' || levelAtMatch === 'INTERNATIONAL');
+        calledUp = canEarnSeniorCallUp
+          ? accrueNationalRep(save, player, rating, output).calledUp
+          : false;
+        if (!isU19WorldCup || levelAtMatch === 'U19') {
+          recordPathPerformance(save, output, rating);
+        }
+        if (resultFixture?.competitionId === 'youth-u19') {
+          recordU19WorldCupMerit(save, {
+            fixtureId: match.id,
+            runs: perf.runs,
+            wickets: perf.wickets,
+            rating,
+          });
+        }
         // Performance-scaled match reward: a quiet game earns ~half, a
         // match-winning display up to ~1.6× — your bat and ball earn the coins.
         const impact = matchImpactScore(output, player.role);
-        coinsAwarded = Math.round(coinsAwarded * (0.5 + impact * 1.1));
+        coinsAwarded = Math.round(coinsAwarded * (0.45 + impact * 0.9));
       } else {
         // Left out of the XI — a fraction of the appearance fee only.
         coinsAwarded = Math.round(coinsAwarded * 0.35);
@@ -1139,8 +1591,8 @@ export const useCareer = create<CareerState>((set, get) => ({
         applyNearRecordSelectionBoost(save, { runs: perf.runs, wickets: perf.wickets });
       }
       if (selected) {
-        save.wallet = spendEnergy(
-          save.wallet,
+        save.wallet = spendSaveEnergy(
+          save,
           isInternational
             ? matchEnergyCost(match.format, 'INTERNATIONAL')
             : fixture
@@ -1180,6 +1632,7 @@ export const useCareer = create<CareerState>((set, get) => ({
 
     // Narrative: surface a story beat + pay endorsements.
     if (ref?.mode === 'career' && save.userPlayerId) {
+      releaseDeferredStoryAfterMatch(save);
       const potm = match.result?.playerOfMatchId === save.userPlayerId;
       const r = perf?.runs ?? 0;
       const w = perf?.wickets ?? 0;
@@ -1209,18 +1662,25 @@ export const useCareer = create<CareerState>((set, get) => ({
         },
         rng,
       );
-      paySponsorsForMatch(save);
+      settleFixtureSponsorship(save, resultFixture, {
+        selected: selected ?? false,
+        userWon,
+      });
     }
 
     // Injuries: recover ongoing knocks, then roll for the match participant(s).
     let injuredInfo: PlayResult['injury'];
-    tickInjuries(save);
+    // Manager recovery/injury is already settled once inside applyResult for
+    // watched, instant and background fixtures alike.
+    if (ref?.mode !== 'manager') tickInjuries(save);
     if (ref?.mode === 'career' && save.userPlayerId && (selected ?? true)) {
       const u = save.players[save.userPlayerId];
       const irng = storyRng(save, (save.timeline?.length ?? 0) * 29 + 555);
       const load = workloadFactor(perf?.ballsBowled ?? 0, perf?.balls ?? 0);
       const youthProtection =
-        save.careerPathLevel === 'SCHOOL' || save.careerPathLevel === 'U19' ? 0.3 : 1;
+        save.careerPathLevel === 'SCHOOL' || save.careerPathLevel === 'U19' || isU19WorldCup
+          ? 0.3
+          : 1;
       const inj = rollMatchInjury(
         u,
         0,
@@ -1245,21 +1705,12 @@ export const useCareer = create<CareerState>((set, get) => ({
       });
     } else if (ref?.mode === 'manager' && resultUserTeamId) {
       const team = save.teams[resultUserTeamId];
-      const xi = team.xi && team.xi.length ? team.xi : team.playerIds;
+      const actualXI =
+        resultUserTeamId === match.homeTeamId ? match.homePlayerIds : match.awayPlayerIds;
+      const xi = actualXI?.length ? actualXI : team.xi && team.xi.length ? team.xi : team.playerIds;
       const managedInteractively = Boolean(
         save.flags?.[`teamTalk:${match.id}`] || save.flags?.[`tactics:${match.id}`],
       );
-      if (xi.length) {
-        const irng = storyRng(save, xi.length * 13 + 222);
-        const pick = save.players[xi[Math.floor(irng() * xi.length)]];
-        if (pick && !pick.isUserPlayer) {
-          const inj = rollMatchInjury(pick, medicalBonus(save), irng);
-          if (inj) {
-            pick.injury = inj;
-            injuredInfo = { playerId: pick.id, playerName: pick.name, matchesOut: inj.matchesOut };
-          }
-        }
-      }
       // Update squad morale based on match result (Feature 3).
       updateTeamMorale(save, userWon, resultUserTeamId);
       if (resultUserTeamId) {
@@ -1279,6 +1730,11 @@ export const useCareer = create<CareerState>((set, get) => ({
         delete save.flags?.[`teamTalk:${match.id}`];
         delete save.flags?.[`tactics:${match.id}`];
       }
+      settleFixtureSponsorship(save, resultFixture, {
+        selected: true,
+        userWon,
+        managedTeamId: resultUserTeamId,
+      });
       // Press is reserved for finals and genuine streaks, with four club
       // fixtures between appearances.
       save.managerStory = save.managerStory ?? {
@@ -1290,7 +1746,8 @@ export const useCareer = create<CareerState>((set, get) => ({
       const pressGap = save.managerStory.flags.matchesSincePress ?? 4;
       save.managerStory.flags.matchesSincePress = pressGap + 1;
       const managerFixture = save.fixtures[match.id];
-      const isFinal = Boolean(managerFixture?.playoff || managerFixture?.cupRound === 'Final');
+      const knockoutLabel = managerFixture?.cupRound?.trim();
+      const isFinal = knockoutLabel === 'Final' || Boolean(knockoutLabel?.endsWith(' Final'));
       const isDerby = isManagerDerby(save, managerFixture);
       const isStreakMoment = (save.winStreak ?? 0) >= 3;
       if (pressGap >= 4 && (isFinal || isDerby || isStreakMoment)) {
@@ -1342,7 +1799,9 @@ export const useCareer = create<CareerState>((set, get) => ({
     // ── Career path promotion check ────────────────────────────────────
     let promotion: PromotionResult = { promoted: false };
     if (ref?.mode === 'career' && save.userPlayerId) {
-      if (selected) tickCareerPathMatch(save);
+      if (selected && (!isU19WorldCup || save.careerPathLevel === 'U19')) {
+        tickCareerPathMatch(save);
+      }
       const avgRating = rating ?? 5.0;
       promotion = checkPathPromotion(save, avgRating);
       synchronizeCareerPromotion(save, promotion);
@@ -1402,7 +1861,9 @@ export const useCareer = create<CareerState>((set, get) => ({
       selected,
       rating,
     });
-    experience.lastMatchImpact = impact;
+    // A team result while the protagonist is outside the XI must not replace
+    // their personal "last match" or Current Form presentation.
+    if (ref?.mode !== 'career' || selected) experience.lastMatchImpact = impact;
     if (ref?.mode === 'career' && perf) {
       const newspaper = buildNewspaperStory(
         save,
@@ -1444,7 +1905,8 @@ export const useCareer = create<CareerState>((set, get) => ({
   beginInternational: () => {
     const { save } = get();
     if (!save || !save.userPlayerId || !save.capped) return null;
-    generateInternationalWindowFixtures(save);
+    validateSeasonState(save);
+    prepareInternationalCalendar(save);
     const fixtureId = nextInternationalFixtureId(save);
     if (!fixtureId || !playerCalendarAllowsFixture(save, fixtureId)) return null;
     resolveNationalDutyConflict(save, fixtureId);
@@ -1462,10 +1924,20 @@ export const useCareer = create<CareerState>((set, get) => ({
       save.playerCareerResources?.declaredCountry ??
       user.nationality;
     const scheduledFixture = save.fixtures[match.id];
-    if (scheduledFixture && !scheduledFixture.played) applyResult(save, match);
+    // International results must obey the same exactly-once contract as club
+    // fixtures. The previous path continued awarding caps, form and coins even
+    // when the scheduled fixture had already been completed.
+    if (!scheduledFixture || scheduledFixture.played || hasRecordedSaveResult(save, match.id)) {
+      if (scheduledFixture && hasRecordedSaveResult(save, match.id)) {
+        scheduledFixture.played = true;
+        scheduledFixture.resultMatchId ??= match.id;
+      }
+      return null;
+    }
+    applyResult(save, match);
     const homeId = scheduledFixture?.homeTeamId ?? `national-${country}`;
     const userWon = match.result?.winnerTeamId === homeId;
-    const tie = Boolean(match.result?.tie);
+    const tie = matchHasNeutralResult(match);
     recordSaveResult(save, match.id, userWon, tie);
     const perf = userPerformance(match, save.userPlayerId);
     const rating = matchRating(perf);
@@ -1516,10 +1988,11 @@ export const useCareer = create<CareerState>((set, get) => ({
       ballsBowled: perf.ballsBowled,
     });
     applyNearRecordSelectionBoost(save, { runs: perf.runs, wickets: perf.wickets });
-    save.wallet = spendEnergy(save.wallet, matchEnergyCost(match.format, 'INTERNATIONAL'));
+    save.wallet = spendSaveEnergy(save, matchEnergyCost(match.format, 'INTERNATIONAL'));
     save.wallet = addCoins(save.wallet, coinsAwarded + bonus);
     recordMatchLiveops(save, userWon, perf.runs, perf.wickets, perf.fours + perf.sixes);
     {
+      releaseDeferredStoryAfterMatch(save);
       const potm = rating >= 7.5;
       const milestone = potm
         ? 'POTM'
@@ -1536,7 +2009,7 @@ export const useCareer = create<CareerState>((set, get) => ({
         { rating, runs: perf.runs, wickets: perf.wickets, won: userWon, selected: true, milestone },
         rng,
       );
-      paySponsorsForMatch(save);
+      settleFixtureSponsorship(save, scheduledFixture, { selected: true, userWon });
     }
     if (!scheduledFixture) {
       applyMatchToStats(save, match);
@@ -1619,25 +2092,29 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (!save || ref?.mode !== 'career' || !save.userPlayerId) return fail('No active career.');
     const player = save.players[save.userPlayerId];
     if (!canTrainGroup(player, group)) return fail('This training is not available for your role.');
-    if (!canTrain(player, group)) return fail('No training sessions left for this discipline.');
-    const cost = trainingCost(sessionsDone(player));
+    if (!canTrain(player, group, save.careerPathLevel)) {
+      return fail('No training sessions left for this discipline.');
+    }
+    const cost = trainingCost(sessionsDone(player), computeOverall(player));
     if (save.wallet.coins < cost) {
       return fail(`You need ${cost.toLocaleString()} coins for this session.`, cost);
     }
     const rng = makeRng((Date.now() ^ (sessionsDone(player) * 2654435761)) >>> 0);
     const acceleratorCharges = inventoryCount(save, 'training_accelerator');
+    const normalTrainingMultiplier =
+      archetypeTrainingMultiplier(save, player, group) *
+      passTrainingMultiplier(save) *
+      personalCoachTrainingMultiplier(save, group);
     const gains = applyTraining(
       player,
       group,
       rng,
       save.careerPathLevel,
-      acceleratorCharges > 0
-        ? 3
-        : archetypeTrainingMultiplier(save, player, group) *
-            passTrainingMultiplier(save) *
-            personalCoachTrainingMultiplier(save, group),
+      normalTrainingMultiplier * (acceleratorCharges > 0 ? 1.5 : 1),
     );
-    if (gains.length === 0) return fail('This training is not available for your role.', cost);
+    if (gains.length === 0) {
+      return fail('This focus has reached the attribute cap for your current career stage.', cost);
+    }
     if (acceleratorCharges > 0) {
       setInventoryCount(save, 'training_accelerator', acceleratorCharges - 1);
     }
@@ -1648,18 +2125,19 @@ export const useCareer = create<CareerState>((set, get) => ({
     recordMetricLiveops(save, 'TRAIN', 1);
     set({ save: { ...save } });
     try {
-      await get().persist();
+      await get().persistCritical();
       return { ok: true, cost, gains };
     } catch {
       return fail('Training was applied but could not be saved. Try saving again.', cost);
     }
   },
 
-  setTactics: (tactics) => {
+  setTactics: (tactics, activeFixtureId) => {
     const save = get().save;
     if (!save) return;
-    const fixtureId = nextUserFixtureId(save);
+    const fixtureId = activeFixtureId ?? nextUserFixtureId(save);
     const fixture = fixtureId ? save.fixtures[fixtureId] : undefined;
+    if (activeFixtureId && (!fixture || fixture.played)) return;
     if (!matchDecisionAuthority(save, fixture).canControlTeam) return;
     save.tactics = tactics;
     if (save.mode === 'manager') {
@@ -1706,6 +2184,9 @@ export const useCareer = create<CareerState>((set, get) => ({
   signPlayer: (playerId, feeOverride) => {
     const save = get().save;
     if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, cost: 0, reason: 'Club transfers are paused during national duty.' };
+    }
     const closedReason = transferWindowClosedReason(save);
     if (closedReason) return { ok: false, cost: 0, reason: closedReason };
     const res = signFreeAgent(save, playerId, feeOverride);
@@ -1720,8 +2201,12 @@ export const useCareer = create<CareerState>((set, get) => ({
   releasePlayer: (playerId) => {
     const save = get().save;
     if (!save) return { ok: false, recouped: 0, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, recouped: 0, reason: 'Club operations are paused during national duty.' };
+    }
     const res = releaseFromSquad(save, playerId);
     if (res.ok) {
+      if (save.mode === 'manager') ensureManagerLeadership(save);
       set({ save: { ...save } });
       void get().persist();
     }
@@ -1731,6 +2216,7 @@ export const useCareer = create<CareerState>((set, get) => ({
   removeFreeAgent: (playerId) => {
     const save = get().save;
     if (!save?.freeAgents?.includes(playerId)) return;
+    if (managerClubOperationsPaused(save)) return;
     save.freeAgents = save.freeAgents.filter((id) => id !== playerId);
     set({ save: { ...save } });
     void get().persist();
@@ -1739,6 +2225,9 @@ export const useCareer = create<CareerState>((set, get) => ({
   investStaff: (role) => {
     const save = get().save;
     if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, cost: 0, reason: 'Club staff are paused during national duty.' };
+    }
     const res = investInStaff(save, role);
     if (res.ok) {
       set({ save: { ...save } });
@@ -1750,6 +2239,9 @@ export const useCareer = create<CareerState>((set, get) => ({
   hireStaff: (candidateId) => {
     const save = get().save;
     if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, cost: 0, reason: 'Club staff are paused during national duty.' };
+    }
     const res = hireStaffPure(save, candidateId);
     if (res.ok) {
       set({ save: { ...save } });
@@ -1777,36 +2269,60 @@ export const useCareer = create<CareerState>((set, get) => ({
     return result;
   },
 
-  upgradeFacilityLevel: (kind) => {
+  upgradeFacilityLevel: (kind, paymentMethod) => {
     const save = get().save;
     if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
-    const upgradeTokens = inventoryCount(save, 'facility_upgrade_token');
-    if (upgradeTokens > 0) {
-      if (!save.userTeamId || !save.facilities) {
-        return { ok: false, cost: 0, reason: 'No club.' };
-      }
-      const level = save.facilities[kind];
-      if (level >= MAX_FACILITY) {
-        return { ok: false, cost: 0, reason: 'Max level.' };
-      }
-      save.facilities[kind] = level + 1;
-      setInventoryCount(save, 'facility_upgrade_token', upgradeTokens - 1);
-      recordPremiumAssistance(save, 'facility_upgrade_token');
-      set({ save: { ...save } });
-      void get().persist();
-      return { ok: true, cost: 0, level: level + 1 };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, cost: 0, reason: 'Club facilities are paused during national duty.' };
     }
-    const res = upgradeFacility(save, kind);
+    const res = upgradeFacility(save, kind, paymentMethod);
     if (res.ok) {
+      if (paymentMethod === 'TOKEN') {
+        recordPremiumAssistance(save, 'facility_upgrade_token');
+      }
+      persistActiveManagerClub(save);
       set({ save: { ...save } });
       void get().persist();
     }
     return res;
   },
 
+  setTicketPreset: (format, preset) => {
+    const save = get().save;
+    if (!save || !setClubTicketPreset(save, format, preset)) return false;
+    set({ save: { ...save } });
+    void get().persist();
+    return true;
+  },
+
+  upgradeStadium: () => {
+    const save = get().save;
+    if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+    const result = upgradeStadiumCapacity(save);
+    if (result.ok) {
+      set({ save: { ...save } });
+      void get().persist();
+    }
+    return result;
+  },
+
+  upgradeMatchday: () => {
+    const save = get().save;
+    if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+    const result = upgradeMatchdayExperience(save);
+    if (result.ok) {
+      set({ save: { ...save } });
+      void get().persist();
+    }
+    return result;
+  },
+
   scout: (playerId) => {
     const save = get().save;
     if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, cost: 0, reason: 'Club scouting is paused during national duty.' };
+    }
     const rng = storyRng(save, (save.scoutReports?.length ?? 0) * 37 + playerId.length + 1);
     const res = scoutPlayer(save, playerId, rng);
     if (res.ok) {
@@ -1820,6 +2336,9 @@ export const useCareer = create<CareerState>((set, get) => ({
   promoteYouth: (playerId) => {
     const save = get().save;
     if (!save) return { ok: false, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, reason: 'Club academy operations are paused during national duty.' };
+    }
     const res = promoteProspect(save, playerId);
     if (res.ok) {
       set({ save: { ...save } });
@@ -1831,6 +2350,9 @@ export const useCareer = create<CareerState>((set, get) => ({
   releaseYouth: (playerId) => {
     const save = get().save;
     if (!save) return { ok: false, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, reason: 'Club academy operations are paused during national duty.' };
+    }
     const res = releaseProspect(save, playerId);
     if (res.ok) {
       set({ save: { ...save } });
@@ -1842,6 +2364,9 @@ export const useCareer = create<CareerState>((set, get) => ({
   renewDeal: (playerId, years) => {
     const save = get().save;
     if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, cost: 0, reason: 'Club contracts are paused during national duty.' };
+    }
     const res = renewContract(save, playerId, years);
     if (res.ok) {
       set({ save: { ...save } });
@@ -1853,9 +2378,37 @@ export const useCareer = create<CareerState>((set, get) => ({
   setTrainFocus: (playerId, group) => {
     const save = get().save;
     if (!save) return;
+    if (managerClubOperationsPaused(save)) return;
     setTrainingFocus(save, playerId, group);
     set({ save: { ...save } });
     void get().persist();
+  },
+
+  setManagerTrainingPlan: (update) => {
+    const save = get().save;
+    if (!save || !setManagerTeamTraining(save, update)) return false;
+    set({ save: { ...save } });
+    void get().persist();
+    return true;
+  },
+
+  setManagerTrainingOverride: (playerId, focus) => {
+    const save = get().save;
+    if (!save || !setManagerPlayerTrainingOverride(save, playerId, focus)) return false;
+    set({ save: { ...save } });
+    void get().persist();
+    return true;
+  },
+
+  appointManagerLeader: (role, playerId) => {
+    const save = get().save;
+    if (!save) return { ok: false, reason: 'No active save.' };
+    const result = appointManagerLeaderPure(save, role, playerId);
+    if (result.ok) {
+      set({ save: { ...save } });
+      void get().persist();
+    }
+    return result;
   },
 
   talkToPlayer: (playerId, kind) => {
@@ -1892,6 +2445,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     }
     const result = applyManagerAppointment(save, teamId);
     if (!result.ok) return;
+    ensureManagerLeadership(save);
     set({ save: { ...save }, targetFixtureId: undefined });
     void get().persist();
   },
@@ -1930,7 +2484,7 @@ export const useCareer = create<CareerState>((set, get) => ({
 
   advanceManagerCalendar: (maxFixtures) => {
     const save = get().save;
-    if (!save?.managerCalendar) return null;
+    if (!save?.managerCalendar || save.managerRetired) return null;
     const result = advanceManagerCalendarPhase(save, maxFixtures);
     set({ save: { ...save } });
     if (result.kind !== 'IN_PROGRESS') void get().persist();
@@ -1940,7 +2494,15 @@ export const useCareer = create<CareerState>((set, get) => ({
   newSeason: () => {
     const { save, ref } = get();
     if (!save) return;
+    if (save.mode === 'manager' && save.managerRetired) return;
     if (!seasonComplete(save)) return;
+    // Capture the assignment that owned the completed season before promotion
+    // changes the current level. This is the settlement boundary: the ELITE
+    // season that earns a National appointment still belongs to the club,
+    // while a full subsequent National season must leave that club untouched.
+    const finishedManagerLevel: ManagerCareerLevel | undefined =
+      save.mode === 'manager' ? (save.managerCareerLevel ?? 'CLUB') : undefined;
+    const finishedNationalManagerSeason = finishedManagerLevel === 'NATIONAL';
     const finishedYear = save.currentSeasonId
       ? (save.seasons[save.currentSeasonId]?.year ?? 2026)
       : 2026;
@@ -1951,23 +2513,45 @@ export const useCareer = create<CareerState>((set, get) => ({
       continental: save.continentalTitles ?? 0,
     };
     const trophyEligible = ref?.mode === 'manager' || careerTrophyParticipationRate(save) >= 0.4;
-    const userSeasonFixtures = save.userTeamId
+    const finishedManagedTeamId = finishedNationalManagerSeason
+      ? save.managerNationalTeamId
+      : ref?.mode === 'career'
+        ? (save.franchiseTeamId ?? save.userTeamId)
+        : save.userTeamId;
+    const userSeasonFixtures = finishedManagedTeamId
       ? Object.values(save.fixtures).filter(
           (fixture) =>
             fixture.played &&
-            (fixture.homeTeamId === save.userTeamId || fixture.awayTeamId === save.userTeamId),
+            (fixture.homeTeamId === finishedManagedTeamId ||
+              fixture.awayTeamId === finishedManagedTeamId),
         )
       : [];
     const allMatchesWon =
       userSeasonFixtures.length > 0 &&
-      userSeasonFixtures.every((fixture) => fixture.winnerTeamId === save.userTeamId);
+      userSeasonFixtures.every((fixture) => fixture.winnerTeamId === finishedManagedTeamId);
     // Settle the Cup: crown a winner and credit a title if it's the user's club.
-    finishCup(save);
-    if (cupChampionId(save) === save.userTeamId && trophyEligible) {
+    if (!finishedNationalManagerSeason) finishCup(save);
+    if (
+      !finishedNationalManagerSeason &&
+      cupChampionId(save) === save.userTeamId &&
+      trophyEligible
+    ) {
       save.cupWins = (save.cupWins ?? 0) + 1;
     }
     // Career: reflect on the finished season + tick endorsement deals before aging.
     if (ref?.mode === 'career' && save.userPlayerId) {
+      const completedContract = save.players[save.userPlayerId]?.contract;
+      const seasonSalary = Math.max(0, Math.round(completedContract?.wage ?? 0));
+      if (seasonSalary > 0 && (completedContract?.yearsLeft ?? 0) > 0) {
+        save.wallet = addCoins(save.wallet, seasonSalary);
+      }
+      const franchiseSalary = Math.max(0, Math.round(save.franchiseContract?.wage ?? 0));
+      if (franchiseSalary > 0 && (save.franchiseContract?.yearsLeft ?? 0) > 0) {
+        save.wallet = addCoins(save.wallet, franchiseSalary);
+      }
+      if (save.franchiseContract) {
+        save.franchiseContract.yearsLeft = Math.max(0, save.franchiseContract.yearsLeft - 1);
+      }
       tickUserContract(save);
       const rng = storyRng(save, (save.seasonRatings?.length ?? 0) + 41);
       // Settle the rivalry on this season's stats BEFORE they're reset.
@@ -1975,29 +2559,27 @@ export const useCareer = create<CareerState>((set, get) => ({
       if (rivalryLine) addTimeline(save, { year: finishedYear, kind: 'STORY', text: rivalryLine });
       queueStoryForTrigger(save, 'SEASON_END', rng);
       rolloverSponsors(save);
+      rolloverSponsorship(save);
 
       // Personal finance: collect academy revenue + fluctuate stock market.
       collectAcademyRevenue(save);
       processPlayerLifeSeason(save, finishedYear);
-      const seasonWins = Object.values(save.fixtures).filter(
-        (f) => f.played && f.winnerTeamId === save.userTeamId,
-      ).length;
-      const totalPlayed = Object.values(save.fixtures).filter((f) => f.played).length;
-      const winRate = totalPlayed > 0 ? seasonWins / totalPlayed : 0.5;
-      tickStockMarket(save, winRate);
+      tickStockMarket(save, finishedYear);
 
       // Age-triggered retirement uses appearances earned during this season,
       // not the player's cumulative career total.
       const capsThisSeason = closeInternationalCapSeason(save);
       const ageRetire = checkAgeRetirement(save, capsThisSeason);
-      if (ageRetire) {
+      const retirementWasRecommended = Boolean(save.flags.playerRetirementRecommended);
+      save.flags.playerRetirementRecommended = ageRetire;
+      if (ageRetire && !retirementWasRecommended) {
         // Queue a retirement-nudge story event.
         queueStoryForTrigger(save, 'SEASON_END', rng, { runs: 0, wickets: 0, won: false });
         // Add a timeline entry.
         addTimeline(save, {
           year: finishedYear,
           kind: 'STORY',
-          text: "The selectors haven't called in two seasons. Your final chapter awaits.",
+          text: 'A decision about the final chapter now awaits.',
         });
       }
 
@@ -2013,18 +2595,29 @@ export const useCareer = create<CareerState>((set, get) => ({
         });
       }
     }
-    // Manager: check if they've earned promotion to the next career level.
-    if (ref?.mode === 'manager') {
-      const promo = checkManagerLevelPromotion(save);
-      if (promo.promoted && promo.to) {
-        applyManagerLevelPromotion(save, promo.to);
-        // Queue a boardroom story event to announce the new role.
-        const prng = storyRng(save, (save.managerStory?.seenEventIds.length ?? 0) + 999);
-        queueManagerEvent(save, 'SEASON_END', prng);
-      }
+    if (ref?.mode === 'manager' && !finishedNationalManagerSeason) rolloverSponsorship(save);
+    // Evaluate promotion against the completed assignment, but keep that old
+    // level active until its club accounts/titles have been settled.
+    let managerPromotion: ReturnType<typeof checkManagerLevelPromotion> | undefined;
+    if (ref?.mode === 'manager' && !finishedNationalManagerSeason) {
+      updateManagerReputation(save, { includeCompletedSeason: true });
+      managerPromotion = checkManagerLevelPromotion(save);
     }
 
-    startNewSeason(save); // rebuilds fixtures (wipes last season's cup ties)
+    startNewSeason(save, {
+      finishedManagerLevel,
+      promoteManagerTo:
+        managerPromotion?.promoted && managerPromotion.to ? managerPromotion.to : undefined,
+    }); // rebuilds fixtures (wipes last season's cup ties)
+    if (ref?.mode === 'career' && playerRetirementAssessment(save).mandatory) {
+      finalizePlayerRetirement(save, finishedYear + 1);
+    }
+    if (ref?.mode === 'manager') updateManagerReputation(save);
+    if (managerPromotion?.promoted && managerPromotion.to) {
+      // Queue a boardroom story event to announce the new role.
+      const prng = storyRng(save, (save.managerStory?.seenEventIds.length ?? 0) + 999);
+      queueManagerEvent(save, 'SEASON_END', prng);
+    }
     const seasonAchievements = checkSeasonAchievements(save, {
       leagueWon: (save.leagueTitles ?? 0) > trophyCountsBefore.league,
       cupWon: (save.cupWins ?? 0) > trophyCountsBefore.cup,
@@ -2038,7 +2631,7 @@ export const useCareer = create<CareerState>((set, get) => ({
       );
       if (gemGain > 0) save.wallet = addGems(save.wallet, gemGain);
     }
-    if (ref?.mode === 'career' && save.userPlayerId) {
+    if (ref?.mode === 'career' && save.userPlayerId && !save.players[save.userPlayerId]?.retired) {
       const earnedTrophies = [
         (save.leagueTitles ?? 0) > trophyCountsBefore.league ? finishedLeagueName : undefined,
         (save.cupWins ?? 0) > trophyCountsBefore.cup ? CUP_NAME : undefined,
@@ -2059,24 +2652,27 @@ export const useCareer = create<CareerState>((set, get) => ({
       });
       if (trophyStory) archiveNewspaperStory(save, trophyStory);
     }
-    // Career: pick a fresh rival + take franchise bids for the new season.
-    if (ref?.mode === 'career' && save.userPlayerId) {
+    // Career: independent domestic and franchise approaches for the new season.
+    if (ref?.mode === 'career' && save.userPlayerId && !save.players[save.userPlayerId]?.retired) {
       recoverCareerOffSeason(save);
       ensureRival(save);
       const arng = storyRng(save, (save.timeline?.length ?? 0) + 97);
       const offers = generateAuctionOffers(save, arng);
       save.auctionOffers = offers.length ? offers : undefined;
+      const domesticRng = storyRng(save, (save.timeline?.length ?? 0) + 149);
+      const domesticOffers = generateDomesticClubOffers(save, domesticRng);
+      save.domesticClubOffers = domesticOffers.length ? domesticOffers : undefined;
     }
-    // Manager: staff wages + upkeep + gate receipts, youth intake, contract expiries.
-    if (ref?.mode === 'manager' && save.userTeamId) {
+    // Manager: wages/upkeep, youth intake and contracts. Gate receipts were
+    // already credited by the canonical per-fixture result pipeline.
+    if (ref?.mode === 'manager' && save.userTeamId && !finishedNationalManagerSeason) {
       const rng = storyRng(save, (save.currentSeasonId?.length ?? 0) + 71);
       const team = save.teams[save.userTeamId];
-      const gate = gateReceipts(team.reputation) * 7;
       const staffWages = staffWageBill(save);
-      const upkeep = facilityMaintenance(save);
-      settleManagerSeason(save, rng);
+      const stadium = save.managerClubs?.[save.userTeamId]?.stadium;
+      const upkeep = facilityMaintenance(save) + (stadium ? stadiumSeasonUpkeep(stadium) : 0);
+      settleManagerSeason(save, rng, { finishedManagerLevel, finishedYear });
       if (save.lastSeasonSettlement) {
-        save.lastSeasonSettlement.gateReceipts = gate;
         save.lastSeasonSettlement.staffWages = staffWages;
         save.lastSeasonSettlement.facilityUpkeep = upkeep;
         save.lastSeasonSettlement.newBudget = team.budget;
@@ -2117,6 +2713,26 @@ export const useCareer = create<CareerState>((set, get) => ({
     void get().persist();
   },
 
+  acceptDomesticClubOffer: (teamId) => {
+    const save = get().save;
+    if (!save) return { ok: false, reason: 'No save.' };
+    const result = applyAcceptDomesticClubOffer(save, teamId);
+    if (result.ok) {
+      analytics.logEvent(analytics.EVT.SEASON_ROLLOVER, { domesticMove: true });
+      set({ save: { ...save } });
+      void get().persist();
+    }
+    return result;
+  },
+
+  declineDomesticClubOffers: () => {
+    const save = get().save;
+    if (!save) return;
+    applyDeclineDomesticClubOffers(save);
+    set({ save: { ...save } });
+    void get().persist();
+  },
+
   pendingStory: () => {
     const save = get().save;
     return save ? nextPendingEvent(save) : null;
@@ -2144,20 +2760,12 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (!save || ref?.mode !== 'career' || !save.userPlayerId) return null;
     const user = save.players[save.userPlayerId];
     if (!user || !canRetire(user)) return null;
-    user.retired = true;
-    save.flags.retired = true;
-    const epitaph = careerEpitaph(save);
     const year = save.currentSeasonId ? (save.seasons[save.currentSeasonId]?.year ?? 2026) : 2026;
-    addTimeline(save, {
-      year,
-      kind: 'RETIREMENT',
-      text: `Called time on a storied career — ${epitaph}.`,
-    });
-    analytics.logEvent(analytics.EVT.SEASON_ROLLOVER, { retired: true });
-    ingestHallOfFame(save);
+    const retirement = finalizePlayerRetirement(save, year);
+    if (!retirement) return null;
     set({ save: { ...save } });
     void get().persist();
-    return { epitaph };
+    return retirement;
   },
 
   contractStatus: () => {
@@ -2232,7 +2840,7 @@ export const useCareer = create<CareerState>((set, get) => ({
         items: [],
       };
     }
-    const reward = streakReward(newStreak);
+    const reward = streakReward(newStreak, save.mode);
     save.lastDailyClaim = day;
     save.dailyStreak = newStreak;
     save.wallet = addCoins(save.wallet, reward.coins);
@@ -2312,6 +2920,7 @@ export const useCareer = create<CareerState>((set, get) => ({
       return { ok: false, reason: 'Ad reward transaction already applied.' };
     }
     save.wallet = addCoins(save.wallet, coins);
+    if (save.mode === 'manager') updateManagerReputation(save);
     analytics.logEvent(analytics.EVT.AD_WATCHED, { coins });
     set({ save: { ...save } });
     void get().persist();
@@ -2335,46 +2944,141 @@ export const useCareer = create<CareerState>((set, get) => ({
     return { ok: true };
   },
 
+  qaGrantWhaleCoins: async () => {
+    if (!QA_TOOLS_ENABLED) return { ok: false, reason: 'QA tools are unavailable.' };
+    const activeSave = get().save;
+    const activeRef = get().ref;
+
+    try {
+      const savesBySlot = new Map(
+        (await listAllSaves()).map((entry) => [`${entry.mode}:${entry.slot}`, entry] as const),
+      );
+
+      // The active store can be newer than its last AsyncStorage write. Use it
+      // for that slot so a QA grant can never roll recent gameplay backwards.
+      if (activeSave && activeRef) {
+        savesBySlot.set(`${activeRef.mode}:${activeRef.slot}`, {
+          mode: activeRef.mode,
+          slot: activeRef.slot,
+          save: activeSave,
+        });
+      }
+
+      const entries = [...savesBySlot.values()];
+      if (entries.length === 0) return { ok: false, reason: 'No Player or Manager saves found.' };
+
+      const previousWallets = new Map(
+        entries.map((entry) => [`${entry.mode}:${entry.slot}`, entry.save.wallet] as const),
+      );
+      for (const entry of entries) {
+        entry.save.wallet = addCoins(entry.save.wallet, QA_WHALE_COINS);
+      }
+      if (activeSave) set({ save: { ...activeSave } });
+
+      const written: typeof entries = [];
+      try {
+        for (const entry of entries) {
+          await writeSave(entry.mode, entry.slot, entry.save);
+          written.push(entry);
+        }
+        if (activeRef) await setLastPlayed(activeRef.mode, activeRef.slot);
+      } catch {
+        for (const entry of entries) {
+          const previousWallet = previousWallets.get(`${entry.mode}:${entry.slot}`);
+          if (previousWallet) entry.save.wallet = previousWallet;
+        }
+        if (activeSave) set({ save: { ...activeSave } });
+        await Promise.allSettled(
+          written.map((entry) => writeSave(entry.mode, entry.slot, entry.save)),
+        );
+        return { ok: false, reason: 'The device did not save every QA coin balance.' };
+      }
+
+      return {
+        ok: true,
+        balance: activeSave?.wallet.coins,
+        savesUpdated: entries.length,
+        playerSavesUpdated: entries.filter((entry) => entry.mode === 'career').length,
+        managerSavesUpdated: entries.filter((entry) => entry.mode === 'manager').length,
+      };
+    } catch {
+      return { ok: false, reason: 'The device could not load the saved careers.' };
+    }
+  },
+
+  qaGrantClubBudget: async () => {
+    if (!QA_TOOLS_ENABLED) return { ok: false, reason: 'QA tools are unavailable.' };
+    const save = get().save;
+    if (!save || save.mode !== 'manager' || !save.userTeamId) {
+      return { ok: false, reason: 'Open a domestic Manager Career first.' };
+    }
+    if (save.managerCareerLevel === 'NATIONAL') {
+      return { ok: false, reason: 'Club finances are paused during national duty.' };
+    }
+    const team = save.teams[save.userTeamId];
+    if (!team) return { ok: false, reason: 'The managed club could not be found.' };
+    const previousBudget = team.budget;
+    team.budget = Math.max(0, Math.round(team.budget + QA_WHALE_CLUB_BUDGET));
+    if (save.finances) save.finances.transferBudget = team.budget;
+    const club = persistActiveManagerClub(save);
+    if (club) club.finances.transferBudget = team.budget;
+    set({ save: { ...save } });
+    try {
+      await get().persistCritical(true);
+      return { ok: true, balance: team.budget };
+    } catch {
+      team.budget = previousBudget;
+      if (save.finances) save.finances.transferBudget = previousBudget;
+      const restoredClub = persistActiveManagerClub(save);
+      if (restoredClub) restoredClub.finances.transferBudget = previousBudget;
+      set({ save: { ...save } });
+      return { ok: false, reason: 'The device did not save the QA club budget.' };
+    }
+  },
+
+  qaRefillEnergy: () => {
+    if (!QA_TOOLS_ENABLED) return false;
+    const save = get().save;
+    if (!save || save.mode !== 'career') return false;
+    refillQaEnergy(save);
+    set({ save: { ...save } });
+    void get().persist();
+    return true;
+  },
+
   claimPass: () => {
     const save = get().save;
     if (!save) {
       return {
         coins: 0,
-        gems: 0,
         count: 0,
         previousCoins: 0,
         newCoins: 0,
-        previousGems: 0,
-        newGems: 0,
         items: [],
       };
     }
     ensureLiveops(save);
     const previousCoins = save.wallet.coins;
-    const previousGems = save.wallet.gems;
     const claimable = claimablePassRewards(save.pass!);
     let coins = 0;
-    let gems = 0;
+    let count = 0;
     const items: string[] = [];
     for (const c of claimable) {
-      const tier = PASS_TIERS.find((t) => t.tier === c.tier);
+      const tier = passTiersForMode(save.mode).find((t) => t.tier === c.tier);
       if (!tier) continue;
       const reward = c.premium ? tier.premiumReward : tier.freeReward;
+      count += 1;
       coins += reward.coins ?? 0;
-      gems += reward.gems ?? 0;
       const track = c.premium ? 'Premium' : 'Free';
       const rewardParts: string[] = [];
       if (reward.coins) rewardParts.push(`🪙 +${reward.coins} Coins`);
-      if (reward.gems) rewardParts.push(`💎 +${reward.gems} Gems`);
       // Legacy crates still open immediately. New pass cosmetics are durable
       // inventory items that can be equipped in the Premium Clubhouse.
       if (reward.item) {
         if (reward.item.startsWith('crate_')) {
           const loot = crateContents(reward.item);
           coins += loot.coins;
-          gems += loot.gems;
           rewardParts.push(`🪙 +${loot.coins} Coins`);
-          if (loot.gems) rewardParts.push(`💎 +${loot.gems} Gems`);
         }
         rewardParts.push(`🎁 1x ${PASS_ITEM_LABELS[reward.item] ?? 'Pass item'}`);
         save.inventory = {
@@ -2387,17 +3091,13 @@ export const useCareer = create<CareerState>((set, get) => ({
       else save.pass!.claimedFree = [...save.pass!.claimedFree, c.tier];
     }
     if (coins > 0) save.wallet = addCoins(save.wallet, coins);
-    if (gems > 0) save.wallet = addGems(save.wallet, gems);
     set({ save: { ...save } });
     void get().persist();
     return {
       coins,
-      gems,
-      count: claimable.length,
+      count,
       previousCoins,
       newCoins: save.wallet.coins,
-      previousGems,
-      newGems: save.wallet.gems,
       items,
     };
   },
@@ -2426,7 +3126,7 @@ export const useCareer = create<CareerState>((set, get) => ({
 
   claimPassScenario: (scenarioId) => {
     const save = get().save;
-    if (!save) return { ok: false, coins: 0, gems: 0, reason: 'No active save.' };
+    if (!save) return { ok: false, coins: 0, reason: 'No active save.' };
     const result = claimPassScenarioReward(save, scenarioId);
     if (result.ok) {
       set({ save: { ...save } });
@@ -2496,9 +3196,40 @@ export const useCareer = create<CareerState>((set, get) => ({
     return { ok: true };
   },
 
+  convertPlayerGems: async (gems) => {
+    const save = get().save;
+    if (!save || save.mode !== 'career') {
+      return { ok: false, reason: 'Gem exchange is available only in Player Career.' };
+    }
+    const spend = Math.max(0, Math.floor(gems));
+    if (!(PLAYER_GEM_CONVERSION_PRESETS as readonly number[]).includes(spend)) {
+      return { ok: false, reason: 'Choose one of the available exchange amounts.' };
+    }
+    if (save.wallet.gems < spend) {
+      return { ok: false, reason: `You need ${spend} gems for this exchange.` };
+    }
+    const previousWallet = { ...save.wallet };
+    const nextWallet = convertPlayerGemsToCoins(save.wallet, spend);
+    if (!nextWallet) return { ok: false, reason: 'The exchange could not be completed.' };
+    const coins = playerGemConversionCoins(spend);
+    save.wallet = nextWallet;
+    set({ save: { ...save } });
+    try {
+      await get().persistCritical();
+      return { ok: true, gems: spend, coins };
+    } catch {
+      save.wallet = previousWallet;
+      set({ save: { ...save } });
+      return { ok: false, reason: 'The exchange was not saved. No gems were spent.' };
+    }
+  },
+
   applySquadRecovery: (payment, transactionId) => {
     const save = get().save;
     if (!save) return { ok: false, reason: 'No active manager squad.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, reason: 'Club recovery is paused during national duty.' };
+    }
     const teamId = save.mode === 'manager' ? managerControlledTeamId(save) : save.userTeamId;
     if (!teamId || !save.teams[teamId]) {
       return { ok: false, reason: 'No active manager squad.' };
@@ -2577,6 +3308,9 @@ export const useCareer = create<CareerState>((set, get) => ({
   useFullScoutReveal: (playerId, payment, transactionId) => {
     const save = get().save;
     if (!save || !save.userTeamId) return { ok: false, cost: 0, reason: 'No active manager club.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, cost: 0, reason: 'Club scouting is paused during national duty.' };
+    }
     const player = save.players[playerId];
     if (!player) return { ok: false, cost: 0, reason: 'Unknown player.' };
     const txId = transactionId ?? `full-scout:${payment}:${save.id}:${playerId}:${Date.now()}`;
@@ -2686,15 +3420,23 @@ export const useCareer = create<CareerState>((set, get) => ({
       'facility_upgrade_token',
       'recovery_pack',
       'manager_legend_pack',
+      'manager_save_sponsor',
     ]);
     const careerOnlyProducts = new Set([
       'contract_boost',
       'form_recovery',
       'training_accelerator',
       'bundle_legend',
+      'player_save_sponsor',
     ]);
     if (managerOnlyProducts.has(productId) && currentSave.mode !== 'manager') {
       return { ok: false, error: 'manager_save_required' };
+    }
+    if (
+      (productId === 'transfer_budget_sm' || productId === 'manager_legend_pack') &&
+      managerClubOperationsPaused(currentSave)
+    ) {
+      return { ok: false, error: 'club_operations_paused' };
     }
     if (careerOnlyProducts.has(productId) && currentSave.mode !== 'career') {
       return { ok: false, error: 'player_career_required' };
@@ -2722,6 +3464,18 @@ export const useCareer = create<CareerState>((set, get) => ({
     }
     if (productId === 'season_pass' && isSeasonPassActive(currentSave)) {
       return { ok: false, error: 'already_active' };
+    }
+    if (
+      (productId === 'player_save_sponsor' || productId === 'manager_save_sponsor') &&
+      currentSave.sponsorship?.premium
+    ) {
+      return { ok: false, error: 'already_owned_for_save' };
+    }
+    if (purchases.isSaveSponsorProduct(productId) && !premiumSponsorStoreUnlocked(currentSave)) {
+      return { ok: false, error: 'sponsorship_not_unlocked' };
+    }
+    if (purchases.isSaveSponsorProduct(productId) && !purchases.isSaveSponsorCheckoutReady()) {
+      return { ok: false, error: 'save_sponsor_checkout_not_ready' };
     }
     if (productId === 'remove_ads' && currentSave.entitlements.removeAds) {
       return { ok: false, error: 'already_owned' };
@@ -2780,6 +3534,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (res.productId !== productId) return { ok: false, error: 'product_mismatch' };
     const save = get().save;
     if (!save) return { ok: false, error: 'no_save' };
+    if (save.id !== currentSave.id) return { ok: false, error: 'active_save_changed' };
     if (!res.purchaseToken?.trim()) return { ok: false, error: 'missing_transaction_id' };
     const ledgerEntry = purchaseLedger.createLedgerEntry({
       result: { ...res, purchaseToken: res.purchaseToken.trim() },
@@ -2791,7 +3546,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     const tokenFlag = purchaseLedger.ledgerFlagKey(ledgerEntry.purchaseToken);
     if (save.flags?.[tokenFlag]) {
       try {
-        await get().persist();
+        await get().persistCritical(true);
         if (productId === 'starter_pack') {
           await accountPurchases.markStarterPackPurchased(ledgerEntry.purchaseToken);
         }
@@ -2904,6 +3659,14 @@ export const useCareer = create<CareerState>((set, get) => ({
         training_accelerator: (save.inventory?.training_accelerator ?? 0) + 3,
       };
     }
+    if (productId === 'player_save_sponsor' || productId === 'manager_save_sponsor') {
+      const sponsorGrant = grantPremiumSponsorToCurrentSave(
+        save,
+        productId,
+        ledgerEntry.purchaseToken,
+      );
+      if (!sponsorGrant.ok) return { ok: false, error: 'premium_sponsor_grant_failed' };
+    }
     // First-purchase bonus: DOUBLE the gems on the player's first-ever
     // gem-bearing purchase (this is the store's advertised "2× gems"). Only
     // consumed when a gem bonus is actually granted, so buying a gem-less item
@@ -2920,7 +3683,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     }
     set({ save: { ...save } });
     try {
-      await get().persist();
+      await get().persistCritical(true);
       if (productId === 'starter_pack') {
         await accountPurchases.markStarterPackPurchased(ledgerEntry.purchaseToken);
       }
@@ -2931,16 +3694,30 @@ export const useCareer = create<CareerState>((set, get) => ({
   },
 
   restorePurchases: async () => {
-    const results = await purchases.restore();
+    const activeSave = get().save;
+    if (!activeSave) {
+      return { status: 'NO_SAVE', count: 0, productIds: [] };
+    }
+    const activeSaveId = activeSave.id;
+    const providerResult = await purchases.restore();
+    if (providerResult.status !== 'RESTORED') {
+      return {
+        status: providerResult.status,
+        count: 0,
+        productIds: [],
+        error: providerResult.error,
+      };
+    }
     const save = get().save;
-    if (!save) return 0;
-    let restored = 0;
-    for (const r of results) {
+    if (!save || save.id !== activeSaveId) {
+      return { status: 'ACTIVE_SAVE_CHANGED', count: 0, productIds: [] };
+    }
+    const restoredProductIds: string[] = [];
+    for (const r of providerResult.purchases) {
       if (!r.ok) continue;
-      const grant = purchases.GRANTS[r.productId];
-      if (grant?.entitlement?.removeAds && r.productId !== 'bundle_legend') {
+      if (r.productId === 'remove_ads') {
         save.entitlements.removeAds = true;
-        restored++;
+        restoredProductIds.push(r.productId);
       }
       if (r.productId === 'bundle_legend' && save.mode === 'career') {
         save.entitlements.removeAds = true;
@@ -2951,11 +3728,15 @@ export const useCareer = create<CareerState>((set, get) => ({
           kit_all_colors: 1,
           player_legend_bundle_owned: 1,
         };
-        restored++;
+        restoredProductIds.push(r.productId);
       }
-      if (r.productId === 'manager_legend_pack' && save.mode === 'manager') {
+      if (
+        r.productId === 'manager_legend_pack' &&
+        save.mode === 'manager' &&
+        !managerClubOperationsPaused(save)
+      ) {
         applyManagerLegendBacking(save);
-        restored++;
+        restoredProductIds.push(r.productId);
       }
       if (r.productId === 'season_pass' && r.entitlement) {
         activateSeasonPass(save, {
@@ -2966,18 +3747,29 @@ export const useCareer = create<CareerState>((set, get) => ({
           provider: 'REVENUECAT',
           willRenew: r.entitlement.willRenew,
         });
-        restored++;
+        restoredProductIds.push(r.productId);
       }
     }
-    if (restored > 0) {
-      set({ save: { ...save } });
-      void get().persist();
+    const productIds = Array.from(new Set(restoredProductIds));
+    if (productIds.length === 0) {
+      return { status: 'NOTHING_APPLICABLE', count: 0, productIds: [] };
     }
-    return restored;
+    set({ save: { ...save } });
+    try {
+      await get().persistCritical(true);
+    } catch {
+      return {
+        status: 'PERSISTENCE_FAILED',
+        count: 0,
+        productIds: [],
+        error: 'persistence_failed',
+      };
+    }
+    return { status: 'RESTORED', count: productIds.length, productIds };
   },
 
   clearPendingAchievements: () => set({ pendingAchievementIds: [] }),
-  clear: () => set({ save: null, ref: null, pendingAchievementIds: [] }),
+  clear: () => set({ save: null, ref: null, pendingAchievementIds: [], persistenceError: null }),
 
   // ── In-game inbox ────────────────────────────────────────────────────────
   addInboxMessage: (msg) => {
@@ -3043,11 +3835,18 @@ export const useCareer = create<CareerState>((set, get) => ({
 
   commitDailyChallengeMatch: (match) => {
     const { save, ref } = get();
-    if (!save || ref?.mode !== 'career' || !save.userPlayerId) return null;
+    if (
+      !save ||
+      ref?.mode !== 'career' ||
+      !save.userPlayerId ||
+      hasRecordedSaveResult(save, match.id)
+    ) {
+      return null;
+    }
     const experienceBefore = captureExperienceSnapshot(save);
     const challenge = save.activeDailyChallenge;
     const userWon = match.result?.winnerTeamId === match.homeTeamId;
-    const tie = Boolean(match.result?.tie);
+    const tie = matchHasNeutralResult(match);
     recordSaveResult(save, match.id, userWon, tie);
     const perf = userPerformance(match, save.userPlayerId);
     recordArchetypeMatch(save, {
@@ -3112,6 +3911,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     // everyone else to the standard 36. Regen never reduces existing energy.
     const cap = isVip ? ECONOMY.vipEnergyMax : ECONOMY.energyMax;
     save.wallet = regenEnergy(save.wallet, Date.now(), cap);
+    refillQaEnergy(save);
     save.vipEnergyBonusActive = isVip;
     set({ save: { ...save } });
   },
@@ -3202,10 +4002,10 @@ export const useCareer = create<CareerState>((set, get) => ({
   },
 
   // ── Personal finance ────────────────────────────────────────────────────
-  investStocksAction: (coins) => {
+  investStocksAction: (companyId, coins) => {
     const save = get().save;
     if (!save) return { ok: false, reason: 'No active save.' };
-    const res = investInStocks(save, coins);
+    const res = investInStockCompany(save, companyId, coins);
     if (res.ok) {
       set({ save: { ...save } });
       void get().persist();
@@ -3213,15 +4013,15 @@ export const useCareer = create<CareerState>((set, get) => ({
     return res;
   },
 
-  withdrawStocksAction: () => {
+  withdrawStocksAction: (companyId, coins) => {
     const save = get().save;
-    if (!save) return 0;
-    const amount = withdrawStocks(save);
-    if (amount > 0) {
+    if (!save) return { ok: false, reason: 'No active save.' };
+    const result = sellStockCompany(save, companyId, coins);
+    if (result.ok) {
       set({ save: { ...save } });
       void get().persist();
     }
-    return amount;
+    return result;
   },
 
   contributeLegacy: (tierId) => {
@@ -3283,19 +4083,6 @@ export const useCareer = create<CareerState>((set, get) => ({
     return result;
   },
 
-  tradeLegacyToken: (direction, units) => {
-    const save = get().save;
-    if (!save || save.mode !== 'career') {
-      return { ok: false, reason: 'No active player career.' };
-    }
-    const result = tradeLegacyToken(save, direction, units);
-    if (result.ok) {
-      set({ save: { ...save } });
-      void get().persist();
-    }
-    return result;
-  },
-
   hirePersonalCoach: (discipline) => {
     const save = get().save;
     if (!save || save.mode !== 'career') {
@@ -3348,14 +4135,17 @@ export const useCareer = create<CareerState>((set, get) => ({
     return result;
   },
 
-  negotiatePlayerSponsor: (approach) => {
+  acceptEarnedSponsorOffer: (offerId) => {
     const save = get().save;
-    if (!save || save.mode !== 'career') {
-      return { ok: false, reason: 'No active player career.' };
+    if (!save) return { ok: false, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, reason: 'Club sponsorship is paused during national duty.' };
     }
-    const result = negotiatePlayerSponsor(save, approach);
-    set({ save: { ...save } });
-    void get().persist();
+    const result = acceptSponsorshipOffer(save, offerId);
+    if (result.ok) {
+      set({ save: { ...save } });
+      void get().persist();
+    }
     return result;
   },
 
@@ -3427,11 +4217,19 @@ export const useCareer = create<CareerState>((set, get) => ({
     // progress, but it cannot manufacture store entitlements.
     imported.entitlements = current.entitlements;
     imported.firstPurchaseDone = current.firstPurchaseDone;
+    // A permanent sponsor is a verified, non-restorable purchase tied to one
+    // save. Transfer JSON cannot clone or move it into another save identity.
+    const preservedPremium =
+      imported.id === current.id && current.sponsorship?.premium?.boundSaveId === current.id
+        ? current.sponsorship.premium
+        : undefined;
+    if (preservedPremium) ensureSponsorshipState(imported).premium = preservedPremium;
+    else if (imported.sponsorship) imported.sponsorship.premium = undefined;
     imported.updatedAt = Date.now();
     validateSeasonState(imported);
     get().setActive(imported, 'career', ref.slot);
     try {
-      await get().persist();
+      await get().persistCritical(true);
       return { ok: true };
     } catch {
       return { ok: false, reason: 'The career was read but could not be saved to this slot.' };
@@ -3453,6 +4251,9 @@ export const useCareer = create<CareerState>((set, get) => ({
   loanPlayer: (playerId, seasons = 1) => {
     const save = get().save;
     if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, cost: 0, reason: 'Club loans are paused during national duty.' };
+    }
     const closedReason = transferWindowClosedReason(save);
     if (closedReason) return { ok: false, cost: 0, reason: closedReason };
     const res = loanPlayerPure(save, playerId, seasons);
@@ -3466,6 +4267,7 @@ export const useCareer = create<CareerState>((set, get) => ({
   recallLoan: (playerId) => {
     const save = get().save;
     if (!save) return false;
+    if (managerClubOperationsPaused(save)) return false;
     const ok = recallLoanPure(save, playerId);
     if (ok) {
       set({ save: { ...save } });
@@ -3477,6 +4279,9 @@ export const useCareer = create<CareerState>((set, get) => ({
   offerFreeAgentContract: (playerId, years = 2) => {
     const save = get().save;
     if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+    if (managerClubOperationsPaused(save)) {
+      return { ok: false, cost: 0, reason: 'Club contracts are paused during national duty.' };
+    }
     const closedReason = transferWindowClosedReason(save);
     if (closedReason) return { ok: false, cost: 0, reason: closedReason };
     const res = offerFreeAgentContractPure(save, playerId, years);
@@ -3533,7 +4338,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     addTimeline(save, {
       year,
       kind: 'TRANSFER',
-      text: `Signed a new ${signedOffer.years}-year deal — ₹${Math.round(signedOffer.wage / 52000)}k/week.`,
+      text: `Signed a new ${signedOffer.years}-year deal worth ${signedOffer.wage.toLocaleString()} coins per season.`,
     });
     set({ save: { ...save } });
     void get().persist();
@@ -3546,6 +4351,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (!save) return { ok: false, reason: 'No active save.' };
     const res = acceptManagerJob(save);
     if (res.ok) {
+      ensureManagerLeadership(save);
       analytics.logEvent(analytics.EVT.SEASON_ROLLOVER, { managerJobMove: true });
       set({ save: { ...save }, targetFixtureId: undefined });
       void get().persist();

@@ -43,9 +43,9 @@ describe('domestic cup', () => {
     expect(['WON', 'ELIMINATED']).toContain(userCupStatus(save));
   });
 
-  it('does not create a national cup for school or U19 career players', () => {
+  it('does not create a standalone national cup in Player Career', () => {
     const save = makeCareerSave();
-    save.careerPathLevel = 'SCHOOL';
+    save.careerPathLevel = 'DOMESTIC';
     ensureCup(save);
     expect(cupTies(save)).toHaveLength(0);
     expect(nextUserCupTie(save)).toBeUndefined();

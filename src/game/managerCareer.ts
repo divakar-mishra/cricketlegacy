@@ -14,6 +14,7 @@
  */
 
 import { Format, ManagerCareerLevel, SaveGame } from '../domain/types';
+import { clamp } from '../utils/math';
 import { managerCompetitionStandings } from './managerCalendar';
 import {
   generateCountryInternationalWindowFixtures,
@@ -34,13 +35,109 @@ export const MANAGER_LEVEL_DESC: Record<ManagerCareerLevel, string> = {
   STATE:
     'Manage a Tier 2 club in the 50-over and T20 blocks. Earn promotion to the elite division.',
   ELITE:
-    'Compete through the full domestic year. Win the Tier 1 Four-Day Shield to earn the national job.',
+    'Compete through the full domestic year. A Four-Day Shield title or a sustained elite record can earn the national job.',
   NATIONAL:
     'Lead the national side through autumn tours, winter WTC Tests and the global tournament window.',
 };
 
 /** Seasons with boardConfidence ≥ 80 needed (without a title) to earn STATE promotion. */
 const SEASONS_HIGH_CONF_FOR_PROMOTION = 3;
+
+export const MANAGER_MERIT_REPUTATION_CAP = 88;
+export const MANAGER_AD_REPUTATION_CAP = 3;
+export const MANAGER_PREMIUM_REPUTATION_CAP = 8;
+export const MANAGER_ADS_PER_REPUTATION_POINT = 15;
+
+export interface ManagerReputationBreakdown {
+  merit: number;
+  adBoost: number;
+  premiumBoost: number;
+  total: number;
+}
+
+function managerLevelReputationBonus(level: ManagerCareerLevel): number {
+  if (level === 'NATIONAL') return 2;
+  if (level === 'ELITE') return 1;
+  if (level === 'STATE') return 0.5;
+  return 0;
+}
+
+function rewardedManagerMatchCount(save: SaveGame): number {
+  return Object.keys(save.flags ?? {}).filter((key) => key.startsWith('rewardTx:match-double:'))
+    .length;
+}
+
+/**
+ * Personal Manager reputation is earned from a complete body of work rather
+ * than copied from the current club. Free merit tops out at 88; sustained
+ * rewarded-ad engagement and recorded premium assistance can accelerate the
+ * final stretch without guaranteeing results, trophies, or appointments.
+ */
+export function managerReputationBreakdown(
+  save: SaveGame,
+  options: { includeCompletedSeason?: boolean } = {},
+): ManagerReputationBreakdown {
+  const current = Math.round(
+    save.managerProgression?.reputation ??
+      (save.userTeamId ? save.teams[save.userTeamId]?.reputation : 0) ??
+      0,
+  );
+  if (save.mode !== 'manager') {
+    return { merit: current, adBoost: 0, premiumBoost: 0, total: current };
+  }
+
+  const seasons =
+    Math.max(0, save.careerSeasons ?? 0) + (options.includeCompletedSeason ? 1 : 0);
+  const wins = Math.max(0, save.careerWins ?? 0);
+  const losses = Math.max(0, save.careerLosses ?? 0);
+  const neutral = Math.max(0, save.careerDraws ?? 0);
+  const played = wins + losses + neutral;
+  const winRate = played > 0 ? wins / played : 0.5;
+  const titles =
+    Math.max(0, save.leagueTitles ?? 0) +
+    Math.max(0, save.cupWins ?? 0) +
+    Math.max(0, save.continentalTitles ?? 0);
+  const experience = Math.min(15, seasons * 0.6);
+  const results = clamp((winRate - 0.4) * 10, -1, 2);
+  const trophies = Math.min(6, titles * 0.5);
+  const level = managerLevelReputationBonus(save.managerCareerLevel ?? 'CLUB');
+  const hasMeritEvidence = seasons > 0 || played > 0 || titles > 0;
+  const merit = hasMeritEvidence
+    ? Math.round(
+        clamp(66 + experience + results + trophies + level, 40, MANAGER_MERIT_REPUTATION_CAP),
+      )
+    : 66;
+  const adBoost = Math.min(
+    MANAGER_AD_REPUTATION_CAP,
+    Math.floor(rewardedManagerMatchCount(save) / MANAGER_ADS_PER_REPUTATION_POINT),
+  );
+  const premiumBoost = Math.min(
+    MANAGER_PREMIUM_REPUTATION_CAP,
+    save.managerProgression?.premiumAssistanceHistory.length ?? 0,
+  );
+  return {
+    merit,
+    adBoost,
+    premiumBoost,
+    total: Math.round(clamp(merit + adBoost + premiumBoost, 0, 99)),
+  };
+}
+
+export function updateManagerReputation(
+  save: SaveGame,
+  options: { includeCompletedSeason?: boolean } = {},
+): ManagerReputationBreakdown {
+  const breakdown = managerReputationBreakdown(save, options);
+  if (save.mode !== 'manager') return breakdown;
+  save.managerProgression = save.managerProgression ?? {
+    reputation: breakdown.total,
+    currentClubId: save.userTeamId ?? '',
+    premiumAssistanceHistory: [],
+  };
+  save.managerProgression.reputation = breakdown.total;
+  save.managerProgression.currentClubId = save.userTeamId ?? save.managerProgression.currentClubId;
+  return breakdown;
+}
 
 // ── Promotion logic ────────────────────────────────────────────────────────
 
@@ -83,20 +180,69 @@ export function checkManagerLevelPromotion(save: SaveGame): PromotionCheckResult
         managerCompetitionStandings(save, 'T20', 2).findIndex(
           (row) => row.teamId === save.userTeamId,
         ) + 1;
-      return position > 0 && position <= 2
-        ? {
-            promoted: true,
-            to: 'ELITE',
-            reason: 'Promotion to Tier 1 unlocks the complete domestic calendar.',
-          }
-        : { promoted: false };
+      if (position > 0 && position <= 2) {
+        return {
+          promoted: true,
+          to: 'ELITE',
+          reason: 'Promotion to Tier 1 unlocks the complete domestic calendar.',
+        };
+      }
+      const completedStateSeasons = seasons + 1;
+      const reputation = save.managerProgression?.reputation ?? 0;
+      const careerTitles =
+        (save.leagueTitles ?? 0) + (save.cupWins ?? 0) + (save.continentalTitles ?? 0);
+      const careerMatches =
+        (save.careerWins ?? 0) + (save.careerLosses ?? 0) + (save.careerDraws ?? 0);
+      const careerWinRate = careerMatches > 0 ? (save.careerWins ?? 0) / careerMatches : 0;
+      if (
+        completedStateSeasons >= 6 &&
+        reputation >= 73 &&
+        careerTitles >= 4 &&
+        careerWinRate >= 0.5
+      ) {
+        return {
+          promoted: true,
+          to: 'ELITE',
+          reason: 'A sustained professional trophy record earns an elite appointment.',
+        };
+      }
+      if (completedStateSeasons >= 10 && reputation >= 76 && careerTitles >= 6) {
+        return {
+          promoted: true,
+          to: 'ELITE',
+          reason: 'A long, decorated professional career earns an elite appointment.',
+        };
+      }
+      return { promoted: false };
     }
-    if (level === 'ELITE' && save.managerWonTierOneFirstClass) {
-      return {
-        promoted: true,
-        to: 'NATIONAL',
-        reason: 'Winning the Tier 1 Four-Day Shield earns the national team appointment.',
-      };
+    if (level === 'ELITE') {
+      if (save.managerWonTierOneFirstClass) {
+        return {
+          promoted: true,
+          to: 'NATIONAL',
+          reason: 'Winning the Tier 1 Four-Day Shield earns the national team appointment.',
+        };
+      }
+      const reputation = save.managerProgression?.reputation ?? 0;
+      const completedEliteSeasons = seasons + 1;
+      if (
+        completedEliteSeasons >= 3 &&
+        reputation >= 73 &&
+        (titles >= 1 || topFinishes >= 2)
+      ) {
+        return {
+          promoted: true,
+          to: 'NATIONAL',
+          reason: 'Sustained Tier 1 contention earns the national team appointment.',
+        };
+      }
+      if (completedEliteSeasons >= 5 && reputation >= 75) {
+        return {
+          promoted: true,
+          to: 'NATIONAL',
+          reason: 'A long elite-level record earns the national team appointment.',
+        };
+      }
     }
     return { promoted: false };
   }

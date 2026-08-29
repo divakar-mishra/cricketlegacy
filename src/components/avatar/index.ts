@@ -1,2 +1,2 @@
-export { AvatarCustomizer } from './AvatarCustomizer';
-export { LayeredAvatar } from './LayeredAvatar';
+export { PortraitAvatar } from './PortraitAvatar';
+export { PortraitPicker } from './PortraitPicker';

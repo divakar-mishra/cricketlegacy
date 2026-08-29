@@ -18,4 +18,13 @@ describe('first-launch onboarding', () => {
     expect(onboardingSource).toContain('accessibilityLabel="Skip intro"');
     expect(onboardingSource).toContain('SafeAreaView');
   });
+
+  it('uses concise slide copy while keeping the core actions', () => {
+    expect(onboardingSource).toContain('Choose your batting stance and bowling plan.');
+    expect(onboardingSource).toContain('Train, earn your place and rise through selection.');
+    expect(onboardingSource).toContain('Shape the squad, tactics and future of the club.');
+    expect(onboardingSource).toContain('Daily Rewards & Season Pass');
+    expect(onboardingSource).toContain('Complete challenges and claim rewards.');
+    expect(onboardingSource).not.toContain('fight for your XI place');
+  });
 });

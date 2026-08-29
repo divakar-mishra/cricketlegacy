@@ -17,6 +17,7 @@ import {
   managerDomesticBlueprints,
   playerDomesticBlueprints,
 } from '../game/domesticBranding';
+import { nationalReplacementQuality } from '../game/nationalTalent';
 import { COUNTRIES, getCountry } from '../data/countries';
 
 export const DIV1_LEAGUE_ID = 'league-1';
@@ -49,7 +50,7 @@ function addNationalPoolsAndTeams(
     if (existingNationals < 22) {
       const reserve = generateManagerRoster({
         nationality: nation.id,
-        quality: 46 + nation.strength * 6,
+        quality: nationalReplacementQuality(nation.id),
         idPrefix: `national-reserve-${nation.id}`,
         rng,
       }).slice(0, 22 - existingNationals);

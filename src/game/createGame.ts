@@ -1,5 +1,6 @@
 import { CREATION } from '../data/attributes';
-import { avatarFromLegacy, normalizeAvatarConfig } from '../avatar';
+import { normalizeAvatarConfig } from '../avatar';
+import { defaultShirtName, defaultShirtNumber } from './kitIdentity';
 import {
   BattingAttrs,
   BattingStyle,
@@ -35,6 +36,8 @@ import { buildPlayerSeasonCalendar } from './playerCalendar';
 import { ensurePlayerLifeState } from './playerLife';
 import { ensureCompetitionFixtures } from './season';
 import { ensurePlayerCareerResources } from './career';
+import { synchronizeU19WorldCupState } from './u19WorldCup';
+import { synchronizeManagerClubState } from './managerClubState';
 
 export interface UserPlayerInput {
   name: string;
@@ -141,7 +144,7 @@ function makeSeason(
 /** The starting division of a team, from its blueprint (defaults to the top flight). */
 /** Map career-start key → initial career path level. */
 function initialPathLevel(age: number): CareerPathLevel {
-  if (age <= 15) return 'SCHOOL';
+  if (age <= 16) return 'SCHOOL';
   if (age <= 19) return 'U19';
   return 'DOMESTIC';
 }
@@ -151,6 +154,8 @@ export function createCareerSave(params: {
   teamId: string;
   difficulty: Difficulty;
   seed?: number;
+  /** Optional deterministic creation clock for audits/tests. */
+  now?: number;
   format?: Format;
   /** New Game+ generation — a protégé inherits a little of the legacy. */
   newGamePlus?: number;
@@ -158,10 +163,9 @@ export function createCareerSave(params: {
   legacyScore?: number;
   archetype?: import('../domain/types').CareerArchetype;
   ironman?: boolean;
-  avatarCustomization?: import('../domain/types').AvatarCustomization;
   avatarConfig?: import('../avatar').AvatarConfig;
 }): SaveGame {
-  const now = Date.now();
+  const now = params.now ?? Date.now();
   params.player.condition ??= 100;
   const selectedBlueprint = TEAM_BLUEPRINTS.find((team) => team.id === params.teamId);
   const world = buildPlayerLeagueWorld(params.seed ?? now >>> 0, {
@@ -173,7 +177,7 @@ export function createCareerSave(params: {
   });
   const startLevel = initialPathLevel(params.player.age);
 
-  // The chosen Tier 3 club is a future destination for School/U19 starts.
+  // The chosen Tier 3 club is a future destination for Grade A/U19 starts.
   // Only a senior starter is inserted into that professional roster now.
   const team = world.teams[params.teamId];
   world.players[params.player.id] = params.player;
@@ -209,6 +213,7 @@ export function createCareerSave(params: {
     entitlements: { removeAds: false },
     userPlayerId: params.player.id,
     userTeamId: params.teamId,
+    franchiseTeamId: params.teamId,
     players: world.players,
     teams: world.teams,
     seasons: {
@@ -238,14 +243,17 @@ export function createCareerSave(params: {
       playerArchetype: params.archetype,
       ironman: params.ironman,
     },
+    statsScopeTrackingStartedAt: now,
+    competitionStatsTrackingStartedAt: now,
     cosmetics: {
       avatar: 'avatar_custom',
       kit: 'kit_white',
       celebration: 'cel_wave',
-      avatarCustomization: params.avatarCustomization,
+      shirtName: defaultShirtName(params.player.name),
+      shirtNumber: defaultShirtNumber(params.player.id),
       avatarConfig: params.avatarConfig
         ? normalizeAvatarConfig(params.avatarConfig)
-        : avatarFromLegacy(params.avatarCustomization, 'kit_white'),
+        : normalizeAvatarConfig(),
     },
   };
 
@@ -258,6 +266,7 @@ export function createCareerSave(params: {
   }
   ensurePlayerCareerResources(save);
   ensurePlayerLifeState(save);
+  synchronizeU19WorldCupState(save);
   buildPlayerSeasonCalendar(save);
 
   return save;
@@ -268,6 +277,8 @@ export function createManagerSave(params: {
   country?: string;
   difficulty: Difficulty;
   seed?: number;
+  /** Optional deterministic creation clock for audits/tests. */
+  now?: number;
   format?: Format;
   /**
    * True when this save is created via a player-legend career-to-manager
@@ -278,7 +289,7 @@ export function createManagerSave(params: {
   /** Career stats from the retiring player (used to determine starting level). */
   legendStats?: { caps: number; runs: number };
 }): SaveGame {
-  const now = Date.now();
+  const now = params.now ?? Date.now();
   const selectedBlueprint = TEAM_BLUEPRINTS.find((team) => team.id === params.teamId);
   const startLevel = initialManagerLevel({
     isLegendTransition: params.legendTransition,
@@ -323,6 +334,8 @@ export function createManagerSave(params: {
     userDivision: world.userDivision,
     boardObjective: { year: 2026, targetPosition: boardTargetFor(team.reputation) },
     managerCareerLevel: startLevel,
+    managerAge: 35,
+    managerRetired: false,
     managerCareerSeasons: 0,
     managerTitlesAtLevel: 0,
     managerNationalTeamId: `national-${country}`,
@@ -337,5 +350,6 @@ export function createManagerSave(params: {
   // A rookie appointment begins with the marquee T20 block in March. Later
   // seasons use the complete September-August calendar.
   buildManagerSeasonCalendar(save, 2026, 'T20');
+  synchronizeManagerClubState(save);
   return save;
 }

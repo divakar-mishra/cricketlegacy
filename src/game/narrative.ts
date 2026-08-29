@@ -159,7 +159,10 @@ export function ensureCareerDepth(save: SaveGame): void {
   if (!save.story.strings) save.story.strings = {};
   // Give brand-new careers their opening beat.
   if (save.timeline.length === 0 && !save.story.seenEventIds.includes('career_start')) {
-    if (!save.story.pendingEventIds.includes('career_start')) {
+    if (
+      save.story.pendingEventIds.length === 0 &&
+      !save.story.pendingEventIds.includes('career_start')
+    ) {
       save.story.pendingEventIds.unshift('career_start');
     }
   }
@@ -331,6 +334,8 @@ export function applyEffects(
   if (
     effects.queueEvent &&
     save.story &&
+    save.story.pendingEventIds.length <= 1 &&
+    !save.story.seenEventIds.includes(effects.queueEvent) &&
     !save.story.pendingEventIds.includes(effects.queueEvent)
   ) {
     save.story.pendingEventIds.push(effects.queueEvent);
@@ -364,12 +369,19 @@ export function availableChoices(save: SaveGame, event: StoryEvent): StoryChoice
   return list.length ? list : event.choices;
 }
 
-/** All events eligible to fire for a context (respecting `once`, conditions). */
+/**
+ * All events eligible to fire for a context.
+ *
+ * Every authored story is a career memory, not a repeatable notification. A
+ * previously seen id is therefore always suppressed. The old `once` opt-in
+ * allowed memorable scenes such as the handwritten letter to return every few
+ * fixtures when one author forgot the flag.
+ */
 export function eligibleEvents(events: StoryEvent[], ctx: StoryContext): StoryEvent[] {
   const seen = new Set(ctx.save.story?.seenEventIds ?? []);
   return events.filter((ev) => {
     if (!triggersMatch(ev, ctx.trigger)) return false;
-    if (ev.once && seen.has(ev.id)) return false;
+    if (seen.has(ev.id)) return false;
     if (ev.condition && !ev.condition(ctx)) return false;
     return true;
   });

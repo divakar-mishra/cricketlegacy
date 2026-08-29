@@ -13,7 +13,7 @@ import {
 import type { IconName } from '../components';
 import { Tactics } from '../domain/types';
 import { BOWLER_PLAN_OPTIONS, FIELD_OPTIONS, TEAM_APPROACH_OPTIONS } from '../engine/intent';
-import { formatClubCurrency } from '../game/finance';
+import { activeManagerClub } from '../game/managerClubState';
 import { managerControlledTeamId } from '../game/managerCalendar';
 import { matchDecisionAuthority } from '../game/matchAuthority';
 import { nextUserFixtureId } from '../game/season';
@@ -50,8 +50,6 @@ const FIELD_ICONS: Record<string, IconName> = {
   DEFENSIVE: 'shield-checkmark',
   SWEEPER: 'scan',
 };
-
-const fmtMoney = formatClubCurrency;
 
 export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
   const save = useCareer((s) => s.save);
@@ -98,6 +96,10 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
     );
   }
   const tactics = save.tactics ?? DEFAULT_TACTICS;
+  const leadershipClub =
+    save.mode === 'manager' && save.managerCareerLevel !== 'NATIONAL' && team.id === save.userTeamId
+      ? activeManagerClub(save)
+      : undefined;
   const squad = team.playerIds.map((id) => save.players[id]).filter(Boolean);
   const forceId = save.mode === 'career' && canEdit ? save.userPlayerId : undefined;
   const xiIds = resolveXI(squad, team.xi, forceId).map((p) => p.id);
@@ -146,7 +148,7 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
   const swapIn = (benchId: string) => {
     if (!canEdit) return;
     if (selected == null) {
-      setHint('Tap a player in your XI first, then a bench player to swap.');
+      setHint('Tap an XI player, then a bench player.');
       return;
     }
     proposeSwap(selected, benchId);
@@ -171,18 +173,22 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
       />
 
       {save.mode === 'manager' ? (
-        <Card style={styles.finance}>
-          <View>
-            <Text style={styles.financeLabel}>Transfer budget</Text>
-            <Text style={styles.financeValue}>{fmtMoney(team.budget)}</Text>
-          </View>
-          <Button
-            label="Transfers"
-            size="sm"
-            fullWidth={false}
-            onPress={() => navigation.navigate('Transfers')}
-          />
-        </Card>
+        save.managerCareerLevel !== 'NATIONAL' ? (
+          <Card style={styles.leadershipEntry}>
+            <View style={styles.leadershipCopy}>
+              <Text style={styles.leadershipTitle}>Captain & vice-captain</Text>
+              <Text style={styles.leadershipMeta}>Set the leaders for your selected XI.</Text>
+            </View>
+            <Button
+              label="Leadership"
+              size="sm"
+              variant="secondary"
+              fullWidth={false}
+              style={styles.managerAction}
+              onPress={() => navigation.navigate('ManagerLeadership')}
+            />
+          </Card>
+        ) : null
       ) : (
         <View style={[styles.authorityBand, canEdit && styles.authorityBandActive]}>
           <Icon
@@ -268,10 +274,7 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
       <Text style={styles.hint}>
         {FIELD_OPTIONS.find((o) => o.value === (tactics.field ?? 'BALANCED'))?.desc}
       </Text>
-      <Text style={styles.hint}>
-        Powerplays automatically use a legal two-outside field; your selected default takes over
-        when the circle restriction allows it.
-      </Text>
+      <Text style={styles.hint}>Powerplay · max 2 outside</Text>
 
       {/* ── Field Diagram ──────────────────────────────────────────── */}
       <View style={styles.sectionRow}>
@@ -309,6 +312,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
           if (!p) return null;
           const isSel = selected === i;
           const isUser = id === save.userPlayerId;
+          const isCaptain = leadershipClub?.captainId === id;
+          const isViceCaptain = leadershipClub?.viceCaptainId === id;
           return (
             <Pressable
               key={id}
@@ -318,11 +323,15 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
               style={[styles.row, isSel && styles.rowSel]}
             >
               <Text style={styles.num}>{i + 1}</Text>
-              <Text style={[styles.name, isUser && { color: colors.accent }]} numberOfLines={1}>
-                {p.name}
-              </Text>
+              <View style={styles.nameCell}>
+                <Text style={[styles.name, isUser && { color: colors.accent }]} numberOfLines={1}>
+                  {p.name}
+                </Text>
+                {isCaptain ? <Text style={styles.leaderBadge}>C</Text> : null}
+                {isViceCaptain ? <Text style={styles.leaderBadge}>VC</Text> : null}
+              </View>
               <PlayerStatusBadges
-                captain={isUser && canEdit}
+                captain={save.mode !== 'manager' && isUser && canEdit}
                 injured={Boolean(p.injury)}
                 fitness={save.managerCalendar ? p.condition : p.meta.fitness}
                 mood={p.morale}
@@ -360,6 +369,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
               const p = save.players[id];
               if (!p) return null;
               const isBenchSel = selectedBenchId === id;
+              const isCaptain = leadershipClub?.captainId === id;
+              const isViceCaptain = leadershipClub?.viceCaptainId === id;
               return (
                 <Pressable
                   key={id}
@@ -369,16 +380,18 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
                     if (selected != null) swapIn(id);
                     else {
                       setSelectedBenchId(isBenchSel ? null : id);
-                      setHint(
-                        isBenchSel ? null : 'Now tap any XI player to swap with this bench player.',
-                      );
+                      setHint(isBenchSel ? null : 'Now tap an XI player to swap.');
                     }
                   }}
                   style={[styles.row, isBenchSel && styles.rowSel]}
                 >
-                  <Text style={[styles.name, { flex: 1 }]} numberOfLines={1}>
-                    {p.name}
-                  </Text>
+                  <View style={styles.nameCell}>
+                    <Text style={styles.name} numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                    {isCaptain ? <Text style={styles.leaderBadge}>C</Text> : null}
+                    {isViceCaptain ? <Text style={styles.leaderBadge}>VC</Text> : null}
+                  </View>
                   <PlayerStatusBadges
                     injured={Boolean(p.injury)}
                     fitness={save.managerCalendar ? p.condition : p.meta.fitness}
@@ -397,9 +410,7 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
       ) : null}
 
       <Text style={styles.hint}>
-        {canEdit
-          ? 'Tactics, XI and batting order save automatically for your next match.'
-          : 'This is the captain-selected XI. Your individual match approach remains under your control.'}
+        {canEdit ? 'Saved automatically' : 'Captain-selected XI'}
       </Text>
     </Screen>
   );
@@ -408,19 +419,20 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     msg: { color: colors.textMuted, fontSize: fontSize.md, marginBottom: spacing.lg },
-    finance: {
+    leadershipEntry: {
+      marginTop: spacing.md,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: spacing.md,
+      gap: spacing.md,
     },
-    financeLabel: {
-      color: colors.textMuted,
-      fontSize: fontSize.xs,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
+    leadershipCopy: { flex: 1, minWidth: 0 },
+    leadershipTitle: {
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.heavy,
     },
-    financeValue: { color: colors.accent, fontSize: fontSize.xl, fontWeight: fontWeight.black },
+    leadershipMeta: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
+    managerAction: { minWidth: 112 },
     authorityBand: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -512,7 +524,18 @@ const makeStyles = (colors: ThemeColors) =>
     },
     rowSel: { backgroundColor: colors.surfaceAlt },
     num: { color: colors.textFaint, fontSize: fontSize.sm, width: 20 },
+    nameCell: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5 },
     name: { color: colors.text, fontSize: fontSize.sm, flex: 1, fontWeight: fontWeight.medium },
+    leaderBadge: {
+      color: colors.bg,
+      backgroundColor: colors.accent,
+      fontSize: 9,
+      fontWeight: fontWeight.black,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      borderRadius: radius.pill,
+      overflow: 'hidden',
+    },
     role: { color: colors.textMuted, fontSize: fontSize.xs, width: 40, textAlign: 'right' },
     ovr: {
       color: colors.accent,

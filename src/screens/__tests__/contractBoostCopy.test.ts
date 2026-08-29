@@ -5,10 +5,9 @@ const screen = fs.readFileSync(path.join(__dirname, '..', 'ContractNegotiationSc
 const store = fs.readFileSync(path.join(__dirname, '..', '..', 'state', 'careerStore.ts'), 'utf8');
 
 describe('contract negotiation boost', () => {
-  it('shows the stored benefit and links the unowned offer to the store', () => {
-    expect(screen).toContain('Renewal boost ready');
-    expect(screen).toContain('+25% wage and signing bonus will apply when you sign.');
-    expect(screen).toContain("navigation.navigate('Purchase')");
+  it('shows the stored benefit without restoring the removed explanatory sales block', () => {
+    expect(screen).toContain('Renewal boost ready · applies when signed');
+    expect(screen).not.toContain('+25% wage and signing bonus will apply when you sign.');
   });
 
   it('applies and consumes the token in the negotiated signing action', () => {

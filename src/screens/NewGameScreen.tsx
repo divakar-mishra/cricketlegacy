@@ -8,22 +8,13 @@ export function NewGameScreen({ navigation }: ScreenProps<'NewGame'>) {
   const t = useT();
   return (
     <Screen scroll>
-      <ScreenHeader
-        title={t('newgame.title')}
-        subtitle={t('newgame.subtitle')}
-        onBack={() => navigation.goBack()}
-      />
+      <ScreenHeader title={t('newgame.title')} onBack={() => navigation.goBack()} />
 
       <ModeCard
         icon="🏏"
         title={t('newgame.playerTitle')}
-        badge="Best first run"
+        badge="Recommended"
         description={t('newgame.playerDesc')}
-        details={[
-          'Start at school level',
-          'Earn selection through matches',
-          'Auctions unlock after a real body of work',
-        ]}
         onPress={() => navigation.navigate('PlayerCreation')}
       />
 
@@ -32,11 +23,6 @@ export function NewGameScreen({ navigation }: ScreenProps<'NewGame'>) {
         title={t('newgame.managerTitle')}
         badge="Advanced"
         description={t('newgame.managerDesc')}
-        details={[
-          'Domestic T20 first',
-          'Board targets control progress',
-          'More formats unlock after promotion',
-        ]}
         onPress={() => navigation.navigate('TeamSelect')}
       />
     </Screen>
@@ -48,14 +34,12 @@ function ModeCard({
   title,
   badge,
   description,
-  details,
   onPress,
 }: {
   icon: string;
   title: string;
   badge: string;
   description: string;
-  details: string[];
   onPress: () => void;
 }) {
   const styles = useThemedStyles(makeStyles);
@@ -71,15 +55,6 @@ function ModeCard({
         </View>
       </View>
       <Text style={styles.desc}>{description}</Text>
-      <View style={styles.detailGrid}>
-        {details.map((detail) => (
-          <View key={detail} style={styles.detailPill}>
-            <Text style={styles.detailText} numberOfLines={2}>
-              {detail}
-            </Text>
-          </View>
-        ))}
-      </View>
     </Card>
   );
 }
@@ -105,19 +80,4 @@ const makeStyles = (colors: ThemeColors) =>
       paddingVertical: 3,
     },
     badgeText: { color: colors.accent, fontSize: fontSize.xs, fontWeight: fontWeight.semibold },
-    detailGrid: { marginTop: spacing.md, gap: spacing.sm },
-    detailPill: {
-      backgroundColor: colors.surfaceAlt,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radius.md,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-    },
-    detailText: {
-      color: colors.text,
-      fontSize: fontSize.xs,
-      lineHeight: 16,
-      fontWeight: fontWeight.medium,
-    },
   });

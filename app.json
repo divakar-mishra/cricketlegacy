@@ -2,6 +2,16 @@
   "expo": {
     "name": "Cricket Legacy",
     "slug": "cricket-legacy",
+    "platforms": [
+      "android"
+    ],
+    "experiments": {
+      "inlineModules": {
+        "watchedDirectories": [
+          "src/native"
+        ]
+      }
+    },
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -12,9 +22,7 @@
       "bundleIdentifier": "com.coverdrive.cricket",
       "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Cricket Legacy uses the camera for profile photos.",
-        "NSPhotoLibraryUsageDescription": "Cricket Legacy saves achievement cards to your photo library."
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -29,10 +37,16 @@
       },
       "permissions": [
         "VIBRATE",
-        "SCHEDULE_EXACT_ALARM",
         "POST_NOTIFICATIONS",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SCHEDULE_EXACT_ALARM"
       ],
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json"
@@ -42,7 +56,14 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "recordAudioAndroid": false,
+          "microphonePermission": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -66,7 +87,10 @@
         {
           "android": {
             "enabled": true,
-            "singleShareMimeTypes": ["image/*", "text/plain"]
+            "singleShareMimeTypes": [
+              "image/*",
+              "text/plain"
+            ]
           }
         }
       ],
@@ -77,6 +101,12 @@
         }
       ],
       "expo-asset"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e2af9059-0952-4706-ade0-588710a19ccd"
+      }
+    },
+    "owner": "sunlightpvt"
   }
 }

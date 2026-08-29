@@ -8,6 +8,7 @@ import {
   checkPathPromotion,
   ensurePlayerCareerResources,
   isLegend,
+  pathReadiness,
   recordPathPerformance,
   resolveCareerStageForAge,
   validateAgeEligibility,
@@ -70,6 +71,7 @@ describe('performance-based path promotion', () => {
     expect(save.teams[schoolTeamId].playerIds).not.toContain(save.userPlayerId);
     expect(save.teams[u19TeamId].playerIds).toContain(save.userPlayerId);
     expect(save.teams[seniorTeamId].playerIds).not.toContain(save.userPlayerId);
+    expect(save.playerCareerResources?.selectionGuaranteeMatches).toBe(3);
 
     save.careerPathMatches = 7;
     save.careerPathRuns = 400;
@@ -88,6 +90,7 @@ describe('performance-based path promotion', () => {
     expect(resolveCareerStageForAge(13)).toBe('SCHOOL');
     expect(resolveCareerStageForAge(14)).toBe('SCHOOL');
     expect(resolveCareerStageForAge(15)).toBe('SCHOOL');
+    expect(resolveCareerStageForAge(16)).toBe('SCHOOL');
     expect(resolveCareerStageForAge(18)).toBe('U19');
     expect(resolveCareerStageForAge(19)).toBe('U19');
     expect(resolveCareerStageForAge(20)).toBe('DOMESTIC');
@@ -106,9 +109,9 @@ describe('performance-based path promotion', () => {
     const age16 = makeSave('BATTER', 48);
     age16.careerPathLevel = 'SCHOOL';
     age16.players.user.age = 16;
-    expect(validateAgeEligibility(age16)).toBe('U19');
-    expect(validateAgeEligibility(age16)).toBe('U19');
-    expect(age16.careerPathLevel).toBe('U19');
+    expect(validateAgeEligibility(age16)).toBe('SCHOOL');
+    expect(validateAgeEligibility(age16)).toBe('SCHOOL');
+    expect(age16.careerPathLevel).toBe('SCHOOL');
   });
 
   it('promotes a SCHOOL batter who actually scores runs', () => {
@@ -123,6 +126,46 @@ describe('performance-based path promotion', () => {
     expect(res.to).toBe('U19');
   });
 
+  it.each([
+    ['BATTER' as const, 110, 0],
+    ['BOWLER' as const, 0, 7],
+    ['ALLROUNDER' as const, 90, 8],
+  ])('promotes a reasonably good SCHOOL %s through earned output', (role, runs, wickets) => {
+    const save = makeSave(role, 48);
+    save.careerPathLevel = 'SCHOOL';
+    save.careerPathMatches = 5;
+    save.careerPathRuns = runs;
+    save.careerPathWickets = wickets;
+    save.careerPathRatingSum = 5 * 6;
+
+    expect(pathReadiness(save, save.players[save.userPlayerId!])).toBeGreaterThanOrEqual(0.68);
+    expect(checkPathPromotion(save)).toMatchObject({
+      promoted: true,
+      from: 'SCHOOL',
+      to: 'U19',
+    });
+  });
+
+  it.each([
+    ['BATTER' as const, 225, 0],
+    ['BOWLER' as const, 0, 12],
+    ['ALLROUNDER' as const, 190, 11],
+  ])('promotes a reasonably good U19 %s through earned output', (role, runs, wickets) => {
+    const save = makeSave(role, 48);
+    save.careerPathLevel = 'U19';
+    save.careerPathMatches = 6;
+    save.careerPathRuns = runs;
+    save.careerPathWickets = wickets;
+    save.careerPathRatingSum = 6 * 7;
+
+    expect(pathReadiness(save, save.players[save.userPlayerId!])).toBeGreaterThanOrEqual(0.68);
+    expect(checkPathPromotion(save)).toMatchObject({
+      promoted: true,
+      from: 'U19',
+      to: 'DOMESTIC',
+    });
+  });
+
   it('does NOT promote a player with high ratings but low output (stuck)', () => {
     const save = makeSave('BATTER', 48);
     save.careerPathLevel = 'SCHOOL';
@@ -134,6 +177,21 @@ describe('performance-based path promotion', () => {
     expect(res.promoted).toBe(false); // rating alone can't carry you up
     expect(save.careerPathLevel).toBe('SCHOOL');
   });
+
+  it.each(['BATTER', 'BOWLER', 'ALLROUNDER'] as const)(
+    'does not let a high rating promote a low-output %s',
+    (role) => {
+      const save = makeSave(role, 48);
+      save.careerPathLevel = 'SCHOOL';
+      save.careerPathMatches = 6;
+      save.careerPathRuns = role === 'BOWLER' ? 0 : 20;
+      save.careerPathWickets = role === 'BATTER' ? 0 : 1;
+      save.careerPathRatingSum = 6 * 10;
+
+      expect(pathReadiness(save, save.players[save.userPlayerId!])).toBeLessThan(0.62);
+      expect(checkPathPromotion(save).promoted).toBe(false);
+    },
+  );
 
   it('fast-tracks a genuine prodigy on overall alone', () => {
     const save = makeSave('BATTER', 80); // very high overall → prodigy
@@ -157,11 +215,11 @@ describe('performance-based path promotion', () => {
     expect(save.careerPathRatingSum).toBe(0);
   });
 
-  it('ages players out of youth pathways before adult careers look broken', () => {
+  it('keeps Grade A merit-based while ageing Under-19 players into senior cricket', () => {
     const oldSchool = makeSave('BATTER', 48);
     oldSchool.careerPathLevel = 'SCHOOL';
     oldSchool.players.user.age = 16;
-    expect(checkPathPromotion(oldSchool).to).toBe('U19');
+    expect(checkPathPromotion(oldSchool).promoted).toBe(false);
 
     const oldU19 = makeSave('BATTER', 48);
     oldU19.careerPathLevel = 'U19';

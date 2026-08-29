@@ -21,7 +21,6 @@ interface ModeGuideStep {
   icon: IconName;
   title: string;
   body: string;
-  action: string;
 }
 
 interface Props {
@@ -104,11 +103,6 @@ export function ModeGuideModal({ visible, modeLabel, steps, onComplete }: Props)
             </Text>
             <Text style={styles.title}>{step.title}</Text>
             <Text style={styles.body}>{step.body}</Text>
-            <View style={styles.actionBox}>
-              <Text style={styles.actionLabel}>YOUR NEXT ACTION</Text>
-              <Text style={styles.actionText}>{step.action}</Text>
-            </View>
-
             <View style={styles.dots}>
               {steps.map((item, dotIndex) => (
                 <Pressable

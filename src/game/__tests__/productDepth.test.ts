@@ -9,6 +9,7 @@ import {
 import { resolveStoryChoice } from '../careerEvents';
 import {
   ensureSeasonPassBranding,
+  managerDomesticBlueprints,
   playerDomesticBlueprints,
   synchronizeSeasonPassBranding,
   updateSeasonPassBranding,
@@ -40,6 +41,19 @@ describe('career identities with gameplay consequences', () => {
     expect(matureLateTraining).toBeGreaterThan(earlyLateTraining);
   });
 
+  it('keeps every merit threshold attainable while preserving archetype differences', () => {
+    const save = makeCareerSave();
+
+    save.experience!.playerArchetype = 'PRODIGY';
+    expect(archetypePathPolicy(save).readiness).toBe(0.62);
+    save.experience!.playerArchetype = 'SPECIALIST';
+    expect(archetypePathPolicy(save).readiness).toBe(0.68);
+    save.experience!.playerArchetype = 'COMEBACK';
+    expect(archetypePathPolicy(save).readiness).toBe(0.67);
+    save.experience!.playerArchetype = 'LATE_BLOOMER';
+    expect(archetypePathPolicy(save).readiness).toBe(0.72);
+  });
+
   it('uses remembered agent and coach relationships in contract value', () => {
     const save = makeCareerSave();
     const base = relationshipContractMultiplier(save);
@@ -64,6 +78,17 @@ describe('career identities with gameplay consequences', () => {
 });
 
 describe('country-complete domestic worlds and premium aliases', () => {
+  it('uses ordinary alphabetic club initials instead of exposing tier and slot codes', () => {
+    for (const country of COUNTRIES) {
+      for (const blueprint of [
+        ...playerDomesticBlueprints(country.id),
+        ...managerDomesticBlueprints(country.id),
+      ]) {
+        expect(blueprint.shortName).toMatch(/^[A-Z]{2,4}$/);
+      }
+    }
+  });
+
   it('uses a visible England fallback marker instead of an unsupported blank flag', () => {
     expect(COUNTRIES.find((country) => country.id === 'england')?.flag).toBe('ENG');
   });
@@ -119,6 +144,12 @@ describe('country-complete domestic worlds and premium aliases', () => {
     expect(save.teams[teamId].name).toBe(originalTeam);
     expect(save.leagues[leagueId].name).toBe(originalLeague);
     expect(save.seasonPassBranding?.customTeamNames[teamId]).toBe('My City XI');
+
+    save.entitlements.seasonPass!.expiresAt = Date.now() + SEASON_PASS_PERIOD_MS;
+    save.entitlements.seasonPass!.premium = true;
+    synchronizeSeasonPassBranding(save);
+    expect(save.teams[teamId].name).toBe('My City XI');
+    expect(save.leagues[leagueId].name).toBe('My T20 Championship');
   });
 });
 

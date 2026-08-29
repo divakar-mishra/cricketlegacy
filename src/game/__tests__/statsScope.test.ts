@@ -1,4 +1,4 @@
-import { MatchState } from '../../domain/types';
+import { CareerCompetitionStatScope, Competition, Format, MatchState } from '../../domain/types';
 import { buildUserPlayer, createCareerSave } from '../createGame';
 import { applyMatchToStats, resetSeasonStats } from '../stats';
 
@@ -38,11 +38,12 @@ function matchFor(
   awayTeamId: string,
   batterId: string,
   bowlerId: string,
+  format: Format = 'T20',
 ): MatchState {
   return {
     id,
     seed: 1,
-    format: 'T20',
+    format,
     conditions: { pitch: 'DRY', weather: 'CLEAR' },
     homeTeamId,
     awayTeamId,
@@ -73,6 +74,31 @@ function matchFor(
 }
 
 describe('canonical scoped career stats', () => {
+  it('uses the completed match XI rather than a later mutable team XI', () => {
+    const save = makeSave();
+    const homeTeam = save.teams[save.userTeamId!];
+    const userId = save.userPlayerId!;
+    const replacementId = homeTeam.playerIds.find((id) => id !== userId)!;
+    const awayTeamId = Object.keys(save.teams).find((id) => id !== homeTeam.id)!;
+    const awayTeam = save.teams[awayTeamId];
+    const match = matchFor(
+      'benched-appearance',
+      homeTeam.id,
+      awayTeamId,
+      replacementId,
+      awayTeam.playerIds[0],
+    );
+    match.homePlayerIds = homeTeam.playerIds.filter((id) => id !== userId).slice(0, 11);
+    match.awayPlayerIds = awayTeam.playerIds.slice(0, 11);
+
+    // Selection for a future fixture must not rewrite who appeared here.
+    homeTeam.xi = [userId, ...homeTeam.playerIds.filter((id) => id !== userId)].slice(0, 11);
+    applyMatchToStats(save, match);
+
+    expect(save.players[userId].careerStats?.matches ?? 0).toBe(0);
+    expect(save.players[replacementId].careerStats?.matches).toBe(1);
+  });
+
   it('counts every selected XI member and separates domestic from international output', () => {
     const save = makeSave();
     const homeTeam = save.teams[save.userTeamId!];
@@ -118,6 +144,11 @@ describe('canonical scoped career stats', () => {
     expect(save.players[userId].careerStats).toMatchObject({ matches: 2, runs: 24 });
     expect(save.players[userId].domesticStats).toMatchObject({ matches: 1, runs: 12 });
     expect(save.players[userId].internationalStats).toMatchObject({ matches: 1, runs: 12 });
+    expect(save.players[userId].competitionStats?.DOMESTIC_T20).toMatchObject({
+      matches: 1,
+      runs: 12,
+    });
+    expect(save.players[userId].competitionStats?.T20I).toMatchObject({ matches: 1, runs: 12 });
     expect(save.players[userId].formatStats?.T20).toMatchObject({ matches: 2, runs: 24 });
     expect(save.players[userId].seasonFormatStats?.T20).toMatchObject({
       matches: 2,
@@ -127,5 +158,89 @@ describe('canonical scoped career stats', () => {
     resetSeasonStats(save);
     expect(save.players[userId].seasonFormatStats).toEqual({});
     expect(save.players[userId].formatStats?.T20).toMatchObject({ matches: 2, runs: 24 });
+  });
+
+  it('keeps Grade A, youth, domestic and international format records separate', () => {
+    const save = makeSave();
+    const homeTeam = save.teams[save.userTeamId!];
+    const userId = save.userPlayerId!;
+    homeTeam.xi = [userId, ...homeTeam.playerIds.filter((id) => id !== userId)].slice(0, 11);
+    const awayTeamId = Object.keys(save.teams).find((id) => id !== homeTeam.id)!;
+    const awayTeam = save.teams[awayTeamId];
+    awayTeam.xi = awayTeam.playerIds.slice(0, 11);
+
+    const cases: Array<{
+      scope: CareerCompetitionStatScope;
+      format: Format;
+      competition: Competition;
+      competitionId: string;
+    }> = [
+      { scope: 'GRADE_A', format: 'T20', competition: 'LEAGUE', competitionId: 'youth-u14' },
+      { scope: 'U19', format: 'ODI', competition: 'LEAGUE', competitionId: 'youth-u19' },
+      {
+        scope: 'U19_WORLD_CUP',
+        format: 'ODI',
+        competition: 'U19_WORLDCUP',
+        competitionId: 'u19-world-cup-2026',
+      },
+      {
+        scope: 'DOMESTIC_T20',
+        format: 'T20',
+        competition: 'LEAGUE',
+        competitionId: 't20-league',
+      },
+      { scope: 'LIST_A', format: 'ODI', competition: 'LEAGUE', competitionId: 'list-a' },
+      {
+        scope: 'FIRST_CLASS',
+        format: 'TEST',
+        competition: 'LEAGUE',
+        competitionId: 'first-class',
+      },
+      {
+        scope: 'T20I',
+        format: 'T20',
+        competition: 'BILATERAL_SERIES',
+        competitionId: 'international-t20',
+      },
+      {
+        scope: 'ODI',
+        format: 'ODI',
+        competition: 'BILATERAL_SERIES',
+        competitionId: 'international-odi',
+      },
+      {
+        scope: 'TEST',
+        format: 'TEST',
+        competition: 'BILATERAL_SERIES',
+        competitionId: 'international-test',
+      },
+    ];
+
+    for (const [index, item] of cases.entries()) {
+      const fixtureId = `scope-${item.scope.toLowerCase()}`;
+      save.fixtures[fixtureId] = {
+        id: fixtureId,
+        seasonId: save.currentSeasonId!,
+        format: item.format,
+        homeTeamId: homeTeam.id,
+        awayTeamId,
+        venue: 'Test Ground',
+        round: index + 1,
+        played: true,
+        competition: item.competition,
+        competitionId: item.competitionId,
+      };
+      applyMatchToStats(
+        save,
+        matchFor(fixtureId, homeTeam.id, awayTeamId, userId, awayTeam.xi[0], item.format),
+      );
+    }
+
+    for (const item of cases) {
+      expect(save.players[userId].competitionStats?.[item.scope]).toMatchObject({
+        matches: 1,
+        runs: 12,
+      });
+    }
   });
 });

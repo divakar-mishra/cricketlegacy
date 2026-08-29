@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Button, Card, LeagueTable, ProgressBar, Screen, ScreenHeader } from '../components';
 import { AppText as Text } from '../components/AppText';
+import { CareerCompetitionStatScope } from '../domain/types';
 import {
   AchievementDef,
   achievementGemReward,
@@ -27,8 +28,14 @@ import {
   ManagerLeaderboardRow,
   rankManagerRows,
 } from '../game/managerRecords';
-import { standings } from '../game/season';
-import { emptyStats } from '../game/stats';
+import {
+  allowedCompetitionIds,
+  checkManagerLevelPromotion,
+  MANAGER_LEVEL_LABEL,
+  upcomingIccEvents,
+} from '../game/managerCareer';
+import { activeCompetitionTable } from '../game/competitionTable';
+import { CAREER_COMPETITION_STAT_LABELS, emptyStats } from '../game/stats';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import { useHallOfFame } from '../state/hofStore';
@@ -45,7 +52,7 @@ import {
 
 type HofTab = 'players' | 'managers';
 type MainTab = 'records' | 'achievements' | 'hof';
-type StatView = 'all' | 'domestic' | 'international' | 'T20' | 'ODI' | 'TEST';
+type StatView = 'all' | CareerCompetitionStatScope;
 
 const TIER_COLOR: Record<string, string> = {
   bronze: '#CD7F32',
@@ -92,7 +99,8 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
   const earnedCount = earned.length;
   const gamerscore = totalGamerscore(save);
   const gamerscoreMax = maxGamerscore(save);
-  const leagueRows = save.mode === 'manager' ? standings(save) : [];
+  const managerCompetitionTable = save.mode === 'manager' ? activeCompetitionTable(save) : null;
+  const leagueRows = managerCompetitionTable?.rows ?? [];
   const managerRecords = save.mode === 'manager' ? activeManagerRecords(save) : null;
   const managerRankedRows = managerRecords
     ? rankManagerRows(managerRecords.rows, managerStatKind)
@@ -143,6 +151,102 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
       {/* ── RECORDS TAB ─────────────────────────────────────────────── */}
       {mainTab === 'records' && (
         <>
+          {save.mode === 'manager'
+            ? (() => {
+                const level = save.managerCareerLevel ?? 'CLUB';
+                const promotion = checkManagerLevelPromotion(save);
+                const year = save.currentSeasonId
+                  ? (save.seasons[save.currentSeasonId]?.year ?? 2026)
+                  : 2026;
+                const events =
+                  level === 'NATIONAL' && !save.managerCalendar ? upcomingIccEvents(year, 4) : [];
+                const accent =
+                  level === 'CLUB'
+                    ? colors.primary
+                    : level === 'STATE'
+                      ? colors.accent
+                      : level === 'ELITE'
+                        ? colors.info
+                        : colors.success;
+                return (
+                  <Animated.View entering={FadeInDown.duration(250)}>
+                    <Text style={styles.section}>Manager Career</Text>
+                    <Card style={[styles.managerCareerCard, { borderColor: accent }]}>
+                      <View style={styles.managerCareerHeader}>
+                        <Text style={[styles.managerCareerLevel, { color: accent }]}>
+                          {MANAGER_LEVEL_LABEL[level]}
+                        </Text>
+                        <Text style={styles.managerCareerMeta}>
+                          Season {(save.managerCareerSeasons ?? 0) + 1} ·{' '}
+                          {save.managerTitlesAtLevel ?? 0} titles
+                        </Text>
+                      </View>
+                      <View style={styles.managerCareerFormats}>
+                        {(['t20-league', 'list-a', 'first-class'] as const).map((id) => {
+                          const unlocked = allowedCompetitionIds(level).has(id);
+                          const label =
+                            id === 't20-league'
+                              ? 'T20'
+                              : id === 'list-a'
+                                ? 'List A'
+                                : 'First Class';
+                          return (
+                            <View
+                              key={id}
+                              style={[
+                                styles.managerCareerFormat,
+                                { borderColor: unlocked ? accent : colors.border },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.managerCareerFormatText,
+                                  { color: unlocked ? accent : colors.textFaint },
+                                ]}
+                              >
+                                {unlocked ? '✓' : '—'} {label}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                      <Text
+                        style={[
+                          styles.managerCareerStatus,
+                          promotion.promoted && { color: colors.success },
+                        ]}
+                      >
+                        {promotion.promoted
+                          ? 'Promotion available at season rollover.'
+                          : level === 'CLUB'
+                            ? 'Next: Tier 3 top two.'
+                            : level === 'STATE'
+                              ? 'Next: Tier 2 top two.'
+                              : level === 'ELITE'
+                                ? 'Next: win the Tier 1 Four-Day Shield.'
+                                : 'National level.'}
+                      </Text>
+                      {events.length ? (
+                        <View style={styles.managerIccList}>
+                          {events.map((event) => (
+                            <View key={event.id} style={styles.managerIccRow}>
+                              <Text style={[styles.managerIccYear, { color: accent }]}>
+                                {event.year}
+                              </Text>
+                              <Text style={styles.managerIccName} numberOfLines={1}>
+                                {event.name}
+                              </Text>
+                              <Text style={styles.managerIccFormat}>{event.format}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+                    </Card>
+                  </Animated.View>
+                );
+              })()
+            : null}
+
           {/* Verified player numbers, split by career scope and format. */}
           {(() => {
             if (save.mode !== 'career' || !save.userPlayerId) return null;
@@ -150,20 +254,24 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
             if (!me) return null;
             const statOptions: { key: StatView; label: string }[] = [
               { key: 'all', label: 'Overall' },
-              { key: 'domestic', label: 'Domestic' },
-              { key: 'international', label: 'International' },
-              { key: 'T20', label: 'T20' },
-              { key: 'ODI', label: 'One-Day' },
-              { key: 'TEST', label: 'First-Class' },
+              ...(
+                [
+                  'GRADE_A',
+                  'U19',
+                  'U19_WORLD_CUP',
+                  'DOMESTIC_T20',
+                  'LIST_A',
+                  'FIRST_CLASS',
+                  'T20I',
+                  'ODI',
+                  'TEST',
+                ] as CareerCompetitionStatScope[]
+              ).map((key) => ({ key, label: CAREER_COMPETITION_STAT_LABELS[key] })),
             ];
             const cs =
               statView === 'all'
                 ? me.careerStats
-                : statView === 'domestic'
-                  ? me.domesticStats
-                  : statView === 'international'
-                    ? me.internationalStats
-                    : me.formatStats?.[statView];
+                : me.competitionStats?.[statView];
             const verified = cs ?? emptyStats();
             const dismissals = Math.max(0, verified.matches - verified.notOuts);
             const avg =
@@ -238,26 +346,28 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                       </View>
                     ))}
                   </View>
-                  {(statView === 'domestic' || statView === 'international') &&
-                  save.statsScopeTrackingStartedAt ? (
-                    <Text style={styles.scopeTrackingNote}>
-                      Scoped totals are exact from the records upgrade onward; Overall preserves the
-                      complete career total.
-                    </Text>
-                  ) : null}
                 </Card>
               </Animated.View>
             );
           })()}
 
+          {save.mode === 'manager' && leagueRows.length > 0 && (
+            <Animated.View entering={FadeInDown.duration(270).delay(20)}>
+              <Text style={styles.section}>{managerCompetitionTable?.title ?? 'League Table'}</Text>
+              <Card>
+                <LeagueTable
+                  rows={leagueRows}
+                  teams={save.teams}
+                  highlightTeamId={save.userTeamId}
+                />
+              </Card>
+            </Animated.View>
+          )}
+
           {save.mode === 'manager' && managerRecords ? (
             <Animated.View entering={FadeInDown.duration(270).delay(20)}>
               <Text style={styles.section}>{managerRecords.competitionLabel} Season Leaders</Text>
               <Card style={styles.managerRecordsPanel}>
-                <Text style={styles.tableHint}>
-                  Only {managerRecords.competitionLabel} performances from the current season are
-                  included. Players from your managed team are highlighted in gold.
-                </Text>
                 <View style={styles.managerStatTabs}>
                   {(
                     [
@@ -299,30 +409,11 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                     ))}
                   </View>
                 ) : (
-                  <Text style={styles.empty}>
-                    No exact {managerRecords.competitionLabel} performances have been recorded in
-                    this season yet. This table updates after the next completed match.
-                  </Text>
+                  <Text style={styles.empty}>No performances yet.</Text>
                 )}
               </Card>
             </Animated.View>
           ) : null}
-
-          {save.mode === 'manager' && leagueRows.length > 0 && (
-            <Animated.View entering={FadeInDown.duration(270).delay(20)}>
-              <Text style={styles.section}>League Table</Text>
-              <Card>
-                <Text style={styles.tableHint}>
-                  P W L T NR Pts NRR are rebuilt from the canonical standings.
-                </Text>
-                <LeagueTable
-                  rows={leagueRows}
-                  teams={save.teams}
-                  highlightTeamId={save.userTeamId}
-                />
-              </Card>
-            </Animated.View>
-          )}
 
           <Animated.View entering={FadeInDown.duration(300).delay(40)}>
             <Text style={styles.section}>🏆 Trophy Cabinet</Text>
@@ -353,7 +444,7 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                 </View>
               ) : (
                 <Card>
-                  <Text style={styles.empty}>No trophies won by your club yet.</Text>
+                  <Text style={styles.empty}>No trophies yet.</Text>
                 </Card>
               )
             ) : rec?.titles.length ? (
@@ -370,7 +461,7 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
               </View>
             ) : (
               <Card>
-                <Text style={styles.empty}>No champions crowned yet — go win some silverware.</Text>
+                <Text style={styles.empty}>No champions yet.</Text>
               </Card>
             )}
           </Animated.View>
@@ -424,7 +515,7 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                   if (pct >= 0.9) return '🏆 Legendary completionist';
                   if (pct >= 0.6) return '🥇 Elite collector';
                   if (pct >= 0.3) return '🥈 Rising achiever';
-                  return '🎯 Just getting started — keep earning achievements';
+                  return 'No achievements yet';
                 })()}
               </Text>
             </Card>
@@ -564,9 +655,6 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.hofHeaderTitle}>Hall of Fame</Text>
-                <Text style={styles.hofHeaderSub}>
-                  Player and manager legacies are ranked separately across saved careers.
-                </Text>
               </View>
             </View>
 
@@ -640,9 +728,7 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                 style={{ marginTop: spacing.sm }}
               />
               <Text style={styles.managerQualificationNote}>
-                Hall score {Math.round(activeManagerScore)} / {MANAGER_HOF_MIN_SCORE}. A trophy or
-                promotion grants immediate qualification; league finishes, win rate and legendary
-                players also build the score.
+                Hall score {Math.round(activeManagerScore)} / {MANAGER_HOF_MIN_SCORE}
               </Text>
             </Card>
           ) : null}
@@ -832,10 +918,7 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
               <Card style={styles.hofEmpty}>
                 <Text style={styles.hofEmptyIcon}>🏛️</Text>
                 <Text style={styles.hofEmptyTitle}>The Hall Awaits</Text>
-                <Text style={styles.hofEmptyText}>
-                  No legends enshrined yet. Complete a career season to earn your place among the
-                  greats.
-                </Text>
+                <Text style={styles.hofEmptyText}>No legends yet.</Text>
               </Card>
             )
           ) : managerHofEntries.length ? (
@@ -924,8 +1007,7 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                         />
                       </View>
                       <Text style={styles.hofSeasons}>
-                        {e.seasons ?? 0} season{(e.seasons ?? 0) !== 1 ? 's' : ''} managed | Club
-                        trophies, league finishes, win rate and elite players produced.
+                        {e.seasons ?? 0} season{(e.seasons ?? 0) !== 1 ? 's' : ''} managed
                       </Text>
                     </View>
                     <View
@@ -1089,6 +1171,42 @@ const makeStyles = (colors: ThemeColors) =>
     },
     statViewButtonTextActive: { color: colors.primaryLight },
     managerRecordsPanel: { paddingVertical: spacing.sm },
+    managerCareerCard: { borderWidth: 1.5 },
+    managerCareerHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    managerCareerLevel: { flex: 1, fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
+    managerCareerMeta: { color: colors.textFaint, fontSize: fontSize.xs },
+    managerCareerFormats: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
+    managerCareerFormat: {
+      flex: 1,
+      minHeight: 34,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.xs,
+    },
+    managerCareerFormatText: { fontSize: fontSize.xs, fontWeight: fontWeight.bold },
+    managerCareerStatus: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: spacing.md },
+    managerIccList: {
+      marginTop: spacing.md,
+      paddingTop: spacing.sm,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    managerIccRow: {
+      minHeight: 34,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    managerIccYear: { width: 38, fontSize: fontSize.sm, fontWeight: fontWeight.black },
+    managerIccName: { flex: 1, minWidth: 0, color: colors.text, fontSize: fontSize.sm },
+    managerIccFormat: { color: colors.textMuted, fontSize: fontSize.xs },
     managerStatTabs: {
       flexDirection: 'row',
       flexWrap: 'wrap',

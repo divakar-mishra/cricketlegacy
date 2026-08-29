@@ -70,6 +70,28 @@ export function addGems(wallet: Wallet, amount: number): Wallet {
   return { ...wallet, gems: Math.max(0, wallet.gems + amount) };
 }
 
+export const PLAYER_GEM_TO_COIN_RATE = 40;
+export const PLAYER_GEM_CONVERSION_PRESETS = [25, 100, 300] as const;
+
+export function playerGemConversionCoins(gems: number): number {
+  const spend = Math.max(0, Math.floor(gems));
+  return (PLAYER_GEM_CONVERSION_PRESETS as readonly number[]).includes(spend)
+    ? spend * PLAYER_GEM_TO_COIN_RATE
+    : 0;
+}
+
+/** One-way Player Career conversion. Mode enforcement belongs to careerStore. */
+export function convertPlayerGemsToCoins(wallet: Wallet, gems: number): Wallet | null {
+  const spend = Math.max(0, Math.floor(gems));
+  const coins = playerGemConversionCoins(spend);
+  if (coins <= 0 || wallet.gems < spend) return null;
+  return {
+    ...wallet,
+    gems: wallet.gems - spend,
+    coins: wallet.coins + coins,
+  };
+}
+
 /** Refill energy to full (a gems sink). Returns null if unaffordable/at max. */
 export const ENERGY_REFILL_GEMS = 10;
 export function refillEnergyWithGems(wallet: Wallet, now = Date.now()): Wallet | null {
@@ -88,11 +110,17 @@ export interface MatchPerformance {
   wickets?: number;
 }
 
-export function matchReward(won: boolean, tie: boolean, performance?: MatchPerformance): number {
+export function matchReward(
+  won: boolean,
+  tie: boolean,
+  performance?: MatchPerformance,
+  profile: 'PLAYER' | 'MANAGER' = 'PLAYER',
+): number {
+  const rewards = profile === 'MANAGER' ? ECONOMY.managerMatchCoins : ECONOMY.matchCoins;
   let base: number;
-  if (won) base = ECONOMY.matchCoins.win;
-  else if (tie) base = ECONOMY.matchCoins.tie;
-  else base = ECONOMY.matchCoins.loss;
+  if (won) base = rewards.win;
+  else if (tie) base = rewards.tie;
+  else base = rewards.loss;
   return base + performanceBonus(performance);
 }
 

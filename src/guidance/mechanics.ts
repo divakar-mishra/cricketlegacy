@@ -14,6 +14,7 @@ export type GuidanceTopicId =
   | 'ffp-wage-cap'
   | 'facilities'
   | 'first-class-stamina'
+  | 'manager-training'
   | 'player-condition'
   | 'condition-and-morale'
   | 'injuries'
@@ -46,19 +47,19 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     id: 'career-path',
     category: 'career',
     title: 'Career Progression',
-    summary: 'Your age and performances control each step from school cricket to senior caps.',
+    summary: 'Performance drives every step from Grade A cricket to senior caps.',
     bullets: [
-      'Ages 14-15 play school cricket, ages 16-19 play U19 cricket, and age 20 enters the senior domestic pyramid.',
+      'You begin Grade A cricket at 16. Strong performances can earn Under-19 selection through age 18; from 19, Grade A form can earn a direct domestic contract.',
       'Youth promotion is performance-led. Senior progression moves from Tier 3 through Tier 2 to Tier 1.',
       'International selection is earned through domestic output and reputation, not a fixed number of seasons.',
     ],
-    keywords: ['school', 'u19', 'domestic', 'tier', 'promotion', 'career'],
+    keywords: ['grade a', 'u19', 'domestic', 'tier', 'promotion', 'career'],
   },
   {
     id: 'selection-formula',
     category: 'career',
     title: 'Selection Formula',
-    summary: 'Selectors compare you with healthy same-role rivals before every domestic fixture.',
+    summary: 'Before each domestic fixture, selectors compare you with healthy same-role rivals.',
     bullets: [
       'Base score: Overall 40% + Form 35% + Coach Trust 25%, refined by format readiness and current condition.',
       'A 10.0 match rating adds 20 Form, 15 Confidence and 15 Coach Trust, then guarantees the next appearance.',
@@ -70,8 +71,7 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     id: 'u19-readiness',
     category: 'career',
     title: 'U19 Readiness',
-    summary:
-      'Readiness rewards sustained match output while still valuing strong all-round performances.',
+    summary: 'Readiness rewards sustained output and strong all-round performances.',
     bullets: [
       'Readiness is 75% match output and 25% average match rating, with at least six U19 appearances normally required.',
       'Full output benchmarks are 320 runs for batters and 16 wickets for bowlers.',
@@ -83,7 +83,7 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     id: 'international-caps',
     category: 'career',
     title: 'International Eligibility',
-    summary: 'Eligibility can expand, but the first senior cap permanently fixes your allegiance.',
+    summary: 'Eligibility can expand; your first senior cap permanently locks allegiance.',
     bullets: [
       'Birth nationality remains permanently eligible.',
       'Three domestic seasons in another country can add that country as an international option.',
@@ -95,7 +95,7 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     id: 'pitch-conditions',
     category: 'match',
     title: 'Pitch and Weather',
-    summary: 'Venue conditions alter the balance between batting, pace and spin on every delivery.',
+    summary: 'Conditions shift the balance between batting, pace and spin on every ball.',
     bullets: [
       'Green or overcast conditions support seam movement; dry, dusty and cracked surfaces increasingly reward spin.',
       'Powerplays, death overs and match format add separate scoring and wicket-pressure modifiers.',
@@ -107,7 +107,7 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     id: 'tactical-modifiers',
     category: 'match',
     title: 'Tactical Modifiers',
-    summary: 'Bowling plans and fields directly change ball-outcome probabilities.',
+    summary: 'Plans and fields change ball-outcome probabilities.',
     bullets: [
       'CONTAIN raises dot-ball weight by 14%, cuts four and six weights by 18% and 22%, and lowers wicket weight by 5%.',
       'ATTACK raises wicket weight by 20%, but raises four and six weights by 8% and reduces dot-ball weight by 5%.',
@@ -119,8 +119,7 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     id: 'format-adaptability',
     category: 'match',
     title: 'Format Adaptability',
-    summary:
-      'Switching between white-ball and red-ball cricket can temporarily reduce match readiness.',
+    summary: 'Switching between white- and red-ball cricket can temporarily lower match readiness.',
     bullets: [
       'White-ball matches build tempo; First-Class and Test matches build red-ball memory.',
       'Low adaptability increases the temporary penalty when switching between red-ball and white-ball blocks.',
@@ -190,6 +189,18 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     keywords: ['facility', 'training', 'medical', 'academy', 'upkeep'],
   },
   {
+    id: 'manager-training',
+    category: 'club',
+    title: 'Training Intensity',
+    summary: 'Choose the balance between squad development and recovery.',
+    bullets: [
+      'Light prioritizes recovery and carries no base training-injury risk.',
+      'Normal balances development with condition recovery.',
+      'High accelerates development but provides less recovery and increases fatigue risk.',
+    ],
+    keywords: ['manager', 'training', 'intensity', 'light', 'normal', 'high', 'recovery'],
+  },
+  {
     id: 'first-class-stamina',
     category: 'physicality',
     title: 'First-Class Workload',
@@ -205,8 +216,7 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     id: 'player-condition',
     category: 'physicality',
     title: 'Player Match Condition',
-    summary:
-      'Long formats and heavy personal workloads require deliberate recovery in Player Career.',
+    summary: 'Long formats and heavy workloads require planned recovery.',
     bullets: [
       'A First-Class or Test appearance has a 25-point base condition load, plus up to 10 points from balls faced and bowled.',
       'Age-based recovery offsets 6 points through age 22, 4 through age 29, 2 through age 32, and none after that.',
@@ -218,11 +228,11 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     id: 'condition-and-morale',
     category: 'physicality',
     title: 'Condition and Morale',
-    summary: 'Manager selections carry a real performance cost when warning signs are ignored.',
+    summary: 'Readiness changes gradually as condition and morale rise or fall.',
     bullets: [
-      'A player below 55 condition or below 45 morale receives a 15% temporary attribute penalty in manager matches.',
+      'Condition below the healthy range applies a growing temporary match penalty rather than a sudden cliff.',
+      'Morale adds a smaller positive or negative adjustment across its full range.',
       'Condition is short-term match readiness; fitness is the underlying physical attribute.',
-      'Rest, rotation and recovery resources improve readiness without changing match results retroactively.',
     ],
     keywords: ['condition', 'fitness', 'morale', 'penalty', 'recovery'],
   },
@@ -230,7 +240,7 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     id: 'injuries',
     category: 'physicality',
     title: 'Injuries and Recovery',
-    summary: 'Injury risk grows when exhausted players are repeatedly selected.',
+    summary: 'Repeatedly selecting exhausted players increases injury risk.',
     bullets: [
       'First-Class workload can create a two-match strain; shorter-format fatigue strains normally cost one match.',
       'Risk begins below 45 condition and increases as condition falls.',
@@ -242,7 +252,7 @@ export const GUIDANCE_TOPICS: readonly GuidanceTopic[] = [
     id: 'age-development',
     category: 'physicality',
     title: 'Age Development',
-    summary: 'Growth slows with age before gradual and then sharper decline begins.',
+    summary: 'Growth slows with age before decline begins.',
     bullets: [
       'Players grow fastest through age 25, then improve more slowly through age 29.',
       'A gradual decline applies from ages 30-32; decline becomes stronger from age 33 onward.',

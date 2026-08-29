@@ -9,6 +9,18 @@ export const MAX_SLOTS = 6;
 const LAST_PLAYED_KEY = 'sg:lastPlayed';
 const slotKey = (mode: GameMode, slot: number): string => `sg:${mode}:${slot}`;
 const bakKey = (mode: GameMode, slot: number): string => `sg:${mode}:${slot}:bak`;
+const slotOperationQueues = new Map<string, Promise<void>>();
+
+function enqueueSlotOperation(key: string, operation: () => Promise<void>): Promise<void> {
+  const previous = slotOperationQueues.get(key) ?? Promise.resolve();
+  const queued = previous.catch(() => undefined).then(operation);
+  slotOperationQueues.set(key, queued);
+  const cleanup = () => {
+    if (slotOperationQueues.get(key) === queued) slotOperationQueues.delete(key);
+  };
+  void queued.then(cleanup, cleanup);
+  return queued;
+}
 
 export interface SlotView {
   slot: number;
@@ -28,9 +40,9 @@ export async function loadSave(mode: GameMode, slot: number): Promise<SaveGame |
   return backup ? runMigrations(backup) : null;
 }
 
-export async function writeSave(mode: GameMode, slot: number, save: SaveGame): Promise<void> {
-  save.updatedAt = Date.now();
+async function writeSaveNow(mode: GameMode, slot: number, save: SaveGame): Promise<void> {
   const key = slotKey(mode, slot);
+  save.updatedAt = Date.now();
   // Roll the last-known-good primary into the backup before overwriting it, so a
   // failure mid-write leaves a recoverable previous state.
   const prev = await getJSON<unknown>(key);
@@ -39,9 +51,24 @@ export async function writeSave(mode: GameMode, slot: number, save: SaveGame): P
   await setJSON(key, wrapSave(save));
 }
 
-export async function deleteSave(mode: GameMode, slot: number): Promise<void> {
-  await removeKey(slotKey(mode, slot));
-  await removeKey(bakKey(mode, slot));
+/**
+ * Serialize writes per slot. Gameplay can request several saves in quick
+ * succession; without a queue, an older AsyncStorage write may finish after a
+ * newer one and roll the slot backwards.
+ */
+export function writeSave(mode: GameMode, slot: number, save: SaveGame): Promise<void> {
+  const key = slotKey(mode, slot);
+  return enqueueSlotOperation(key, () => writeSaveNow(mode, slot, save));
+}
+
+export function deleteSave(mode: GameMode, slot: number): Promise<void> {
+  const key = slotKey(mode, slot);
+  return enqueueSlotOperation(key, async () => {
+    // Wait behind any pending save for this slot so a late write cannot
+    // resurrect a career after the player confirms deletion.
+    await removeKey(key);
+    await removeKey(bakKey(mode, slot));
+  });
 }
 
 export async function listSlots(mode: GameMode): Promise<SlotView[]> {

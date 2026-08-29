@@ -6,7 +6,12 @@
 import { STORY_EVENTS } from '../content/storyEvents';
 import { Player, RelationshipMemory, SaveGame } from '../domain/types';
 import { makeRng, Rng } from '../engine/rng';
-import { careerTier, TIER_LABEL } from './career';
+import {
+  careerTier,
+  PLAYER_RETIREMENT_OPTIONAL_AGE,
+  playerRetirementAssessment,
+  TIER_LABEL,
+} from './career';
 import { archetypeLegacyEnding } from './careerArchetypes';
 import {
   AppliedEffect,
@@ -22,6 +27,50 @@ import {
   StoryTrigger,
 } from './narrative';
 
+const DEFERRED_STORY_KEY = '__deferred_story_event_ids';
+
+function deferredStoryIds(save: SaveGame): string[] {
+  const raw = save.story?.strings?.[DEFERRED_STORY_KEY];
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeDeferredStoryIds(save: SaveGame, ids: string[]): void {
+  if (!save.story) return;
+  save.story.strings ??= {};
+  if (ids.length > 0) save.story.strings[DEFERRED_STORY_KEY] = JSON.stringify(ids);
+  else delete save.story.strings[DEFERRED_STORY_KEY];
+}
+
+/** Repair old saves that accumulated several optional youth stories at once. */
+export function normalizePendingStoryQueue(save: SaveGame): void {
+  ensureCareerDepth(save);
+  if (!save.story || save.story.pendingEventIds.length <= 1) return;
+  const [current, ...overflow] = save.story.pendingEventIds;
+  const deferred = [...deferredStoryIds(save), ...overflow].filter(
+    (id, index, all) => id !== current && all.indexOf(id) === index,
+  );
+  save.story.pendingEventIds = [current];
+  writeDeferredStoryIds(save, deferred);
+}
+
+/** Release at most one preserved story after a later match, never immediately. */
+export function releaseDeferredStoryAfterMatch(save: SaveGame): boolean {
+  normalizePendingStoryQueue(save);
+  if (!save.story || save.story.pendingEventIds.length > 0) return false;
+  const deferred = deferredStoryIds(save);
+  const next = deferred.shift();
+  if (!next) return false;
+  save.story.pendingEventIds.push(next);
+  writeDeferredStoryIds(save, deferred);
+  return true;
+}
+
 function currentYear(save: SaveGame): number {
   return (save.currentSeasonId ? save.seasons[save.currentSeasonId]?.year : undefined) ?? 2026;
 }
@@ -34,8 +83,20 @@ function baseContext(save: SaveGame, trigger: StoryTrigger): StoryContext | null
 }
 
 /** Queue at most one event for a trigger (respecting once/conditions/weights). */
-export function queueStoryForTrigger(save: SaveGame, trigger: StoryTrigger, rng: Rng, extra?: Partial<StoryContext>): boolean {
+export function queueStoryForTrigger(
+  save: SaveGame,
+  trigger: StoryTrigger,
+  rng: Rng,
+  extra?: Partial<StoryContext>,
+): boolean {
   ensureCareerDepth(save);
+  normalizePendingStoryQueue(save);
+  // Youth matchday deliberately remains playable while a story is waiting.
+  // Do not let one unresolved beat grow into a four-card backlog across the
+  // next fixtures; story chains can still queue their single direct follow-up.
+  if ((save.story?.pendingEventIds.length ?? 0) > 0 || deferredStoryIds(save).length > 0) {
+    return true;
+  }
   const ctx = baseContext(save, trigger);
   if (!ctx) return false;
   Object.assign(ctx, extra);
@@ -144,7 +205,12 @@ export interface ChoiceResult {
 }
 
 /** Apply a chosen option: mutate the save, record the beat, advance the inbox. */
-export function resolveStoryChoice(save: SaveGame, eventId: string, choiceId: string, rng: Rng): ChoiceResult {
+export function resolveStoryChoice(
+  save: SaveGame,
+  eventId: string,
+  choiceId: string,
+  rng: Rng,
+): ChoiceResult {
   const event = findEvent(eventId);
   if (!event) return { ok: false };
   const choice = event.choices.find((c) => c.id === choiceId);
@@ -185,20 +251,13 @@ export function resolveStoryChoice(save: SaveGame, eventId: string, choiceId: st
     if (memories.length > 40) memories.length = 40;
     (save.experience ??= {}).relationshipMemories = memories;
   }
-  addTimeline(save, { year: currentYear(save), kind: 'STORY', text: `${renderText(event.title, save)}: ${resultText}` });
+  addTimeline(save, {
+    year: currentYear(save),
+    kind: 'STORY',
+    text: `${renderText(event.title, save)}: ${resultText}`,
+  });
   markSeen(save, eventId);
   return { ok: true, resultText, applied };
-}
-
-/* ---------------- Sponsor / endorsement economy ---------------- */
-
-/** Pay out per-match endorsement money (called after each match the user plays). */
-export function paySponsorsForMatch(save: SaveGame): number {
-  const sponsors = save.sponsors ?? [];
-  if (!sponsors.length) return 0;
-  const total = sponsors.reduce((s, sp) => s + sp.perMatchCoins, 0);
-  if (total > 0) save.wallet.coins += total;
-  return total;
 }
 
 /**
@@ -233,11 +292,13 @@ export function rolloverSponsors(save: SaveGame): { expired: string[]; lost: str
 /* ---------------- Retirement & New Game+ ---------------- */
 
 export function canRetire(user: Player): boolean {
-  return user.age >= 33;
+  return user.age >= PLAYER_RETIREMENT_OPTIONAL_AGE;
 }
 
-export function shouldPromptRetirement(user: Player): boolean {
-  return canRetire(user) && user.overall <= 62;
+export function shouldPromptRetirement(user: Player, save?: SaveGame): boolean {
+  return save
+    ? playerRetirementAssessment(save).recommended || Boolean(save.flags.playerRetirementRecommended)
+    : canRetire(user) && user.overall <= 62;
 }
 
 /**

@@ -1,10 +1,15 @@
 import { memo, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { avatarFromLegacy, normalizeAvatarConfig } from '../avatar';
+import { avatarFromSeed, normalizeAvatarConfig } from '../avatar';
 import type { AvatarConfig } from '../avatar';
-import type { AvatarCustomization } from '../domain/types';
 import { AppText } from './AppText';
-import { LayeredAvatar } from './avatar';
+import { PortraitAvatar } from './avatar';
+import {
+  AvatarSponsorBadges,
+  PortraitSponsorPrint,
+  type SponsorBrandRef,
+} from './SponsorBranding';
+import { largeAvatarBrandingLayout } from './sponsorAvatarLayout';
 
 type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -24,11 +29,10 @@ interface Props {
   size?: AvatarSize;
   showRole?: boolean;
   legendary?: boolean;
-  kitColor?: string;
   config?: Partial<AvatarConfig> | null;
-  /** Kept during schema-30 rollout so old saves always have a visual fallback. */
-  customization?: AvatarCustomization;
   profileFrame?: string;
+  earnedSponsor?: SponsorBrandRef;
+  premiumSponsor?: SponsorBrandRef;
   testID?: string;
 }
 
@@ -41,23 +45,30 @@ function PlayerAvatarComponent({
   showRole = false,
   legendary = false,
   config,
-  customization,
   profileFrame,
+  earnedSponsor,
+  premiumSponsor,
   testID,
 }: Props) {
   const px = SIZE_MAP[size];
   const safeConfig = useMemo(
-    () =>
-      config
-        ? normalizeAvatarConfig(config)
-        : avatarFromLegacy(customization, undefined, profileFrame),
-    [config, customization, profileFrame],
+    () => (config ? normalizeAvatarConfig(config) : avatarFromSeed(name, 'male', profileFrame)),
+    [config, name, profileFrame],
   );
   const activeFrame = legendary ? 'frame_gold' : profileFrame;
+  const largeLayout =
+    px >= SIZE_MAP.lg
+      ? largeAvatarBrandingLayout({
+          avatarSize: px,
+          hasEarned: Boolean(earnedSponsor),
+          hasPremium: Boolean(premiumSponsor),
+          showRole,
+        })
+      : undefined;
 
   return (
     <View style={[styles.wrap, { width: px, height: px }]}>
-      <LayeredAvatar
+      <PortraitAvatar
         config={safeConfig}
         size={px}
         frameId={activeFrame}
@@ -65,9 +76,39 @@ function PlayerAvatarComponent({
         accessibilityLabel={`${name} player avatar`}
         testID={testID}
       />
+      {largeLayout ? (
+        <PortraitSponsorPrint
+          earned={earnedSponsor}
+          premium={premiumSponsor}
+          layout={largeLayout}
+        />
+      ) : (
+        <AvatarSponsorBadges
+          earned={earnedSponsor}
+          premium={premiumSponsor}
+          avatarSize={px}
+          reserveRoleSpace={showRole}
+        />
+      )}
       {showRole ? (
-        <View style={[styles.roleBadge, { backgroundColor: secondaryColor }]}>
-          <AppText style={[styles.roleText, { fontSize: Math.max(7, px * 0.1) }]}>
+        <View
+          style={[
+            styles.roleBadge,
+            largeLayout?.role
+              ? {
+                  left: largeLayout.role.x,
+                  top: largeLayout.role.y,
+                  width: largeLayout.role.width,
+                  height: largeLayout.role.height,
+                }
+              : styles.roleBadgeCompact,
+            { backgroundColor: secondaryColor },
+          ]}
+        >
+          <AppText
+            numberOfLines={1}
+            style={[styles.roleText, { fontSize: Math.max(7, px * 0.1) }]}
+          >
             {ROLE_ICON[role] ?? 'PLR'}
           </AppText>
         </View>
@@ -82,8 +123,14 @@ const styles = StyleSheet.create({
   wrap: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
   roleBadge: {
     position: 'absolute',
-    bottom: 2,
+    zIndex: 5,
     borderRadius: 99,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleBadgeCompact: {
+    right: 2,
+    bottom: 2,
     paddingHorizontal: 5,
     paddingVertical: 1,
   },

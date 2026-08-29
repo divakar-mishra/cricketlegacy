@@ -1,8 +1,15 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
-import { Button, Screen, ScreenHeader, SelectableCard, AppText as Text } from '../components';
-import { COUNTRIES, getCountry } from '../data/countries';
+import {
+  Button,
+  CountrySelect,
+  Screen,
+  ScreenHeader,
+  SelectableCard,
+  AppText as Text,
+} from '../components';
+import { getCountry } from '../data/countries';
 import { Difficulty } from '../domain/types';
 import { createManagerSave } from '../game/createGame';
 import { managerDomesticBlueprints } from '../game/domesticBranding';
@@ -20,49 +27,62 @@ export function TeamSelectScreen({ navigation, route }: ScreenProps<'TeamSelect'
   const [countryId, setCountryId] = useState('india');
   const [teamId, setTeamId] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty>('NORMAL');
+  const [creating, setCreating] = useState(false);
   const teams = managerDomesticBlueprints(countryId).filter((team) => team.tier === 3);
 
   const create = async () => {
-    if (!teamId) return;
-    const slots = await listSlots('manager');
-    const slot = route?.params?.slot ?? firstFreeSlot(slots);
-    if (!slot) {
-      Alert.alert('All slots full', 'Delete a manager save from Saved Games first.', [
-        { text: 'OK', onPress: () => navigation.navigate('SavedGames') },
-      ]);
-      return;
+    if (!teamId || creating) return;
+    setCreating(true);
+    try {
+      const slots = await listSlots('manager');
+      const slot = route?.params?.slot ?? firstFreeSlot(slots);
+      if (!slot) {
+        Alert.alert('All slots full', 'Delete a manager save from Saved Games first.', [
+          { text: 'OK', onPress: () => navigation.navigate('SavedGames') },
+        ]);
+        return;
+      }
+      const save = createManagerSave({
+        teamId,
+        country: countryId,
+        difficulty,
+        format: 'T20',
+      });
+      await writeSave('manager', slot, save);
+      await setLastPlayed('manager', slot);
+      setActive(save, 'manager', slot);
+      analytics.setUserProperty('mode', 'manager');
+      analytics.logEvent(analytics.EVT.CAREER_START, { mode: 'manager', difficulty });
+      navigation.reset({ index: 1, routes: [{ name: 'MainMenu' }, { name: 'ManagerHub' }] });
+    } catch {
+      Alert.alert(
+        'Career not created',
+        'The device did not confirm the first save. Check available storage and try again.',
+      );
+    } finally {
+      setCreating(false);
     }
-    const save = createManagerSave({
-      teamId,
-      country: countryId,
-      difficulty,
-      format: 'T20',
-    });
-    await writeSave('manager', slot, save);
-    await setLastPlayed('manager', slot);
-    setActive(save, 'manager', slot);
-    analytics.setUserProperty('mode', 'manager');
-    analytics.logEvent(analytics.EVT.CAREER_START, { mode: 'manager', difficulty });
-    navigation.reset({ index: 1, routes: [{ name: 'MainMenu' }, { name: 'ManagerHub' }] });
   };
 
   return (
     <Screen
       scroll
       footer={
-        <Button
-          label="Start Managing"
-          variant="gold"
-          disabled={!teamId}
-          onPress={() => void create()}
-        />
+        <View>
+          {!teamId ? (
+            <Text style={styles.footerHint}>Select a Tier 3 club above to start managing.</Text>
+          ) : null}
+          <Button
+            label="Start Managing"
+            variant="gold"
+            disabled={!teamId || creating}
+            loading={creating}
+            onPress={() => void create()}
+          />
+        </View>
       }
     >
-      <ScreenHeader
-        title="Choose your club"
-        subtitle="Manager career"
-        onBack={() => navigation.goBack()}
-      />
+      <ScreenHeader title="Choose your club" onBack={() => navigation.goBack()} />
 
       <Text style={styles.label}>Difficulty</Text>
       <View style={styles.chips}>
@@ -84,36 +104,18 @@ export function TeamSelectScreen({ navigation, route }: ScreenProps<'TeamSelect'
       </View>
 
       <View style={styles.progressNote}>
-        <Text style={styles.progressNoteTitle}>You start in Tier 3</Text>
-        <Text style={styles.progressNoteText}>
-          Rookie managers play the March-May T20 block while the 50-over and four-day seasons run
-          automatically. Finish in the top two to reach Tier 2 and unlock the 50-over calendar.
-        </Text>
+        <Text style={styles.progressNoteTitle}>Tier 3 · T20</Text>
       </View>
 
       <Text style={[styles.label, styles.sectionGap]}>Country</Text>
-      <View style={styles.chips}>
-        {COUNTRIES.map((country) => {
-          const selected = country.id === countryId;
-          return (
-            <Pressable
-              key={country.id}
-              onPress={() => {
-                setCountryId(country.id);
-                setTeamId(null);
-              }}
-              style={[styles.chip, selected && styles.chipActive]}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              accessibilityLabel={country.name}
-            >
-              <Text style={[styles.chipText, selected && styles.chipTextActive]}>
-                {country.name}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <CountrySelect
+        value={countryId}
+        onChange={(nextCountryId) => {
+          setCountryId(nextCountryId);
+          setTeamId(null);
+        }}
+        testID="manager-country-select"
+      />
 
       <Text style={[styles.label, styles.sectionGap]}>Tier 3 clubs</Text>
       {teams.map((team) => (
@@ -132,6 +134,12 @@ export function TeamSelectScreen({ navigation, route }: ScreenProps<'TeamSelect'
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    footerHint: {
+      color: colors.warning,
+      fontSize: fontSize.xs,
+      marginBottom: spacing.sm,
+      textAlign: 'center',
+    },
     label: {
       color: colors.textMuted,
       fontSize: fontSize.sm,

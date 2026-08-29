@@ -104,10 +104,25 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // EAS injects the remote keystore values into this config on its
+        // builder. Keeping the declaration here also lets the QA variant
+        // select it while Gradle evaluates this file.
+        release {
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
+        }
+        qa {
+            // Standalone internal-testing APK: embed the JavaScript bundle and
+            // use release runtime behavior, while keeping debug signing and
+            // store-release legal/signing gates reserved for `release`.
+            initWith release
+            signingConfig System.getenv("EAS_BUILD") == "true"
+                ? signingConfigs.release
+                : signingConfigs.debug
+            matchingFallbacks = ['release']
         }
         release {
             // Caution! In production, you need to generate your own keystore file.
@@ -129,6 +144,20 @@ android {
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+}
+
+// Store release builds must never bypass the same legal-page readiness gate
+// used by EAS and tagged CI releases. Debug builds stay available while launch
+// policy choices and hosted URLs are intentionally incomplete.
+def checkLegalReadinessForRelease = tasks.register("checkLegalReadinessForRelease", Exec) {
+    workingDir rootDir.parentFile
+    commandLine "node", new File(rootDir.parentFile, "scripts/check-legal-readiness.mjs").absolutePath
+}
+
+tasks.configureEach { task ->
+    if (task.name == "preReleaseBuild") {
+        task.dependsOn checkLegalReadinessForRelease
     }
 }
 

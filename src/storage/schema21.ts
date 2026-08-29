@@ -13,7 +13,7 @@ import {
 } from '../generation/world';
 import { ensurePlayerCareerResources } from '../game/career';
 import { syncThreeTierLeagues } from '../game/divisions';
-import { generateInternationalWindowFixtures } from '../game/intlCalendar';
+import { prepareInternationalCalendar } from '../game/intlCalendar';
 import { buildPlayerSeasonCalendar } from '../game/playerCalendar';
 import { ensureCompetitionFixtures } from '../game/season';
 
@@ -232,6 +232,6 @@ export function synchronizeSchema21State(save: SaveGame): void {
   addThirdPlayerTier(save);
   ensureCompetitionFixtures(save, 'list-a');
   ensureCompetitionFixtures(save, 'first-class');
-  if (save.capped) generateInternationalWindowFixtures(save);
+  if (save.capped) prepareInternationalCalendar(save);
   buildPlayerSeasonCalendar(save);
 }

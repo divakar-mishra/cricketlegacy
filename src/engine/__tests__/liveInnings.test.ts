@@ -69,6 +69,48 @@ describe('LiveInnings (stepwise controller)', () => {
     ).toBeGreaterThanOrEqual(12);
   });
 
+  it('never records a selected specialist Bowler appearance without a spell', () => {
+    const specialist = {
+      ...away.players[4],
+      role: 'BOWLER' as const,
+      bowlingStyle: 'PACE' as const,
+    };
+    const input = {
+      ...inningsInput(),
+      bowlingXI: away.players.map((player, index) => (index === 4 ? specialist : player)),
+      preferredAllRounderId: specialist.id,
+    };
+    const seed = seedFor(48);
+    const auto = simulateInnings(input, makeRng(seed));
+    const live = new LiveInnings(
+      { ...input, interactiveBowlerId: specialist.id },
+      makeRng(seed),
+    ).runToEnd();
+
+    expect(auto.bowling.find((card) => card.playerId === specialist.id)?.balls).toBeGreaterThanOrEqual(
+      12,
+    );
+    expect(live.bowling.find((card) => card.playerId === specialist.id)?.balls).toBeGreaterThanOrEqual(
+      12,
+    );
+  });
+
+  it('does not apply Player Career assistance to the whole XI when the focus player is absent', () => {
+    const seed = seedFor(49);
+    const neutral = simulateInnings(inningsInput(), makeRng(seed));
+    const scoped = simulateInnings(
+      {
+        ...inningsInput(),
+        outcomeBalance: { wicket: 0.5, scoring: 1.3 },
+        outcomeBalanceScope: 'STRIKER',
+        outcomeBalancePlayerId: 'not-in-this-xi',
+      },
+      makeRng(seed),
+    );
+
+    expect(scoped).toEqual(neutral);
+  });
+
   it('treats an all-rounder minimum spell as a floor rather than an overs cap', () => {
     const elite = {
       ...away.players[4],

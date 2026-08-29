@@ -68,9 +68,15 @@ export function archetypeTrainingMultiplier(
       return player.meta.fitness < 60 ? 0.92 : 1.15;
     case 'SPECIALIST':
     default: {
-      const signature =
-        player.role === 'BOWLER' ? 'bowling' : player.role === 'ALLROUNDER' ? undefined : 'batting';
-      return signature == null || group === signature ? 1.18 : 0.96;
+      // All-rounders must develop eleven role-defining batting/bowling
+      // attributes instead of a specialist's five or six. They retain a
+      // workload allowance, but it is deliberately below the old 1.35/1.70
+      // curve that drove all three audited careers to exactly 92 OVR.
+      if (player.role === 'ALLROUNDER') {
+        return save.careerPathLevel === 'SCHOOL' || save.careerPathLevel === 'U19' ? 1.25 : 1.55;
+      }
+      const signature = player.role === 'BOWLER' ? 'bowling' : 'batting';
+      return group === signature ? 1.27 : 0.96;
     }
   }
 }
@@ -113,13 +119,13 @@ export function archetypePathPolicy(save: SaveGame): {
 } {
   switch (archetype(save)) {
     case 'PRODIGY':
-      return { readiness: 0.68, matchAdjustment: -1, fastTrackAdjustment: -3 };
+      return { readiness: 0.62, matchAdjustment: -1, fastTrackAdjustment: -3 };
     case 'LATE_BLOOMER':
-      return { readiness: 0.8, matchAdjustment: 1, fastTrackAdjustment: 5 };
+      return { readiness: 0.72, matchAdjustment: 1, fastTrackAdjustment: 5 };
     case 'COMEBACK':
-      return { readiness: 0.74, matchAdjustment: 0, fastTrackAdjustment: 1 };
+      return { readiness: 0.67, matchAdjustment: 0, fastTrackAdjustment: 1 };
     default:
-      return { readiness: 0.75, matchAdjustment: 0, fastTrackAdjustment: 0 };
+      return { readiness: 0.68, matchAdjustment: 0, fastTrackAdjustment: 0 };
   }
 }
 

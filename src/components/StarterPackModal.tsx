@@ -62,21 +62,19 @@ export function StarterPackModal({ visible, onPurchase, onDismiss }: Props) {
           </LinearGradient>
 
           <Text style={[styles.title, { color: colors.text }]}>Starter Pack</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Optional support for the next chapter of your career
-          </Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>Optional support</Text>
 
           {/* Rewards list */}
           <View style={styles.rewardsList}>
             <RewardRow
               icon="wallet-outline"
               label="3,000 Coins"
-              desc="Train and prepare for upcoming fixtures"
+              desc="Training and match preparation"
             />
             <RewardRow
               icon="diamond-outline"
               label="50 Gems"
-              desc="Unlock cosmetics or capped convenience"
+              desc="Cosmetics or capped convenience"
             />
             <RewardRow icon="ban-outline" label="Remove Ads" desc="Ad-free for 7 days" />
           </View>
@@ -84,7 +82,7 @@ export function StarterPackModal({ visible, onPurchase, onDismiss }: Props) {
           {/* Pricing */}
           <View style={styles.priceRow}>
             <View style={styles.saveBadge}>
-              <Text style={styles.saveText}>ONE PER CAREER</Text>
+              <Text style={styles.saveText}>ONE PER ACCOUNT</Text>
             </View>
           </View>
 
@@ -96,13 +94,11 @@ export function StarterPackModal({ visible, onPurchase, onDismiss }: Props) {
             onPress={handlePurchase}
           />
           <Text style={[styles.oneTime, { color: colors.textMuted }]}>
-            Google Play shows the localized price before purchase.
+            Google Play shows the price before purchase.
           </Text>
 
           <Pressable onPress={onDismiss} style={styles.dismissBtn} hitSlop={12}>
-            <Text style={[styles.dismissText, { color: colors.textMuted }]}>
-              No thanks, maybe later
-            </Text>
+            <Text style={[styles.dismissText, { color: colors.textMuted }]}>Maybe later</Text>
           </Pressable>
         </Animated.View>
       </Animated.View>

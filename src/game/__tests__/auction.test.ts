@@ -46,19 +46,20 @@ describe('franchise auction — real wages', () => {
     makeAuctionEligible(save);
     save.brand = 60;
     save.userCaps = 20;
-    save.players.user.contract = { wage: 40_000, yearsLeft: 1 };
+    save.franchiseContract = { wage: 40_000, yearsLeft: 1 };
     const offers = generateAuctionOffers(save, makeRng(7));
     expect(offers.length).toBeGreaterThan(0);
     for (const o of offers) {
-      expect(o.wagePromise).toBeGreaterThan(save.players.user.contract!.wage);
+      expect(o.wagePromise).toBeGreaterThan(save.franchiseContract.wage);
     }
   });
 
-  it('accepting sets the promised wage as a real, multi-year contract and moves club', () => {
+  it('accepting creates a separate multi-year T20 contract without moving the domestic club', () => {
     const save = makeCareer(75);
     const fromTeam = save.userTeamId!;
     const otherId = Object.keys(save.teams).find((id) => id !== fromTeam)!;
     save.players.user.contract = { wage: 30_000, yearsLeft: 1 };
+    save.franchiseContract = { wage: 30_000, yearsLeft: 1 };
     save.auctionOffers = [
       { teamId: otherId, fee: 500_000, signingBonus: 1_000, wagePromise: 80_000 },
     ];
@@ -66,9 +67,11 @@ describe('franchise auction — real wages', () => {
 
     const res = acceptAuctionOffer(save, otherId);
     expect(res.ok).toBe(true);
-    expect(save.userTeamId).toBe(otherId);
-    expect(save.players.user.contract!.wage).toBe(80_000);
-    expect(save.players.user.contract!.yearsLeft).toBeGreaterThanOrEqual(3);
+    expect(save.userTeamId).toBe(fromTeam);
+    expect(save.franchiseTeamId).toBe(otherId);
+    expect(save.players.user.contract!.wage).toBe(30_000);
+    expect(save.franchiseContract!.wage).toBe(80_000);
+    expect(save.franchiseContract!.yearsLeft).toBeGreaterThanOrEqual(3);
     expect(save.auctionOffers).toBeUndefined();
     expect(nextUserFixtureId(save)).toBeUndefined();
     expect(currentPlayerCalendarEvent(save)?.kind).toBe('TRAINING');
@@ -77,11 +80,11 @@ describe('franchise auction — real wages', () => {
   it('never downgrades a player already on a bigger wage', () => {
     const save = makeCareer(75);
     const otherId = Object.keys(save.teams).find((id) => id !== save.userTeamId)!;
-    save.players.user.contract = { wage: 120_000, yearsLeft: 2 };
+    save.franchiseContract = { wage: 120_000, yearsLeft: 2 };
     save.auctionOffers = [
       { teamId: otherId, fee: 500_000, signingBonus: 1_000, wagePromise: 80_000 },
     ];
     acceptAuctionOffer(save, otherId);
-    expect(save.players.user.contract!.wage).toBe(120_000); // kept the higher wage
+    expect(save.franchiseContract!.wage).toBe(120_000);
   });
 });

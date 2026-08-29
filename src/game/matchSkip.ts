@@ -1,7 +1,7 @@
 export type MatchDriveMode = 'WATCH' | 'KEY' | 'INSTANT' | null;
 
 export type CareerSkipAction =
-  | { kind: 'SKIP_TO_BATTING'; label: 'Skip to My Batting' }
+  | { kind: 'SKIP_TO_BATTING'; label: 'Skip to my batting' }
   | { kind: 'SKIP_BOWLING_INNINGS'; label: 'Skip Bowling Innings' }
   | { kind: 'SKIP_REST_OF_INNINGS'; label: 'Skip Rest of Innings' };
 
@@ -27,14 +27,16 @@ export function careerSkipAction(state: CareerSkipState): CareerSkipAction | nul
   if (state.userSelected === false || state.userCanStillBat === false) return null;
   if (state.userAtCrease) return null;
   if (!state.userTeamBatting) {
-    return { kind: 'SKIP_BOWLING_INNINGS', label: 'Skip Bowling Innings' };
+    // Keep this as one continuous request: finish the opposition innings, then
+    // continue until the career player actually reaches the crease.
+    return { kind: 'SKIP_TO_BATTING', label: 'Skip to my batting' };
   }
 
   if (state.userDismissed) {
     return { kind: 'SKIP_REST_OF_INNINGS', label: 'Skip Rest of Innings' };
   }
 
-  return { kind: 'SKIP_TO_BATTING', label: 'Skip to My Batting' };
+  return { kind: 'SKIP_TO_BATTING', label: 'Skip to my batting' };
 }
 
 /** Keep a single skip request alive when the user's batting innings comes next. */

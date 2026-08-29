@@ -4,17 +4,9 @@
  * social proof, gem sinks list, and full product hierarchy.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-  ZoomIn,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Circle, Path, Rect } from 'react-native-svg';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
@@ -26,16 +18,24 @@ import {
   Screen,
   ScreenHeader,
   Skeleton,
+  SponsorLogo,
   WalletBar,
 } from '../components';
 import { ScreenProps } from '../navigation';
 import { accountPurchases, ads, purchases } from '../services';
 import { ECONOMY } from '../data/gameConfig';
-import { areAdsRemoved } from '../game/economy';
-import { contractOffer, weeklyWage } from '../game/career';
+import {
+  areAdsRemoved,
+  ENERGY_REFILL_GEMS,
+  PLAYER_GEM_CONVERSION_PRESETS,
+  PLAYER_GEM_TO_COIN_RATE,
+  playerGemConversionCoins,
+} from '../game/economy';
+import { contractOffer } from '../game/career';
 import { formatClubCurrency } from '../game/finance';
 import { facilityUpgradeCost } from '../game/manager';
 import { isSeasonPassActive } from '../game/seasonPass';
+import { premiumSponsorStoreUnlocked, premiumSponsorWeeklyRate } from '../game/sponsorship';
 import { useIsCompact } from '../hooks/useResponsive';
 import { useCareer } from '../state/careerStore';
 import {
@@ -143,6 +143,8 @@ const PRODUCT_ICON_NAME: Partial<Record<string, React.ComponentProps<typeof Ioni
   facility_upgrade_token: 'business',
   recovery_pack: 'fitness',
   transfer_budget_sm: 'cash',
+  player_save_sponsor: 'shirt',
+  manager_save_sponsor: 'shirt',
   remove_ads: 'shield-checkmark',
 };
 
@@ -154,10 +156,22 @@ const PRODUCT_ACCENT: Record<string, string> = {
   facility_upgrade_token: '#E8B332',
   recovery_pack: '#30D070',
   transfer_budget_sm: '#E8B332',
+  player_save_sponsor: '#E8B332',
+  manager_save_sponsor: '#E8B332',
   remove_ads: '#E5484D',
 };
 
 function ProductIcon({ product }: { product: purchases.Product }) {
+  if (purchases.isSaveSponsorProduct(product.id)) {
+    return (
+      <SponsorLogo
+        brand={{ brandId: 'legacy_crown', brandName: 'Legacy Crown' }}
+        variant="badge"
+        size={32}
+        label="Legacy Crown permanent sponsor"
+      />
+    );
+  }
   if (product.kind === 'coins') return <CoinIcon />;
   if (product.kind === 'gems') return <GemIcon />;
   const iconName = PRODUCT_ICON_NAME[product.id];
@@ -169,31 +183,16 @@ function ProductIcon({ product }: { product: purchases.Product }) {
 
 // ─── Trust bar ────────────────────────────────────────────────────────────────
 
-function TrustBar() {
+function TrustBar({ storeName }: { storeName: string }) {
   const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.proofBar}>
-      <Text style={styles.proofText}>
-        Purchases secured by Google Play · All prices include taxes
-      </Text>
+      <Text style={styles.proofText}>Purchases handled by {storeName}</Text>
     </View>
   );
 }
 
 // ─── Product row ──────────────────────────────────────────────────────────────
-
-const BADGES: Record<string, { label: string; color: string }> = {
-  coins_large: { label: 'Best Value', color: '#31A85A' },
-  gems_large: { label: 'Best Value', color: '#31A85A' },
-  season_pass: { label: 'Most Popular', color: '#4C9AFF' },
-  remove_ads: { label: 'Premium', color: '#E9B23B' },
-  starter_pack: { label: '🔥 Limited', color: '#E5484D' },
-};
-
-const SAVINGS: Record<string, string> = {
-  coins_large: 'Save 25%',
-  gems_large: 'Save 15%',
-};
 
 const PURCHASE_ERROR_MESSAGE: Record<string, string> = {
   already_active: 'This pass is already active.',
@@ -203,40 +202,50 @@ const PURCHASE_ERROR_MESSAGE: Record<string, string> = {
   facilities_maxed: 'Every club facility is already fully upgraded.',
   season_limit_reached: 'This season’s transfer-budget boost is already used.',
   manager_save_required: 'This item requires an active Manager Career save.',
+  club_operations_paused: 'Club operations are paused during national duty.',
   player_career_required: 'This item requires an active Player Career save.',
   purchase_in_progress: 'Another purchase is already being processed.',
+  already_owned_for_save: 'This save already owns its permanent sponsor.',
+  sponsorship_not_unlocked: 'Sponsorship has not unlocked in this career yet.',
+  save_sponsor_checkout_not_ready: 'Secure per-save checkout is not available yet.',
+  active_save_changed: 'The active save changed, so nothing was applied.',
+  persistence_failed: 'The device did not confirm the purchase save. Please try again.',
 };
 
 function ProductRow({
   p,
   busy,
   onBuy,
-  badge,
-  saving,
   valueNote,
   owned,
   unavailableReason,
+  hideUnavailableReason = false,
+  unavailableLabel,
+  benefits,
   delay = 0,
 }: {
   p: purchases.Product;
   busy: string | null;
   onBuy: () => void;
-  badge?: { label: string; color: string };
-  saving?: string;
   valueNote?: string;
   owned?: boolean;
   unavailableReason?: string;
+  hideUnavailableReason?: boolean;
+  unavailableLabel: string;
+  benefits: readonly string[];
   delay?: number;
 }) {
   const styles = useThemedStyles(makeStyles);
-  const compact = useIsCompact();
+  const { colors } = useTheme();
+  const compact = useIsCompact(560);
+  const [showDetails, setShowDetails] = useState(false);
   const available = purchases.isProductAvailable(p) && !unavailableReason;
   const action = (
     <Button
-      label={owned ? 'Owned ✓' : available ? p.priceString : 'Unavailable'}
+      label={owned ? 'Owned ✓' : available ? p.priceString : unavailableLabel}
       size="sm"
       variant={owned ? 'secondary' : 'gold'}
-      fullWidth={false}
+      fullWidth={compact}
       loading={busy === p.id}
       disabled={!available || owned || (busy != null && busy !== p.id)}
       onPress={onBuy}
@@ -247,43 +256,75 @@ function ProductRow({
   return (
     <Animated.View entering={FadeInDown.duration(260).delay(delay)}>
       <GlassSurface intensity={0.5} padded={false} style={styles.itemGlass}>
-        <View style={styles.itemInner}>
-          <View
-            style={[styles.itemIcon, { backgroundColor: `${PRODUCT_ACCENT[p.id] ?? '#E8B332'}14` }]}
-          >
-            <ProductIcon product={p} />
-          </View>
-          <View style={styles.itemCopy}>
-            <View style={styles.titleRow}>
-              <Text style={styles.itemTitle} numberOfLines={2}>
-                {p.title}
-              </Text>
-              {badge && (
-                <View
-                  style={[
-                    styles.badgePill,
-                    { backgroundColor: `${badge.color}22`, borderColor: badge.color },
-                  ]}
+        <Animated.View key={showDetails ? 'details' : 'front'} entering={ZoomIn.duration(160)}>
+          {showDetails ? (
+            <View style={styles.itemDetails}>
+              <View style={styles.detailsHeader}>
+                <Text style={styles.itemTitle}>{p.title}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show ${p.title} front`}
+                  hitSlop={10}
+                  onPress={() => setShowDetails(false)}
+                  style={styles.infoButton}
                 >
-                  <Text style={[styles.badgePillText, { color: badge.color }]}>{badge.label}</Text>
-                </View>
-              )}
+                  <Ionicons name="arrow-back" size={18} color={colors.textMuted} />
+                </Pressable>
+              </View>
+              <View style={styles.benefitList}>
+                {benefits.map((benefit) => (
+                  <View key={benefit} style={styles.benefitRow}>
+                    <Ionicons name="checkmark-circle" size={17} color={colors.success} />
+                    <Text style={styles.benefitText}>{benefit}</Text>
+                  </View>
+                ))}
+              </View>
+              {action}
             </View>
-            <Text style={styles.itemDesc} numberOfLines={compact ? 3 : 2}>
-              {p.description}
-            </Text>
-            {valueNote ? <Text style={styles.itemValue}>{valueNote}</Text> : null}
-            {saving && <Text style={styles.itemSaving}>{saving}</Text>}
-            {!available && (
-              <Text style={styles.unavailableText}>
-                {unavailableReason ??
-                  'Google Play pricing is unavailable. Try again when connected.'}
-              </Text>
-            )}
-            {compact ? action : null}
-          </View>
-          {!compact ? action : null}
-        </View>
+          ) : (
+            <View style={styles.itemInner}>
+              <View
+                style={[
+                  styles.itemIcon,
+                  { backgroundColor: `${PRODUCT_ACCENT[p.id] ?? '#E8B332'}14` },
+                ]}
+              >
+                <ProductIcon product={p} />
+              </View>
+              <View style={styles.itemCopy}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.itemTitle} numberOfLines={2}>
+                    {p.title}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`What is included in ${p.title}`}
+                    hitSlop={10}
+                    onPress={() => setShowDetails(true)}
+                    style={styles.infoButton}
+                  >
+                    <Ionicons name="information" size={18} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+                <Text style={styles.itemDesc} numberOfLines={1}>
+                  {p.description}
+                </Text>
+                {valueNote ? (
+                  <Text style={styles.itemValue} numberOfLines={1}>
+                    {valueNote}
+                  </Text>
+                ) : null}
+                {!available && !owned && !hideUnavailableReason && (
+                  <Text style={styles.unavailableText}>
+                    {unavailableReason ?? 'Price unavailable. Try again later.'}
+                  </Text>
+                )}
+                {compact ? action : null}
+              </View>
+              {!compact ? action : null}
+            </View>
+          )}
+        </Animated.View>
       </GlassSurface>
     </Animated.View>
   );
@@ -294,26 +335,22 @@ function ProductRow({
 export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
   const save = useCareer((s) => s.save);
   const purchaseProduct = useCareer((s) => s.purchaseProduct);
+  const restorePurchases = useCareer((s) => s.restorePurchases);
   const grantAdEnergy = useCareer((s) => s.grantAdEnergy);
+  const refillEnergy = useCareer((s) => s.refillEnergy);
+  const convertPlayerGems = useCareer((s) => s.convertPlayerGems);
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [products, setProducts] = useState<purchases.Product[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [starterPackOwned, setStarterPackOwned] = useState(true);
+  const [expandedFeatureCard, setExpandedFeatureCard] = useState<string | null>(null);
   const rewardedEnergyPendingRef = useRef(false);
   const rewardedEnergyAttemptRef = useRef(0);
-
-  // Subtle pulse animation for the starter offer badge
-  const pulse = useSharedValue(1);
-  useEffect(() => {
-    pulse.value = withRepeat(
-      withSequence(withTiming(1.04, { duration: 600 }), withTiming(1, { duration: 600 })),
-      -1,
-      true,
-    );
-  }, [pulse]);
-  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
+  const storeSetupPending = !purchases.MOCK_MODE && !purchases.isStoreReady();
+  const unavailableLabel = storeSetupPending ? 'Coming soon' : 'Unavailable';
+  const storeName = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
 
   // The one-time Starter Pack starts only after the first completed match.
   const [nowTs, setNowTs] = useState(Date.now());
@@ -351,7 +388,7 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
 
   const removeAds = areAdsRemoved(save?.entitlements);
 
-  const onBuy = async (p: purchases.Product) => {
+  const completePurchase = async (p: purchases.Product) => {
     if (p.id === 'remove_ads' && removeAds) return;
     setBusy(p.id);
     const res = await purchaseProduct(p.id);
@@ -360,8 +397,86 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
     Alert.alert(
       res.ok ? 'Purchase complete ✓' : 'Purchase failed',
       res.ok
-        ? `${p.title} applied to your account.`
+        ? purchases.isSaveSponsorProduct(p.id)
+          ? `${p.title} is now bound to this save.`
+          : `${p.title} applied to your account.`
         : (PURCHASE_ERROR_MESSAGE[res.error ?? ''] ?? res.error ?? 'Please try again.'),
+    );
+  };
+
+  const onRestorePurchases = async () => {
+    if (busy != null) return;
+    setBusy('restore_purchases');
+    try {
+      const result = await restorePurchases();
+      switch (result.status) {
+        case 'RESTORED':
+          Alert.alert(
+            'Purchases restored',
+            `${result.count} purchase${result.count === 1 ? '' : 's'} restored to this save.`,
+          );
+          break;
+        case 'NOTHING_TO_RESTORE':
+          Alert.alert(
+            'Nothing to restore',
+            `No active permanent upgrade or Season Pass was found for this ${storeName} account.`,
+          );
+          break;
+        case 'NOTHING_APPLICABLE':
+          Alert.alert(
+            'Nothing applied',
+            'Your restorable purchases do not apply to this career mode right now.',
+          );
+          break;
+        case 'NOT_CONFIGURED':
+          Alert.alert(
+            'Store unavailable',
+            `${storeName} purchases are not connected in this build.`,
+          );
+          break;
+        case 'ACTIVE_SAVE_CHANGED':
+          Alert.alert('Restore stopped', 'The active save changed. Open the Store and try again.');
+          break;
+        case 'PERSISTENCE_FAILED':
+          Alert.alert(
+            'Restore not saved',
+            'The device could not save the restored access. Try again.',
+          );
+          break;
+        case 'NO_SAVE':
+          Alert.alert('No active career', 'Open a career before restoring purchases.');
+          break;
+        default:
+          Alert.alert(
+            'Restore failed',
+            `Could not reach ${storeName}. Check your connection and try again.`,
+          );
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onBuy = (p: purchases.Product) => {
+    if (!purchases.isSaveSponsorProduct(p.id)) {
+      void completePurchase(p);
+      return;
+    }
+    const careerName =
+      save?.mode === 'career' && save.userPlayerId
+        ? save.players[save.userPlayerId]?.name
+        : save?.userTeamId
+          ? save.teams[save.userTeamId]?.name
+          : undefined;
+    const targetSave = careerName ? `${careerName}’s save` : 'this save';
+    Alert.alert(
+      'Bind sponsor to this save?',
+      `${p.priceString} permanently adds the extra sponsor slot to ${targetSave}. It cannot move to another save or mode. Signed-in recovery can restore this exact save after reinstall or device loss. Choosing Delete Save permanently destroys its server backup and sponsor binding.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: `Buy ${p.priceString}`, onPress: () => void completePurchase(p) },
+      ],
+      { cancelable: true },
     );
   };
 
@@ -381,7 +496,6 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
   const legendProduct = legendProductId
     ? products.find((p) => p.id === legendProductId)
     : undefined;
-  const energyProduct = products.find((p) => p.id === 'energy_refill');
   const coinProducts = products.filter((p) => p.id === 'coins_medium' || p.id === 'coins_large');
   const gemProducts = products.filter((p) => p.id === 'gems_medium' || p.id === 'gems_large');
   const energyLow = (save?.wallet.energy ?? 30) <= 8;
@@ -390,9 +504,14 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
     userPlayer && (userPlayer.meta.form < 70 || userPlayer.meta.confidence < 65),
   );
   const modeProductIds = save ? purchases.MODE_STORE_PRODUCT_IDS[save.mode] : [];
+  const saveSponsorUnlocked = save ? premiumSponsorStoreUnlocked(save) : false;
+  const ownedSaveSponsorProductId = save?.sponsorship?.premium?.productId;
   const modeProducts = products.filter(
     (product) =>
       (modeProductIds as readonly string[]).includes(product.id) &&
+      (!purchases.isSaveSponsorProduct(product.id) ||
+        saveSponsorUnlocked ||
+        ownedSaveSponsorProductId === product.id) &&
       (product.id !== 'form_recovery' || needsFormRecovery),
   );
   const sharedProducts = products.filter((product) =>
@@ -423,39 +542,158 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
   const valueNoteFor = (product: purchases.Product): string | undefined => {
     switch (product.id) {
       case 'training_accelerator':
-        return `Immediate value: 3 sessions at 3x gains · ${acceleratorCharges}/6 charges stored`;
+        return `${acceleratorCharges}/6 charges stored`;
       case 'contract_boost': {
         if (!nextContractOffer) return 'Applies automatically to the next Player Career renewal.';
-        const boostedWeekly = weeklyWage(Math.round(nextContractOffer.wage * 1.25));
-        const baseWeekly = weeklyWage(nextContractOffer.wage);
+        const boostedSeason = Math.round(nextContractOffer.wage * 1.25);
         const bonusGain = Math.round(nextContractOffer.signingBonus * 0.25);
-        return `Projected next deal: +₹${Math.max(0, boostedWeekly - baseWeekly).toLocaleString()}/week · +${bonusGain.toLocaleString()} coins`;
+        return `Next deal: +${Math.max(0, boostedSeason - nextContractOffer.wage).toLocaleString()} salary coins · +${bonusGain.toLocaleString()} bonus coins`;
       }
       case 'form_recovery':
         return userPlayer
           ? `Immediate: form ${Math.round(userPlayer.meta.form)}→${Math.max(70, Math.round(userPlayer.meta.form))} · confidence ${Math.round(userPlayer.meta.confidence)}→${Math.max(65, Math.round(userPlayer.meta.confidence))}`
           : undefined;
       case 'scout_full_reveal':
-        return 'One selected player · exact OVR, condition and valuation';
+        return undefined;
       case 'facility_upgrade_token':
         return facilitiesMaxed
           ? undefined
-          : `One level instantly · saves at least ${formatClubCurrency(nextFacilitySaving)} club budget`;
+          : `1 level · saves at least ${formatClubCurrency(nextFacilitySaving)}`;
       case 'recovery_pack':
         return lowConditionPlayers > 0
-          ? `${lowConditionPlayers} tired player${lowConditionPlayers === 1 ? '' : 's'} can receive +20 condition, +20 fitness and +15 morale`
-          : 'Every eligible squad player can receive +20 condition, +20 fitness and +15 morale';
+          ? `${lowConditionPlayers} tired player${lowConditionPlayers === 1 ? '' : 's'} eligible`
+          : 'All eligible squad players covered';
       case 'transfer_budget_sm':
-        return `Immediate: +${formatClubCurrency(500_000)} transfer budget · once per season · FFP wage ceiling unchanged`;
+        return undefined;
+      case 'player_save_sponsor':
+        return save
+          ? `Current rate: ${premiumSponsorWeeklyRate(save).toLocaleString()} coins per qualifying week`
+          : undefined;
+      case 'manager_save_sponsor':
+        if (save?.managerCareerLevel === 'NATIONAL' && ownedSaveSponsorProductId === product.id) {
+          return 'Owned · payments paused during national duty · resumes with next domestic club';
+        }
+        return save
+          ? `Current rate: ${formatClubCurrency(premiumSponsorWeeklyRate(save))} per qualifying week`
+          : undefined;
       case 'remove_ads':
-        return 'Permanent · 60-energy cap · +20% match coins in Player and Manager careers';
+        return undefined;
       default:
         return undefined;
     }
   };
+  const benefitsFor = (product: purchases.Product): readonly string[] => {
+    switch (product.id) {
+      case 'starter_pack':
+        return ['3,000 Wallet Coins', '50 Gems', 'Seven ad-free days'];
+      case 'coins_medium':
+        return ['10,000 Wallet Coins in the active save'];
+      case 'coins_large':
+        return ['20,000 Wallet Coins in the active save'];
+      case 'gems_medium':
+        return ['300 Gems in the active save'];
+      case 'gems_large':
+        return ['1,200 Gems in the active save'];
+      case 'bundle_legend':
+        return [
+          '40,000 Wallet Coins and 1,200 Gems',
+          'Permanent ad removal and a 60-energy cap',
+          'All kit colours and the Legend avatar frame',
+          'Does not buy stats, selection, trophies or Hall of Fame entry',
+        ];
+      case 'manager_legend_pack':
+        return [
+          'Board confidence raised to at least 82 and club reputation +3',
+          'Two full-scout tokens, one facility token and one squad-conditioning token',
+          'Legend boardroom presentation',
+          'Does not buy results, trophies or Hall of Fame entry',
+        ];
+      case 'season_pass':
+        return [
+          'Thirty days of Premium access across every save',
+          'Premium rewards across all 20 tiers',
+          'Every Player and Manager save keeps separate XP and reward claims',
+          'League and club naming editor while Premium is active',
+          'Active access removes ads for the pass period',
+        ];
+      case 'remove_ads':
+        return [
+          'Permanent ad removal',
+          'Training Focus capacity increased to 60',
+          '20% more Wallet Coins from match rewards',
+        ];
+      case 'training_accelerator':
+        return [
+          '1.5× attribute gains on the next three paid training sessions',
+          'Up to six charges can be stored',
+        ];
+      case 'contract_boost':
+        return [
+          '25% higher wage and signing bonus on the next Player Career renewal',
+          'Consumed only when that contract is signed',
+        ];
+      case 'form_recovery':
+        return [
+          'Immediately raises form to at least 70',
+          'Immediately raises confidence to at least 65',
+          'Does not change permanent attributes',
+        ];
+      case 'scout_full_reveal':
+        return [
+          'One full-scout token',
+          'Reveals overall, form, fitness, injury status and value for one transfer target',
+        ];
+      case 'facility_upgrade_token':
+        return [
+          'One level for Training Ground, Medical Centre or Academy',
+          'Club Balance upgrades remain available',
+          'Normal facility upkeep still applies',
+        ];
+      case 'recovery_pack':
+        return [
+          'One squad-conditioning token',
+          '+20 condition, +20 fitness and +15 morale for eligible non-injured players',
+          'Does not heal injuries',
+        ];
+      case 'transfer_budget_sm':
+        return [
+          '$500,000 added to the current club budget',
+          'Limited to once per in-game season',
+          'Unavailable during national-team duty',
+        ];
+      case 'player_save_sponsor':
+        return [
+          'A permanent extra kit-sponsor slot for this Player save',
+          `${save ? premiumSponsorWeeklyRate(save).toLocaleString() : 'Stature-scaled'} Wallet Coins per qualifying week`,
+          'Rate scales with career stature; one official match qualifies the week',
+          'Sponsor branding appears dynamically on supported kit surfaces',
+        ];
+      case 'manager_save_sponsor':
+        return [
+          'A permanent extra kit-sponsor slot for this Manager save',
+          `${save ? formatClubCurrency(premiumSponsorWeeklyRate(save)) : 'Stature-scaled income'} added to Club Balance per qualifying week`,
+          'Rate scales with manager stature; one official match qualifies the week',
+          'Payments pause during national duty and resume at the next domestic club',
+        ];
+      default:
+        return product.description.split(' · ').filter(Boolean);
+    }
+  };
   const unavailableReason = (product: purchases.Product): string | undefined => {
+    if (
+      (product.id === 'transfer_budget_sm' || product.id === 'manager_legend_pack') &&
+      save?.mode === 'manager' &&
+      save.managerCareerLevel === 'NATIONAL'
+    ) {
+      return 'Unavailable during national duty.';
+    }
     if (!purchases.isProductAvailable(product)) {
-      return 'Google Play pricing is unavailable. Try again when connected.';
+      return storeSetupPending
+        ? `${storeName} checkout will activate after product setup is finished.`
+        : 'Price unavailable. Try again later.';
+    }
+    if (purchases.isSaveSponsorProduct(product.id) && !purchases.isSaveSponsorCheckoutReady()) {
+      return 'Secure save binding is not ready. Checkout remains disabled.';
     }
     if (
       product.id === 'training_accelerator' &&
@@ -500,27 +738,6 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
     save?.mode === 'manager' ? 'MANAGER LEGACY EDITION' : 'PLAYER LEGEND EDITION';
   const legendBundleTitle =
     save?.mode === 'manager' ? 'Build a Dynasty' : 'The Ultimate Player Edition';
-  const legendPerks =
-    save?.mode === 'manager'
-      ? [
-          '👑 Permanent Manager-only Legend backing',
-          '🏛 Exclusive Legend Boardroom presentation',
-          '📋 Board confidence lifted to at least 82',
-          '🔍 2 Full Scout Intelligence tokens',
-          '🏗 1 free Facility Upgrade token',
-          '💪 1 Squad Conditioning token',
-          '🧾 Recorded as premium manager assistance',
-          '🚫 No purchased results, trophies or Hall of Fame entry',
-        ]
-      : [
-          '👑 Exclusive Legend Avatar Frame',
-          '🎽 Premium Kit - all team colours unlocked',
-          '💎 600 Gems + 20,000 Coins instantly',
-          '🚫 Remove Ads - forever',
-          '⚡ Double Energy Cap (60) - always',
-          '🎨 Permanent Player Career cosmetics',
-          '🚫 No purchased stats, selection, trophies or Hall of Fame entry',
-        ];
   const rewardedEnergyAvailable = ads.isAdsReady() || ads.isReady('rewarded');
 
   const onWatchEnergyAd = async () => {
@@ -553,16 +770,63 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
     }
   };
 
+  const onRefillEnergy = () => {
+    const result = refillEnergy();
+    Alert.alert(
+      result.ok ? 'Energy refilled' : 'Cannot refill',
+      result.ok
+        ? `Energy restored to ${ECONOMY.energyMax}.`
+        : `You need ${ENERGY_REFILL_GEMS} gems and less than full energy.`,
+    );
+  };
+
+  const confirmGemConversion = (gems: number) => {
+    const coins = playerGemConversionCoins(gems);
+    Alert.alert(
+      'Convert gems?',
+      `${gems} gems will become ${coins.toLocaleString()} Wallet Coins. This cannot be reversed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Convert',
+          onPress: () => {
+            void (async () => {
+              setBusy(`gem_conversion_${gems}`);
+              const result = await convertPlayerGems(gems);
+              setBusy(null);
+              Alert.alert(
+                result.ok ? 'Exchange complete' : 'Exchange unavailable',
+                result.ok
+                  ? `+${(result.coins ?? 0).toLocaleString()} Wallet Coins`
+                  : (result.reason ?? 'Try again.'),
+              );
+            })();
+          },
+        },
+      ],
+      { cancelable: true },
+    );
+  };
+
   return (
     <Screen scroll gradient={gradients.pitch}>
       <ScreenHeader
         title="Store"
-        subtitle="Power up your career"
+        subtitle={save?.mode === 'manager' ? 'Manager Career' : 'Player Career'}
         onBack={() => navigation.goBack()}
       />
 
-      {save ? <WalletBar wallet={save.wallet} /> : null}
-      <TrustBar />
+      {save ? <WalletBar wallet={save.wallet} showEnergy={save.mode !== 'manager'} /> : null}
+      <TrustBar storeName={storeName} />
+
+      {storeSetupPending ? (
+        <View style={styles.storePendingCard}>
+          <Ionicons name="storefront-outline" size={22} color={colors.info} />
+          <View style={styles.storePendingCopy}>
+            <Text style={styles.storePendingTitle}>Checkout coming soon</Text>
+          </View>
+        </View>
+      ) : null}
 
       {loading ? (
         [0, 1, 2, 3].map((i) => (
@@ -587,18 +851,38 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                 style={[styles.starterCard, shadow.card]}
               >
                 <View style={styles.starterContent}>
-                  <Animated.View style={pulseStyle}>
-                    <Text style={styles.starterBadge}>NEW PLAYER OFFER — ONE PER ACCOUNT</Text>
-                  </Animated.View>
-                  <Text style={styles.starterTitle}>{starterPack.title}</Text>
-                  <Text style={styles.starterDesc}>{starterPack.description}</Text>
-
-                  <View style={styles.starterSavingsRow}>
-                    <View style={styles.starterSavingBadge}>
-                      <Text style={styles.starterSavingText}>Best starter value</Text>
-                    </View>
-                    <Text style={styles.starterRRP}>coins + gems + 7 days ad-free</Text>
+                  <View style={styles.specialTitleRow}>
+                    <Text style={styles.starterTitle}>{starterPack.title}</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Starter Pack details"
+                      onPress={() =>
+                        setExpandedFeatureCard((current) =>
+                          current === starterPack.id ? null : starterPack.id,
+                        )
+                      }
+                      style={styles.specialInfoButton}
+                    >
+                      <Ionicons
+                        name={expandedFeatureCard === starterPack.id ? 'arrow-back' : 'information'}
+                        size={18}
+                        color={colors.white}
+                      />
+                    </Pressable>
                   </View>
+                  {expandedFeatureCard === starterPack.id ? (
+                    <View style={styles.featureBenefitList}>
+                      {benefitsFor(starterPack).map((benefit) => (
+                        <View key={benefit} style={styles.benefitRow}>
+                          <Ionicons name="checkmark-circle" size={17} color={colors.accent} />
+                          <Text style={styles.featureBenefitText}>{benefit}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.starterDesc}>{starterPack.description}</Text>
+                  )}
+
                   {/* Genuine, persisted window (from career start) — real
                       urgency, not a resetting fake timer. */}
                   <Text style={styles.starterRRP}>Offer ends in {countdown}</Text>
@@ -607,7 +891,7 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                     label={
                       purchases.isProductAvailable(starterPack)
                         ? `Buy Now · ${starterPack.priceString}`
-                        : 'Google Play unavailable'
+                        : `${storeName} unavailable`
                     }
                     variant="gold"
                     loading={busy === starterPack.id}
@@ -626,54 +910,40 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
               entering={ZoomIn.duration(400).delay(100)}
               style={styles.firstPurchaseBanner}
             >
-              <Text style={styles.firstPurchaseIcon}>🎁</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.firstPurchaseTitle}>First Purchase Bonus!</Text>
-                <Text style={styles.firstPurchaseText}>
-                  Your very first purchase gives you 2× the gems — one time only!
-                </Text>
-              </View>
+              <Text style={styles.firstPurchaseTitle}>🎁 First purchase: 2× gems</Text>
             </Animated.View>
           )}
 
           {/* ── Loss Aversion: Low Energy Alert ── */}
-          {energyLow && (
+          {save?.mode !== 'manager' && energyLow && (
             <Animated.View entering={FadeInDown.duration(300)} style={styles.energyAlertCard}>
-              <Text style={styles.energyAlertIcon}>⚡</Text>
-              <View style={{ flex: 1 }}>
+              <View style={styles.energyAlertHeading}>
+                <Text style={styles.energyAlertIcon}>⚡</Text>
                 <Text style={styles.energyAlertTitle}>
-                  Energy Running Low ({save?.wallet.energy ?? 0}/{ECONOMY.energyMax})
-                </Text>
-                <Text style={styles.energyAlertText}>
-                  Refill now or watch an ad for free energy to jump straight into your next match.
+                  Energy {save?.wallet.energy ?? 0}/{ECONOMY.energyMax}
                 </Text>
               </View>
-              <Button
-                label={rewardedEnergyAvailable ? 'Watch ad' : 'Rewarded ads unavailable'}
-                variant="secondary"
-                size="sm"
-                fullWidth={false}
-                loading={busy === 'rewarded_energy'}
-                disabled={!rewardedEnergyAvailable || (busy != null && busy !== 'rewarded_energy')}
-                onPress={() => void onWatchEnergyAd()}
-              />
-              <Button
-                label={
-                  energyProduct && purchases.isProductAvailable(energyProduct)
-                    ? `Refill ${energyProduct.priceString}`
-                    : 'Refill unavailable'
-                }
-                variant="gold"
-                size="sm"
-                fullWidth={false}
-                loading={busy === 'energy_refill'}
-                disabled={
-                  !energyProduct ||
-                  !purchases.isProductAvailable(energyProduct) ||
-                  (busy != null && busy !== 'energy_refill')
-                }
-                onPress={() => energyProduct && void onBuy(energyProduct)}
-              />
+              <View style={styles.energyAlertActions}>
+                <Button
+                  label={rewardedEnergyAvailable ? 'Watch ad' : 'Ad unavailable'}
+                  variant="secondary"
+                  size="sm"
+                  style={styles.energyAlertAction}
+                  loading={busy === 'rewarded_energy'}
+                  disabled={
+                    !rewardedEnergyAvailable || (busy != null && busy !== 'rewarded_energy')
+                  }
+                  onPress={() => void onWatchEnergyAd()}
+                />
+                <Button
+                  label={`Refill · ${ENERGY_REFILL_GEMS} gems`}
+                  variant="gold"
+                  size="sm"
+                  style={styles.energyAlertAction}
+                  disabled={(save?.wallet.gems ?? 0) < ENERGY_REFILL_GEMS || busy != null}
+                  onPress={onRefillEnergy}
+                />
+              </View>
             </Animated.View>
           )}
 
@@ -694,27 +964,48 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                   <View style={styles.legendBundleHeader}>
                     <Text style={styles.legendBundleCrown}>👑</Text>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.legendBundleLabel}>{legendBundleLabel}</Text>
+                      <View style={styles.specialTitleRow}>
+                        <Text style={styles.legendBundleLabel}>{legendBundleLabel}</Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`${legendProduct.title} details`}
+                          onPress={() =>
+                            setExpandedFeatureCard((current) =>
+                              current === legendProduct.id ? null : legendProduct.id,
+                            )
+                          }
+                          style={styles.specialInfoButton}
+                        >
+                          <Ionicons
+                            name={
+                              expandedFeatureCard === legendProduct.id
+                                ? 'arrow-back'
+                                : 'information'
+                            }
+                            size={18}
+                            color={colors.white}
+                          />
+                        </Pressable>
+                      </View>
                       <Text style={styles.legendBundleTitle}>{legendBundleTitle}</Text>
                     </View>
-                    <View style={styles.legendBundleBestVal}>
-                      <Text style={styles.legendBundleBestValText}>
-                        {save?.mode === 'manager' ? 'MANAGER ONLY' : 'BEST VALUE'}
-                      </Text>
+                  </View>
+                  {expandedFeatureCard === legendProduct.id ? (
+                    <View style={styles.legendBundlePerks}>
+                      {benefitsFor(legendProduct).map((perk) => (
+                        <View key={perk} style={styles.legendBundlePerkRow}>
+                          <Text style={styles.legendBundlePerkText}>{perk}</Text>
+                        </View>
+                      ))}
                     </View>
-                  </View>
-                  <View style={styles.legendBundlePerks}>
-                    {legendPerks.map((perk) => (
-                      <View key={perk} style={styles.legendBundlePerkRow}>
-                        <Text style={styles.legendBundlePerkText}>{perk}</Text>
-                      </View>
-                    ))}
-                  </View>
+                  ) : (
+                    <Text style={styles.legendFrontDesc}>{legendProduct.description}</Text>
+                  )}
                   <Button
                     label={
                       purchases.isProductAvailable(legendProduct)
-                        ? `Buy ${legendProduct.title} · ${legendProduct.priceString}`
-                        : 'Google Play unavailable'
+                        ? `Buy · ${legendProduct.priceString}`
+                        : 'Coming soon'
                     }
                     variant="gold"
                     loading={busy === legendProduct.id}
@@ -722,9 +1013,6 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                     onPress={() => void onBuy(legendProduct)}
                     style={{ marginTop: spacing.md }}
                   />
-                  <Text style={styles.legendBundleSaving}>
-                    Applies only to this {save?.mode === 'manager' ? 'manager' : 'player'} mode
-                  </Text>
                 </View>
               </LinearGradient>
             </Animated.View>
@@ -736,37 +1024,13 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
               <Card style={styles.vipStreakCard}>
                 <Text style={styles.vipStreakTitle}>🔥 VIP Streak Active</Text>
                 <Text style={styles.vipStreakText}>
-                  Log in daily as a VIP — 7 days = bonus gems, 30 days = exclusive avatar frame.
                   Current streak: {save?.vipStreakDays ?? 0} day
                   {(save?.vipStreakDays ?? 0) !== 1 ? 's' : ''}
+                  {' · '}Day 7: bonus gems · Day 30: exclusive frame
                 </Text>
               </Card>
             </Animated.View>
           )}
-
-          {/* ── Gem sinks showcase (what gems unlock) ── */}
-          <Animated.View entering={FadeInDown.duration(300).delay(60)} style={styles.gemSinksCard}>
-            <Text style={styles.gemSinksTitle}>💎 What Gems Unlock</Text>
-            <View style={styles.gemSinksList}>
-              {[
-                ...(save?.mode === 'manager'
-                  ? [
-                      '🔍 Full scouting intelligence',
-                      '🧑‍💼 Elite staff shortlist search',
-                      '💪 Squad conditioning and recovery',
-                    ]
-                  : [
-                      '⚡ Training and energy support',
-                      '🎨 Premium kits and player avatars',
-                      '🎲 Story choice re-rolls',
-                    ]),
-              ].map((item) => (
-                <View key={item} style={styles.gemSinkItem}>
-                  <Text style={styles.gemSinkText}>{item}</Text>
-                </View>
-              ))}
-            </View>
-          </Animated.View>
 
           {/* ── Season Pass ── */}
           {passProduct && (
@@ -776,28 +1040,42 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                 style={[styles.passCard, { borderColor: colors.info }]}
               >
                 <View style={styles.passLeft}>
-                  <View style={styles.passHeader}>
-                    <PassIcon size={28} />
-                    <View
-                      style={[
-                        styles.badgePill,
-                        {
-                          backgroundColor: colors.info + '22',
-                          borderColor: colors.info,
-                          marginLeft: spacing.sm,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.badgePillText, { color: colors.info }]}>
-                        Most Popular
-                      </Text>
+                  <View style={styles.specialTitleRow}>
+                    <View style={styles.passHeader}>
+                      <PassIcon size={28} />
                     </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Season Pass details"
+                      onPress={() =>
+                        setExpandedFeatureCard((current) =>
+                          current === passProduct.id ? null : passProduct.id,
+                        )
+                      }
+                      style={styles.infoButton}
+                    >
+                      <Ionicons
+                        name={expandedFeatureCard === passProduct.id ? 'arrow-back' : 'information'}
+                        size={18}
+                        color={colors.textMuted}
+                      />
+                    </Pressable>
                   </View>
                   <Text style={styles.passTitle}>{passProduct.title}</Text>
-                  <Text style={styles.passDesc}>{passProduct.description}</Text>
-                  <Text style={styles.passPerks}>
-                    Dual Mode Value · 20 reward tiers · Player and Manager cosmetics + stories
-                  </Text>
+                  {expandedFeatureCard === passProduct.id ? (
+                    <View style={styles.benefitList}>
+                      {benefitsFor(passProduct).map((benefit) => (
+                        <View key={benefit} style={styles.benefitRow}>
+                          <Ionicons name="checkmark-circle" size={17} color={colors.info} />
+                          <Text style={styles.benefitText}>{benefit}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.passPerks}>
+                      20 tiers · {save?.mode === 'manager' ? 'Manager' : 'Player'} Career rewards
+                    </Text>
+                  )}
                 </View>
                 <Button
                   label={
@@ -805,7 +1083,7 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                       ? '✓ Active'
                       : purchases.isProductAvailable(passProduct)
                         ? passProduct.priceString
-                        : 'Unavailable'
+                        : 'Coming soon'
                   }
                   variant={save && isSeasonPassActive(save) ? 'secondary' : 'primary'}
                   size="sm"
@@ -835,10 +1113,16 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                   p={product}
                   busy={busy}
                   onBuy={() => void onBuy(product)}
-                  badge={BADGES[product.id]}
-                  owned={product.id === 'contract_boost' && contractBoostStored}
+                  owned={
+                    (product.id === 'contract_boost' && contractBoostStored) ||
+                    (purchases.isSaveSponsorProduct(product.id) &&
+                      ownedSaveSponsorProductId === product.id)
+                  }
                   unavailableReason={unavailableReason(product)}
+                  hideUnavailableReason={false}
+                  unavailableLabel={unavailableLabel}
                   valueNote={valueNoteFor(product)}
+                  benefits={benefitsFor(product)}
                   delay={index * 40}
                 />
               ))}
@@ -857,10 +1141,12 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                   p={product}
                   busy={busy}
                   onBuy={() => void onBuy(product)}
-                  badge={BADGES[product.id]}
                   owned={product.id === 'remove_ads' && removeAds}
                   unavailableReason={unavailableReason(product)}
+                  hideUnavailableReason={false}
+                  unavailableLabel={unavailableLabel}
                   valueNote={valueNoteFor(product)}
+                  benefits={benefitsFor(product)}
                   delay={index * 40}
                 />
               ))}
@@ -880,8 +1166,9 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                   p={p}
                   busy={busy}
                   onBuy={() => void onBuy(p)}
-                  badge={BADGES[p.id]}
-                  saving={SAVINGS[p.id]}
+                  hideUnavailableReason={false}
+                  unavailableLabel={unavailableLabel}
+                  benefits={benefitsFor(p)}
                   delay={idx * 40}
                 />
               ))}
@@ -889,7 +1176,7 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
           )}
 
           {/* ── Gems ── */}
-          {gemProducts.length > 0 && (
+          {(gemProducts.length > 0 || save?.mode === 'career') && (
             <Animated.View entering={FadeInDown.duration(300).delay(160)}>
               <View style={styles.sectionHeader}>
                 <GemIcon size={20} />
@@ -901,19 +1188,57 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                   p={p}
                   busy={busy}
                   onBuy={() => void onBuy(p)}
-                  badge={BADGES[p.id]}
-                  saving={SAVINGS[p.id]}
+                  hideUnavailableReason={false}
+                  unavailableLabel={unavailableLabel}
+                  benefits={benefitsFor(p)}
                   delay={idx * 40}
                 />
               ))}
+              {save?.mode === 'career' ? (
+                <Card style={styles.gemExchangeCard}>
+                  <View style={styles.gemExchangeHeader}>
+                    <Text style={styles.gemExchangeTitle}>Gem Exchange</Text>
+                    <Text style={styles.gemExchangeRate}>
+                      1 gem = {PLAYER_GEM_TO_COIN_RATE} coins
+                    </Text>
+                  </View>
+                  <View style={styles.gemExchangeActions}>
+                    {PLAYER_GEM_CONVERSION_PRESETS.map((gems) => (
+                      <Button
+                        key={gems}
+                        label={`${gems} → ${playerGemConversionCoins(gems) / 1_000}K`}
+                        variant="secondary"
+                        size="sm"
+                        fullWidth={false}
+                        style={styles.gemExchangeAction}
+                        loading={busy === `gem_conversion_${gems}`}
+                        disabled={(save.wallet.gems ?? 0) < gems || busy != null}
+                        onPress={() => confirmGemConversion(gems)}
+                      />
+                    ))}
+                  </View>
+                </Card>
+              ) : null}
             </Animated.View>
           )}
 
-          <Text style={styles.disclaimer}>
-            {purchases.MOCK_MODE
-              ? '⚠️ Dev mode: purchases apply instantly. Wire RevenueCat + EAS Dev Build to go live.'
-              : ''}
-          </Text>
+          <View style={styles.restoreBlock}>
+            <Button
+              label="Restore Purchases"
+              variant="secondary"
+              size="sm"
+              fullWidth={false}
+              loading={busy === 'restore_purchases'}
+              disabled={!save || busy != null}
+              onPress={() => void onRestorePurchases()}
+              style={styles.restoreButton}
+            />
+            <Text style={styles.restoreHint}>
+              {save
+                ? 'Restores permanent upgrades and active passes.'
+                : 'Open a career to restore purchases.'}
+            </Text>
+          </View>
         </>
       )}
     </Screen>
@@ -931,6 +1256,25 @@ const makeStyles = (colors: ThemeColors) =>
       alignItems: 'center',
     },
     proofText: { color: colors.textFaint, fontSize: fontSize.xs },
+    storePendingCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.info + '55',
+      backgroundColor: colors.info + '10',
+      borderRadius: radius.md,
+    },
+    storePendingCopy: { flex: 1, minWidth: 0 },
+    storePendingTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+    storePendingText: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      lineHeight: 18,
+      marginTop: 2,
+    },
 
     // Starter pack — refined dark premium card
     starterCard: {
@@ -961,6 +1305,29 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: 2,
     },
     starterContent: { padding: spacing.lg },
+    specialTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    specialInfoButton: {
+      width: 30,
+      height: 30,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.25)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    featureBenefitList: { gap: spacing.xs, marginTop: spacing.sm },
+    featureBenefitText: {
+      color: 'rgba(255,255,255,0.72)',
+      fontSize: fontSize.sm,
+      lineHeight: 19,
+      flex: 1,
+    },
     starterBadge: {
       color: colors.accent,
       fontSize: fontSize.xs,
@@ -1022,8 +1389,6 @@ const makeStyles = (colors: ThemeColors) =>
     firstPurchaseText: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
     // Low energy alert
     energyAlertCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
       gap: spacing.sm,
       backgroundColor: colors.danger + '18',
       borderWidth: 1.5,
@@ -1032,6 +1397,17 @@ const makeStyles = (colors: ThemeColors) =>
       padding: spacing.md,
       marginTop: spacing.md,
     },
+    energyAlertHeading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    energyAlertActions: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      width: '100%',
+    },
+    energyAlertAction: { flex: 1, minWidth: 0 },
     energyAlertIcon: { fontSize: 24 },
     energyAlertTitle: { color: colors.danger, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
     energyAlertText: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
@@ -1081,6 +1457,7 @@ const makeStyles = (colors: ThemeColors) =>
       letterSpacing: 0.5,
     },
     legendBundlePerks: { gap: 8, marginBottom: spacing.sm },
+    legendFrontDesc: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
     legendBundlePerkRow: { flexDirection: 'row', alignItems: 'center' },
     legendBundlePerkText: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
     legendBundleSaving: {
@@ -1118,6 +1495,23 @@ const makeStyles = (colors: ThemeColors) =>
     gemSinksList: { gap: 6 },
     gemSinkItem: { flexDirection: 'row', alignItems: 'center' },
     gemSinkText: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
+    gemExchangeCard: {
+      gap: spacing.sm,
+      marginTop: spacing.xs,
+      borderWidth: 1,
+      borderColor: colors.info + '55',
+    },
+    gemExchangeHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      flexWrap: 'wrap',
+    },
+    gemExchangeTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+    gemExchangeRate: { color: colors.info, fontSize: fontSize.xs, fontWeight: fontWeight.semibold },
+    gemExchangeActions: { flexDirection: 'row', gap: spacing.xs },
+    gemExchangeAction: { flex: 1, minWidth: 0 },
 
     // Season pass
     passCard: {
@@ -1182,6 +1576,21 @@ const makeStyles = (colors: ThemeColors) =>
       borderColor: colors.border,
     },
     itemCopy: { flex: 1, minWidth: 0 },
+    itemDetails: { padding: spacing.md, gap: spacing.md },
+    detailsHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    infoButton: {
+      width: 30,
+      height: 30,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    benefitList: { gap: spacing.xs },
+    benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+    benefitText: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 19, flex: 1 },
     itemButton: { flexShrink: 0, minWidth: 72, alignSelf: 'center' },
     itemButtonCompact: {
       alignSelf: 'stretch',
@@ -1221,6 +1630,19 @@ const makeStyles = (colors: ThemeColors) =>
       fontWeight: fontWeight.bold,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
+    },
+
+    restoreBlock: {
+      alignItems: 'center',
+      marginTop: spacing.xl,
+      gap: spacing.xs,
+    },
+    restoreButton: { minWidth: 190 },
+    restoreHint: {
+      color: colors.textFaint,
+      fontSize: fontSize.xs,
+      lineHeight: 17,
+      textAlign: 'center',
     },
 
     disclaimer: {

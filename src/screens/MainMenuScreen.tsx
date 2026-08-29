@@ -11,7 +11,9 @@ import { APP_NAME, APP_TAGLINE, APP_VERSION } from '../config/app';
 import { saveSubtitle } from '../game/saveMeta';
 import { useT } from '../i18n';
 import { ScreenProps } from '../navigation';
+import { purchases } from '../services';
 import { useCareer } from '../state/careerStore';
+import { useSettings } from '../state/settingsStore';
 import { getLastPlayed, ResolvedSave } from '../storage/saveGames';
 import {
   fonts,
@@ -159,6 +161,8 @@ function MenuButton({
 export function MainMenuScreen({ navigation }: ScreenProps<'MainMenu'>) {
   const [resume, setResume] = useState<ResolvedSave | null>(null);
   const setActive = useCareer((s) => s.setActive);
+  const storeUnlocked = useSettings((s) => s.playedMatchesAllModes >= 2);
+  const storeAvailable = purchases.MOCK_MODE || purchases.isStoreReady();
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
@@ -224,12 +228,14 @@ export function MainMenuScreen({ navigation }: ScreenProps<'MainMenu'>) {
           delay={120}
           onPress={() => navigation.navigate('SavedGames')}
         />
-        <MenuButton
-          label="Store"
-          iconName="storefront"
-          delay={180}
-          onPress={() => navigation.navigate('Purchase')}
-        />
+        {storeUnlocked && storeAvailable ? (
+          <MenuButton
+            label={t('menu.purchase')}
+            iconName="storefront"
+            delay={180}
+            onPress={() => navigation.navigate('Purchase')}
+          />
+        ) : null}
         <MenuButton
           label={t('menu.login')}
           iconName="person-circle"

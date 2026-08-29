@@ -5,14 +5,11 @@ import {
   buyPlayerEquipment,
   ensurePlayerLifeState,
   hirePersonalCoach,
-  negotiatePlayerSponsor,
   personalCoachTrainingMultiplier,
   PLAYER_LIFE_COSTS,
   processPlayerLifeSeason,
   publishPlayerSocialPost,
   recordPlayerLifeMatch,
-  sponsorNegotiationPreview,
-  tradeLegacyToken,
   transferPlayerBank,
 } from '../playerLife';
 import { makeCareerSave } from './_depthHelpers';
@@ -127,14 +124,6 @@ describe('Player Life economy and development', () => {
     expect(PLAYER_LIFE_COSTS.analyst).toBe(12_000);
   });
 
-  it('trades only the fictional in-game token and cannot sell unowned units', () => {
-    const save = seniorCareer();
-    expect(tradeLegacyToken(save, 'SELL', 1).ok).toBe(false);
-    expect(tradeLegacyToken(save, 'BUY', 3).ok).toBe(true);
-    expect(save.playerLife?.legacyTokenUnits).toBe(3);
-    expect(tradeLegacyToken(save, 'SELL', 2).ok).toBe(true);
-    expect(save.playerLife?.legacyTokenUnits).toBe(1);
-  });
 });
 
 describe('Player Life history and season processing', () => {
@@ -195,19 +184,4 @@ describe('Player Life history and season processing', () => {
     expect(save.playerLife!.personalCoaches.MENTAL).toBeUndefined();
   });
 
-  it('allows only one sponsor negotiation per season', () => {
-    const save = seniorCareer();
-    save.sponsors = [];
-    const safe = sponsorNegotiationPreview(save, 'SAFE');
-    const balanced = sponsorNegotiationPreview(save, 'BALANCED');
-    const bold = sponsorNegotiationPreview(save, 'BOLD');
-    expect(safe.chance).toBe(100);
-    expect(safe.signingBonus).toBeLessThan(balanced.signingBonus);
-    expect(balanced.signingBonus).toBeLessThan(bold.signingBonus);
-    expect(safe.perMatchCoins).toBeLessThan(bold.perMatchCoins);
-    expect(bold.seasons).toBe(2);
-    expect(negotiatePlayerSponsor(save, 'SAFE').ok).toBe(true);
-    expect(negotiatePlayerSponsor(save, 'SAFE').ok).toBe(false);
-    expect(save.sponsors).toHaveLength(1);
-  });
 });

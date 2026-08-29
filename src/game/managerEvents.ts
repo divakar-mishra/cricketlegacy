@@ -559,10 +559,15 @@ export function queueManagerEvent(save: SaveGame, trigger: MgrTrigger, rng: Rng)
   if (save.mode !== 'manager' || !save.userTeamId) return false;
   ensureMgrStory(save);
   const seen = new Set(save.managerStory!.seenEventIds);
+  const seasonYear =
+    save.managerCalendar?.year ??
+    (save.currentSeasonId ? save.seasons[save.currentSeasonId]?.year : undefined) ??
+    2026;
   const pool = MANAGER_EVENTS.filter((ev) => {
     const triggers = Array.isArray(ev.trigger) ? ev.trigger : [ev.trigger];
     if (!triggers.includes(trigger)) return false;
     if (ev.once && seen.has(ev.id)) return false;
+    if (save.managerStory!.flags[`lastAskedSeason:${ev.id}`] === seasonYear) return false;
     const lastAskedAt = save.managerStory!.flags[`lastAskedMatch:${ev.id}`];
     if (
       typeof lastAskedAt === 'number' &&
@@ -589,6 +594,7 @@ export function queueManagerEvent(save: SaveGame, trigger: MgrTrigger, rng: Rng)
   if (!save.managerStory!.pendingEventIds.includes(chosen.id))
     save.managerStory!.pendingEventIds.push(chosen.id);
   save.managerStory!.flags[`lastAskedMatch:${chosen.id}`] = save.managerMatchesAtCurrentClub ?? 0;
+  save.managerStory!.flags[`lastAskedSeason:${chosen.id}`] = seasonYear;
   if (chosen.id.startsWith('pass_monthly_manager_') && chosen.id.endsWith('_opening')) {
     ensureSeasonPassExperience(save, save.pass?.seasonId);
     save.seasonPassExperience!.managerStoryCycleId = save.pass!.seasonId;

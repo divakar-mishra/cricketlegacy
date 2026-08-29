@@ -50,36 +50,44 @@ export function evaluateDailyClaim(
 
 /** Length of the escalating reward cycle before it repeats. */
 export const STREAK_CYCLE_DAYS = 7;
-/** Extra fraction of coins granted per fully-completed cycle ("week"). */
-export const STREAK_WEEK_BONUS = 0.5;
-/** Hard cap on the per-week coin multiplier so long streaks plateau sensibly. */
-export const STREAK_MAX_WEEK_MULTIPLIER = 3;
+/** Legacy exports retained for save/test compatibility; weekly escalation is disabled. */
+export const STREAK_WEEK_BONUS = 0;
+export const STREAK_MAX_WEEK_MULTIPLIER = 1;
 
 /** Base coin/gem payout for each day of a single 7-day cycle (day 1 → day 7). */
 const STREAK_BASE: readonly { coins: number; gems: number }[] = [
-  { coins: 100, gems: 0 },
+  { coins: 75, gems: 0 },
+  { coins: 125, gems: 0 },
   { coins: 150, gems: 0 },
   { coins: 200, gems: 0 },
   { coins: 250, gems: 0 },
   { coins: 300, gems: 0 },
-  { coins: 400, gems: 0 },
-  { coins: 600, gems: 10 }, // day 7 payoff: biggest coins + the only gems
+  { coins: 400, gems: 10 }, // 1,500 coins per completed Manager week
+];
+
+const PLAYER_STREAK_BASE: readonly { coins: number; gems: number }[] = [
+  { coins: 50, gems: 0 },
+  { coins: 75, gems: 0 },
+  { coins: 100, gems: 0 },
+  { coins: 125, gems: 0 },
+  { coins: 150, gems: 0 },
+  { coins: 200, gems: 0 },
+  { coins: 300, gems: 5 },
 ];
 
 /**
  * Reward for a given streak length. Rewards escalate within the 7-day cycle
- * (day 1 < … < day 7, with gems only on day 7) and then keep rising per
- * completed cycle via a coin multiplier that is capped at
- * {@link STREAK_MAX_WEEK_MULTIPLIER}. Gems are deliberately *not* multiplied so
- * the premium currency stays scarce.
+ * (day 1 < … < day 7, with gems only on day 7) and repeat without escalating
+ * across later weeks. Gems remain scarce and are never multiplied.
  */
-export function streakReward(streak: number): { coins: number; gems: number } {
+export function streakReward(
+  streak: number,
+  mode: 'career' | 'manager' = 'career',
+): { coins: number; gems: number } {
   const s = Math.max(1, Math.floor(streak));
   const dayIndex = (s - 1) % STREAK_CYCLE_DAYS; // 0..6
-  const week = Math.floor((s - 1) / STREAK_CYCLE_DAYS); // completed cycles (0-based)
-  const multiplier = Math.min(1 + week * STREAK_WEEK_BONUS, STREAK_MAX_WEEK_MULTIPLIER);
-  const base = STREAK_BASE[dayIndex];
-  return { coins: Math.round(base.coins * multiplier), gems: base.gems };
+  if (mode === 'career') return PLAYER_STREAK_BASE[dayIndex];
+  return STREAK_BASE[dayIndex];
 }
 
 /* =========================================================================
@@ -118,7 +126,8 @@ export interface QuestProgress {
 }
 
 /** How many daily quests are active at once (default for {@link pickDailyQuests}). */
-export const DAILY_QUEST_COUNT = 3;
+export const DAILY_QUEST_COUNT = 2;
+export const MANAGER_DAILY_QUEST_COUNT = 2;
 
 /** The daily quest pool. {@link pickDailyQuests} rotates a window across this. */
 export const DAILY_QUESTS: QuestDef[] = [
@@ -129,7 +138,7 @@ export const DAILY_QUESTS: QuestDef[] = [
     description: 'Play 2 matches',
     metric: 'PLAY_MATCH',
     target: 2,
-    rewardCoins: 120,
+    rewardCoins: 75,
   },
   {
     id: 'daily_win_1',
@@ -138,7 +147,7 @@ export const DAILY_QUESTS: QuestDef[] = [
     description: 'Win a match',
     metric: 'WIN_MATCH',
     target: 1,
-    rewardCoins: 150,
+    rewardCoins: 100,
   },
   {
     id: 'daily_runs_50',
@@ -147,7 +156,7 @@ export const DAILY_QUESTS: QuestDef[] = [
     description: 'Score 50 runs',
     metric: 'SCORE_RUNS',
     target: 50,
-    rewardCoins: 140,
+    rewardCoins: 90,
   },
   {
     id: 'daily_wickets_3',
@@ -156,7 +165,7 @@ export const DAILY_QUESTS: QuestDef[] = [
     description: 'Take 3 wickets',
     metric: 'TAKE_WICKETS',
     target: 3,
-    rewardCoins: 140,
+    rewardCoins: 90,
   },
   {
     id: 'daily_boundaries_6',
@@ -165,7 +174,7 @@ export const DAILY_QUESTS: QuestDef[] = [
     description: 'Hit 6 boundaries',
     metric: 'HIT_BOUNDARIES',
     target: 6,
-    rewardCoins: 130,
+    rewardCoins: 85,
   },
   {
     id: 'daily_train_1',
@@ -174,7 +183,7 @@ export const DAILY_QUESTS: QuestDef[] = [
     description: 'Complete a training session',
     metric: 'TRAIN',
     target: 1,
-    rewardCoins: 100,
+    rewardCoins: 70,
   },
 ];
 
@@ -187,7 +196,7 @@ export const WEEKLY_QUESTS: QuestDef[] = [
     description: 'Play 10 matches this week',
     metric: 'PLAY_MATCH',
     target: 10,
-    rewardCoins: 600,
+    rewardCoins: 400,
   },
   {
     id: 'weekly_win_5',
@@ -196,7 +205,7 @@ export const WEEKLY_QUESTS: QuestDef[] = [
     description: 'Win 5 matches this week',
     metric: 'WIN_MATCH',
     target: 5,
-    rewardCoins: 800,
+    rewardCoins: 550,
   },
   {
     id: 'weekly_runs_300',
@@ -205,7 +214,7 @@ export const WEEKLY_QUESTS: QuestDef[] = [
     description: 'Score 300 runs this week',
     metric: 'SCORE_RUNS',
     target: 300,
-    rewardCoins: 700,
+    rewardCoins: 475,
   },
   {
     id: 'weekly_wickets_15',
@@ -214,14 +223,14 @@ export const WEEKLY_QUESTS: QuestDef[] = [
     description: 'Take 15 wickets this week',
     metric: 'TAKE_WICKETS',
     target: 15,
-    rewardCoins: 700,
+    rewardCoins: 475,
   },
 ];
 
 export const DAILY_CHALLENGE_REWARDS = {
-  BRONZE: { coins: 120, gems: 0 },
-  SILVER: { coins: 200, gems: 0 },
-  GOLD: { coins: 350, gems: 0 },
+  BRONZE: { coins: 100, gems: 0 },
+  SILVER: { coins: 175, gems: 0 },
+  GOLD: { coins: 275, gems: 0 },
 } as const;
 
 export const MANAGER_DAILY_QUESTS: QuestDef[] = [
@@ -232,7 +241,7 @@ export const MANAGER_DAILY_QUESTS: QuestDef[] = [
     description: 'Manage 1 match',
     metric: 'PLAY_MATCH',
     target: 1,
-    rewardCoins: 140,
+    rewardCoins: 100,
   },
   {
     id: 'mgr_daily_win_1',
@@ -241,7 +250,7 @@ export const MANAGER_DAILY_QUESTS: QuestDef[] = [
     description: 'Win a match',
     metric: 'WIN_MATCH',
     target: 1,
-    rewardCoins: 170,
+    rewardCoins: 125,
   },
   {
     id: 'mgr_daily_play_2',
@@ -250,7 +259,7 @@ export const MANAGER_DAILY_QUESTS: QuestDef[] = [
     description: 'Manage 2 matches',
     metric: 'PLAY_MATCH',
     target: 2,
-    rewardCoins: 220,
+    rewardCoins: 150,
   },
   {
     id: 'mgr_daily_sign_1',
@@ -259,7 +268,7 @@ export const MANAGER_DAILY_QUESTS: QuestDef[] = [
     description: 'Sign 1 player',
     metric: 'SIGN_PLAYER',
     target: 1,
-    rewardCoins: 180,
+    rewardCoins: 125,
   },
 ];
 
@@ -271,7 +280,7 @@ export const MANAGER_WEEKLY_QUESTS: QuestDef[] = [
     description: 'Manage 8 matches this week',
     metric: 'PLAY_MATCH',
     target: 8,
-    rewardCoins: 800,
+    rewardCoins: 500,
   },
   {
     id: 'mgr_weekly_win_4',
@@ -280,7 +289,7 @@ export const MANAGER_WEEKLY_QUESTS: QuestDef[] = [
     description: 'Win 4 matches this week',
     metric: 'WIN_MATCH',
     target: 4,
-    rewardCoins: 950,
+    rewardCoins: 650,
   },
   {
     id: 'mgr_weekly_sign_2',
@@ -289,7 +298,7 @@ export const MANAGER_WEEKLY_QUESTS: QuestDef[] = [
     description: 'Sign 2 players this week',
     metric: 'SIGN_PLAYER',
     target: 2,
-    rewardCoins: 900,
+    rewardCoins: 600,
   },
 ];
 
@@ -312,11 +321,12 @@ export function weeklyQuestsForMode(mode: 'career' | 'manager' = 'career'): Ques
  */
 export function pickDailyQuests(
   daySeed: number,
-  count: number = DAILY_QUEST_COUNT,
+  count: number | undefined = undefined,
   mode: 'career' | 'manager' = 'career',
 ): QuestDef[] {
   const pool = questPoolForMode(mode);
-  const n = Math.max(0, Math.min(Math.floor(count), pool.length));
+  const requested = count ?? (mode === 'manager' ? MANAGER_DAILY_QUEST_COUNT : DAILY_QUEST_COUNT);
+  const n = Math.max(0, Math.min(Math.floor(requested), pool.length));
   const start = ((Math.floor(daySeed) % pool.length) + pool.length) % pool.length;
   const out: QuestDef[] = [];
   for (let i = 0; i < n; i++) out.push(pool[(start + i) % pool.length]);
@@ -376,12 +386,17 @@ export function claimQuest(
  * ========================================================================= */
 
 /** A single battle-pass tier with its cumulative XP gate and free/premium loot. */
+export interface PassReward {
+  coins?: number;
+  item?: string;
+}
+
 export interface PassTier {
   tier: number;
   /** Cumulative season XP required to reach (unlock) this tier. */
   xpRequired: number;
-  freeReward: { coins?: number; gems?: number; item?: string };
-  premiumReward: { coins?: number; gems?: number; item?: string };
+  freeReward: PassReward;
+  premiumReward: PassReward;
 }
 
 /** Persisted per-save battle-pass state for the active season. */
@@ -389,6 +404,8 @@ export interface PassState {
   seasonId: string;
   periodStartedAt?: number;
   periodEndsAt?: number;
+  /** Reward-curve version used to preserve earned tier progress after rebalancing. */
+  balanceVersion?: number;
   xp: number;
   premium: boolean;
   /** Tiers whose *free* reward has already been claimed. */
@@ -397,18 +414,27 @@ export interface PassState {
   claimedPremium: number[];
 }
 
-/** XP sources — earn these amounts from the corresponding live-ops events. */
-export const XP_PER_MATCH = 50;
-export const XP_PER_WIN = 40; // awarded on top of XP_PER_MATCH for a win
-export const XP_PER_QUEST = 100; // completing a daily quest
-export const XP_PER_WEEKLY_QUEST = 300; // completing a weekly quest
+/**
+ * XP sources. The pass is paced for consistent play across a calendar month:
+ * matches provide steady progress while daily and weekly quests do most of the
+ * work. A few high-volume sessions can no longer clear all 20 tiers.
+ */
+export const XP_PER_MATCH = 20;
+export const XP_PER_WIN = 10; // awarded on top of XP_PER_MATCH for a win
+export const XP_PER_QUEST = 75; // completing a daily quest
+export const XP_PER_WEEKLY_QUEST = 500; // completing a weekly quest
 
 /** Number of tiers in the pass. */
 export const PASS_TIER_COUNT = 20;
 /** XP required to clear tier 1. */
-export const PASS_TIER_BASE_XP = 80;
+export const PASS_TIER_BASE_XP = 285;
 /** Additional XP each subsequent tier costs (rising cost curve). */
-export const PASS_TIER_STEP_XP = 16;
+export const PASS_TIER_STEP_XP = 28;
+/** Current XP/reward balance revision persisted with each pass. */
+export const PASS_BALANCE_VERSION = 2;
+
+const LEGACY_PASS_TIER_BASE_XP = 80;
+const LEGACY_PASS_TIER_STEP_XP = 16;
 
 /**
  * Cumulative XP required to reach `tier`.
@@ -417,35 +443,61 @@ export const PASS_TIER_STEP_XP = 16;
  * cumulative gate is `BASE*tier + STEP * (tier-1)*tier/2` — always an integer
  * because `(tier-1)*tier` is even.
  */
-function tierXpRequired(tier: number): number {
-  return PASS_TIER_BASE_XP * tier + (PASS_TIER_STEP_XP * ((tier - 1) * tier)) / 2;
+function cumulativeTierXp(tier: number, base: number, step: number): number {
+  return base * tier + (step * ((tier - 1) * tier)) / 2;
 }
 
-function buildPassTiers(): PassTier[] {
-  const milestoneItems: Record<number, string> = {
+function tierXpRequired(tier: number): number {
+  return cumulativeTierXp(tier, PASS_TIER_BASE_XP, PASS_TIER_STEP_XP);
+}
+
+const PASS_MILESTONE_TIERS = new Set([1, 5, 10, 15, 20]);
+
+const PASS_MILESTONE_ITEMS_BY_MODE: Readonly<
+  Record<'career' | 'manager', Readonly<Partial<Record<number, string>>>>
+> = {
+  career: {
     1: 'pass_kit_noir',
     5: 'pass_frame_gold',
     10: 'pass_celebration_lights',
     15: 'pass_stadium_noir',
+  },
+  manager: {
+    15: 'pass_stadium_noir',
     20: 'pass_office_noir',
-  };
+  },
+};
+
+function buildPassTiers(
+  milestoneItems: Readonly<Partial<Record<number, string>>> = {},
+): PassTier[] {
   const tiers: PassTier[] = [];
   for (let t = 1; t <= PASS_TIER_COUNT; t++) {
     const milestoneItem = milestoneItems[t];
+    const milestone = PASS_MILESTONE_TIERS.has(t);
     tiers.push({
       tier: t,
       xpRequired: tierXpRequired(t),
-      freeReward: t % 5 === 0 ? { coins: 200 + t * 15, gems: 2 } : { coins: 100 + t * 10 },
-      premiumReward: milestoneItem
-        ? { coins: 300 + t * 25, gems: 8, item: milestoneItem }
-        : { coins: 200 + t * 15, gems: 3 },
+      freeReward: { coins: t % 5 === 0 ? 200 + t * 15 : 100 + t * 10 },
+      premiumReward: {
+        coins: milestone ? 300 + t * 25 : 200 + t * 15,
+        ...(milestoneItem ? { item: milestoneItem } : {}),
+      },
     });
   }
   return tiers;
 }
 
-/** The 20-tier, 30-day pass ladder with rising XP gates (index 0 === tier 1). */
+/** Mode-neutral 20-tier XP and coin curve (index 0 === tier 1). */
 export const PASS_TIERS: PassTier[] = buildPassTiers();
+
+const PLAYER_PASS_TIERS = buildPassTiers(PASS_MILESTONE_ITEMS_BY_MODE.career);
+const MANAGER_PASS_TIERS = buildPassTiers(PASS_MILESTONE_ITEMS_BY_MODE.manager);
+
+/** The same XP/coin curve with only cosmetics usable by the selected mode. */
+export function passTiersForMode(mode: 'career' | 'manager'): PassTier[] {
+  return mode === 'manager' ? MANAGER_PASS_TIERS : PLAYER_PASS_TIERS;
+}
 
 export const PASS_ITEM_LABELS: Record<string, string> = {
   pass_kit_noir: 'Stadium Noir kit',
@@ -456,13 +508,78 @@ export const PASS_ITEM_LABELS: Record<string, string> = {
 };
 
 /**
- * Loot inside a battle-pass reward crate (`crate_t5`, `crate_t10`, …). Crates are
- * opened immediately on claim and pay out coins + gems that scale with the tier,
- * so a "crate" reward is a real payout rather than an inert label.
+ * Loot inside a legacy battle-pass reward crate (`crate_t5`, `crate_t10`, …).
+ * Crates open immediately and now pay coins only, matching current pass rewards.
  */
-export function crateContents(item: string): { coins: number; gems: number } {
+export function crateContents(item: string): { coins: number } {
   const tier = Number.parseInt(item.replace(/[^0-9]/g, ''), 10) || 5;
-  return { coins: 250 + tier * 40, gems: 10 + Math.floor(tier / 5) * 5 };
+  return { coins: 250 + tier * 40 };
+}
+
+function levelForCurve(xp: number, base: number, step: number): number {
+  const safeXp = Math.max(0, Math.floor(xp));
+  let level = 0;
+  for (let tier = 1; tier <= PASS_TIER_COUNT; tier += 1) {
+    if (safeXp < cumulativeTierXp(tier, base, step)) break;
+    level = tier;
+  }
+  return level;
+}
+
+function normalizeClaimedTiers(tiers: number[]): number[] {
+  return [...new Set(tiers)]
+    .filter((tier) => Number.isInteger(tier) && tier >= 1 && tier <= PASS_TIER_COUNT)
+    .sort((a, b) => a - b);
+}
+
+/**
+ * Upgrade an existing pass to the current monthly curve without taking away a
+ * tier already earned. Fractional progress toward the next tier is preserved,
+ * and claimed tiers are treated as a minimum reached level.
+ */
+export function synchronizePassBalance(state: PassState): PassState {
+  const claimedFree = normalizeClaimedTiers(state.claimedFree ?? []);
+  const claimedPremium = normalizeClaimedTiers(state.claimedPremium ?? []);
+  if ((state.balanceVersion ?? 1) >= PASS_BALANCE_VERSION) {
+    return {
+      ...state,
+      balanceVersion: PASS_BALANCE_VERSION,
+      xp: Math.max(0, Math.floor(state.xp)),
+      claimedFree,
+      claimedPremium,
+    };
+  }
+
+  const legacyXp = Math.max(0, Math.floor(state.xp));
+  const legacyLevel = levelForCurve(legacyXp, LEGACY_PASS_TIER_BASE_XP, LEGACY_PASS_TIER_STEP_XP);
+  const legacyFloor =
+    legacyLevel > 0
+      ? cumulativeTierXp(legacyLevel, LEGACY_PASS_TIER_BASE_XP, LEGACY_PASS_TIER_STEP_XP)
+      : 0;
+  const legacyCeiling =
+    legacyLevel < PASS_TIER_COUNT
+      ? cumulativeTierXp(legacyLevel + 1, LEGACY_PASS_TIER_BASE_XP, LEGACY_PASS_TIER_STEP_XP)
+      : legacyFloor;
+  const progress =
+    legacyCeiling > legacyFloor
+      ? Math.min(1, Math.max(0, (legacyXp - legacyFloor) / (legacyCeiling - legacyFloor)))
+      : 1;
+  const currentFloor = legacyLevel > 0 ? tierXpRequired(legacyLevel) : 0;
+  const currentCeiling =
+    legacyLevel < PASS_TIER_COUNT ? tierXpRequired(legacyLevel + 1) : currentFloor;
+  const highestClaimed = Math.max(0, ...claimedFree, ...claimedPremium);
+  const remappedXp = Math.max(
+    Math.round(currentFloor + (currentCeiling - currentFloor) * progress),
+    highestClaimed > 0 ? tierXpRequired(highestClaimed) : 0,
+  );
+
+  return {
+    ...state,
+    balanceVersion: PASS_BALANCE_VERSION,
+    xp: remappedXp,
+    claimedFree,
+    claimedPremium,
+  };
 }
 
 /**
@@ -491,11 +608,13 @@ export function xpForTier(tier: number): number {
  */
 export function addPassXp(state: PassState, xp: number): PassState {
   const delta = Math.max(0, Math.floor(xp));
+  const current = synchronizePassBalance(state);
   return {
-    ...state,
-    xp: state.xp + delta,
-    claimedFree: [...state.claimedFree],
-    claimedPremium: [...state.claimedPremium],
+    ...current,
+    balanceVersion: PASS_BALANCE_VERSION,
+    xp: current.xp + delta,
+    claimedFree: [...current.claimedFree],
+    claimedPremium: [...current.claimedPremium],
   };
 }
 

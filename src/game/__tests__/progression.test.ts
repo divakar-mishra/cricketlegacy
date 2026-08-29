@@ -2,6 +2,7 @@ import { MatchState, Player, SaveGame } from '../../domain/types';
 import { computeOverall } from '../../engine/rating';
 import { makeRng } from '../../engine/rng';
 import {
+  ALLROUNDER_TRAINING_GAIN_MULTIPLIER,
   applyTraining,
   canTrain,
   canTrainGroup,
@@ -13,7 +14,10 @@ import {
   seasonAwards,
   sessionsDone,
   trainingCost,
+  trainingCostMultiplier,
+  trainingFocusSessionLimit,
   trainingGroupsForRole,
+  trainingSessionLimit,
   updateFormAfterMatch,
   userPerformance,
 } from '../progression';
@@ -72,6 +76,19 @@ describe('developPlayer (age curve)', () => {
     expect(p.age).toBe(37);
     expect(p.overall).toBeLessThan(before);
   });
+
+  it('does not automatically grow a young player beyond the active stage cap', () => {
+    const p = makePlayer({ age: 14, potential: 90 });
+    for (const group of ['batting', 'bowling', 'fielding', 'meta'] as const) {
+      const attributes = p[group] as unknown as Record<string, number>;
+      for (const key of Object.keys(attributes)) attributes[key] = 62;
+    }
+    developPlayer(p, makeRng(3), 62);
+    expect(p.age).toBe(15);
+    for (const group of ['batting', 'bowling', 'fielding', 'meta'] as const) {
+      expect(Math.max(...Object.values(p[group]))).toBeLessThanOrEqual(62);
+    }
+  });
 });
 
 describe('training', () => {
@@ -80,16 +97,28 @@ describe('training', () => {
     const keeper = makePlayer({ role: 'WK_BATTER' });
     const allrounder = makePlayer({ role: 'ALLROUNDER' });
 
-    expect(trainingGroupsForRole('BATTER')).toEqual(['batting', 'fitness', 'mental']);
-    expect(trainingGroupsForRole('BOWLER')).toEqual(['bowling', 'fitness', 'mental']);
-    expect(trainingGroupsForRole('WK_BATTER')).toEqual(['batting', 'wicketkeeping', 'fitness']);
-    expect(trainingGroupsForRole('ALLROUNDER')).toEqual(['batting', 'bowling', 'fitness']);
+    expect(trainingGroupsForRole('BATTER')).toEqual(['batting', 'fielding', 'fitness', 'mental']);
+    expect(trainingGroupsForRole('BOWLER')).toEqual(['bowling', 'fielding', 'fitness', 'mental']);
+    expect(trainingGroupsForRole('WK_BATTER')).toEqual([
+      'batting',
+      'wicketkeeping',
+      'fielding',
+      'fitness',
+      'mental',
+    ]);
+    expect(trainingGroupsForRole('ALLROUNDER')).toEqual([
+      'batting',
+      'bowling',
+      'fielding',
+      'fitness',
+      'mental',
+    ]);
     expect(canTrainGroup(batter, 'bowling')).toBe(false);
-    expect(canTrainGroup(keeper, 'fielding')).toBe(false);
-    expect(canTrainGroup(keeper, 'mental')).toBe(false);
+    expect(canTrainGroup(keeper, 'fielding')).toBe(true);
+    expect(canTrainGroup(keeper, 'mental')).toBe(true);
     expect(canTrainGroup(keeper, 'fitness')).toBe(true);
     expect(canTrainGroup(allrounder, 'bowling')).toBe(true);
-    expect(canTrainGroup(allrounder, 'fielding')).toBe(false);
+    expect(canTrainGroup(allrounder, 'fielding')).toBe(true);
   });
 
   it('rejects hidden training disciplines without spending a session', () => {
@@ -103,17 +132,35 @@ describe('training', () => {
     expect(sessionsDone(p, 'bowling')).toBe(0);
   });
 
-  it('improves the two weakest attributes and costs more each session', () => {
+  it('directly improves the three weakest eligible attributes', () => {
     const p = makePlayer({
       batting: { technique: 30, timing: 70, power: 70, footwork: 40, temperament: 70, running: 70 },
     });
     const gains = applyTraining(p, 'batting', makeRng(5));
-    expect(gains).toHaveLength(2);
+    expect(gains).toHaveLength(3);
     for (const g of gains) expect(g.to).toBeGreaterThan(g.from);
     expect(p.trainingSessionsThisSeason).toBe(1);
-    // weakest two were technique(30) & footwork(40)
+    // The two uniquely weakest attributes must always be included.
     expect(p.batting.technique).toBeGreaterThan(30);
     expect(p.batting.footwork).toBeGreaterThan(40);
+  });
+
+  it('keeps All-Rounder sessions visible while accounting for dual-discipline workload', () => {
+    let specialistGain = 0;
+    let allRounderGain = 0;
+    for (let seed = 1; seed <= 24; seed += 1) {
+      const specialist = makePlayer({ role: 'BATTER' });
+      const allRounder = makePlayer({ role: 'ALLROUNDER' });
+      const specialistGains = applyTraining(specialist, 'batting', makeRng(seed));
+      const allRounderGains = applyTraining(allRounder, 'batting', makeRng(seed));
+      expect(allRounderGains.length).toBeGreaterThan(0);
+      expect(allRounderGains.every((gain) => gain.to > gain.from)).toBe(true);
+      specialistGain += specialistGains.reduce((sum, gain) => sum + gain.to - gain.from, 0);
+      allRounderGain += allRounderGains.reduce((sum, gain) => sum + gain.to - gain.from, 0);
+    }
+
+    expect(ALLROUNDER_TRAINING_GAIN_MULTIPLIER).toBe(0.98);
+    expect(allRounderGain).toBeLessThan(specialistGain);
   });
 
   it('tracks costs per training discipline', () => {
@@ -122,20 +169,26 @@ describe('training', () => {
 
     expect(sessionsDone(p, 'batting')).toBe(1);
     expect(sessionsDone(p, 'bowling')).toBe(0);
-    expect(trainingCost(sessionsDone(p, 'batting'))).toBe(400);
-    expect(trainingCost(sessionsDone(p, 'bowling'))).toBe(250);
+    expect(trainingCost(sessionsDone(p, 'batting'))).toBe(450);
+    expect(trainingCost(sessionsDone(p, 'bowling'))).toBe(300);
   });
 
-  it('caps a season at six sessions and one focus at three', () => {
+  it('uses stage-specific season and focus limits', () => {
     const p = makePlayer({ role: 'ALLROUNDER' });
-    for (let i = 0; i < 3; i += 1) applyTraining(p, 'batting', makeRng(20 + i));
+    expect(trainingSessionLimit('SCHOOL')).toBe(8);
+    expect(trainingSessionLimit('U19')).toBe(12);
+    expect(trainingSessionLimit('DOMESTIC')).toBe(18);
+    expect(trainingFocusSessionLimit('SCHOOL')).toBe(4);
+    expect(trainingFocusSessionLimit('DOMESTIC')).toBe(9);
 
-    expect(canTrain(p, 'batting')).toBe(false);
-    expect(canTrain(p, 'bowling')).toBe(true);
+    for (let i = 0; i < 4; i += 1) applyTraining(p, 'batting', makeRng(20 + i), 'SCHOOL');
 
-    for (let i = 0; i < 3; i += 1) applyTraining(p, 'bowling', makeRng(30 + i));
-    expect(sessionsDone(p)).toBe(6);
-    expect(canTrain(p, 'fitness')).toBe(false);
+    expect(canTrain(p, 'batting', 'SCHOOL')).toBe(false);
+    expect(canTrain(p, 'bowling', 'SCHOOL')).toBe(true);
+
+    for (let i = 0; i < 4; i += 1) applyTraining(p, 'bowling', makeRng(30 + i), 'SCHOOL');
+    expect(sessionsDone(p)).toBe(8);
+    expect(canTrain(p, 'fitness', 'SCHOOL')).toBe(false);
   });
 
   it('trains wicketkeeping, fitness, and mental as separate role focuses', () => {
@@ -147,7 +200,7 @@ describe('training', () => {
 
     applyTraining(keeper, 'wicketkeeping', makeRng(4));
     expect(keeper.fielding.keeping).toBeGreaterThan(20);
-    expect(keeper.fielding.catching).toBe(70);
+    expect(keeper.fielding.catching).toBeGreaterThan(70);
 
     applyTraining(keeper, 'fitness', makeRng(4));
     expect(keeper.meta.fitness).toBeGreaterThan(30);
@@ -177,19 +230,30 @@ describe('training', () => {
     const normal = makePlayer({ role: 'BATTER' });
     const accelerated = JSON.parse(JSON.stringify(normal)) as Player;
     const normalGains = applyTraining(normal, 'batting', makeRng(33), 'DOMESTIC');
-    const acceleratedGains = applyTraining(accelerated, 'batting', makeRng(33), 'DOMESTIC', 3);
+    const acceleratedGains = applyTraining(accelerated, 'batting', makeRng(33), 'DOMESTIC', 1.5);
 
     expect(acceleratedGains).toHaveLength(normalGains.length);
+    const normalTotal = normalGains.reduce((total, gain) => total + gain.to - gain.from, 0);
+    const acceleratedTotal = acceleratedGains.reduce(
+      (total, gain) => total + gain.to - gain.from,
+      0,
+    );
+    expect(acceleratedTotal).toBeGreaterThan(normalTotal);
     for (let index = 0; index < normalGains.length; index += 1) {
-      expect(acceleratedGains[index].to - acceleratedGains[index].from).toBe(
-        (normalGains[index].to - normalGains[index].from) * 3,
+      expect(acceleratedGains[index].to - acceleratedGains[index].from).toBeGreaterThanOrEqual(
+        normalGains[index].to - normalGains[index].from,
       );
     }
   });
 
-  it('cost scales with sessions done', () => {
-    expect(trainingCost(0)).toBe(250);
-    expect(trainingCost(2)).toBe(250 + 2 * 150);
+  it('cost scales with sessions and current OVR', () => {
+    expect(trainingCost(0, 60)).toBe(300);
+    expect(trainingCost(2, 60)).toBe(300 + 2 * 150);
+    expect(trainingCostMultiplier(75)).toBe(1.25);
+    expect(trainingCostMultiplier(82)).toBe(1.75);
+    expect(trainingCostMultiplier(87)).toBe(2.5);
+    expect(trainingCostMultiplier(92)).toBe(3.5);
+    expect(trainingCost(0, 92)).toBe(1_050);
   });
 });
 

@@ -6,9 +6,7 @@ const matchScreen = fs.readFileSync(path.join(__dirname, '..', 'MatchScreen.tsx'
 describe('match back navigation guard', () => {
   it('wires Android hardware back to the active-match leave confirmation', () => {
     expect(matchScreen).toContain("BackHandler.addEventListener('hardwareBackPress'");
-    expect(matchScreen).toContain(
-      'Leaving now will restart or forfeit the current match. Are you sure you want to leave?',
-    );
+    expect(matchScreen).toContain('Leaving restarts or forfeits this match.');
     expect(matchScreen).toContain('Stay in match');
     expect(matchScreen).toContain('Leave match');
     expect(matchScreen).toContain('leaveDialogOpen');

@@ -1,10 +1,6 @@
 /**
  * Rewarded/interstitial boundary with a lazily loaded AdMob native module.
  *
- * Rewarded ads only resolve `{ completed: true }` after the real provider emits
- * an earned-reward callback. Local/dev builds without an ad SDK return
- * `{ completed: false }` so gameplay never grants fake rewards.
- *
  * ---------------------------------------------------------------------------
  * The live provider is implemented below and kept behind this interface.
  * Keep all SDK usage inside this module and flip {@link MOCK_MODE} to `false`.
@@ -259,6 +255,11 @@ export async function maybeShowInterstitial(
   if (history.length >= INTERSTITIAL_MAX_PER_WINDOW || now - latest < minGapMs) return false;
   const shown = await showInterstitial(true);
   if (!shown) return false;
-  await setJSON(INTERSTITIAL_HISTORY_KEY, [...history, Date.now()]);
+  try {
+    await setJSON(INTERSTITIAL_HISTORY_KEY, [...history, Date.now()]);
+  } catch {
+    // The ad was already shown. Persistence failure must not become an
+    // unhandled rejection in the hub; keep the in-memory gap as a fallback.
+  }
   return true;
 }

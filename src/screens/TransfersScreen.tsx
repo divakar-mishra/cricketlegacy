@@ -22,7 +22,13 @@ import {
   ScreenHeader,
 } from '../components';
 import { Player } from '../domain/types';
-import { computeValue, formatClubCurrency, MAX_SQUAD, MIN_SQUAD, WAGE_RATE } from '../game/finance';
+import {
+  computeValue,
+  formatClubCurrency,
+  maxSquadSize,
+  MIN_SQUAD,
+  WAGE_RATE,
+} from '../game/finance';
 import { SCOUT_FEE, superstarPrefersClub } from '../game/manager';
 import { MANAGER_FAST_TRACK_SCOUT_COINS } from '../game/managerResources';
 import {
@@ -124,7 +130,7 @@ function BidWarModal({
         <Animated.View entering={FadeInDown.duration(220)} style={[styles.bidCard, shadow.card]}>
           {/* Header */}
           <View style={styles.bidHeader}>
-            <Text style={styles.bidTitle}>Transfer Bid War!</Text>
+            <Text style={styles.bidTitle}>Bid War</Text>
             <View style={[styles.timerBadge, { backgroundColor: urgency }]}>
               <Text style={styles.timerText}>{timeLeft}s</Text>
             </View>
@@ -202,10 +208,10 @@ function BidWarModal({
             </View>
             <Text style={styles.urgencyHint}>
               {timeLeft > 20
-                ? 'The rival club is considering their options.'
+                ? 'Rival considering.'
                 : timeLeft > 10
-                  ? 'The rival club is close to sealing the deal.'
-                  : 'Critical: decide now or be outbid.'}
+                  ? 'Rival close to signing.'
+                  : 'Decide now or lose the player.'}
             </Text>
             <Text style={styles.bidFooter}>
               Minimum next bid: {fmtMoney(counterOffer)} - Wage requirement:{' '}
@@ -315,6 +321,18 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
     );
   }
 
+  if (save.mode === 'manager' && save.managerCareerLevel === 'NATIONAL') {
+    return (
+      <Screen>
+        <ScreenHeader title="Transfers" onBack={() => navigation.goBack()} />
+        <Card style={styles.nationalPauseCard}>
+          <Icon name="flag-outline" size={24} color={colors.primaryLight} />
+          <Text style={styles.nationalPauseTitle}>Club operations paused</Text>
+        </Card>
+      </Screen>
+    );
+  }
+
   const team = save.teams[save.userTeamId];
   const freeAgents = (save.freeAgents ?? [])
     .map((id) => save.players[id])
@@ -326,13 +344,14 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
     .sort((a, b) => b.overall - a.overall);
 
   const isManager = save.mode === 'manager';
+  const squadCap = maxSquadSize(save);
   const transferWindowOpen = isTransferWindowOpen(save);
   const scoutRevealTokens = Math.max(0, save.inventory?.scout_full_reveal_token ?? 0);
 
   const onSign = (p: Player) => {
     if (bidWar || actionInFlightRef.current) return;
     if (isManager && !transferWindowOpen) {
-      showFlash('Transfer window closed - scouting is available, signings are disabled.', false);
+      showFlash('Transfer window closed.', false);
       return;
     }
     const value = computeValue(p);
@@ -423,8 +442,8 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
     setSigningId(null);
     showFlash(
       reason === 'expired'
-        ? `Outbid: deadline expired and the player joined ${rivalClub}.`
-        : `Withdrawn: you ended negotiations and the player joined ${rivalClub}.`,
+        ? `Outbid: deadline expired; the player joined ${rivalClub}.`
+        : `Withdrawn: the player joined ${rivalClub}.`,
       false,
     );
   };
@@ -483,14 +502,14 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
         if (!result) return;
         showFlash(
           result.ok
-            ? `Full report ready: ${p.name} is ${result.report?.knownOverall ?? p.overall} OVR. Fitness, form, injury status and valuation are now confirmed.`
+            ? `Full report: ${p.name} · ${result.report?.knownOverall ?? p.overall} OVR. Fitness, form, injury and value confirmed.`
             : (result.reason ?? 'Full report unavailable.'),
           result.ok,
         );
       };
       Alert.alert(
         'Scouting options',
-        `${p.name} is currently at ${Math.round((1 - report.uncertainty) * 100)}% Scout Confidence. Fast-track adds 25 percentage points once per season.`,
+        `${p.name} · ${Math.round((1 - report.uncertainty) * 100)}% scout confidence. Fast-track: +25 points, once per season.`,
         [
           { text: 'Cancel', style: 'cancel' },
           scoutRevealTokens > 0
@@ -506,7 +525,7 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
     }
     Alert.alert(
       'Full Scout Intelligence',
-      `Reveal ${p.name}'s exact overall, fitness, form, injury status and valuation now?\n\n${scoutRevealTokens} token${scoutRevealTokens === 1 ? '' : 's'} available. A normal scout report costs ${fmtMoney(SCOUT_FEE)}.`,
+      `Reveal ${p.name}'s exact overall, fitness, form, injury status and valuation?\n\n${scoutRevealTokens} token${scoutRevealTokens === 1 ? '' : 's'} · Normal report: ${fmtMoney(SCOUT_FEE)}.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Scout normally', onPress: () => onScout(p.id) },
@@ -519,7 +538,7 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
             if (!result) return;
             showFlash(
               result.ok
-                ? `Full report ready: ${p.name} is ${result.report?.knownOverall ?? p.overall} OVR. Fitness, form, injury status and valuation are now confirmed.`
+                ? `Full report: ${p.name} · ${result.report?.knownOverall ?? p.overall} OVR. Fitness, form, injury and value confirmed.`
                 : (result.reason ?? 'Full report unavailable.'),
               result.ok,
             );
@@ -566,14 +585,20 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
     if (tab === 'market') {
       const value = computeValue(p);
       const canAfford =
-        transferWindowOpen && team.budget >= value && team.playerIds.length < MAX_SQUAD;
+        transferWindowOpen && team.budget >= value && team.playerIds.length < squadCap;
       const rep = isManager ? save.scoutReports?.find((r) => r.playerId === p.id) : undefined;
-      const confident = rep != null && rep.uncertainty < 0.2;
-      const shownOvr = !isManager ? p.overall : rep ? rep.knownOverall : '?';
+      const fullReport = !isManager || Boolean(rep && rep.uncertainty <= 0);
+      const shownOvr = !isManager
+        ? p.overall
+        : fullReport
+          ? p.overall
+          : rep
+            ? `~${rep.knownOverall}`
+            : '?';
       const interest = isManager ? rivalInterestCount(save, p.id) : 0;
       const hotProperty = interest >= 2;
       const actionPending = Boolean(pendingTransferAction);
-      const squadFull = team.playerIds.length >= MAX_SQUAD;
+      const squadFull = team.playerIds.length >= squadCap;
       const signLabel = !transferWindowOpen
         ? 'Closed'
         : squadFull
@@ -607,11 +632,13 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
                 {ROLE_ABBR[p.role]} · Age {p.age}
               </Text>
             </Pressable>
-            <PlayerStatusBadges
-              injured={Boolean(p.injury)}
-              fitness={p.meta.fitness}
-              mood={p.morale}
-            />
+            {fullReport ? (
+              <PlayerStatusBadges
+                injured={Boolean(p.injury)}
+                fitness={p.meta.fitness}
+                mood={p.morale}
+              />
+            ) : null}
             <View style={styles.ovrBlock}>
               <Text style={styles.ovr}>{shownOvr}</Text>
               <Text style={styles.ovrLabel}>OVR</Text>
@@ -620,15 +647,15 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
           <View style={styles.marketActionRow}>
             <Text style={styles.marketStatus} numberOfLines={1}>
               {rep
-                ? confident
-                  ? 'Scouting confirmed'
+                ? fullReport
+                  ? 'Full report available'
                   : `${Math.round((1 - rep.uncertainty) * 100)}% scout confidence`
                 : isManager
                   ? 'Not scouted'
                   : fmtMoney(value)}
             </Text>
             <View style={styles.rowActions}>
-              {isManager && !confident ? (
+              {isManager && !fullReport ? (
                 <Button
                   label={scoutRevealTokens > 0 ? `Reveal (${scoutRevealTokens})` : 'Scout'}
                   size="sm"
@@ -659,85 +686,119 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
       const canLoan =
         transferWindowOpen &&
         team.budget >= loanFee1 &&
-        team.playerIds.length < MAX_SQUAD &&
+        team.playerIds.length < squadCap &&
         !p.loanedFrom;
       const isFreeAgent = (save.freeAgents ?? []).includes(p.id);
+      const report = isManager
+        ? save.scoutReports?.find((entry) => entry.playerId === p.id)
+        : undefined;
+      const fullReport = !isManager || Boolean(report && report.uncertainty <= 0);
+      const shownOverall = fullReport ? p.overall : report ? `~${report.knownOverall}` : '?';
       const actionPending = Boolean(pendingTransferAction);
       const loanLabel = !transferWindowOpen
         ? 'Closed'
-        : team.playerIds.length >= MAX_SQUAD
+        : team.playerIds.length >= squadCap
           ? 'Squad full'
           : team.budget < loanFee1
             ? 'No funds'
             : 'Loan';
       const contractLabel = !transferWindowOpen
         ? 'Closed'
-        : team.playerIds.length >= MAX_SQUAD
+        : team.playerIds.length >= squadCap
           ? 'Squad full'
           : 'Contract';
       return (
         <Animated.View entering={FadeIn.duration(250)} style={styles.row}>
-          <CountryBadge countryId={p.nationality} />
-          <Pressable
-            style={{ flex: 1 }}
-            onPress={() => navigation.navigate('PlayerProfile', { playerId: p.id })}
-          >
-            <Text style={styles.name} numberOfLines={1}>
-              {p.name}
+          <View style={styles.playerMainRow}>
+            <CountryBadge countryId={p.nationality} />
+            <Pressable
+              style={styles.playerIdentity}
+              onPress={() => navigation.navigate('PlayerProfile', { playerId: p.id })}
+            >
+              <Text style={styles.name} numberOfLines={1}>
+                {p.name}
+              </Text>
+              <Text style={styles.meta}>
+                {ROLE_ABBR[p.role]} · Age {p.age}
+                {isFreeAgent
+                  ? ' · Free Agent'
+                  : ` · ${Object.values(save.teams).find((t) => t.playerIds.includes(p.id))?.shortName ?? '?'}`}
+              </Text>
+            </Pressable>
+            {fullReport ? (
+              <PlayerStatusBadges
+                injured={Boolean(p.injury)}
+                fitness={p.meta.fitness}
+                mood={p.morale}
+              />
+            ) : null}
+            <View style={styles.ovrBlock}>
+              <Text style={styles.ovr}>{shownOverall}</Text>
+              <Text style={styles.ovrLabel}>OVR</Text>
+            </View>
+          </View>
+          <View style={styles.marketActionRow}>
+            <Text style={styles.marketStatus} numberOfLines={1}>
+              {report
+                ? `${Math.round((1 - report.uncertainty) * 100)}% scout confidence`
+                : `Loan fee ${fmtMoney(loanFee1)}`}
             </Text>
-            <Text style={styles.meta}>
-              {ROLE_ABBR[p.role]} · Age {p.age} · {p.overall} OVR
-              {isFreeAgent
-                ? ' · Free Agent'
-                : ` · ${Object.values(save.teams).find((t) => t.playerIds.includes(p.id))?.shortName ?? '?'}`}
-            </Text>
-            <Text style={[styles.meta, { color: colors.accent }]}>
-              1-season loan: {fmtMoney(loanFee1)}
-            </Text>
-          </Pressable>
-          <PlayerStatusBadges
-            injured={Boolean(p.injury)}
-            fitness={p.meta.fitness}
-            mood={p.morale}
-          />
-          <Text style={styles.ovr}>{p.overall}</Text>
-          <Button
-            label={loanLabel}
-            size="sm"
-            variant="secondary"
-            fullWidth={false}
-            disabled={!canLoan || actionPending}
-            onPress={() => {
-              const res = runTransferAction(`loan:${p.id}`, () => loanPlayer(p.id, 1));
-              if (!res) return;
-              showFlash(
-                res.ok
-                  ? `${p.name} loaned for 1 season (-${fmtMoney(res.cost)})`
-                  : (res.reason ?? 'Cannot loan.'),
-                res.ok,
-              );
-            }}
-          />
-          {isFreeAgent && (
-            <Button
-              label={contractLabel}
-              size="sm"
-              variant="ghost"
-              fullWidth={false}
-              style={{ marginLeft: spacing.xs }}
-              disabled={!transferWindowOpen || team.playerIds.length >= MAX_SQUAD || actionPending}
-              onPress={() => {
-                const res = runTransferAction(`contract:${p.id}`, () =>
-                  offerFreeAgentContract(p.id, 2),
-                );
-                if (!res) return;
-                showFlash(
-                  res.ok ? `${p.name} signed on a free transfer` : (res.reason ?? 'Cannot sign.'),
-                  res.ok,
-                );
-              }}
-            />
-          )}
+            <View style={styles.rowActions}>
+              {isManager && !fullReport ? (
+                <Button
+                  label="Scout"
+                  size="sm"
+                  variant="secondary"
+                  fullWidth={false}
+                  style={styles.rowAction}
+                  disabled={actionPending}
+                  onPress={() => onScoutChoice(p)}
+                />
+              ) : null}
+              <Button
+                label={loanLabel}
+                size="sm"
+                variant="secondary"
+                fullWidth={false}
+                style={styles.rowAction}
+                disabled={!canLoan || actionPending}
+                onPress={() => {
+                  const res = runTransferAction(`loan:${p.id}`, () => loanPlayer(p.id, 1));
+                  if (!res) return;
+                  showFlash(
+                    res.ok
+                      ? `${p.name} loaned for 1 season (-${fmtMoney(res.cost)})`
+                      : (res.reason ?? 'Cannot loan.'),
+                    res.ok,
+                  );
+                }}
+              />
+              {isFreeAgent ? (
+                <Button
+                  label={contractLabel}
+                  size="sm"
+                  variant="ghost"
+                  fullWidth={false}
+                  style={styles.rowAction}
+                  disabled={
+                    !transferWindowOpen || team.playerIds.length >= squadCap || actionPending
+                  }
+                  onPress={() => {
+                    const res = runTransferAction(`contract:${p.id}`, () =>
+                      offerFreeAgentContract(p.id, 2),
+                    );
+                    if (!res) return;
+                    showFlash(
+                      res.ok
+                        ? `${p.name} signed on a free transfer`
+                        : (res.reason ?? 'Cannot sign.'),
+                      res.ok,
+                    );
+                  }}
+                />
+              ) : null}
+            </View>
+          </View>
         </Animated.View>
       );
     }
@@ -830,7 +891,7 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
           <View style={styles.financeItem}>
             <Text style={styles.financeLabel}>Squad</Text>
             <Text style={styles.squadSize}>
-              {team.playerIds.length} / {MAX_SQUAD}
+              {team.playerIds.length} / {squadCap}
             </Text>
           </View>
           <View style={styles.financeDivider} />
@@ -856,10 +917,6 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
         <Card style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>Transfer window closed</Text>
           <Text style={styles.emptyText}>{transferWindowLabel(save)}</Text>
-          <Text style={styles.emptyText}>
-            Scouting and squad review remain available. Signings, loans and contracts reopen in the
-            next window.
-          </Text>
         </Card>
       ) : null}
 
@@ -885,8 +942,8 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
         <View style={styles.marketHintRow}>
           <Text style={[styles.marketHint, { flex: 1 }]}>
             {scoutRevealTokens > 0
-              ? `Full Scout Intelligence ready: ${scoutRevealTokens} instant reveal${scoutRevealTokens === 1 ? '' : 's'} available.`
-              : `Full reveals cost ${SCOUT_FULL_REVEAL_GEMS} gems or a Store token. Rival interest can trigger bid wars.`}
+              ? `${scoutRevealTokens} full-reveal token${scoutRevealTokens === 1 ? '' : 's'} available.`
+              : `Full reveal: ${SCOUT_FULL_REVEAL_GEMS} gems or a Store token. Rival interest may trigger bid wars.`}
           </Text>
           <MechanicInfoButton topicId="scout-confidence" size={40} />
         </View>
@@ -962,7 +1019,7 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
           keyExtractor={(p) => p.id}
           renderItem={renderRow}
           ListHeaderComponent={ListHeader}
-          ListEmptyComponent={<Text style={styles.emptyList}>No players here right now.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyList}>No players found.</Text>}
           contentContainerStyle={{ paddingBottom: spacing.xxl }}
           showsVerticalScrollIndicator={false}
         />
@@ -985,6 +1042,13 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     msg: { color: colors.textMuted, fontSize: fontSize.md, marginBottom: spacing.lg },
+    nationalPauseCard: { marginTop: spacing.md, gap: spacing.sm },
+    nationalPauseTitle: {
+      color: colors.text,
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.heavy,
+    },
+    nationalPauseCopy: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
 
     // Finance strip
     finance: {
@@ -1145,7 +1209,13 @@ const makeStyles = (colors: ThemeColors) =>
       paddingLeft: 28,
     },
     marketStatus: { flex: 1, minWidth: 0, color: colors.textFaint, fontSize: 10 },
-    rowActions: { flexDirection: 'row', gap: spacing.xs, flexShrink: 0 },
+    rowActions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+      gap: spacing.xs,
+      flexShrink: 0,
+    },
     rowAction: { minWidth: 72, maxWidth: 112 },
     emptyList: {
       color: colors.textFaint,

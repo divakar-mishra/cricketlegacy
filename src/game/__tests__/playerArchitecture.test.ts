@@ -95,19 +95,32 @@ describe('Player Career architecture', () => {
     ).toBe(true);
   });
 
-  it('stores literal school exams and senior weekly selection blocks', () => {
+  it('takes School and Under-19 players directly to matches while keeping senior blocks', () => {
     const school = career(14);
     const schoolState = buildPlayerSeasonCalendar(school)!;
-    expect(schoolState.events.filter((item) => item.kind === 'TRAINING')).toHaveLength(2);
-    expect(schoolState.events.filter((item) => item.kind === 'EXAM')).toHaveLength(2);
-    expect(schoolState.events.some((item) => item.kind === 'RECOVERY')).toBe(true);
-    expect(schoolState.events.some((item) => item.kind === 'SELECTION')).toBe(true);
+    expect(schoolState.events).toHaveLength(6);
+    expect(schoolState.events.every((item) => item.kind === 'MATCH')).toBe(true);
+    expect(currentPlayerCalendarEvent(school)).toMatchObject({ kind: 'MATCH', format: 'T20' });
+    expect(resolvePlayerCalendarEvent(school, 'SKILL')).toMatchObject({
+      ok: false,
+      reason: 'Play this fixture to advance.',
+    });
 
-    expect(currentPlayerCalendarEvent(school)?.kind).toBe('TRAINING');
-    expect(resolvePlayerCalendarEvent(school, 'SKILL').ok).toBe(true);
-    expect(currentPlayerCalendarEvent(school)?.kind).toBe('TRAINING');
-    expect(resolvePlayerCalendarEvent(school, 'FITNESS').ok).toBe(true);
-    expect(currentPlayerCalendarEvent(school)?.kind).toBe('EXAM');
+    const under19 = career(18);
+    const under19State = buildPlayerSeasonCalendar(under19)!;
+    expect(under19State.events).toHaveLength(8);
+    expect(under19State.events.every((item) => item.kind === 'MATCH')).toBe(true);
+    expect(under19State.events.map((item) => item.format)).toEqual([
+      'ODI',
+      'ODI',
+      'ODI',
+      'ODI',
+      'T20',
+      'T20',
+      'T20',
+      'T20',
+    ]);
+    expect(currentPlayerCalendarEvent(under19)).toMatchObject({ kind: 'MATCH', format: 'ODI' });
 
     const senior = career(21);
     const state = buildPlayerSeasonCalendar(senior)!;
@@ -132,6 +145,7 @@ describe('Player Career architecture', () => {
     expect(declareInternationalCountry(save, 'australia').ok).toBe(true);
 
     save.players.user.overall = 85;
+    save.players.user.age = 22;
     save.nationalRep = 79;
     expect(accrueNationalRep(save, save.players.user, 10, { runs: 140, wickets: 5 }).calledUp).toBe(
       true,
@@ -144,10 +158,9 @@ describe('Player Career architecture', () => {
     expect(declareInternationalCountry(save, 'india').ok).toBe(false);
 
     const ids = generateInternationalWindowFixtures(save);
-    expect(ids).toHaveLength(9);
-    expect(new Set(ids.map((id) => save.fixtures[id].calendarMonth))).toEqual(
-      new Set([10, 11, 1, 2, 6, 7]),
-    );
+    expect(ids).toHaveLength(48);
+    expect(ids.every((id) => save.fixtures[id].calendarMonth !== 4)).toBe(true);
+    expect(ids.every((id) => save.fixtures[id].calendarMonth !== 5)).toBe(true);
     expect(ids.some((id) => save.fixtures[id].cupRound === 'Semi-Final')).toBe(false);
     expect(ids.some((id) => save.fixtures[id].cupRound === 'Final')).toBe(false);
     expect(ids.every((id) => save.fixtures[id].homeTeamId === 'national-australia')).toBe(true);
@@ -161,9 +174,11 @@ describe('Player Career architecture', () => {
     expect(save.players.user.nationality).toBe('india');
     expect(save.playerCareerResources?.domesticCountry).toBe('england');
     expect(save.teams[save.userTeamId!].country).toBe('england');
+    expect(save.franchiseTeamId).toBeDefined();
+    expect(save.teams[save.franchiseTeamId!].country).toBe('india');
     expect(
       Object.values(save.teams)
-        .filter((team) => !team.isNationalTeam)
+        .filter((team) => !team.isNationalTeam && team.id !== save.franchiseTeamId)
         .every((team) => team.country === 'england'),
     ).toBe(true);
   });

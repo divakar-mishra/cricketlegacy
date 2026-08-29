@@ -15,6 +15,8 @@ import { Player } from '../domain/types';
 import { weeklyWage } from '../game/career';
 import { formatClubCurrency, playerWage, seasonWageBill } from '../game/finance';
 import { facilityMaintenance, staffWageBill } from '../game/manager';
+import { activeManagerClub } from '../game/managerClubState';
+import { stadiumSeasonUpkeep } from '../game/stadiumManagement';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import {
@@ -77,7 +79,13 @@ export function WageBreakdownScreen({ navigation }: ScreenProps<'WageBreakdown'>
   // Manager-mode extras
   const isManager = save.mode === 'manager';
   const staffAnnual = isManager ? staffWageBill(save) : 0;
-  const upkeepAnnual = isManager ? facilityMaintenance(save) : 0;
+  const clubStadium =
+    isManager && save.managerCareerLevel !== 'NATIONAL'
+      ? activeManagerClub(save)?.stadium
+      : undefined;
+  const upkeepAnnual = isManager
+    ? facilityMaintenance(save) + (clubStadium ? stadiumSeasonUpkeep(clubStadium) : 0)
+    : 0;
   const finances = save.finances;
   const wageCap = finances?.wageBudgetPerSeason ?? team.budget;
   const budgetUsePct = Math.min(1, totalAnnualWage / wageCap);
@@ -127,7 +135,7 @@ export function WageBreakdownScreen({ navigation }: ScreenProps<'WageBreakdown'>
               )}
               {upkeepAnnual > 0 && (
                 <View style={styles.extraRow}>
-                  <Text style={styles.extraLabel}>Facility upkeep</Text>
+                  <Text style={styles.extraLabel}>Infrastructure upkeep</Text>
                   <Text style={styles.extraValue}>{wk(upkeepAnnual)}</Text>
                 </View>
               )}

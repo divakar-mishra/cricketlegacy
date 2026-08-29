@@ -3,6 +3,7 @@ import { addCoins, addGems } from './economy';
 import { addEliteStaffCandidates } from './manager';
 import { managerControlledTeamId, nextManagerUserFixtureId } from './managerCalendar';
 import { buildOppositionReport } from './oppositionAnalysis';
+import { managerClubOperationsPaused } from './managerClubState';
 import { clamp } from '../utils/math';
 
 export const MANAGER_MATCH_ANALYSIS_COINS = 650;
@@ -48,15 +49,17 @@ export function nextManagerFixtureId(save: SaveGame): string | undefined {
 function scopeFor(
   save: SaveGame,
   action: ManagerResourceAction,
-  targetPlayerId?: string,
+  targetId?: string,
 ): string | undefined {
   if (action === 'MATCH_ANALYSIS' || action === 'EMERGENCY_TEAM_TALK') {
+    if (targetId) {
+      const fixture = save.fixtures[targetId];
+      return fixture && !fixture.played ? targetId : undefined;
+    }
     return nextManagerFixtureId(save);
   }
   if (action === 'FAST_TRACK_SCOUT') {
-    return targetPlayerId && save.currentSeasonId
-      ? `${save.currentSeasonId}:${targetPlayerId}`
-      : undefined;
+    return targetId && save.currentSeasonId ? `${save.currentSeasonId}:${targetId}` : undefined;
   }
   return save.currentSeasonId;
 }
@@ -64,9 +67,9 @@ function scopeFor(
 export function managerResourceUsed(
   save: SaveGame,
   action: ManagerResourceAction,
-  targetPlayerId?: string,
+  targetId?: string,
 ): boolean {
-  const scopeId = scopeFor(save, action, targetPlayerId);
+  const scopeId = scopeFor(save, action, targetId);
   if (!scopeId) return false;
   return Boolean(
     save.managerResources?.transactions.some((entry) => entry.id === `${action}:${scopeId}`),
@@ -83,7 +86,7 @@ export function executeManagerResourceAction(
   targetPlayerIdOrNow?: string | number,
   now: number = Date.now(),
 ): ManagerResourceOutcome {
-  const targetPlayerId = typeof targetPlayerIdOrNow === 'string' ? targetPlayerIdOrNow : undefined;
+  const targetId = typeof targetPlayerIdOrNow === 'string' ? targetPlayerIdOrNow : undefined;
   const createdAt = typeof targetPlayerIdOrNow === 'number' ? targetPlayerIdOrNow : now;
   const currency = action === 'ELITE_STAFF_SEARCH' ? 'gems' : 'coins';
   const cost =
@@ -102,13 +105,13 @@ export function executeManagerResourceAction(
     reason,
   });
   if (save.mode !== 'manager' || !save.userTeamId) return fail('Available in Manager Career only.');
-  const activeTeamId =
-    action === 'MATCH_ANALYSIS' || action === 'EMERGENCY_TEAM_TALK'
-      ? managerControlledTeamId(save)
-      : save.userTeamId;
-  const team = activeTeamId ? save.teams[activeTeamId] : undefined;
-  if (!team) return fail('The active team could not be found.');
-  const scopeId = scopeFor(save, action, targetPlayerId);
+  if (
+    managerClubOperationsPaused(save) &&
+    (action === 'FAST_TRACK_SCOUT' || action === 'ELITE_STAFF_SEARCH')
+  ) {
+    return fail('Club services are paused during national duty.');
+  }
+  const scopeId = scopeFor(save, action, targetId);
   if (!scopeId) {
     return fail(
       action === 'MATCH_ANALYSIS' || action === 'EMERGENCY_TEAM_TALK'
@@ -117,6 +120,23 @@ export function executeManagerResourceAction(
           ? 'Choose a scouted transfer target first.'
           : 'No active season is available.',
     );
+  }
+  const scopedFixture =
+    action === 'MATCH_ANALYSIS' || action === 'EMERGENCY_TEAM_TALK'
+      ? save.fixtures[scopeId]
+      : undefined;
+  const activeTeamId =
+    action === 'MATCH_ANALYSIS' || action === 'EMERGENCY_TEAM_TALK'
+      ? managerControlledTeamId(save, scopedFixture?.managerPhase)
+      : save.userTeamId;
+  const team = activeTeamId ? save.teams[activeTeamId] : undefined;
+  if (!team) return fail('The active team could not be found.');
+  if (
+    scopedFixture &&
+    scopedFixture.homeTeamId !== activeTeamId &&
+    scopedFixture.awayTeamId !== activeTeamId
+  ) {
+    return fail('The selected fixture is not controlled by your manager.');
   }
   const state = ensureState(save);
   const transactionId = `${action}:${scopeId}`;
@@ -166,9 +186,9 @@ export function executeManagerResourceAction(
     state.totalCoinsSpent += cost;
     detail = `Emergency morale session lifted the three lowest-morale players by +5 morale before the upcoming fixture.`;
   } else if (action === 'FAST_TRACK_SCOUT') {
-    const player = targetPlayerId ? save.players[targetPlayerId] : undefined;
-    const report = targetPlayerId
-      ? save.scoutReports?.find((entry) => entry.playerId === targetPlayerId)
+    const player = targetId ? save.players[targetId] : undefined;
+    const report = targetId
+      ? save.scoutReports?.find((entry) => entry.playerId === targetId)
       : undefined;
     if (!player || !report) return fail('A normal scout report is required before fast-tracking.');
     if (report.uncertainty <= 0) return fail('This report is already at 100% confidence.');

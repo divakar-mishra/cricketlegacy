@@ -10,8 +10,40 @@ export interface CosmeticOption {
   id: string;
   label: string;
   preview: string; // emoji, or a hex colour for kits
+  /** Code-native preview used by the cosmetics picker. */
+  previewIcon?: string;
+  /** Accent colour paired with {@link previewIcon}. */
+  previewAccent?: string;
   gemCost: number; // 0 = free
   passExclusive?: boolean;
+}
+
+const CELEBRATION_VISUALS: Readonly<
+  Record<string, Pick<CosmeticOption, 'previewIcon' | 'previewAccent'>>
+> = {
+  cel_wave: { previewIcon: 'hand-left-outline', previewAccent: '#5DADE2' },
+  cel_fist: { previewIcon: 'fitness-outline', previewAccent: '#E8B332' },
+  cel_helmet: { previewIcon: 'shield-half-outline', previewAccent: '#E5484D' },
+  cel_sky: { previewIcon: 'arrow-up-circle-outline', previewAccent: '#4C9AFF' },
+  cel_dance: { previewIcon: 'musical-notes-outline', previewAccent: '#D95FCE' },
+  cel_legend: { previewIcon: 'walk-outline', previewAccent: '#30D070' },
+  pass_celebration_lights: { previewIcon: 'flashlight-outline', previewAccent: '#F5CF65' },
+  pass_celebration_rainmaker: { previewIcon: 'water-outline', previewAccent: '#36C6B0' },
+  pass_celebration_wave: { previewIcon: 'water-outline', previewAccent: '#50B7C5' },
+  pass_celebration_crest: { previewIcon: 'shield-outline', previewAccent: '#D5B56D' },
+  pass_celebration_pulse: { previewIcon: 'pulse-outline', previewAccent: '#5DADE2' },
+  pass_celebration_ice: { previewIcon: 'snow-outline', previewAccent: '#8FB8D8' },
+  pass_celebration_crown: { previewIcon: 'trophy-outline', previewAccent: '#E1B94F' },
+  pass_celebration_startrail: { previewIcon: 'star-outline', previewAccent: '#9D86E8' },
+  pass_celebration_dust: { previewIcon: 'cloud-outline', previewAccent: '#E36A54' },
+  pass_celebration_lightsout: { previewIcon: 'moon-outline', previewAccent: '#777EE8' },
+  pass_celebration_fireworks: { previewIcon: 'sparkles-outline', previewAccent: '#F07EC2' },
+  pass_celebration_numberone: { previewIcon: 'medal-outline', previewAccent: '#E6C75C' },
+  pass_celebration_legacy: { previewIcon: 'ribbon-outline', previewAccent: '#C59758' },
+};
+
+function withCelebrationVisual(option: CosmeticOption): CosmeticOption {
+  return { ...option, ...CELEBRATION_VISUALS[option.id] };
 }
 
 export const KIT_COLORS: CosmeticOption[] = [
@@ -40,26 +72,28 @@ export const KIT_COLORS: CosmeticOption[] = [
 ];
 
 export const CELEBRATIONS: CosmeticOption[] = [
-  { id: 'cel_wave', label: 'Classic Wave', preview: '👋', gemCost: 0 },
-  { id: 'cel_fist', label: 'Fist Pump', preview: '✊', gemCost: 0 },
-  { id: 'cel_helmet', label: 'Helmet Off', preview: '⛑️', gemCost: 30 },
-  { id: 'cel_sky', label: 'Sky Salute', preview: '☝️', gemCost: 50 },
-  { id: 'cel_dance', label: 'Victory Dance', preview: '💃', gemCost: 70 },
-  { id: 'cel_legend', label: 'Legend Walk', preview: '🚶‍♂️', gemCost: 100 },
-  {
+  withCelebrationVisual({ id: 'cel_wave', label: 'Classic Wave', preview: '👋', gemCost: 0 }),
+  withCelebrationVisual({ id: 'cel_fist', label: 'Fist Pump', preview: '✊', gemCost: 0 }),
+  withCelebrationVisual({ id: 'cel_helmet', label: 'Helmet Off', preview: '⛑️', gemCost: 30 }),
+  withCelebrationVisual({ id: 'cel_sky', label: 'Sky Salute', preview: '☝️', gemCost: 50 }),
+  withCelebrationVisual({ id: 'cel_dance', label: 'Victory Dance', preview: '💃', gemCost: 70 }),
+  withCelebrationVisual({ id: 'cel_legend', label: 'Legend Walk', preview: '🚶‍♂️', gemCost: 100 }),
+  withCelebrationVisual({
     id: 'pass_celebration_lights',
     label: 'Floodlight Salute',
     preview: '✦',
     gemCost: 0,
     passExclusive: true,
-  },
-  ...MONTHLY_PASS_CONTENT.map((content) => ({
-    id: content.celebration.id,
-    label: content.celebration.label,
-    preview: content.celebration.preview,
-    gemCost: 0,
-    passExclusive: true,
-  })),
+  }),
+  ...MONTHLY_PASS_CONTENT.map((content) =>
+    withCelebrationVisual({
+      id: content.celebration.id,
+      label: content.celebration.label,
+      preview: content.celebration.preview,
+      gemCost: 0,
+      passExclusive: true,
+    }),
+  ),
 ];
 
 const ALL_COSMETICS: CosmeticOption[] = [...KIT_COLORS, ...CELEBRATIONS];

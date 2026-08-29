@@ -6,9 +6,12 @@ describe('cloud save service', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'cloud.ts'), 'utf8');
 
     expect(source).toContain("from('cloud_saves').upsert");
-    expect(source).toContain("from('cloud_saves').select");
+    expect(source).toMatch(
+      /\.from\('cloud_saves'\)\s*\.select\('save_json, checksum'\)/,
+    );
     expect(source).toContain('currentSupabaseSession');
     expect(source).toContain('isSupabaseBackendEnabled');
     expect(source).toContain('DATA_PREFIX + key');
+    expect(source).toContain('checksum(canonicalJSON(row.save_json)) === row.checksum');
   });
 });

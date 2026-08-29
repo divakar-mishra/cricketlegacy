@@ -12,10 +12,17 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "ios": { "simulator": true }
+      "env": {
+        "NODE_ENV": "production",
+        "EXPO_PUBLIC_QA_TOOLS": "true"
+      },
+      "android": {
+        "gradleCommand": ":app:assembleQa"
+      }
     },
     "production": {
       "channel": "production",
+      "environment": "production",
       "autoIncrement": true
     }
   },

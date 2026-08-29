@@ -5,13 +5,32 @@
  * finances, and end-of-season settlement. Pure/mutating helpers, unit-tested.
  */
 import { namePoolFor } from '../data/names';
-import { Facilities, Player, SaveGame, ScoutReport, StaffMember, StaffRole } from '../domain/types';
+import {
+  Facilities,
+  ManagerCareerLevel,
+  Player,
+  SaveGame,
+  ScoutReport,
+  StaffMember,
+  StaffRole,
+} from '../domain/types';
 import { generateYouth } from '../generation/players';
 import { makeRng, Rng } from '../engine/rng';
 import { clamp } from '../utils/math';
-import { computeValue, maxSquadSize, WAGE_RATE } from './finance';
+import {
+  broadcastIncome,
+  computeValue,
+  FACILITY_LEVEL_UPKEEP,
+  maxSquadSize,
+  optionalClubSpendBlockReason,
+  playerWage,
+  WAGE_RATE,
+} from './finance';
 import { initialManagerLevel } from './managerCareer';
+import { synchronizeManagerClubState } from './managerClubState';
 import { passStaffSigningMultiplier, passSuperstarInterestBonus } from './seasonPass';
+import { XI_SIZE } from './squad';
+import { stadiumSeasonUpkeep } from './stadiumManagement';
 
 /* ---------------- Constants ---------------- */
 
@@ -28,6 +47,8 @@ export const STAFF_ROLES: { role: StaffRole; label: string }[] = [
 
 export const MAX_FACILITY = 5;
 export const MAX_STAFF_QUALITY = 92;
+export const MANAGER_DEBT_BOARD_PENALTY = 6;
+export const MANAGER_DEBT_INTERVENTION_PENALTY = 12;
 
 function hashSeed(str: string): number {
   let h = 2166136261 >>> 0;
@@ -144,7 +165,12 @@ export function ensureManagerDepth(save: SaveGame): void {
     save.managerCareerSeasons = 0;
     save.managerTitlesAtLevel = 0;
   }
+  if (save.managerAge == null) {
+    save.managerAge = Math.min(60, 35 + Math.max(0, save.careerSeasons ?? 0));
+  }
+  save.managerRetired = Boolean(save.managerRetired || save.managerAge >= 60);
   ensureContracts(save);
+  synchronizeManagerClubState(save);
 }
 
 function sustainableWage(reputation: number): number {
@@ -182,7 +208,8 @@ export function renewContract(save: SaveGame, playerId: string, years = 2): Rene
   if (!p || !team.playerIds.includes(playerId))
     return { ok: false, cost: 0, reason: 'Not in your squad.' };
   const fee = Math.round(computeValue(p) * 0.1);
-  if (team.budget < fee) return { ok: false, cost: fee, reason: 'Not enough budget.' };
+  const budgetBlock = optionalClubSpendBlockReason(save, fee);
+  if (budgetBlock) return { ok: false, cost: fee, reason: budgetBlock };
   team.budget -= fee;
   if (save.finances) save.finances.transferBudget = team.budget;
   const newWage = Math.round(computeValue(p) * WAGE_RATE * 1.08);
@@ -204,6 +231,9 @@ export function expiringContracts(save: SaveGame): Player[] {
 
 /**
  * Tick contracts on rollover: expired (non-user) players leave to free agency.
+ * A club cannot release its way below a legal XI; the final eleven receive a
+ * one-season emergency extension on their existing wage and remain available
+ * for an ordinary negotiated renewal.
  * Returns the ids that departed so the caller can report them.
  */
 export function tickContracts(save: SaveGame): string[] {
@@ -215,6 +245,10 @@ export function tickContracts(save: SaveGame): string[] {
     if (!p || !p.contract || id === save.userPlayerId) continue;
     p.contract.yearsLeft -= 1;
     if (p.contract.yearsLeft <= 0) {
+      if (team.playerIds.length <= XI_SIZE) {
+        p.contract.yearsLeft = 1;
+        continue;
+      }
       // Higher-rated players are more likely to actually walk if not renewed.
       team.playerIds = team.playerIds.filter((x) => x !== id);
       if (team.xi?.includes(id)) team.xi = undefined;
@@ -251,7 +285,8 @@ export function investInStaff(save: SaveGame, role: StaffRole): StaffOutcome {
   if (!staff) return { ok: false, cost: 0, reason: 'No such role.' };
   if (staff.quality >= MAX_STAFF_QUALITY) return { ok: false, cost: 0, reason: 'Already elite.' };
   const cost = staffInvestCost(staff.quality);
-  if (team.budget < cost) return { ok: false, cost, reason: 'Not enough budget.' };
+  const budgetBlock = optionalClubSpendBlockReason(save, cost);
+  if (budgetBlock) return { ok: false, cost, reason: budgetBlock };
   team.budget -= cost;
   if (save.finances) save.finances.transferBudget = team.budget;
   staff.quality = clamp(staff.quality + 4 + Math.floor(Math.random() * 3), 1, MAX_STAFF_QUALITY);
@@ -277,8 +312,13 @@ export function hireStaff(save: SaveGame, candidateId: string): StaffOutcome {
   const candidate = save.staffCandidates?.find((member) => member.id === candidateId);
   if (!candidate) return { ok: false, cost: 0, reason: 'Candidate is no longer available.' };
   const cost = Math.round(staffHireCost(candidate) * passStaffSigningMultiplier(save));
-  if (team.budget < cost) return { ok: false, cost, reason: 'Not enough club budget.' };
   const previous = staffByRole(save, candidate.role);
+  const budgetBlock = optionalClubSpendBlockReason(
+    save,
+    cost,
+    Math.max(0, candidate.wage - (previous?.wage ?? 0)),
+  );
+  if (budgetBlock) return { ok: false, cost, reason: budgetBlock };
   team.budget -= cost;
   save.staff = [
     ...(save.staff ?? []).filter((member) => member.role !== candidate.role),
@@ -388,27 +428,67 @@ export function facilityUpgradeCost(level: number): number {
 export function facilityMaintenance(save: SaveGame): number {
   const f = save.facilities;
   if (!f) return 0;
-  return (f.training + f.medical + f.academy) * 18_000;
+  return (f.training + f.medical + f.academy) * FACILITY_LEVEL_UPKEEP;
 }
 
 export interface FacilityOutcome {
   ok: boolean;
   cost: number;
   level?: number;
+  paymentMethod?: FacilityUpgradePaymentMethod;
   reason?: string;
 }
 
-export function upgradeFacility(save: SaveGame, kind: keyof Facilities): FacilityOutcome {
+export type FacilityUpgradePaymentMethod = 'CLUB_BUDGET' | 'TOKEN';
+
+/**
+ * Apply exactly the facility-upgrade payment method selected by the manager.
+ *
+ * The validation for the selected method is completed before either balance is
+ * mutated. In particular, owning a token never changes a CLUB_BUDGET purchase
+ * into a token purchase (or vice versa).
+ */
+export function upgradeFacility(
+  save: SaveGame,
+  kind: keyof Facilities,
+  paymentMethod: FacilityUpgradePaymentMethod,
+): FacilityOutcome {
   if (!save.userTeamId || !save.facilities) return { ok: false, cost: 0, reason: 'No club.' };
   const team = save.teams[save.userTeamId];
+  if (!team) return { ok: false, cost: 0, reason: 'No club.' };
   const level = save.facilities[kind];
   if (level >= MAX_FACILITY) return { ok: false, cost: 0, reason: 'Max level.' };
   const cost = facilityUpgradeCost(level + 1);
-  if (team.budget < cost) return { ok: false, cost, reason: 'Not enough budget.' };
-  team.budget -= cost;
-  if (save.finances) save.finances.transferBudget = team.budget;
+
+  if (paymentMethod === 'CLUB_BUDGET') {
+    const budgetBlock = optionalClubSpendBlockReason(save, cost, FACILITY_LEVEL_UPKEEP);
+    if (budgetBlock) return { ok: false, cost, reason: budgetBlock };
+  } else if (paymentMethod === 'TOKEN') {
+    const tokens = Math.max(0, Math.floor(save.inventory?.facility_upgrade_token ?? 0));
+    if (tokens < 1) return { ok: false, cost: 0, reason: 'No facility upgrade token.' };
+  } else {
+    return { ok: false, cost: 0, reason: 'Choose a valid payment method.' };
+  }
+
+  if (paymentMethod === 'CLUB_BUDGET') {
+    team.budget -= cost;
+    if (save.finances) save.finances.transferBudget = team.budget;
+  } else {
+    save.inventory = {
+      ...(save.inventory ?? {}),
+      facility_upgrade_token: Math.max(
+        0,
+        Math.floor(save.inventory?.facility_upgrade_token ?? 0) - 1,
+      ),
+    };
+  }
   save.facilities[kind] = level + 1;
-  return { ok: true, cost, level: level + 1 };
+  return {
+    ok: true,
+    cost: paymentMethod === 'CLUB_BUDGET' ? cost : 0,
+    level: level + 1,
+    paymentMethod,
+  };
 }
 
 /* ---------------- Coaching / facility effects ---------------- */
@@ -471,7 +551,8 @@ export function scoutPlayer(
   const team = save.teams[save.userTeamId];
   const p = save.players[playerId];
   if (!p) return { ok: false, cost: 0, reason: 'Unknown player.' };
-  if (team.budget < SCOUT_FEE) return { ok: false, cost: SCOUT_FEE, reason: 'Not enough budget.' };
+  const budgetBlock = optionalClubSpendBlockReason(save, SCOUT_FEE);
+  if (budgetBlock) return { ok: false, cost: SCOUT_FEE, reason: budgetBlock };
   team.budget -= SCOUT_FEE;
 
   const scoutSkill = staffQuality(save, 'SCOUT'); // 40..92
@@ -600,7 +681,8 @@ export function loanPlayer(save: SaveGame, playerId: string, seasons = 1): LoanO
   if (p.loanedFrom) return { ok: false, cost: 0, reason: 'Player is already on loan.' };
 
   const cost = loanFee(p, seasons);
-  if (team.budget < cost) return { ok: false, cost, reason: 'Not enough budget.' };
+  const budgetBlock = optionalClubSpendBlockReason(save, cost, playerWage(p));
+  if (budgetBlock) return { ok: false, cost, reason: budgetBlock };
 
   const currentYear =
     (save.currentSeasonId ? save.seasons[save.currentSeasonId]?.year : undefined) ?? 2026;
@@ -694,9 +776,8 @@ export function offerFreeAgentContract(
   const seasonalCost = wage * years;
 
   // Check sustainable wage budget if available.
-  if (save.finances && team.budget < wage) {
-    return { ok: false, cost: wage, reason: "Not enough budget for the first season's wage." };
-  }
+  const budgetBlock = optionalClubSpendBlockReason(save, 0, wage);
+  if (budgetBlock) return { ok: false, cost: wage, reason: budgetBlock };
 
   save.freeAgents = (save.freeAgents ?? []).filter((id) => id !== playerId);
   team.playerIds.push(playerId);
@@ -746,38 +827,100 @@ export function applyTrainingPlans(save: SaveGame): void {
 
 /* ---------------- Finances (season settlement) ---------------- */
 
-/** Match-day gate receipts, scaling with club reputation. */
-export function gateReceipts(reputation: number): number {
-  return Math.round(60_000 + reputation * 3_500);
+export interface ManagerDebtOutcome {
+  inDebt: boolean;
+  intervention: number;
+  debtLimit: number;
+  boardPenalty: number;
+}
+
+/**
+ * A club may use a one-season overdraft no larger than its next broadcast
+ * distribution. Debt blocks ordinary cash purchases through their existing
+ * affordability guards and now also costs board confidence. If fixed costs
+ * would breach that limit, the board intervenes visibly instead of allowing
+ * an unbounded negative balance.
+ */
+export function applyManagerDebtControls(
+  save: SaveGame,
+  year = currentYear(save),
+): ManagerDebtOutcome {
+  if (save.mode !== 'manager' || !save.userTeamId) {
+    return { inDebt: false, intervention: 0, debtLimit: 0, boardPenalty: 0 };
+  }
+  const team = save.teams[save.userTeamId];
+  if (!team || team.budget >= 0) {
+    return { inDebt: false, intervention: 0, debtLimit: 0, boardPenalty: 0 };
+  }
+
+  const debtLimit = broadcastIncome(team.reputation);
+  const minimumBalance = -debtLimit;
+  const intervention = Math.max(0, minimumBalance - team.budget);
+  if (intervention > 0) team.budget = minimumBalance;
+  const boardPenalty =
+    intervention > 0 ? MANAGER_DEBT_INTERVENTION_PENALTY : MANAGER_DEBT_BOARD_PENALTY;
+  save.boardConfidence = clamp((save.boardConfidence ?? 60) - boardPenalty, 0, 100);
+  if (save.finances) save.finances.transferBudget = team.budget;
+  const club = save.managerClubs?.[save.userTeamId];
+  if (club) club.finances.transferBudget = team.budget;
+
+  const messageId = `manager-debt-${year}`;
+  if (!(save.inbox ?? []).some((message) => message.id === messageId)) {
+    save.inbox = [
+      {
+        id: messageId,
+        kind: 'BOARD_OBJECTIVE' as const,
+        title: intervention > 0 ? 'Board financial intervention' : 'Club operating in debt',
+        body:
+          intervention > 0
+            ? `The board covered ${Math.round(intervention).toLocaleString()} to hold the club within its overdraft limit. Board confidence fell.`
+            : 'The club ended the season inside its overdraft. Cash upgrades and signings remain unavailable until the balance recovers.',
+        timestamp: Date.now(),
+        read: false,
+      },
+      ...(save.inbox ?? []),
+    ].slice(0, 100);
+  }
+  return { inDebt: true, intervention, debtLimit, boardPenalty };
 }
 
 /**
  * Manager-mode extras applied on season rollover, on TOP of the base
- * sponsor-minus-player-wages settlement already done by startNewSeason:
- * deduct staff wages + facility upkeep, add a season of gate receipts, then run
- * the youth intake, contract expiries and training plans.
+ * sponsor-minus-player-wages settlement already done by startNewSeason. Matchday
+ * gates are credited fixture by fixture; rollover deducts staff and complete
+ * infrastructure upkeep, then runs youth, contracts and training.
  */
 export function settleManagerSeason(
   save: SaveGame,
   rng: Rng,
+  options: { finishedManagerLevel?: ManagerCareerLevel; finishedYear?: number } = {},
 ): { departed: string[]; intake: string[] } {
   if (save.mode !== 'manager' || !save.userTeamId) return { departed: [], intake: [] };
+  // The domestic club is retained, not actively managed, during a National
+  // appointment.  The explicit finished-level override lets the final ELITE
+  // season settle once even though promotion is applied before the next
+  // calendar is built.
+  const finishedManagerLevel = options.finishedManagerLevel ?? save.managerCareerLevel ?? 'CLUB';
+  if (finishedManagerLevel === 'NATIONAL') return { departed: [], intake: [] };
   ensureManagerDepth(save);
   const team = save.teams[save.userTeamId];
 
-  const gate = gateReceipts(team.reputation) * 7; // a home season of gates
   const staffWages = staffWageBill(save);
-  const upkeep = facilityMaintenance(save);
-  team.budget += gate - staffWages - upkeep;
+  const clubStadium = save.managerClubs?.[save.userTeamId]?.stadium;
+  const upkeep = facilityMaintenance(save) + (clubStadium ? stadiumSeasonUpkeep(clubStadium) : 0);
+  team.budget -= staffWages + upkeep;
+  applyManagerDebtControls(save, options.finishedYear ?? Math.max(2026, currentYear(save) - 1));
 
   if (save.finances) {
-    save.finances.lastGateReceipts = gate;
     save.finances.lastWageBill = staffWages;
     save.finances.transferBudget = team.budget;
     save.finances.wageBudgetPerSeason = Math.round(sustainableWage(team.reputation));
   }
 
-  applyTrainingPlans(save);
+  // Calendar saves develop automatically after each official fixture. Legacy
+  // Manager saves have no fixture-block pipeline, even after schema migration
+  // creates club-owned state, so they retain their rollover training nudge.
+  if (!save.managerCalendar) applyTrainingPlans(save);
   const departed = tickContracts(save);
   const intake = runYouthIntake(save, rng);
   ensureContracts(save);

@@ -4,6 +4,7 @@ import { SAVE_SCHEMA_VERSION, SaveGame } from '../../domain/types';
 import { runMigrations } from '../../storage/migrate';
 import {
   addCoins,
+  convertPlayerGemsToCoins,
   fixtureEnergyCost,
   matchEnergyCost,
   regenEnergy,
@@ -13,6 +14,7 @@ import {
 import { simulateFirstWeekNoSpendLoop, simulateNoSpendLoop } from './_economyHarness';
 import { buildUserPlayer, createCareerSave } from '../createGame';
 import {
+  ensurePlayoffs,
   finishSeason,
   nextUserFixtureId,
   playUserFixture,
@@ -20,6 +22,7 @@ import {
   seasonComplete,
   standings,
   startNewSeason,
+  validateSeasonState,
 } from '../season';
 import { currentPlayerCalendarEvent, resolvePlayerCalendarEvent } from '../playerCalendar';
 
@@ -107,6 +110,15 @@ describe('economy', () => {
     expect(spendEnergy(wallet, 999).energy).toBe(0);
   });
 
+  it('converts only the approved Player gem presets at forty coins per gem', () => {
+    const wallet = { coins: 750, gems: 300, energy: 36, energyUpdatedAt: 0 };
+    expect(convertPlayerGemsToCoins(wallet, 25)).toMatchObject({ coins: 1_750, gems: 275 });
+    expect(convertPlayerGemsToCoins(wallet, 100)).toMatchObject({ coins: 4_750, gems: 200 });
+    expect(convertPlayerGemsToCoins(wallet, 300)).toMatchObject({ coins: 12_750, gems: 0 });
+    expect(convertPlayerGemsToCoins(wallet, 24)).toBeNull();
+    expect(convertPlayerGemsToCoins({ ...wallet, gems: 20 }, 25)).toBeNull();
+  });
+
   it('keeps a two-hour no-spend loop clear of early energy walls', () => {
     const sim = simulateNoSpendLoop({ minutes: 120, matchDurationMinutes: 8 });
     expect(sim.matchesPlayed).toBeGreaterThanOrEqual(14);
@@ -186,6 +198,30 @@ describe('season flow', () => {
     expect(seasonComplete(save)).toBe(false);
     expect(Object.keys(save.fixtures)).toHaveLength(336);
     expect(save.players.user.age).toBe(ageBefore + 1);
+  });
+
+  it('uses season-scoped playoff IDs so an earlier result ledger cannot complete a new tie', () => {
+    const save = makeCareer();
+    finishSeason(save);
+    const firstPlayoffIds = Object.values(save.fixtures)
+      .filter((fixture) => fixture.playoff && fixture.competition === 'PLAYOFF')
+      .map((fixture) => fixture.id);
+    expect(firstPlayoffIds.length).toBeGreaterThan(0);
+    for (const fixtureId of firstPlayoffIds) save.flags[`resultCount:${fixtureId}`] = true;
+
+    startNewSeason(save);
+    for (const fixture of Object.values(save.fixtures)) {
+      if (!fixture.playoff && fixture.competitionId === 't20-league') fixture.played = true;
+    }
+    ensurePlayoffs(save);
+    const secondPlayoffs = Object.values(save.fixtures).filter(
+      (fixture) => fixture.playoff && fixture.competition === 'PLAYOFF',
+    );
+
+    expect(secondPlayoffs.length).toBeGreaterThan(0);
+    expect(secondPlayoffs.every((fixture) => !firstPlayoffIds.includes(fixture.id))).toBe(true);
+    validateSeasonState(save);
+    expect(secondPlayoffs.every((fixture) => !fixture.played)).toBe(true);
   });
 
   it('simulates fixtures deterministically', () => {

@@ -21,9 +21,11 @@ function cupFixtures(save: SaveGame): Fixture[] {
 }
 
 function cupAvailable(save: SaveGame): boolean {
-  if (save.mode === 'manager') return (save.managerCareerLevel ?? 'CLUB') !== 'CLUB';
-  const level = save.mode === 'career' ? (save.careerPathLevel ?? 'DOMESTIC') : 'DOMESTIC';
-  return level !== 'SCHOOL' && level !== 'U19';
+  // The standalone knockout cup belongs to Manager Career. Player Career
+  // already has pathway, domestic, franchise and international calendars;
+  // adding a separate user-controlled cup here produced unrelated hub ties
+  // and could block the next career step.
+  return save.mode === 'manager' && (save.managerCareerLevel ?? 'CLUB') !== 'CLUB';
 }
 
 /** Seed rank by reputation (0 = strongest) so the bracket is stable & sensible. */

@@ -228,15 +228,7 @@ export function InjuryReportScreen({ navigation, route }: ScreenProps<'InjuryRep
                 <Text style={styles.gemBadgeText}>{gemCost}💎</Text>
               </View>
             </View>
-            <Text style={styles.fastTrackDesc}>
-              Skip the recovery period with premium sports medicine. Be back on the pitch
-              immediately.
-            </Text>
-            <View style={styles.fastTrackBullets}>
-              <Text style={styles.fastTrackBullet}>✓ Return to full training today</Text>
-              <Text style={styles.fastTrackBullet}>✓ No matches missed</Text>
-              <Text style={styles.fastTrackBullet}>✓ Full match fitness guaranteed</Text>
-            </View>
+            <Text style={styles.fastTrackDesc}>Full fitness today.</Text>
             <Button
               label={`Recover now — ${gemCost} gems`}
               variant="secondary"

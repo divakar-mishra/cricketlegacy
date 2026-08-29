@@ -1,3 +1,4 @@
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
@@ -10,6 +11,8 @@ import {
   weeklyQuestsForMode,
   xpForTier,
 } from '../game/liveops';
+import { isSeasonPassActive, monthlyBundleForSave } from '../game/seasonPass';
+import { RootStackParamList } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import { fontSize, fontWeight, spacing, ThemeColors, useTheme, useThemedStyles } from '../theme';
 import { AppText as Text } from './AppText';
@@ -18,8 +21,62 @@ import { Card } from './Card';
 import { ProgressBar } from './ProgressBar';
 import { RewardModal, RewardModalData } from './RewardModal';
 
+interface LiveOpsCardsProps {
+  /** Cricket-home ticket summary; full quest detail remains available elsewhere. */
+  compact?: boolean;
+}
+
+/** A single, low-density Home entry for the save-specific Season Pass. */
+export function SeasonPassHomeCard() {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const save = useCareer((s) => s.save);
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+
+  if (!save?.pass) return null;
+
+  const pass = save.pass;
+  const premiumActive = isSeasonPassActive(save);
+  const monthlyBundle = monthlyBundleForSave(save);
+  const modeLabel = save.mode === 'manager' ? 'MANAGER' : 'PLAYER';
+  const level = passLevel(pass.xp);
+  const claimable = claimablePassRewards(pass).length;
+  const nextTierXp = level < PASS_TIER_COUNT ? xpForTier(level + 1) : xpForTier(PASS_TIER_COUNT);
+  const thisTierXp = level > 0 ? xpForTier(level) : 0;
+  const progress = nextTierXp > thisTierXp ? (pass.xp - thisTierXp) / (nextTierXp - thisTierXp) : 1;
+
+  return (
+    <Card
+      style={styles.homePassCard}
+      onPress={() => navigation.navigate('SeasonPass')}
+      accessibilityLabel={`${modeLabel.toLowerCase()} Season Pass, ${monthlyBundle.title}, tier ${level} of ${PASS_TIER_COUNT}${claimable ? `, ${claimable} rewards ready` : ''}. Open reward track.`}
+    >
+      <View style={styles.homePassTopRow}>
+        <View style={styles.homePassTicket}>
+          <Text style={styles.homePassTicketIcon}>🎟</Text>
+        </View>
+        <View style={styles.homePassCopy}>
+          <Text style={styles.homePassEyebrow}>{modeLabel} SEASON PASS</Text>
+          <Text style={styles.homePassTitle}>
+            {monthlyBundle.title} · Tier {level}/{PASS_TIER_COUNT}
+          </Text>
+          <Text style={styles.homePassMode}>{premiumActive ? 'Premium track' : 'Free track'}</Text>
+        </View>
+        <Text style={[styles.homePassAction, claimable > 0 && { color: colors.success }]}>
+          {claimable > 0 ? `${claimable} READY` : 'OPEN →'}
+        </Text>
+      </View>
+      <ProgressBar value={progress} color={colors.accent} style={styles.homePassProgress} />
+      <Text style={styles.homePassXp}>
+        {level >= PASS_TIER_COUNT ? 'TRACK COMPLETE' : `${pass.xp}/${nextTierXp} XP`}
+      </Text>
+    </Card>
+  );
+}
+
 /** Daily quests + season-pass progress, wired to the career store. */
-export function LiveOpsCards() {
+export function LiveOpsCards({ compact = false }: LiveOpsCardsProps) {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const save = useCareer((s) => s.save);
   const claimQuestReward = useCareer((s) => s.claimQuestReward);
   const claimWeeklyReward = useCareer((s) => s.claimWeeklyReward);
@@ -27,6 +84,7 @@ export function LiveOpsCards() {
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [rewardModal, setRewardModal] = useState<RewardModalData | null>(null);
+
   if (!save || !save.quests || !save.pass) return null;
   const weeklyDefs = weeklyQuestsForMode(save.mode);
   const weeklyDefById = new Map<string, QuestDef>(weeklyDefs.map((d) => [d.id, d]));
@@ -39,6 +97,83 @@ export function LiveOpsCards() {
   const nextTierXp = level < PASS_TIER_COUNT ? xpForTier(level + 1) : xpForTier(PASS_TIER_COUNT);
   const thisTierXp = level > 0 ? xpForTier(level) : 0;
   const progress = nextTierXp > thisTierXp ? (pass.xp - thisTierXp) / (nextTierXp - thisTierXp) : 1;
+  const dailyReady = save.quests.items.filter((item) => {
+    const def = defById.get(item.id);
+    return Boolean(def && !item.claimed && isQuestComplete(item, def));
+  });
+  const weeklyReady = (save.weeklyQuests?.items ?? []).filter((item) => {
+    const def = weeklyDefById.get(item.id);
+    return Boolean(def && !item.claimed && isQuestComplete(item, def));
+  });
+
+  if (compact) {
+    const objectiveReady = dailyReady.length + weeklyReady.length;
+    const activeObjectives = save.quests.items.length + (save.weeklyQuests?.items.length ?? 0);
+    return (
+      <>
+        <Card style={styles.compactCard}>
+          <View style={styles.compactSummaryRow}>
+            <View style={styles.compactSummaryCell}>
+              <Text style={styles.compactLabel}>🎟 OBJECTIVES</Text>
+              <Text style={[styles.compactValue, objectiveReady > 0 && styles.compactReady]}>
+                {objectiveReady > 0 ? `${objectiveReady} READY` : `${activeObjectives} ACTIVE`}
+              </Text>
+            </View>
+            <View style={styles.compactDivider} />
+            <View style={styles.compactSummaryCell}>
+              <Text style={styles.compactLabel}>PASS TICKET</Text>
+              <Text style={styles.compactValue}>TIER {level}</Text>
+            </View>
+          </View>
+          {objectiveReady > 0 ? (
+            <Button
+              label={`Claim ${objectiveReady} objective reward${objectiveReady === 1 ? '' : 's'}`}
+              size="sm"
+              variant="gold"
+              style={styles.compactAction}
+              onPress={() => {
+                let coins = 0;
+                for (const item of dailyReady) coins += claimQuestReward(item.id).coins;
+                for (const item of weeklyReady) coins += claimWeeklyReward(item.id).coins;
+                setRewardModal({
+                  title: 'Objectives claimed',
+                  items: [`Coins x ${coins}`],
+                });
+              }}
+            />
+          ) : null}
+          {claimable > 0 ? (
+            <Button
+              label={`Claim ${claimable} pass reward${claimable === 1 ? '' : 's'}`}
+              size="sm"
+              variant="gold"
+              style={styles.compactAction}
+              onPress={() => {
+                const reward = claimPass();
+                if (reward.count <= 0) return;
+                setRewardModal({
+                  title: 'Season Pass reward claimed',
+                  items: reward.items,
+                  balances: [
+                    `Coins: ${reward.previousCoins.toLocaleString()} -> ${reward.newCoins.toLocaleString()}`,
+                  ],
+                  icon: 'trophy',
+                });
+              }}
+            />
+          ) : null}
+          <Button
+            label="Open objectives & pass"
+            size="sm"
+            variant="ghost"
+            style={styles.compactAction}
+            onPress={() => navigation.navigate('SeasonPass')}
+          />
+        </Card>
+        <RewardModal data={rewardModal} onClose={() => setRewardModal(null)} />
+      </>
+    );
+  }
 
   return (
     <>
@@ -148,7 +283,7 @@ export function LiveOpsCards() {
       <Card>
         <View style={styles.passHead}>
           <Text style={styles.passTier}>
-            Tier {level}/{PASS_TIER_COUNT}
+            Tier {level}/{PASS_TIER_COUNT} reached
           </Text>
           <Text
             style={[styles.passPremium, { color: pass.premium ? colors.accent : colors.textFaint }]}
@@ -158,9 +293,16 @@ export function LiveOpsCards() {
         </View>
         <ProgressBar value={progress} color={colors.accent} style={{ marginTop: spacing.sm }} />
         <Text style={styles.passXp}>{pass.xp} XP</Text>
+        <Button
+          label="View full track"
+          size="sm"
+          variant="secondary"
+          style={{ marginTop: spacing.sm }}
+          onPress={() => navigation.navigate('SeasonPass')}
+        />
         {claimable > 0 ? (
           <Button
-            label={`Claim ${claimable} pass reward${claimable === 1 ? '' : 's'}`}
+            label={`Claim ${claimable} track reward${claimable === 1 ? '' : 's'}`}
             variant="gold"
             style={{ marginTop: spacing.sm }}
             onPress={() => {
@@ -172,15 +314,12 @@ export function LiveOpsCards() {
                 items: reward.items,
                 balances: [
                   `Coins: ${reward.previousCoins.toLocaleString()} -> ${reward.newCoins.toLocaleString()}`,
-                  `Gems: ${reward.previousGems.toLocaleString()} -> ${reward.newGems.toLocaleString()}`,
                 ],
                 icon: 'trophy',
               });
             }}
           />
-        ) : (
-          <Text style={styles.passNote}>Play matches and complete quests to earn pass XP.</Text>
-        )}
+        ) : null}
       </Card>
       <RewardModal data={rewardModal} onClose={() => setRewardModal(null)} />
     </>
@@ -216,4 +355,67 @@ const makeStyles = (colors: ThemeColors) =>
     passPremium: { fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
     passXp: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: 4 },
     passNote: { color: colors.textFaint, fontSize: fontSize.xs, marginTop: spacing.sm },
+    compactCard: { marginTop: spacing.md },
+    compactSummaryRow: { alignItems: 'center', flexDirection: 'row' },
+    compactSummaryCell: { flex: 1, paddingVertical: spacing.xs },
+    compactDivider: { alignSelf: 'stretch', backgroundColor: colors.border, width: 1 },
+    compactLabel: {
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+      letterSpacing: 0.6,
+    },
+    compactValue: {
+      color: colors.accent,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.black,
+      marginTop: 3,
+    },
+    compactReady: { color: colors.success },
+    compactAction: { marginTop: spacing.sm },
+    homePassCard: {
+      marginTop: spacing.md,
+      borderColor: colors.accent + '88',
+      backgroundColor: colors.surface,
+    },
+    homePassTopRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+    homePassTicket: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.accent + '18',
+      borderWidth: 1,
+      borderColor: colors.accent + '66',
+    },
+    homePassTicketIcon: { fontSize: 18 },
+    homePassCopy: { flex: 1, minWidth: 0, marginLeft: spacing.sm },
+    homePassEyebrow: {
+      color: colors.accent,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+      letterSpacing: 0.8,
+    },
+    homePassTitle: {
+      color: colors.text,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.heavy,
+      marginTop: 2,
+    },
+    homePassMode: { color: colors.textFaint, fontSize: 9, marginTop: 1 },
+    homePassAction: {
+      color: colors.accentLight,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+      marginLeft: spacing.sm,
+    },
+    homePassProgress: { marginTop: spacing.sm },
+    homePassXp: {
+      color: colors.textFaint,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.semibold,
+      marginTop: 4,
+      textAlign: 'right',
+    },
   });

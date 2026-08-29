@@ -17,7 +17,19 @@ import { synchronizeSchema26State } from './schema26';
 import { synchronizeSchema27State } from './schema27';
 import { synchronizeSchema28State } from './schema28';
 import { synchronizeSchema29State } from './schema29';
-import { synchronizeSchema30State } from './schema30';
+import { synchronizeSchema31State } from './schema31';
+import { synchronizeSchema32State } from './schema32';
+import { synchronizeSchema33State } from './schema33';
+import { synchronizeSchema34State } from './schema34';
+import { synchronizeSchema35State } from './schema35';
+import { synchronizeSchema36State } from './schema36';
+import { synchronizeSchema37SponsorBranding } from './schema37';
+import { synchronizeSchema38LegacyEndorsements } from './schema38';
+import { synchronizeSchema39KitIdentity } from './schema39';
+import { synchronizeSchema40PlayerAffiliations } from './schema40';
+import { synchronizeSchema41ManagerAge } from './schema41';
+import { synchronizeSchema42Portfolio } from './schema42';
+import { synchronizeSchema43InternationalRankingPeaks } from './schema43';
 
 type AnySave = Record<string, unknown> & { schemaVersion?: number };
 type Migration = (save: AnySave) => AnySave;
@@ -235,10 +247,97 @@ const MIGRATIONS: Record<number, Migration> = {
     synchronizeSchema29State(save as unknown as SaveGame);
     return save;
   },
-  // v29 -> v30: persist stable IDs for the supplied modular avatar pack. The
-  // former SVG fields remain untouched as a rollback/fallback source.
-  29: (save) => {
-    synchronizeSchema30State(save as unknown as SaveGame);
+  // v29 -> v30: historical modular-avatar schema marker. Conversion is now
+  // deferred to v32 so the retired component registry never needs to load.
+  29: (save) => save,
+  // v30 -> v31: remove internal tier/slot numbers from generated domestic
+  // abbreviations. Full club identities, custom pass aliases and every match
+  // result remain unchanged.
+  30: (save) => {
+    synchronizeSchema31State(save as unknown as SaveGame);
+    return save;
+  },
+  // v31 -> v32: replace modular face/hair/equipment recipes with one stable ID
+  // from the fixed 128-portrait library. Profile frames and all other cosmetics
+  // are retained.
+  31: (save) => {
+    synchronizeSchema32State(save as unknown as SaveGame);
+    return save;
+  },
+  // v32 -> v33: persist one merit-based U19 World Cup opportunity. Current
+  // U19 path totals are retained as the initial merit snapshot; senior caps,
+  // ordinary fixtures and every economy balance remain untouched.
+  32: (save) => {
+    synchronizeSchema33State(save as unknown as SaveGame);
+    return save;
+  },
+  // v33 -> v34: add immutable newspaper-template metadata and optional verified
+  // score-panel facts. Existing rendered clippings are historical records and
+  // remain byte-for-byte unchanged; invalid new optional metadata is dropped.
+  33: (save) => {
+    synchronizeSchema34State(save as unknown as SaveGame);
+    return save;
+  },
+  // v34 -> v35: persist Manager infrastructure by club. The current club's
+  // staff, facilities, academy, reports and finances are copied exactly;
+  // unvisited clubs receive deterministic defaults and no currency moves.
+  34: (save) => {
+    synchronizeSchema35State(save as unknown as SaveGame);
+    return save;
+  },
+  // v35 -> v36: earned Manager kit partnerships become club-owned. Existing
+  // contracts, ledgers and balances move to the signing club; the permanent
+  // sponsor grant remains bound to the Manager save.
+  35: (save) => {
+    synchronizeSchema36State(save as unknown as SaveGame);
+    return save;
+  },
+  // v36 -> v37: add approved dynamic kit-brand identities to earned offers,
+  // contracts and the per-save premium grant. Portrait assets, contract terms,
+  // club ownership, purchase bindings and every balance remain untouched.
+  36: (save) => {
+    synchronizeSchema37SponsorBranding(save as unknown as SaveGame);
+    return save;
+  },
+  // v37 -> v38: story-event sponsors remain separate off-shirt endorsement
+  // campaigns. Retire the temporary legacy-to-kit mirror, preserving its paid
+  // fixture ledger and leaving currency, expiry terms and the premium slot intact.
+  37: (save) => {
+    synchronizeSchema38LegacyEndorsements(save as unknown as SaveGame);
+    return save;
+  },
+  // v38 -> v39: add editable back-of-shirt name and number. Existing saves
+  // receive deterministic cosmetic defaults; gameplay and currency are unchanged.
+  38: (save) => {
+    synchronizeSchema39KitIdentity(save as unknown as SaveGame);
+    return save;
+  },
+  // v39 -> v40: Player Career gets independent domestic (First-Class/List A)
+  // and franchise (T20) affiliations. Existing saves keep every result and
+  // begin with the currently contracted club in both slots.
+  39: (save) => {
+    synchronizeSchema40PlayerAffiliations(save as unknown as SaveGame);
+    return save;
+  },
+  // v40 -> v41: Manager Careers begin at age 35 and retire at 60. Legacy
+  // manager age is derived from completed seasons; all results stay intact.
+  40: (save) => {
+    synchronizeSchema41ManagerAge(save as unknown as SaveGame);
+    return save;
+  },
+  // v41 -> v42: replace the anonymous Player stock balance with a 24-company
+  // portfolio. Existing value/history becomes a sell-only Legacy Market Index,
+  // and removed Legacy Tokens receive the approved higher-of-cost-or-market
+  // Wallet Coin refund exactly once.
+  41: (save) => {
+    synchronizeSchema42Portfolio(save as unknown as SaveGame);
+    return save;
+  },
+  // v42 -> v43: prospectively track the Player Career's best international
+  // ranking position and rating per format/category. Historical results,
+  // stats and balances remain unchanged; old ranks are not fabricated.
+  42: (save) => {
+    synchronizeSchema43InternationalRankingPeaks(save as unknown as SaveGame);
     return save;
   },
 };

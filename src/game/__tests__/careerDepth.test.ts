@@ -4,6 +4,7 @@ import { makeRng } from '../../engine/rng';
 import { acceptAuctionOffer, generateAuctionOffers, starValue } from '../auction';
 import { buildUserPlayer, createCareerSave } from '../createGame';
 import { ensureRival, rivalComparison } from '../rivalry';
+import { simulateUnplayedBefore, teamSide } from '../season';
 import { emptyStats } from '../stats';
 
 function makeSave(): SaveGame {
@@ -77,7 +78,7 @@ describe('franchise auction', () => {
     expect(starValue(save, save.players[save.userPlayerId!])).toBeGreaterThan(0);
   });
 
-  it('accepting a bid moves the player to the new club and pays a bonus', () => {
+  it('accepting a bid changes only the T20 affiliation and pays a bonus', () => {
     const save = makeSave();
     makeAuctionEligible(save);
     save.auctionOffers = generateAuctionOffers(save, makeRng(7));
@@ -87,11 +88,49 @@ describe('franchise auction', () => {
 
     const res = acceptAuctionOffer(save, target.teamId);
     expect(res.ok).toBe(true);
-    expect(save.userTeamId).toBe(target.teamId);
-    expect(save.teams[target.teamId].playerIds).toContain(save.userPlayerId);
-    expect(save.teams[oldTeam].playerIds).not.toContain(save.userPlayerId);
-    expect(save.teams[target.teamId].xi).toContain(save.userPlayerId);
+    expect(save.userTeamId).toBe(oldTeam);
+    expect(save.franchiseTeamId).toBe(target.teamId);
+    expect(save.teams[oldTeam].playerIds).toContain(save.userPlayerId);
+    expect(
+      teamSide(save, oldTeam, target.teamId, 'T20').players.map((player) => player.id),
+    ).not.toContain(save.userPlayerId);
+    expect(
+      teamSide(save, target.teamId, target.teamId, 'T20').players.map((player) => player.id),
+    ).toContain(save.userPlayerId);
     expect(save.wallet.coins).toBe(coinsBefore + target.signingBonus);
     expect(save.auctionOffers).toBeUndefined();
+  });
+
+  it('never counts the domestic-club roster entry in franchise background matches', () => {
+    const save = makeSave();
+    makeAuctionEligible(save);
+    save.auctionOffers = generateAuctionOffers(save, makeRng(7));
+    const targetTeamId = save.auctionOffers[0].teamId;
+    const domesticTeamId = save.userTeamId!;
+    expect(acceptAuctionOffer(save, targetTeamId).ok).toBe(true);
+
+    const fixtures = Object.values(save.fixtures).filter(
+      (fixture) => fixture.competitionId === 't20-league' && !fixture.played,
+    );
+    const target = [...fixtures]
+      .filter(
+        (fixture) =>
+          fixture.homeTeamId === targetTeamId || fixture.awayTeamId === targetTeamId,
+      )
+      .sort((left, right) => right.round - left.round)[0];
+    const domesticBackground = fixtures.find(
+      (fixture) =>
+        fixture.id !== target?.id &&
+        fixture.round <= (target?.round ?? 0) &&
+        (fixture.homeTeamId === domesticTeamId || fixture.awayTeamId === domesticTeamId),
+    );
+    expect(target).toBeDefined();
+    expect(domesticBackground).toBeDefined();
+    const appearancesBefore = save.players[save.userPlayerId!].careerStats?.matches ?? 0;
+
+    simulateUnplayedBefore(save, target.id);
+
+    expect(domesticBackground!.played).toBe(true);
+    expect(save.players[save.userPlayerId!].careerStats?.matches ?? 0).toBe(appearancesBefore);
   });
 });

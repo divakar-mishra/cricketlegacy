@@ -642,6 +642,7 @@ export const EXTRA_EVENTS: StoryEvent[] = [
     id: 'x_fan_letter',
     trigger: 'POST_MATCH',
     title: 'The Handwritten Letter',
+    once: true,
     weight: 1,
     body: "Amid the fan mail your club forwards, one envelope is handwritten. A kid who stammers writes that watching you bat is the only hour a week he forgets to be afraid. He doesn\u2019t ask for anything. He just wanted you to know.",
     choices: [
@@ -2181,10 +2182,14 @@ export const EXTRA_EVENTS: StoryEvent[] = [
   {
     id: 'x_near_record',
     trigger: 'GOOD_MATCH',
-    title: 'One Short of History',
+    title: 'A Record Within Reach',
+    once: true,
     weight: 2,
-    condition: (c) => (c.rating ?? 0) >= 7.5,
-    body: "After a strong performance, {selector} tells you something quietly: you are three innings from the all-time record for most runs for {team} in a single season. The previous holder is a legend. The record is within reach. The pressure of knowing is a different kind of weight.",
+    condition: (c) => {
+      const record = c.save.records?.highestScore?.runs ?? 0;
+      return record >= 100 && (c.runs ?? 0) >= record - 10 && (c.runs ?? 0) < record;
+    },
+    body: "Your latest innings came within ten runs of the recorded highest score. {selector} mentions it quietly after the match. The mark is close enough to chase now, and knowing that changes the pressure.",
     choices: [
       {
         id: 'embrace_it',

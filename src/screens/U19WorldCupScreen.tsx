@@ -1,13 +1,22 @@
-/**
- * U19WorldCupScreen — bracket view for the U19 World Cup.
- * Feature 5: shows 6 teams, results, and the user's path to the final.
- */
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Button, Card, Screen, ScreenHeader } from '../components';
 import { AppText as Text } from '../components/AppText';
-import { getCountry } from '../data/countries';
-import { shouldRunU19WorldCup, u19Qualifies } from '../game/u19';
+import type { Fixture, Team, U19WorldCupStatus } from '../domain/types';
+import { fixtureEnergyCost } from '../game/economy';
+import { playerCalendarAllowsFixture } from '../game/playerCalendar';
+import {
+  getU19WorldCupFixturesByRound,
+  getU19WorldCupState,
+  isU19WorldCupTournamentComplete,
+  nextU19WorldCupUserFixture,
+  nextU19WorldCupUserFixtureId,
+  U19_WORLD_CUP_MIN_APPEARANCES,
+  U19_WORLD_CUP_MIN_AVERAGE_RATING,
+  U19_WORLD_CUP_MIN_READINESS,
+  u19WorldCupControlledTeamId,
+  u19WorldCupSelectionStatus,
+} from '../game/u19WorldCup';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import {
@@ -20,8 +29,45 @@ import {
   useThemedStyles,
 } from '../theme';
 
+const APPEARANCE_TARGET = U19_WORLD_CUP_MIN_APPEARANCES;
+const RATING_TARGET = U19_WORLD_CUP_MIN_AVERAGE_RATING;
+const READINESS_TARGET = U19_WORLD_CUP_MIN_READINESS;
+
+type StatusPresentation = {
+  label: string;
+  tone: 'neutral' | 'active' | 'success';
+};
+
+function statusPresentation(
+  status: U19WorldCupStatus,
+  tournamentComplete: boolean,
+  hasFixtures: boolean,
+): StatusPresentation {
+  switch (status) {
+    case 'TRACKING':
+      return { label: 'Selection in progress', tone: 'neutral' };
+    case 'SELECTED':
+      if (tournamentComplete) return { label: 'Tournament complete', tone: 'neutral' };
+      return { label: hasFixtures ? 'Tournament active' : 'Squad selected', tone: 'active' };
+    case 'NOT_SELECTED':
+      return { label: 'Selection missed', tone: 'neutral' };
+    case 'ELIMINATED':
+      return { label: 'Eliminated', tone: 'neutral' };
+    case 'RUNNER_UP':
+      return { label: 'Runners-up', tone: 'active' };
+    case 'CHAMPION':
+      return { label: 'Champions', tone: 'success' };
+  }
+}
+
+function teamName(teams: Record<string, Team>, teamId?: string): string {
+  if (!teamId) return 'Team pending';
+  return teams[teamId]?.name ?? 'Team pending';
+}
+
 export function U19WorldCupScreen({ navigation }: ScreenProps<'U19WorldCup'>) {
-  const save = useCareer((s) => s.save);
+  const save = useCareer((state) => state.save);
+  const setTargetFixture = useCareer((state) => state.setTargetFixture);
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
 
@@ -29,185 +75,238 @@ export function U19WorldCupScreen({ navigation }: ScreenProps<'U19WorldCup'>) {
     return (
       <Screen>
         <ScreenHeader title="U19 World Cup" onBack={() => navigation.goBack()} />
-        <Text style={styles.msg}>No active save.</Text>
+        <Text style={styles.msg}>No active career.</Text>
       </Screen>
     );
   }
 
-  const userCountry = save.userPlayerId ? save.players[save.userPlayerId]?.nationality : undefined;
-  const userCountryName = userCountry ? (getCountry(userCountry)?.name ?? 'Your country') : '—';
-  const qualifies = u19Qualifies(save);
-  const shouldRun = shouldRunU19WorldCup(save);
-
-  // Find U19 WC fixtures in the current season.
-  const u19Fixtures = Object.values(save.fixtures).filter(
-    (fx) => fx.competition === 'U19_WORLDCUP',
+  const cup = getU19WorldCupState(save);
+  const selection = u19WorldCupSelectionStatus(save);
+  const controlledTeamId = u19WorldCupControlledTeamId(save);
+  const rounds = getU19WorldCupFixturesByRound(save);
+  const nextFixture = nextU19WorldCupUserFixture(save);
+  const nextFixtureEnergy = nextFixture ? fixtureEnergyCost(nextFixture) : 0;
+  const nextFixtureIsDue = Boolean(
+    nextFixture && playerCalendarAllowsFixture(save, nextFixture.id),
   );
+  const canPlayNextFixture = Boolean(
+    nextFixtureIsDue && nextFixture && save.wallet.energy >= nextFixtureEnergy,
+  );
+  const allFixtures = [...rounds.quarterFinals, ...rounds.semiFinals, ...rounds.final];
+  const tournamentComplete = isU19WorldCupTournamentComplete(save);
+  const status = cup?.status ?? selection.status;
+  const presentation = statusPresentation(status, tournamentComplete, allFixtures.length > 0);
+  const controlledTeamName = teamName(save.teams, controlledTeamId);
 
-  const qfFixtures = u19Fixtures.filter((_, i) => i < 2);
-  const sfFixtures = u19Fixtures.filter((_, i) => i >= 2 && i < 4);
-  const finalFixture = u19Fixtures.find((_, i) => i === 4);
+  const statusColor =
+    presentation.tone === 'success'
+      ? colors.success
+      : presentation.tone === 'active'
+        ? colors.accent
+        : colors.textMuted;
+
+  const playNextMatch = () => {
+    const nextFixtureId = nextU19WorldCupUserFixtureId(save);
+    if (!nextFixtureId) return;
+    setTargetFixture(nextFixtureId);
+    navigation.navigate('Match');
+  };
 
   return (
     <Screen scroll>
       <ScreenHeader title="U19 World Cup" onBack={() => navigation.goBack()} />
 
-      {/* Status card */}
-      <Animated.View entering={FadeInDown.duration(300)}>
-        <Card
-          style={[styles.statusCard, { borderColor: qualifies ? colors.success : colors.border }]}
-        >
-          <Text style={styles.statusTitle}>Your Status</Text>
+      <Animated.View entering={FadeInDown.duration(280)}>
+        <Card style={[styles.statusCard, { borderColor: statusColor + '88' }]}>
           <View style={styles.statusRow}>
-            <Text style={styles.country}>{userCountryName}</Text>
-            <View
-              style={[
-                styles.badge,
-                { backgroundColor: qualifies ? colors.success + '22' : colors.surfaceAlt },
-              ]}
-            >
-              <Text
-                style={[styles.badgeText, { color: qualifies ? colors.success : colors.textMuted }]}
-              >
-                {qualifies ? '✓ Qualified' : 'Not qualified'}
+            <View style={styles.statusCopy}>
+              <Text style={styles.statusKicker}>Your campaign</Text>
+              <Text style={styles.teamTitle}>
+                {controlledTeamId ? controlledTeamName : 'Age-18 U19 selection'}
+              </Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+              <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                {presentation.label}
               </Text>
             </View>
           </View>
-          {!qualifies && (
-            <Text style={styles.qualNote}>
-              Qualify by playing 3+ U19 matches with an average rating of 6.5+. Current:{' '}
-              {save.careerPathMatches ?? 0} matches played.
-            </Text>
-          )}
-          {!shouldRun && (
-            <Text style={styles.qualNote}>
-              The U19 World Cup fires every 2 seasons (even years).
-            </Text>
-          )}
+
+          <View style={styles.meritGrid}>
+            <MeritItem
+              label="Appearances"
+              value={`${selection.merit.appearances}/${APPEARANCE_TARGET}`}
+              passed={selection.merit.appearances >= APPEARANCE_TARGET}
+            />
+            <MeritItem
+              label="Avg rating"
+              value={`${selection.merit.averageRating.toFixed(1)}/${RATING_TARGET.toFixed(1)}`}
+              passed={selection.merit.averageRating >= RATING_TARGET}
+            />
+            <MeritItem
+              label="Readiness"
+              value={`${Math.round(selection.merit.readiness * 100)}%/${Math.round(
+                READINESS_TARGET * 100,
+              )}%`}
+              passed={selection.merit.readiness >= READINESS_TARGET}
+            />
+          </View>
+
+          {nextFixture && nextFixtureIsDue ? (
+            <Button
+              label={
+                canPlayNextFixture
+                  ? `Play ${nextFixture.cupRound ?? 'next match'}`
+                  : `Restore energy · need ${nextFixtureEnergy}`
+              }
+              variant="gold"
+              style={{ marginTop: spacing.md }}
+              onPress={() =>
+                canPlayNextFixture ? playNextMatch() : navigation.navigate('Purchase')
+              }
+            />
+          ) : nextFixture ? (
+            <>
+              <Text style={styles.scheduleNote}>
+                Your tournament match is on the upcoming calendar. Advance from Career Home to reach
+                it.
+              </Text>
+              <Button
+                label="Return to Career Home"
+                variant="secondary"
+                size="sm"
+                style={{ marginTop: spacing.sm }}
+                onPress={() => navigation.navigate('CareerHub')}
+              />
+            </>
+          ) : null}
         </Card>
       </Animated.View>
 
-      {/* Bracket */}
-      {u19Fixtures.length > 0 ? (
+      {allFixtures.length > 0 ? (
         <>
-          <Text style={styles.section}>Tournament Bracket</Text>
-
-          {qfFixtures.length > 0 && (
-            <Animated.View entering={FadeInDown.duration(320).delay(80)}>
-              <Text style={styles.roundLabel}>Quarter-Finals</Text>
-              {qfFixtures.map((fx) => (
-                <BracketMatch
-                  key={fx.id}
-                  homeId={fx.homeTeamId}
-                  awayId={fx.awayTeamId}
-                  winnerTeamId={fx.winnerTeamId}
-                  played={fx.played}
-                  userCountry={userCountry}
-                />
-              ))}
-            </Animated.View>
-          )}
-
-          {sfFixtures.length > 0 && (
-            <Animated.View entering={FadeInDown.duration(340).delay(120)}>
-              <Text style={styles.roundLabel}>Semi-Finals</Text>
-              {sfFixtures.map((fx) => (
-                <BracketMatch
-                  key={fx.id}
-                  homeId={fx.homeTeamId}
-                  awayId={fx.awayTeamId}
-                  winnerTeamId={fx.winnerTeamId}
-                  played={fx.played}
-                  userCountry={userCountry}
-                />
-              ))}
-            </Animated.View>
-          )}
-
-          {finalFixture && (
-            <Animated.View entering={FadeInDown.duration(360).delay(160)}>
-              <Text style={styles.roundLabel}>🏆 Final</Text>
-              <BracketMatch
-                homeId={finalFixture.homeTeamId}
-                awayId={finalFixture.awayTeamId}
-                winnerTeamId={finalFixture.winnerTeamId}
-                played={finalFixture.played}
-                userCountry={userCountry}
-                isFinal
-              />
-            </Animated.View>
-          )}
+          <Text style={styles.section}>
+            {tournamentComplete ? 'Tournament complete' : 'Tournament'}
+          </Text>
+          <TournamentRound
+            label="Quarter-finals"
+            fixtures={rounds.quarterFinals}
+            teams={save.teams}
+            controlledTeamId={controlledTeamId}
+            nextFixtureId={nextFixture?.id}
+          />
+          <TournamentRound
+            label="Semi-finals"
+            fixtures={rounds.semiFinals}
+            teams={save.teams}
+            controlledTeamId={controlledTeamId}
+            nextFixtureId={nextFixture?.id}
+          />
+          <TournamentRound
+            label="Final"
+            fixtures={rounds.final}
+            teams={save.teams}
+            controlledTeamId={controlledTeamId}
+            nextFixtureId={nextFixture?.id}
+          />
         </>
-      ) : (
-        <Animated.View entering={FadeInDown.duration(320).delay(80)}>
-          <Card style={{ marginTop: spacing.md }}>
-            <Text style={styles.emptyText}>
-              {shouldRun && qualifies
-                ? 'The U19 World Cup bracket will be generated at the start of the next season.'
-                : 'No U19 World Cup scheduled this season.'}
-            </Text>
-          </Card>
-        </Animated.View>
-      )}
-
-      <Button
-        label="Back"
-        variant="ghost"
-        style={{ marginTop: spacing.xl }}
-        onPress={() => navigation.goBack()}
-      />
+      ) : null}
     </Screen>
   );
 }
 
-function BracketMatch({
-  homeId,
-  awayId,
-  winnerTeamId,
-  played,
-  userCountry,
-  isFinal = false,
+function MeritItem({ label, value, passed }: { label: string; value: string; passed: boolean }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.meritItem}>
+      <Text style={[styles.meritValue, passed && { color: colors.success }]}>{value}</Text>
+      <Text style={styles.meritLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function TournamentRound({
+  label,
+  fixtures,
+  teams,
+  controlledTeamId,
+  nextFixtureId,
 }: {
-  homeId: string;
-  awayId: string;
-  winnerTeamId?: string;
-  played: boolean;
-  userCountry?: string;
-  isFinal?: boolean;
+  label: string;
+  fixtures: Fixture[];
+  teams: Record<string, Team>;
+  controlledTeamId?: string;
+  nextFixtureId?: string;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <Animated.View entering={FadeInDown.duration(300)}>
+      <Text style={styles.roundLabel}>{label}</Text>
+      {fixtures.length > 0 ? (
+        fixtures.map((fixture) => (
+          <TournamentMatch
+            key={fixture.id}
+            fixture={fixture}
+            teams={teams}
+            controlledTeamId={controlledTeamId}
+            isNext={fixture.id === nextFixtureId}
+          />
+        ))
+      ) : (
+        <View style={styles.pendingRound}>
+          <Text style={styles.pendingText}>Awaiting earlier results</Text>
+        </View>
+      )}
+    </Animated.View>
+  );
+}
+
+function TournamentMatch({
+  fixture,
+  teams,
+  controlledTeamId,
+  isNext,
+}: {
+  fixture: Fixture;
+  teams: Record<string, Team>;
+  controlledTeamId?: string;
+  isNext: boolean;
 }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
-
-  const homeName = getCountry(homeId)?.name ?? 'Team pending';
-  const awayName = getCountry(awayId)?.name ?? 'Team pending';
-  const isUserHome = homeId === userCountry;
-  const isUserAway = awayId === userCountry;
-  const userWon = played && winnerTeamId === userCountry;
+  const result = fixture.played
+    ? fixture.winnerTeamId
+      ? `${teamName(teams, fixture.winnerTeamId)} won`
+      : 'Match tied'
+    : isNext
+      ? 'Your next match'
+      : 'Upcoming';
 
   return (
-    <View style={[styles.matchCard, isFinal && { borderColor: colors.accent, borderWidth: 1.5 }]}>
+    <View style={[styles.matchCard, isNext && { borderColor: colors.accent }]}>
       <TeamRow
-        name={homeName}
-        isUser={isUserHome}
-        isWinner={played && winnerTeamId === homeId}
-        played={played}
+        name={teamName(teams, fixture.homeTeamId)}
+        isUser={fixture.homeTeamId === controlledTeamId}
+        isWinner={fixture.played && fixture.winnerTeamId === fixture.homeTeamId}
+        played={fixture.played}
       />
-      <View style={styles.vsDivider} />
+      <View style={styles.matchDivider} />
       <TeamRow
-        name={awayName}
-        isUser={isUserAway}
-        isWinner={played && winnerTeamId === awayId}
-        played={played}
+        name={teamName(teams, fixture.awayTeamId)}
+        isUser={fixture.awayTeamId === controlledTeamId}
+        isWinner={fixture.played && fixture.winnerTeamId === fixture.awayTeamId}
+        played={fixture.played}
       />
-      {played && (
-        <Text style={[styles.resultBadge, { color: userWon ? colors.success : colors.textFaint }]}>
-          {userWon
-            ? '🏅 Your country advances'
-            : winnerTeamId
-              ? `${getCountry(winnerTeamId)?.name ?? 'Winning team'} wins`
-              : ''}
-        </Text>
-      )}
+      <Text
+        style={[
+          styles.resultText,
+          isNext && { color: colors.accent },
+          fixture.winnerTeamId === controlledTeamId && { color: colors.success },
+        ]}
+      >
+        {result}
+      </Text>
     </View>
   );
 }
@@ -224,53 +323,80 @@ function TeamRow({
   played: boolean;
 }) {
   const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: spacing.xs,
-        gap: spacing.sm,
-      }}
-    >
-      {isUser && <Text style={{ color: colors.accent, fontSize: 12 }}>★</Text>}
+    <View style={styles.teamRow}>
+      {isUser ? <Text style={styles.userMark}>★</Text> : null}
       <Text
-        style={{
-          flex: 1,
-          color: isWinner ? colors.success : played ? colors.textMuted : colors.text,
-          fontSize: fontSize.md,
-          fontWeight: isUser ? fontWeight.heavy : fontWeight.regular,
-          textDecorationLine: played && !isWinner ? 'line-through' : 'none',
-        }}
+        style={[
+          styles.teamName,
+          played && !isWinner && { color: colors.textMuted },
+          isUser && styles.userTeamName,
+        ]}
       >
         {name}
       </Text>
-      {isWinner && <Text style={{ color: colors.success, fontSize: 12 }}>✓</Text>}
+      {isWinner ? <Text style={styles.winnerMark}>✓</Text> : null}
     </View>
   );
 }
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    msg: { color: colors.textMuted, fontSize: fontSize.md, margin: spacing.lg },
-    statusCard: { marginTop: spacing.lg, borderWidth: 1 },
-    statusTitle: {
-      color: colors.textFaint,
-      fontSize: 10,
-      fontWeight: fontWeight.bold,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-      marginBottom: spacing.sm,
+    msg: { color: colors.textMuted, fontSize: fontSize.md },
+    statusCard: { borderWidth: 1 },
+    statusRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
     },
-    statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    country: { color: colors.text, fontSize: fontSize.xl, fontWeight: fontWeight.heavy },
-    badge: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-    badgeText: { fontSize: fontSize.xs, fontWeight: fontWeight.bold },
-    qualNote: {
+    statusCopy: { flex: 1, minWidth: 0 },
+    statusKicker: {
       color: colors.textFaint,
       fontSize: fontSize.xs,
-      marginTop: spacing.sm,
-      lineHeight: 16,
+      fontWeight: fontWeight.bold,
+      textTransform: 'uppercase',
+      letterSpacing: 0.9,
+    },
+    teamTitle: {
+      color: colors.text,
+      fontSize: fontSize.xl,
+      fontWeight: fontWeight.heavy,
+      marginTop: 3,
+    },
+    statusBadge: {
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 5,
+      maxWidth: '48%',
+    },
+    statusBadgeText: {
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+      textAlign: 'center',
+    },
+    meritGrid: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
+    scheduleNote: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      marginTop: spacing.md,
+    },
+    meritItem: {
+      flex: 1,
+      minWidth: 0,
+      alignItems: 'center',
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.sm,
+      paddingHorizontal: 4,
+      paddingVertical: spacing.sm,
+    },
+    meritValue: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
+    meritLabel: {
+      color: colors.textFaint,
+      fontSize: 10,
+      marginTop: 3,
+      textAlign: 'center',
     },
     section: {
       color: colors.textMuted,
@@ -279,7 +405,7 @@ const makeStyles = (colors: ThemeColors) =>
       textTransform: 'uppercase',
       letterSpacing: 1,
       marginTop: spacing.xl,
-      marginBottom: spacing.sm,
+      marginBottom: spacing.xs,
     },
     roundLabel: {
       color: colors.accent,
@@ -296,16 +422,33 @@ const makeStyles = (colors: ThemeColors) =>
       padding: spacing.md,
       marginBottom: spacing.sm,
     },
-    vsDivider: {
+    teamRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 30,
+      gap: spacing.sm,
+    },
+    userMark: { color: colors.accent, fontSize: fontSize.xs },
+    teamName: { flex: 1, minWidth: 0, color: colors.text, fontSize: fontSize.md },
+    userTeamName: { fontWeight: fontWeight.heavy },
+    winnerMark: { color: colors.success, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+    matchDivider: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: colors.border,
       marginVertical: spacing.xs,
     },
-    resultBadge: { fontSize: fontSize.xs, marginTop: spacing.xs, fontWeight: fontWeight.bold },
-    emptyText: {
-      color: colors.textMuted,
-      fontSize: fontSize.sm,
-      textAlign: 'center',
-      padding: spacing.md,
+    resultText: {
+      color: colors.textFaint,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+      marginTop: spacing.xs,
     },
+    pendingRound: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    pendingText: { color: colors.textFaint, fontSize: fontSize.sm, textAlign: 'center' },
   });

@@ -16,9 +16,9 @@ const ATTRS = {
   meta: { fitness: 60, confidence: 60, aggression: 55, discipline: 60 },
 };
 
-// Legacy/manual starting ages still need to map consistently even though the UI exposes only U14.
+// Legacy/manual starting ages still need to map consistently even though the UI exposes only Grade A.
 const STARTS = [
-  { value: 'u14', age: 14, attrScale: 0.52, level: 'SCHOOL', stock: false },
+  { value: 'grade-a', age: 16, attrScale: 0.52, level: 'SCHOOL', stock: false },
   { value: 'u19', age: 17, attrScale: 0.74, level: 'U19', stock: false },
   { value: 'domestic', age: 20, attrScale: 1.0, level: 'DOMESTIC', stock: true },
 ] as const;
@@ -39,7 +39,7 @@ function build(role: Role, s: (typeof STARTS)[number]) {
 }
 
 describe('player creation is consistent across every start level', () => {
-  it('keeps a School player out of the reserved Tier 3 senior roster', () => {
+  it('keeps a Grade A player out of the reserved Tier 3 senior roster', () => {
     const player = build('BATTER', STARTS[0]);
     const save = createCareerSave({
       player,
@@ -58,14 +58,20 @@ describe('player creation is consistent across every start level', () => {
     expect(
       save.teams[save.careerPathTeamId!].playerIds
         .filter((id) => id !== player.id)
-        .every((id) => save.players[id].age >= 14 && save.players[id].age <= 15),
+        .every((id) => save.players[id].age >= 16 && save.players[id].age <= 28),
     ).toBe(true);
     const youthFixtures = Object.values(save.fixtures).filter(
       (fixture) => fixture.competitionId === 'youth-u14',
     );
-    expect(youthFixtures).toHaveLength(6);
+    expect(youthFixtures).toHaveLength(21);
+    const playerTeamFixtures = youthFixtures.filter(
+      (fixture) =>
+        fixture.homeTeamId === save.careerPathTeamId ||
+        fixture.awayTeamId === save.careerPathTeamId,
+    );
+    expect(playerTeamFixtures).toHaveLength(6);
     expect(
-      youthFixtures.every(
+      playerTeamFixtures.every(
         (fixture) =>
           fixture.homeTeamId === save.careerPathTeamId ||
           fixture.awayTeamId === save.careerPathTeamId,

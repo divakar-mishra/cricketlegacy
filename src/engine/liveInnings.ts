@@ -57,6 +57,12 @@ export interface LiveInningsInput {
   matchOversOffset?: number;
   /** User-side difficulty adjustment for this innings. Hard is the 1.0 baseline. */
   outcomeBalance?: DifficultyOutcomeBalance;
+  /** Team-wide for Manager; protagonist-only for Player Career. */
+  outcomeBalanceScope?: 'TEAM' | 'STRIKER' | 'BOWLER';
+  outcomeBalancePlayerId?: string;
+  /** Match-only captaincy effects; zero outside high-pressure passages. */
+  battingLeadershipBonus?: number;
+  fieldingLeadershipBonus?: number;
 }
 
 export interface LiveScore {
@@ -423,7 +429,16 @@ export class LiveInnings {
       keeperQuality: this.keeperQuality,
       chasing: this.chasing,
       matchOversOffset: this.input.matchOversOffset,
-      outcomeBalance: this.input.outcomeBalance,
+      outcomeBalance:
+        this.input.outcomeBalanceScope === 'TEAM' ||
+        (this.input.outcomeBalanceScope === 'STRIKER' &&
+          striker.id === this.input.outcomeBalancePlayerId) ||
+        (this.input.outcomeBalanceScope === 'BOWLER' &&
+          bowler.id === this.input.outcomeBalancePlayerId)
+          ? this.input.outcomeBalance
+          : undefined,
+      battingLeadershipBonus: this.input.battingLeadershipBonus,
+      fieldingLeadershipBonus: this.input.fieldingLeadershipBonus,
     };
 
     const ev = resolveBall(ctx, this.rng);

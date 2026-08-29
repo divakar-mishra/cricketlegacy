@@ -44,6 +44,31 @@ const PLAYER_NICKNAMES = [
   'Dragons',
 ] as const;
 
+const LEGACY_GENERATED_SHORT_NAME = /^[A-Z]{2}\d{2}$/;
+
+/**
+ * Human-readable club initials. Generated domestic teams previously included
+ * their tier and slot in the abbreviation (for example `BS31`), which exposed
+ * internal generation data anywhere a compact name was rendered.
+ */
+export function domesticTeamShortName(name: string): string {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.replace(/[^A-Za-z]/g, ''))
+    .filter(Boolean);
+  const initials = words
+    .map((word) => word[0])
+    .join('')
+    .toUpperCase();
+  if (initials.length >= 2) return initials.slice(0, 4);
+  return name
+    .replace(/[^A-Za-z]/g, '')
+    .slice(0, 3)
+    .toUpperCase()
+    .padEnd(2, 'X');
+}
+
 function countryPyramidBlueprints(countryId: string, mode: 'player' | 'manager'): TeamBlueprint[] {
   const country = COUNTRIES_BY_ID[countryId];
   if (!country) return [];
@@ -58,15 +83,12 @@ function countryPyramidBlueprints(countryId: string, mode: 'player' | 'manager')
       const palette =
         COLORS[(index + tier * 2 + country.strength + (mode === 'player' ? 3 : 0)) % COLORS.length];
       const strengthBase = 49 + country.strength * 4 + (tier === 1 ? 15 : tier === 2 ? 6 : -3);
-      const short = `${city.name[0] ?? 'C'}${nickname[0]}${tier}${index + 1}`
-        .replace(/[^A-Za-z0-9]/g, '')
-        .slice(0, 4)
-        .toUpperCase();
+      const name = `${city.name} ${nickname}`;
       blueprints.push(
         TeamBlueprintSchema.parse({
           id: `${mode}_${countryId}_t${tier}_${index + 1}`,
-          name: `${city.name} ${nickname}`,
-          shortName: short,
+          name,
+          shortName: domesticTeamShortName(name),
           country: countryId,
           primaryColor: palette[0],
           secondaryColor: palette[1],
@@ -120,12 +142,26 @@ export function ensureSeasonPassBranding(save: SaveGame): void {
 }
 
 function derivedShortName(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const initials = words
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase();
-  return (initials.length >= 2 ? initials : name.slice(0, 3)).slice(0, 4).toUpperCase();
+  return domesticTeamShortName(name);
+}
+
+/**
+ * Repair domestic abbreviations produced by the old tier/slot naming scheme.
+ * This is safe to run repeatedly and preserves premium/custom aliases. The
+ * original-name snapshot is repaired too, otherwise a lapsed pass could bring
+ * the numeric abbreviation back later.
+ */
+export function synchronizeDomesticTeamShortNames(save: SaveGame): void {
+  const generatedTeam = (id: string) => /^(?:player|manager)_.+_t[123]_\d+$/.test(id);
+  for (const [id, team] of Object.entries(save.teams ?? {})) {
+    if (!generatedTeam(id) || !LEGACY_GENERATED_SHORT_NAME.test(team.shortName)) continue;
+    team.shortName = domesticTeamShortName(team.name);
+  }
+
+  for (const [id, original] of Object.entries(save.seasonPassBranding?.originalTeamNames ?? {})) {
+    if (!generatedTeam(id) || !LEGACY_GENERATED_SHORT_NAME.test(original.shortName)) continue;
+    original.shortName = domesticTeamShortName(original.name);
+  }
 }
 
 /** Apply premium aliases or restore canonical fictional names when premium lapses. */

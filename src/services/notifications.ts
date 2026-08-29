@@ -198,11 +198,14 @@ const MATCH_READY_BODIES = [
 
 const SEASON_ENDING_BODIES = [
   '⏰ Season pass rewards expiring soon! Claim everything before the season resets.',
-  "Last chance to grab your battle pass rewards. Don't leave coins and gems on the table!",
+  "Last chance to grab your battle pass rewards. Don't leave earned rewards unclaimed!",
   'The season is closing. Finish your challenges and claim your final rewards. 🏆',
   'Battle pass ending in 3 days. Are you leaving rewards unclaimed? Log in now!',
   'Season finale incoming! Complete your objectives and collect your hard-earned prizes.',
 ];
+
+const SEASON_ENDING_WARNING_LEAD_SECONDS = 3 * 24 * 60 * 60;
+const MIN_SCHEDULE_DELAY_SECONDS = 60;
 
 function pickLine(lines: readonly string[]): string {
   return lines[Math.floor(Math.random() * lines.length)];
@@ -248,8 +251,28 @@ export function scheduleMatchReady(secondsUntil = 4 * 60 * 60): Promise<string |
   });
 }
 
-/** Warns the player a limited-time event / season pass is ending (defaults ~3 days). */
-export function scheduleSeasonEnding(secondsUntil = 3 * 24 * 60 * 60): Promise<string | null> {
+/**
+ * Delay until the three-day warning for a real UTC pass boundary. Returning
+ * `null` avoids firing an immediate/stale warning when the warning point is
+ * already less than a minute away or has passed.
+ */
+export function seasonEndingReminderDelaySeconds(
+  periodEndsAt: number,
+  now: number = Date.now(),
+): number | null {
+  if (!Number.isFinite(periodEndsAt) || !Number.isFinite(now)) return null;
+  const secondsUntilWarning =
+    Math.floor((periodEndsAt - now) / 1000) - SEASON_ENDING_WARNING_LEAD_SECONDS;
+  return secondsUntilWarning >= MIN_SCHEDULE_DELAY_SECONDS ? secondsUntilWarning : null;
+}
+
+/** Warn three days before the supplied UTC Season Pass boundary. */
+export function scheduleSeasonEnding(
+  periodEndsAt: number,
+  now: number = Date.now(),
+): Promise<string | null> {
+  const secondsUntil = seasonEndingReminderDelaySeconds(periodEndsAt, now);
+  if (secondsUntil == null) return Promise.resolve(null);
   return scheduleLocal({
     id: NOTIF_ID.SEASON_ENDING,
     title: '⏰ Season Rewards Expiring!',
