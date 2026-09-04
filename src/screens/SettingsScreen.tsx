@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { setMusicEnabled } from '../audio';
+import { FranchiseOfferModal } from '../components/FranchiseOfferModal';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import {
   AppText as Text,
@@ -38,6 +40,25 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
   const qaGrantWhaleCoins = useCareer((state) => state.qaGrantWhaleCoins);
   const qaGrantClubBudget = useCareer((state) => state.qaGrantClubBudget);
   const qaRefillEnergy = useCareer((state) => state.qaRefillEnergy);
+  const [qaAuctionPreviewOpen, setQaAuctionPreviewOpen] = useState(false);
+
+  const qaAuctionOffers =
+    activeSave?.mode === 'career' && activeSave.userPlayerId
+      ? Object.values(activeSave.teams)
+          .filter(
+            (team) =>
+              !team.isNationalTeam &&
+              team.id !== (activeSave.franchiseTeamId ?? activeSave.userTeamId),
+          )
+          .sort((left, right) => right.reputation - left.reputation)
+          .slice(0, 2)
+          .map((team, index) => ({
+            teamId: team.id,
+            fee: index === 0 ? 2_400_000 : 1_850_000,
+            signingBonus: index === 0 ? 120_000 : 90_000,
+            wagePromise: index === 0 ? 425_000 : 360_000,
+          }))
+      : [];
 
   const themeOptions: { id: ThemeMode; label: string }[] = [
     { id: 'dark', label: t('settings.themeDark') },
@@ -151,8 +172,32 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
                 }}
               />
             </View>
+            <Divider />
+            <View style={styles.qaCoinsRow}>
+              <View style={styles.qaCoinsCopy}>
+                <Text style={styles.rowLabel}>Auction Presentation</Text>
+                <Text style={styles.qaBalance}>Real UI · preview only · no contract changes</Text>
+              </View>
+              <Button
+                label="Preview auction"
+                size="sm"
+                fullWidth={false}
+                disabled={activeSave?.mode !== 'career' || qaAuctionOffers.length === 0}
+                style={styles.qaCoinsButton}
+                onPress={() => setQaAuctionPreviewOpen(true)}
+              />
+            </View>
           </Card>
         </>
+      ) : null}
+
+      {QA_TOOLS_ENABLED && activeSave?.mode === 'career' ? (
+        <FranchiseOfferModal
+          save={activeSave}
+          offers={qaAuctionPreviewOpen ? qaAuctionOffers : []}
+          onAccept={() => setQaAuctionPreviewOpen(false)}
+          onStay={() => setQaAuctionPreviewOpen(false)}
+        />
       ) : null}
 
       <Text style={styles.section}>{t('settings.theme')}</Text>

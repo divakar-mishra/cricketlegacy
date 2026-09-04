@@ -100,7 +100,8 @@
           "androidAppId": "ca-app-pub-4249020515368291~8405865949"
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

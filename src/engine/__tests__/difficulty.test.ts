@@ -1,5 +1,5 @@
 import { difficultyAggression } from '../ai';
-import { difficultyOutcomeBalance } from '../difficulty';
+import { difficultyOutcomeBalance, playerCareerOdiBattingBalance } from '../difficulty';
 import { LiveMatch } from '../liveMatch';
 import { generateSquad } from '../../generation/players';
 import { makeRng } from '../rng';
@@ -105,11 +105,11 @@ describe('difficulty aggression tuning', () => {
 });
 
 describe('difficulty outcome balance', () => {
-  it('gives Normal a measured user-side edge without changing the Hard baseline', () => {
-    expect(difficultyOutcomeBalance('NORMAL', true)).toEqual({ wicket: 0.56, scoring: 1.24 });
-    expect(difficultyOutcomeBalance('NORMAL', false)).toEqual({ wicket: 1.2, scoring: 0.9 });
-    expect(difficultyOutcomeBalance('HARD', true)).toEqual({ wicket: 1, scoring: 1 });
-    expect(difficultyOutcomeBalance('HARD', false)).toEqual({ wicket: 1, scoring: 1 });
+  it('keeps Normal neutral and gives Hard the approved opposition edge', () => {
+    expect(difficultyOutcomeBalance('NORMAL', true)).toEqual({ wicket: 1, scoring: 1 });
+    expect(difficultyOutcomeBalance('NORMAL', false)).toEqual({ wicket: 1, scoring: 1 });
+    expect(difficultyOutcomeBalance('HARD', true)).toEqual({ wicket: 1.05, scoring: 0.975 });
+    expect(difficultyOutcomeBalance('HARD', false)).toEqual({ wicket: 0.95, scoring: 1.025 });
   });
 
   it('keeps Easy more forgiving and Pro less forgiving than Normal', () => {
@@ -135,9 +135,26 @@ describe('difficulty outcome balance', () => {
       scoring: 1,
     });
     expect(difficultyOutcomeBalance('NORMAL', true, 'PLAYER', 0, 'ODI')).toEqual({
-      wicket: 0.56,
-      scoring: 1.24,
+      wicket: 1,
+      scoring: 1,
     });
+  });
+
+  it('scales Player ODI batting merit between the free and rewarded OVR bands', () => {
+    const base = difficultyOutcomeBalance('NORMAL', true, 'PLAYER', 0, 'ODI');
+    expect(playerCareerOdiBattingBalance(base, 'ODI', 'PLAYER', 88, 90)).toEqual({
+      wicket: expect.closeTo(0.8867, 3),
+      scoring: expect.closeTo(1.0327, 3),
+    });
+    const rewarded = playerCareerOdiBattingBalance(base, 'ODI', 'PLAYER', 92, 94);
+    expect(rewarded.wicket).toBeCloseTo(0.7404, 5);
+    expect(rewarded.scoring).toBeCloseTo(1.05976, 5);
+    expect(rewarded.wicket).toBeLessThan(
+      playerCareerOdiBattingBalance(base, 'ODI', 'PLAYER', 88, 90).wicket,
+    );
+    expect(playerCareerOdiBattingBalance(base, 'TEST', 'PLAYER', 92, 94)).toBe(base);
+    expect(playerCareerOdiBattingBalance(base, 'ODI', 'MANAGER', 92, 94)).toBe(base);
+    expect(playerCareerOdiBattingBalance(base, 'ODI', 'PLAYER', 92, 20)).toBe(base);
   });
 
   it('turns the multipliers into a meaningful School-strength match advantage', () => {
@@ -151,10 +168,10 @@ describe('difficulty outcome balance', () => {
     expect(normal.runDifference).toBeGreaterThan(hard.runDifference);
   });
 
-  it('keeps a School-capped specialist meaningfully successful on Normal', () => {
+  it('keeps a School-capped specialist competitive on neutral Normal', () => {
     const sample = schoolBatterSample();
-    expect(sample.average).toBeGreaterThanOrEqual(37);
-    expect(sample.scoresThirtyPlus).toBeGreaterThanOrEqual(100);
-    expect(sample.scoresUnderTen).toBeLessThanOrEqual(45);
+    expect(sample.average).toBeGreaterThanOrEqual(16);
+    expect(sample.scoresThirtyPlus).toBeGreaterThanOrEqual(45);
+    expect(sample.scoresUnderTen).toBeLessThanOrEqual(100);
   });
 });

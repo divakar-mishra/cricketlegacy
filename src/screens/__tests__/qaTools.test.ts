@@ -16,7 +16,17 @@ describe('internal QA tools', () => {
     expect(settings).toContain('{QA_TOOLS_ENABLED ? (');
     expect(settings).toContain('Unlimited energy');
     expect(settings).toContain('+10M coins');
+    expect(settings).toContain('Preview auction');
+    expect(settings).toContain('qaAuctionPreviewOpen ? qaAuctionOffers : []');
     expect(eas).toContain('"EXPO_PUBLIC_QA_TOOLS": "true"');
+  });
+
+  it('previews the production auction UI without accepting a contract', () => {
+    expect(settings).toContain('<FranchiseOfferModal');
+    expect(settings).toContain('Real UI · preview only · no contract changes');
+    expect(settings).toContain('!team.isNationalTeam');
+    expect(settings).toContain('onAccept={() => setQaAuctionPreviewOpen(false)}');
+    expect(settings).toContain('onStay={() => setQaAuctionPreviewOpen(false)}');
   });
 
   it('persists the unlimited-energy choice and applies it to every match path', () => {

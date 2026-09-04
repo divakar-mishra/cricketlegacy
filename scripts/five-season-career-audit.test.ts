@@ -101,6 +101,7 @@ const MANAGER_SEED = Number(process.env.CAREER_AUDIT_MANAGER_SEED ?? 71_005);
 const FULL_CAREER_AUDIT = process.env.CAREER_AUDIT_FULL === '1';
 const MONETIZATION_CAREER_AUDIT = process.env.CAREER_AUDIT_MONETIZATION === '1';
 const SKIP_FULL_CAREER_MANAGER = process.env.CAREER_AUDIT_SKIP_MANAGER === '1';
+const DOUBLE_PLAYER_MATCH_COINS = process.env.CAREER_AUDIT_DOUBLE_MATCH_COINS === '1';
 const FULL_PLAYER_RUNS_PER_ROLE = Math.max(
   1,
   Math.floor(Number(process.env.CAREER_AUDIT_PLAYER_RUNS_PER_ROLE ?? 1)),
@@ -278,7 +279,8 @@ interface ModeAudit {
   training?: TrainingAudit;
   titles: {
     league: number;
-    cup: number;
+    /** The standalone National Knockout Cup is a Manager-only competition. */
+    cup?: number;
     continental: number;
     world: string[];
   };
@@ -557,7 +559,7 @@ function matchAuditFromState(
 function completeLiveFixture(
   mode: AuditMode,
   errors: string[],
-): { fixtureId: string; selected?: boolean; match: MatchState } | null {
+): { fixtureId: string; selected?: boolean; coinsAwarded?: number; match: MatchState } | null {
   const state = useCareer.getState();
   const started = state.beginLiveMatch();
   if (!started) return null;
@@ -619,7 +621,12 @@ function completeLiveFixture(
   ) {
     errors.push(`${mode}:${fixtureId} did not persist its played/result authority fields.`);
   }
-  return { fixtureId, selected: committed.selected, match };
+  return {
+    fixtureId,
+    selected: committed.selected,
+    coinsAwarded: committed.coinsAwarded,
+    match,
+  };
 }
 
 function validateRows(
@@ -804,7 +811,7 @@ function buyAffordableTraining(
       });
     const group = candidates[0];
     if (!group) return;
-    const cost = trainingCost(sessionsDone(player), computeOverall(player));
+    const cost = trainingCost(sessionsDone(player), computeOverall(player), player.role);
     if (save.wallet.coins < cost) return;
     const rng = makeRng((seed ^ Math.imul(audit.sessions + 1, 0x9e3779b1)) >>> 0);
     const accelerated = (accelerator?.remaining ?? 0) > 0;
@@ -922,6 +929,8 @@ interface RunModeOptions {
   playerRetirementAge?: number;
   retireWhenRecommended?: boolean;
   acceleratorCharges?: number;
+  /** Simulates completing the optional post-match coin-doubling ad every time it is offered. */
+  doubleMatchCoins?: boolean;
 }
 
 function runMode(
@@ -1024,6 +1033,16 @@ function runMode(
         if (completed) {
           liveMatches.set(completed.fixtureId, completed.match);
           selectedByFixture.set(completed.fixtureId, completed.selected);
+          if (mode === 'career' && options.doubleMatchCoins && (completed.coinsAwarded ?? 0) > 0) {
+            const granted = useCareer
+              .getState()
+              .grantAdReward(completed.coinsAwarded!, `match-double:${completed.fixtureId}`);
+            if (!granted.ok) {
+              errors.push(
+                `player:${completed.fixtureId} could not apply its rewarded-ad coin double (${granted.reason ?? 'unknown reason'}).`,
+              );
+            }
+          }
         } else if (mode === 'career') {
           const outcome = useCareer.getState().advanceWhileBenched();
           if (!outcome.ok) {
@@ -1438,7 +1457,7 @@ function runMode(
     training: mode === 'career' ? training : undefined,
     titles: {
       league: finalSave.leagueTitles ?? 0,
-      cup: finalSave.cupWins ?? 0,
+      ...(mode === 'manager' ? { cup: finalSave.cupWins ?? 0 } : {}),
       continental: finalSave.continentalTitles ?? 0,
       world: worldTitles(finalSave),
     },
@@ -1590,6 +1609,7 @@ fullCareerAuditTest(
             buyTraining: true,
             playerRetirementAge: FULL_PLAYER_RETIREMENT_AGE,
             retireWhenRecommended: FULL_PLAYER_RETIREMENT_AGE == null,
+            doubleMatchCoins: DOUBLE_PLAYER_MATCH_COINS,
           });
         }),
       );
@@ -1621,7 +1641,7 @@ fullCareerAuditTest(
         managerRuns: managerRuns.length,
         spending:
           'PLAYER_EARNED_WALLET_COINS_ON_TRAINING_AND_MANAGER_CLUB_BALANCE_ON_RETENTION_UPGRADES',
-        iapOrAds: false,
+        iapOrAds: DOUBLE_PLAYER_MATCH_COINS ? 'REWARDED_MATCH_COIN_DOUBLE' : false,
         matchMode: 'INSTANT_SIM',
       },
       players: playerRuns,

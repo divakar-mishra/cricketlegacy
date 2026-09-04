@@ -17,7 +17,12 @@ import {
   TEST_INNINGS_CAP,
   testRemaining,
 } from './simulateMatch';
-import { DifficultyBalanceProfile, difficultyOutcomeBalance } from './difficulty';
+import {
+  DifficultyBalanceProfile,
+  difficultyOutcomeBalance,
+  playerCareerOdiBattingBalance,
+} from './difficulty';
+import { battingMean } from './rating';
 import { resolveToss, TossCall, TossChoice, TossDecision } from './toss';
 
 export interface LiveMatchInput {
@@ -99,7 +104,9 @@ export class LiveMatch {
       ? [input.home, input.away].find((side) => side.teamId === input.userTeamId)
       : undefined;
     const oppositionSide = controlledSide
-      ? (controlledSide.teamId === input.home.teamId ? input.away : input.home)
+      ? controlledSide.teamId === input.home.teamId
+        ? input.away
+        : input.home
       : undefined;
     this.managerRatingAdvantage =
       input.difficultyBalanceProfile === 'MANAGER' && controlledSide && oppositionSide
@@ -243,6 +250,30 @@ export class LiveMatch {
           : focusPlayerId && field.players.some((player) => player.id === focusPlayerId)
             ? 'BOWLER'
             : undefined;
+    const focusPlayer =
+      balanceScope === 'STRIKER'
+        ? bat.players.find((player) => player.id === focusPlayerId)
+        : undefined;
+    const baseOutcomeBalance =
+      this.input.userTeamId && balanceScope
+        ? difficultyOutcomeBalance(
+            this.difficulty,
+            bat.teamId === this.input.userTeamId,
+            this.input.difficultyBalanceProfile,
+            this.managerRatingAdvantage,
+            this.format,
+          )
+        : undefined;
+    const outcomeBalance =
+      baseOutcomeBalance && focusPlayer
+        ? playerCareerOdiBattingBalance(
+            baseOutcomeBalance,
+            this.format,
+            this.input.difficultyBalanceProfile ?? 'PLAYER',
+            focusPlayer.overall,
+            battingMean(focusPlayer),
+          )
+        : baseOutcomeBalance;
     return new LiveInnings(
       {
         battingTeamId: bat.teamId,
@@ -265,19 +296,9 @@ export class LiveMatch {
             ? this.input.tactics?.bowlingPlan
             : field.tactics?.bowlerPlan,
         fieldSetting:
-          field.teamId === this.input.userTeamId
-            ? this.input.tactics?.field
-            : field.tactics?.field,
+          field.teamId === this.input.userTeamId ? this.input.tactics?.field : field.tactics?.field,
         matchOversOffset: this.isTest ? this.oversUsed : undefined,
-        outcomeBalance: this.input.userTeamId && balanceScope
-          ? difficultyOutcomeBalance(
-              this.difficulty,
-              bat.teamId === this.input.userTeamId,
-              this.input.difficultyBalanceProfile,
-              this.managerRatingAdvantage,
-              this.format,
-            )
-          : undefined,
+        outcomeBalance,
         outcomeBalanceScope: balanceScope,
         outcomeBalancePlayerId: balanceScope === 'TEAM' ? undefined : focusPlayerId,
         battingLeadershipBonus: bat.leadershipBonus,

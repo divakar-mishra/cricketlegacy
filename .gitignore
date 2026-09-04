@@ -45,6 +45,7 @@ __pycache__/
 
 # local env files
 .env*.local
+/supabase/.temp/
 
 # typescript
 *.tsbuildinfo

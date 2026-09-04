@@ -9,6 +9,8 @@ let urlPolyfillInstalled = false;
 export interface SupabaseUserSession {
   userId: string;
   isAnonymous: boolean;
+  provider: string | null;
+  displayName?: string;
 }
 
 export interface OnlineDailyVerification {
@@ -77,13 +79,43 @@ function hasRecoverableUserIdentity(user: unknown): boolean {
   );
 }
 
+function authProvider(user: unknown): string | null {
+  if (!user || typeof user !== 'object') return null;
+  const record = user as {
+    app_metadata?: { provider?: unknown };
+    identities?: { provider?: unknown }[] | null;
+  };
+  if (typeof record.app_metadata?.provider === 'string') return record.app_metadata.provider;
+  const identity = (record.identities ?? []).find(
+    (candidate) => typeof candidate?.provider === 'string',
+  );
+  return typeof identity?.provider === 'string' ? identity.provider : null;
+}
+
+function authDisplayName(user: unknown): string | undefined {
+  if (!user || typeof user !== 'object') return undefined;
+  const metadata = (user as { user_metadata?: unknown }).user_metadata;
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  const record = metadata as Record<string, unknown>;
+  for (const key of ['full_name', 'name', 'display_name']) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+  }
+  return undefined;
+}
+
 export async function currentSupabaseSession(): Promise<SupabaseUserSession | null> {
   const supabase = getSupabaseClient();
   if (!supabase) return null;
 
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.user) return null;
-  return { userId: data.session.user.id, isAnonymous: isAnonymousUser(data.session.user) };
+  return {
+    userId: data.session.user.id,
+    isAnonymous: isAnonymousUser(data.session.user),
+    provider: authProvider(data.session.user),
+    displayName: authDisplayName(data.session.user),
+  };
 }
 
 /**
@@ -110,7 +142,12 @@ export async function ensureAnonymousSupabaseUser(): Promise<SupabaseUserSession
     throw new Error(error?.message ?? 'Supabase anonymous sign-in failed.');
   }
 
-  return { userId: data.user.id, isAnonymous: isAnonymousUser(data.user) };
+  return {
+    userId: data.user.id,
+    isAnonymous: isAnonymousUser(data.user),
+    provider: authProvider(data.user),
+    displayName: authDisplayName(data.user),
+  };
 }
 
 function parseVerificationRow(data: unknown): OnlineDailyVerification {

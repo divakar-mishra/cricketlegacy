@@ -300,80 +300,85 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
           <PlayerDevelopmentPanel />
         ) : (
           visibleGroups.map((group, idx) => {
-          const obj = player[group.sourceGroup] as unknown as Record<string, number>;
-          const labels = new Map(
-            ATTR_META[group.sourceGroup].map(([key, label]) => [key as string, label]),
-          );
-          const attrs = group.attributes.map((key) => ({
-            key,
-            label: labels.get(key) ?? key,
-            val: baseAttributeValue(obj[key]),
-          }));
-          const groupAvg = Math.round(attrs.reduce((s, a) => s + a.val, 0) / attrs.length);
-          const isBusy = busyGroup === group.id;
-          const groupDone = sessionsDone(player, group.id);
-          const groupLeft = Math.max(
-            0,
-            Math.min(trainingFocusSessionLimit(save.careerPathLevel) - groupDone, left),
-          );
-          const groupCost = trainingCost(done, overall);
-          const groupTrainable = canTrain(player, group.id, save.careerPathLevel);
-          const canAfford = save.wallet.coins >= groupCost;
-          const cost = groupCost;
-          const trainable = groupTrainable;
-          const cap = Math.min(
-            TRAINING.attrCeiling,
-            trainingAttributeCeiling(save.careerPathLevel),
-          );
-          const improvableCount = attrs.filter((attr) => attr.val < cap).length;
-          const blockedByCap = improvableCount === 0;
-          const analystRecommended = activeAnalysis?.recommendedTrainingGroup === group.id;
+            const obj = player[group.sourceGroup] as unknown as Record<string, number>;
+            const labels = new Map(
+              ATTR_META[group.sourceGroup].map(([key, label]) => [key as string, label]),
+            );
+            const attrs = group.attributes.map((key) => ({
+              key,
+              label: labels.get(key) ?? key,
+              val: baseAttributeValue(obj[key]),
+            }));
+            const groupAvg = Math.round(attrs.reduce((s, a) => s + a.val, 0) / attrs.length);
+            const isBusy = busyGroup === group.id;
+            const groupDone = sessionsDone(player, group.id);
+            const groupLeft = Math.max(
+              0,
+              Math.min(trainingFocusSessionLimit(save.careerPathLevel) - groupDone, left),
+            );
+            const groupCost = trainingCost(done, overall, player.role);
+            const groupTrainable = canTrain(player, group.id, save.careerPathLevel);
+            const canAfford = save.wallet.coins >= groupCost;
+            const cost = groupCost;
+            const trainable = groupTrainable;
+            const cap = Math.min(
+              TRAINING.attrCeiling,
+              trainingAttributeCeiling(save.careerPathLevel),
+            );
+            const improvableCount = attrs.filter((attr) => attr.val < cap).length;
+            const blockedByCap = improvableCount === 0;
+            const analystRecommended = activeAnalysis?.recommendedTrainingGroup === group.id;
 
-          return (
-            <Animated.View key={group.id} entering={FadeInDown.duration(300).delay(80 + idx * 50)}>
-              <Card style={[styles.groupCard, analystRecommended && styles.recommendedGroup]}>
-                <View style={styles.groupHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.groupTitle}>{group.label}</Text>
-                    {analystRecommended ? (
-                      <Text style={styles.recommendedLabel}>Analyst recommendation</Text>
-                    ) : null}
-                    <Text style={styles.groupAvg}>Avg {groupAvg} · {groupLeft} left</Text>
-                  </View>
-                  <Button
-                    label={
-                      isBusy
-                        ? 'Training...'
-                        : blockedByCap
-                          ? 'Stage cap reached'
-                          : trainable
-                            ? canAfford
-                              ? `Train · ${cost}`
-                              : `Need ${cost}`
-                            : 'Season limit reached'
-                    }
-                    size="sm"
-                    variant={groupTrainable && !blockedByCap ? 'primary' : 'secondary'}
-                    fullWidth={false}
-                    loading={isBusy}
-                    disabled={!groupTrainable || blockedByCap || !canAfford || !!busyGroup}
-                    onPress={() => void onTrain(group.id)}
-                  />
-                </View>
-                {attrs.map((attr) => (
-                  <View key={attr.key} style={styles.attrRow}>
-                    <Text style={styles.attrLabel}>{attr.label}</Text>
-                    <View style={styles.attrRight}>
-                      <View style={styles.attrBarBg}>
-                        <View style={[styles.attrBarFill, { width: `${attr.val}%` }]} />
-                      </View>
-                      <Text style={styles.attrVal}>{attr.val}</Text>
+            return (
+              <Animated.View
+                key={group.id}
+                entering={FadeInDown.duration(300).delay(80 + idx * 50)}
+              >
+                <Card style={[styles.groupCard, analystRecommended && styles.recommendedGroup]}>
+                  <View style={styles.groupHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.groupTitle}>{group.label}</Text>
+                      {analystRecommended ? (
+                        <Text style={styles.recommendedLabel}>Analyst recommendation</Text>
+                      ) : null}
+                      <Text style={styles.groupAvg}>
+                        Avg {groupAvg} · {groupLeft} left
+                      </Text>
                     </View>
+                    <Button
+                      label={
+                        isBusy
+                          ? 'Training...'
+                          : blockedByCap
+                            ? 'Stage cap reached'
+                            : trainable
+                              ? canAfford
+                                ? `Train · ${cost}`
+                                : `Need ${cost}`
+                              : 'Season limit reached'
+                      }
+                      size="sm"
+                      variant={groupTrainable && !blockedByCap ? 'primary' : 'secondary'}
+                      fullWidth={false}
+                      loading={isBusy}
+                      disabled={!groupTrainable || blockedByCap || !canAfford || !!busyGroup}
+                      onPress={() => void onTrain(group.id)}
+                    />
                   </View>
-                ))}
-              </Card>
-            </Animated.View>
-          );
+                  {attrs.map((attr) => (
+                    <View key={attr.key} style={styles.attrRow}>
+                      <Text style={styles.attrLabel}>{attr.label}</Text>
+                      <View style={styles.attrRight}>
+                        <View style={styles.attrBarBg}>
+                          <View style={[styles.attrBarFill, { width: `${attr.val}%` }]} />
+                        </View>
+                        <Text style={styles.attrVal}>{attr.val}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </Card>
+              </Animated.View>
+            );
           })
         )}
       </ScrollView>

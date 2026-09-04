@@ -166,16 +166,40 @@ export function trainingFocusSessionLimit(level?: CareerPathLevel): number {
 }
 
 export function trainingCostMultiplier(overall: number): number {
-  if (overall >= 90) return 3.5;
-  if (overall >= 85) return 2.5;
+  // Late development is the long-term economy boundary. Sessions still grant
+  // their full visible attribute movement, but sustaining an elite rating now
+  // requires substantially more earned/ad/IAP currency than reaching the
+  // professional 80s.
+  if (overall >= 90) return 60;
+  if (overall >= 85) return 10;
   if (overall >= 80) return 1.75;
   if (overall >= 70) return 1.25;
   return 1;
 }
 
-export function trainingCost(sessionsDone: number, overall = 0): number {
+export function trainingCost(sessionsDone: number, overall = 0, role?: Role): number {
   const base = TRAINING.baseCost + sessionsDone * TRAINING.costGrowth;
-  return Math.round(base * trainingCostMultiplier(overall));
+  // Batting specialists spread development across six core batting skills,
+  // compared with five bowling skills. The development discount prevents a
+  // low-rated specialist from becoming permanently benched before reaching
+  // professional standard; it ends at 80 OVR, before elite progression.
+  const battingSpecialist = role === 'BATTER' || role === 'WK_BATTER';
+  const roleCostFactor = battingSpecialist
+    ? overall < 80
+      ? 0.3
+      : overall >= 90
+        ? 4
+        : overall >= 85
+          ? 2
+          : 1
+    : role === 'ALLROUNDER' && overall >= 90
+      ? 2
+      : role === 'ALLROUNDER' && overall >= 85
+        ? 1.2
+        : role === 'BOWLER' && overall >= 90
+          ? 4
+          : 1;
+  return Math.round(base * trainingCostMultiplier(overall) * roleCostFactor);
 }
 
 export function sessionsDone(player: Player, group?: TrainGroup): number {
@@ -228,8 +252,7 @@ export function applyTraining(
   for (const e of entries.slice(0, TRAINING.attrsPerSession)) {
     const baseGain =
       TRAINING.gainMin + Math.floor(rng() * (TRAINING.gainMax - TRAINING.gainMin + 1));
-    const roleMultiplier =
-      player.role === 'ALLROUNDER' ? ALLROUNDER_TRAINING_GAIN_MULTIPLIER : 1;
+    const roleMultiplier = player.role === 'ALLROUNDER' ? ALLROUNDER_TRAINING_GAIN_MULTIPLIER : 1;
     const scaledGain = baseGain * Math.max(1, gainMultiplier) * roleMultiplier;
     const wholeGain = Math.floor(scaledGain);
     const gain = Math.max(1, wholeGain + (rng() < scaledGain - wholeGain ? 1 : 0));

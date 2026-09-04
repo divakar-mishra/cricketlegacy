@@ -2095,7 +2095,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (!canTrain(player, group, save.careerPathLevel)) {
       return fail('No training sessions left for this discipline.');
     }
-    const cost = trainingCost(sessionsDone(player), computeOverall(player));
+    const cost = trainingCost(sessionsDone(player), computeOverall(player), player.role);
     if (save.wallet.coins < cost) {
       return fail(`You need ${cost.toLocaleString()} coins for this session.`, cost);
     }

@@ -255,6 +255,7 @@ function inferredCareerResources(save: SaveGame, user: Player): PlayerCareerReso
     residencySeasons: { ...(current?.residencySeasons ?? { [domesticCountry]: 0 }) },
     lastFormat: current?.lastFormat,
     consecutiveMatches: Math.max(0, Math.floor(current?.consecutiveMatches ?? 0)),
+    consecutiveBenches: Math.max(0, Math.floor(current?.consecutiveBenches ?? 0)),
     formatAppearances: { ...(current?.formatAppearances ?? {}) },
     requestedRestFixtureId: current?.requestedRestFixtureId,
     selectionGuaranteeMatches: Math.max(0, Math.floor(current?.selectionGuaranteeMatches ?? 0)),
@@ -470,6 +471,18 @@ export function careerSelectionDecision(
       reason: 'Selected in the U19 World Cup XI on tournament merit.',
     };
   }
+  const level = save.careerPathLevel ?? 'DOMESTIC';
+  if (
+    (level === 'DOMESTIC' || level === 'INTERNATIONAL') &&
+    (resources.consecutiveBenches ?? 0) >= 4
+  ) {
+    return {
+      selected: true,
+      userScore,
+      rivalScore,
+      reason: 'Selected for a rotation opportunity after time outside the XI.',
+    };
+  }
   if ((resources.selectionGuaranteeMatches ?? 0) > 0) {
     return {
       selected: true,
@@ -479,7 +492,6 @@ export function careerSelectionDecision(
     };
   }
 
-  const level = save.careerPathLevel ?? 'DOMESTIC';
   if (level === 'SCHOOL') {
     return {
       selected: true,
@@ -612,6 +624,7 @@ export function applyCareerMatchReadiness(
       100,
     );
     resources.consecutiveMatches += 1;
+    resources.consecutiveBenches = 0;
     resources.formatAppearances[input.format] =
       (resources.formatAppearances[input.format] ?? 0) + 1;
     const rating = input.rating ?? 5;
@@ -640,6 +653,7 @@ export function applyCareerMatchReadiness(
     const recovery = user.age <= 22 ? 28 : user.age <= 29 ? 24 : user.age <= 32 ? 20 : 16;
     resources.playerCondition = clamp(resources.playerCondition + recovery, 0, 100);
     resources.consecutiveMatches = 0;
+    resources.consecutiveBenches = (resources.consecutiveBenches ?? 0) + 1;
     // A player outside the XI still trains with the squad. Without a bounded
     // form recovery, one drop becomes permanent because form previously moved
     // only when the player appeared. Youth players recover a little faster so

@@ -13,7 +13,12 @@ import { planRain } from './rain';
 import { simulateInnings } from './simulateInnings';
 import { makeRng, Rng } from './rng';
 import { resolveToss, TossCall, TossChoice } from './toss';
-import { DifficultyBalanceProfile, difficultyOutcomeBalance } from './difficulty';
+import {
+  DifficultyBalanceProfile,
+  difficultyOutcomeBalance,
+  playerCareerOdiBattingBalance,
+} from './difficulty';
+import { battingMean } from './rating';
 
 export interface TeamTactics {
   battingBias: number;
@@ -82,8 +87,15 @@ function inningsBalance(
   }
   if (!input.focusPlayerId) return {};
   if (batting.players.some((player) => player.id === input.focusPlayerId)) {
+    const focusPlayer = batting.players.find((player) => player.id === input.focusPlayerId)!;
     return {
-      outcomeBalance: balance,
+      outcomeBalance: playerCareerOdiBattingBalance(
+        balance,
+        input.format,
+        input.difficultyBalanceProfile ?? 'PLAYER',
+        focusPlayer.overall,
+        battingMean(focusPlayer),
+      ),
       outcomeBalanceScope: 'STRIKER',
       outcomeBalancePlayerId: input.focusPlayerId,
     };

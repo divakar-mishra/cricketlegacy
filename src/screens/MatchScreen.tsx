@@ -114,8 +114,10 @@ const BATTING_STANCES = [
 ] as const;
 
 interface Dot {
+  id: number;
   sym: string;
   tone: Tone;
+  legal: boolean;
 }
 type FeedItem = CommentaryEntry;
 interface Crease {
@@ -146,6 +148,7 @@ interface Display {
   bowlingTeamId: string;
   score: LiveScore | null;
   crease: Crease | null;
+  overNumber: number;
   overDots: Dot[];
   feed: FeedItem[];
   partnership: Partnership | null;
@@ -612,6 +615,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     bowlingTeamId: '',
     score: null,
     crease: null,
+    overNumber: -1,
     overDots: [],
     feed: [],
     partnership: null,
@@ -624,7 +628,10 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const cancelled = useRef(false);
   const appPausedRef = useRef(AppState.currentState !== 'active');
   const instant = useRef(false);
-  const clearDots = useRef(false);
+  const liveOverRef = useRef<{ overNumber: number; dots: Dot[] }>({
+    overNumber: -1,
+    dots: [],
+  });
   const feedId = useRef(0);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveDialogOpen = useRef(false);
@@ -957,19 +964,35 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         commentaryArchiveRef.current.splice(0, commentaryArchiveRef.current.length - 2400);
       }
 
+      // The tracker follows the event's actual over instead of clearing one
+      // render late. Keeping it in a ref also means 2x/4x batching cannot drop
+      // quiet deliveries from the visible over.
+      const previousOver = liveOverRef.current;
+      const dots = previousOver.overNumber === ev.over ? previousOver.dots : [];
+      const overSnapshot = {
+        overNumber: ev.over,
+        dots: [
+          ...dots,
+          {
+            id: stepId,
+            sym: symbolFor(ev),
+            tone,
+            legal: ev.outcome !== 'WD' && ev.outcome !== 'NB',
+          },
+        ],
+      };
+      liveOverRef.current = overSnapshot;
+
       if (renderCurrentStepRef.current) {
-        setDisplay((prev) => {
-          let dots = prev.overDots;
-          if (clearDots.current) {
-            dots = [];
-            clearDots.current = false;
-          }
-          dots = [...dots, { sym: symbolFor(ev), tone }];
-          if (step.overComplete) clearDots.current = true;
-          return { ...prev, overDots: dots, feed: [item, ...prev.feed].slice(0, 12) };
-        });
-      } else if (step.overComplete) {
-        clearDots.current = true;
+        setDisplay((prev) => ({
+          ...prev,
+          overNumber: overSnapshot.overNumber,
+          overDots: [...overSnapshot.dots],
+          feed: [item, ...prev.feed].slice(0, 12),
+        }));
+      }
+      if (step.inningsBreak || step.matchComplete) {
+        liveOverRef.current = { overNumber: -1, dots: [] };
       }
 
       if (mode === 'career' && userPlayerId && step.wicketOf === userPlayerId) {
@@ -997,6 +1020,10 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           angleDeg: shotAngle(ev),
           reach: shotReach(ev.runs, ev.outcome === '6'),
           tone,
+          runs: ev.runs,
+          delivery: ev.delivery,
+          shot: ev.shot,
+          dismissalType: ev.dismissal?.type,
         });
       }
       // Sound + haptic + celebration juice (milestone takes priority).
@@ -1153,14 +1180,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         setPhase('save-error');
       }
     },
-    [
-      commitInternational,
-      commitLiveMatch,
-      commitDailyChallengeMatch,
-      intl,
-      daily,
-      persistCritical,
-    ],
+    [commitInternational, commitLiveMatch, commitDailyChallengeMatch, intl, daily, persistCritical],
   );
 
   const waitForPlan = useCallback(
@@ -1523,6 +1543,19 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
 
   const onSimToEnd = () => {
     instant.current = true;
+    // "Simulate Match" is also available while the user has manually paused.
+    // Release every local presentation pause before asking the drive loop to
+    // finish; otherwise `waitForManualResume()` can keep the instant sim
+    // blocked behind a button that the user has already pressed.
+    manualPauseRef.current = false;
+    setManualPaused(false);
+    stancePauseRef.current = false;
+    setShowStancePicker(false);
+    commentaryPauseRef.current = false;
+    setCommentaryOpen(false);
+    guidePauseRef.current = false;
+    firstGuideDoneRef.current = true;
+    setFirstGuideDone(true);
     skipToBatRef.current = false;
     skipRestOfInningsRef.current = false;
     skipBusyRef.current = false;
@@ -1576,7 +1609,11 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           {phase === 'save-error' ? (
             <>
               {settlementError ? <Text style={styles.msg}>{settlementError}</Text> : null}
-              <Button label="Retry save" variant="gold" onPress={() => void retrySettlementSave()} />
+              <Button
+                label="Retry save"
+                variant="gold"
+                onPress={() => void retrySettlementSave()}
+              />
             </>
           ) : null}
         </Card>
@@ -2177,11 +2214,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           : neutralOutcome
             ? 'No Result'
             : 'Defeat';
-    const headlineColor = userWon
-      ? colors.success
-      : neutralOutcome
-        ? colors.accent
-        : colors.danger;
+    const headlineColor = userWon ? colors.success : neutralOutcome ? colors.accent : colors.danger;
     const rewardedAdsAvailable = ads.isAdsReady() || ads.isReady('rewarded');
     return (
       <>
@@ -2510,8 +2543,29 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const controlledPlayerAtCrease =
     !!userPlayerId &&
     (display.crease?.strikerId === userPlayerId || display.crease?.nonStrikerId === userPlayerId);
+  const userBatterPosition: 'striker' | 'nonStriker' | null =
+    mode !== 'career' || !userPlayerId || !c
+      ? null
+      : c.strikerId === userPlayerId
+        ? 'striker'
+        : c.nonStrikerId === userPlayerId
+          ? 'nonStriker'
+          : null;
+  const battingTeam = save.teams[display.battingTeamId];
+  const bowlingTeam = save.teams[display.bowlingTeamId];
+  const visibleFieldSetting: FieldSetting =
+    mode === 'manager' && display.bowlingTeamId === userTeamId
+      ? (managerTactics.field ?? 'BALANCED')
+      : 'BALANCED';
   const liveFormat = setup?.format ?? lmRef.current?.format ?? 'T20';
-  const currentOver = Math.floor((s?.legalBalls ?? 0) / FORMATS[liveFormat].ballsPerOver);
+  const ballsPerOver = FORMATS[liveFormat].ballsPerOver;
+  const currentOver = Math.floor((s?.legalBalls ?? 0) / ballsPerOver);
+  const legalOverDots = display.overDots.filter((dot) => dot.legal).slice(0, ballsPerOver);
+  const extraOverDots = display.overDots.filter((dot) => !dot.legal);
+  const overSlots = Array.from(
+    { length: ballsPerOver },
+    (_, index) => legalOverDots[index] ?? null,
+  );
   let footer: React.ReactNode;
   if (awaitingPlan) {
     // Bowling plan — shown once per over when user is bowling.
@@ -3051,21 +3105,72 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             <View style={[styles.midRow, fastMatchUi && styles.midRowFast]}>
               <View style={styles.fieldWrap}>
                 <FieldView
-                  size={150}
+                  size={fastMatchUi ? 220 : 280}
                   lastShot={lastShot}
                   stadiumTheme={save?.seasonPassExperience?.selectedStadiumTheme}
                   animate={!fastMatchUi}
+                  userBatterPosition={userBatterPosition}
+                  battingPrimaryColor={battingTeam?.primaryColor}
+                  battingSecondaryColor={battingTeam?.secondaryColor}
+                  fieldingPrimaryColor={bowlingTeam?.primaryColor}
+                  fieldingSecondaryColor={bowlingTeam?.secondaryColor}
+                  fieldSetting={visibleFieldSetting}
+                  conditions={liveConditions}
                 />
               </View>
               <View style={styles.overCol}>
-                <Text style={styles.overLabel}>This over</Text>
-                <View style={styles.dots}>
-                  {display.overDots.map((d, i) => (
-                    <View key={i} style={[styles.dot, { borderColor: TONE_COLOR[d.tone] }]}>
-                      <Text style={[styles.dotText, { color: TONE_COLOR[d.tone] }]}>{d.sym}</Text>
-                    </View>
-                  ))}
+                <View style={styles.overHeader}>
+                  <View>
+                    <Text style={styles.overLabel}>This over</Text>
+                    <Text style={styles.overNumber}>
+                      Over {Math.max(1, display.overNumber + 1)}
+                    </Text>
+                  </View>
+                  <Text style={styles.overProgress}>
+                    {legalOverDots.length >= ballsPerOver
+                      ? 'Over complete'
+                      : `Ball ${legalOverDots.length + 1} of ${ballsPerOver}`}
+                  </Text>
                 </View>
+                <View style={styles.dots} accessibilityLabel="Live deliveries in this over">
+                  {overSlots.map((dot, index) => {
+                    const next = !dot && index === legalOverDots.length;
+                    return (
+                      <Animated.View
+                        key={dot?.id ?? `empty-${display.overNumber}-${index}`}
+                        entering={dot ? FadeInDown.duration(180) : undefined}
+                        style={[
+                          styles.dot,
+                          !dot && styles.dotEmpty,
+                          next && styles.dotNext,
+                          dot ? { borderColor: TONE_COLOR[dot.tone] } : null,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.dotText,
+                            dot ? { color: TONE_COLOR[dot.tone] } : styles.dotTextEmpty,
+                          ]}
+                        >
+                          {dot?.sym ?? (next ? '●' : '·')}
+                        </Text>
+                      </Animated.View>
+                    );
+                  })}
+                </View>
+                {extraOverDots.length > 0 ? (
+                  <View style={styles.extraRow}>
+                    <Text style={styles.extraLabel}>Extras</Text>
+                    {extraOverDots.map((dot) => (
+                      <Text
+                        key={dot.id}
+                        style={[styles.extraBall, { color: TONE_COLOR[dot.tone] }]}
+                      >
+                        {dot.sym}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             </View>
           </>
@@ -3706,13 +3811,13 @@ const makeStyles = (colors: ThemeColors) =>
 
     // field + over dots
     midRow: {
-      flexDirection: 'row',
+      flexDirection: 'column',
       alignItems: 'center',
       gap: spacing.md,
       marginTop: spacing.md,
-      minHeight: 150,
+      minHeight: 280,
     },
-    midRowFast: { minHeight: 112, marginTop: spacing.sm },
+    midRowFast: { minHeight: 220, marginTop: spacing.sm },
     stadiumScene: {
       marginTop: spacing.md,
       marginHorizontal: -spacing.md,
@@ -3731,31 +3836,81 @@ const makeStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surfaceMuted,
     },
     fieldWrap: {
+      alignSelf: 'stretch',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing.sm,
       borderRadius: radius.lg,
       overflow: 'hidden',
       backgroundColor: colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
     },
-    overCol: { flex: 1, gap: spacing.sm },
+    overCol: {
+      alignSelf: 'stretch',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderStrong,
+      backgroundColor: colors.surfaceMuted,
+    },
+    overHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
     overLabel: {
       color: colors.textFaint,
       fontSize: fontSize.xs,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
-    dots: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    overNumber: {
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.black,
+      marginTop: 2,
+    },
+    overProgress: {
+      color: colors.primaryLight,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+    },
+    dots: { flexDirection: 'row', gap: 6 },
     dot: {
-      minWidth: 26,
-      height: 26,
-      borderRadius: 13,
+      flex: 1,
+      maxWidth: 46,
+      height: 34,
+      borderRadius: 17,
       borderWidth: 1.5,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 4,
       backgroundColor: colors.surface,
     },
-    dotText: { fontSize: fontSize.xs, fontWeight: fontWeight.bold },
+    dotEmpty: {
+      borderStyle: 'dashed',
+      borderColor: colors.border,
+      backgroundColor: 'transparent',
+    },
+    dotNext: {
+      borderStyle: 'solid',
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + '1F',
+    },
+    dotText: { fontSize: fontSize.xs, fontWeight: fontWeight.black },
+    dotTextEmpty: { color: colors.textFaint },
+    extraRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    extraLabel: {
+      color: colors.textFaint,
+      fontSize: 10,
+      fontWeight: fontWeight.bold,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    extraBall: { fontSize: fontSize.xs, fontWeight: fontWeight.black },
     // feed
     feed: { marginTop: spacing.md, paddingBottom: spacing.md },
     feedFast: { marginTop: spacing.sm, paddingBottom: spacing.xs },

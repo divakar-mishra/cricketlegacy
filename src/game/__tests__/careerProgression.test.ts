@@ -271,6 +271,33 @@ describe('selection rewards', () => {
     expect(resources.selectionGuaranteeMatches).toBe(1);
     expect(careerSelectionDecision(save, 'T20', 'next-fixture').selected).toBe(true);
   });
+
+  it('provides a rotation opportunity after four healthy fixtures on the bench', () => {
+    const save = makeSave('BATTER', 35);
+    save.careerPathLevel = 'DOMESTIC';
+
+    for (let index = 0; index < 4; index += 1) {
+      applyCareerMatchReadiness(save, {
+        fixtureId: `bench-${index}`,
+        format: 'T20',
+        selected: false,
+      });
+    }
+
+    expect(ensurePlayerCareerResources(save)?.consecutiveBenches).toBe(4);
+    expect(careerSelectionDecision(save, 'T20', 'rotation-fixture')).toMatchObject({
+      selected: true,
+      reason: 'Selected for a rotation opportunity after time outside the XI.',
+    });
+
+    applyCareerMatchReadiness(save, {
+      fixtureId: 'rotation-fixture',
+      format: 'T20',
+      selected: true,
+      rating: 5,
+    });
+    expect(ensurePlayerCareerResources(save)?.consecutiveBenches).toBe(0);
+  });
 });
 
 describe('recordPathPerformance', () => {

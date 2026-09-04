@@ -249,11 +249,19 @@ describe('training', () => {
   it('cost scales with sessions and current OVR', () => {
     expect(trainingCost(0, 60)).toBe(300);
     expect(trainingCost(2, 60)).toBe(300 + 2 * 150);
+    expect(trainingCost(0, 60, 'BATTER')).toBe(90);
+    expect(trainingCost(2, 60, 'BATTER')).toBe(180);
+    expect(trainingCost(0, 80, 'BATTER')).toBe(525);
+    expect(trainingCost(0, 87, 'BATTER')).toBe(6_000);
+    expect(trainingCost(0, 92, 'BATTER')).toBe(72_000);
+    expect(trainingCost(0, 87, 'ALLROUNDER')).toBe(3_600);
+    expect(trainingCost(0, 92, 'ALLROUNDER')).toBe(36_000);
+    expect(trainingCost(0, 92, 'BOWLER')).toBe(72_000);
     expect(trainingCostMultiplier(75)).toBe(1.25);
     expect(trainingCostMultiplier(82)).toBe(1.75);
-    expect(trainingCostMultiplier(87)).toBe(2.5);
-    expect(trainingCostMultiplier(92)).toBe(3.5);
-    expect(trainingCost(0, 92)).toBe(1_050);
+    expect(trainingCostMultiplier(87)).toBe(10);
+    expect(trainingCostMultiplier(92)).toBe(60);
+    expect(trainingCost(0, 92)).toBe(18_000);
   });
 });
 

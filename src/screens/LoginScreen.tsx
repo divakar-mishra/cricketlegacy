@@ -17,12 +17,6 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
 
-  const soon = (provider: string) =>
-    Alert.alert(
-      'Coming soon',
-      `${provider} sign-in will be enabled once the online backend is connected. You can play as a guest now.`,
-    );
-
   const onGuest = async () => {
     setBusy(true);
     try {
@@ -37,6 +31,29 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
           ? error.message
           : 'The device could not save the guest profile. Check available storage and try again.',
       );
+    }
+  };
+
+  const onGoogle = async () => {
+    setBusy(true);
+    try {
+      const googleUser = await auth.signInGoogle();
+      setFlash(
+        googleUser.displayName
+          ? `Signed in with Google as ${googleUser.displayName}.`
+          : 'Signed in with Google.',
+      );
+    } catch (error) {
+      if (!auth.isGoogleSignInCancelled(error)) {
+        Alert.alert(
+          'Google sign-in unavailable',
+          error instanceof Error
+            ? error.message
+            : 'Google sign-in could not be completed. Please try again.',
+        );
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -148,10 +165,18 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
           <Card style={styles.account}>
             <Text style={styles.accountLabel}>Signed in</Text>
             <Text style={styles.accountId} numberOfLines={1}>
-              {user.provider === 'guest' ? 'Guest profile' : `${user.provider} account`}
+              {user.provider === 'guest' ? 'Guest profile' : (user.displayName ?? 'Google account')}
             </Text>
           </Card>
           <View style={styles.buttons}>
+            {user.provider === 'guest' ? (
+              <Button
+                label={user.remoteId ? 'Link Google account' : 'Continue with Google'}
+                variant="primary"
+                loading={busy}
+                onPress={onGoogle}
+              />
+            ) : null}
             <Button label="Cloud save unavailable" variant="secondary" onPress={onBackup} />
             <Button label="Sign out" variant="secondary" onPress={onSignOut} />
             <Button
@@ -164,16 +189,24 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
         </>
       ) : (
         <View style={styles.buttons}>
-          <Button label="Continue with Google" variant="secondary" onPress={() => soon('Google')} />
+          <Button
+            label="Continue with Google"
+            variant="secondary"
+            loading={busy}
+            onPress={onGoogle}
+          />
           <Button label="Play as Guest" variant="primary" loading={busy} onPress={onGuest} />
         </View>
       )}
 
       <Card style={styles.note}>
-        <Text style={styles.noteTitle}>Local-only progress</Text>
+        <Text style={styles.noteTitle}>
+          {user?.provider === 'google' ? 'Recoverable account' : 'Local-only progress'}
+        </Text>
         <Text style={styles.noteText}>
-          Guest saves stay on this device and may be lost if the app is removed. Cloud save is
-          unavailable.
+          {user?.provider === 'google'
+            ? 'Google sign-in protects purchase ownership and restores. Cloud save is unavailable.'
+            : 'Guest saves stay on this device and may be lost if the app is removed. Cloud save is unavailable.'}
         </Text>
       </Card>
     </Screen>

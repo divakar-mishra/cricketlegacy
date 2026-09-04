@@ -396,6 +396,8 @@ export interface PlayerCareerResources {
   residencySeasons: Record<string, number>;
   lastFormat?: Format;
   consecutiveMatches: number;
+  /** Consecutive healthy fixtures spent outside the XI. */
+  consecutiveBenches?: number;
   formatAppearances: Partial<Record<Format, number>>;
   requestedRestFixtureId?: string;
   /** Match appearances guaranteed by exceptional recent performance. */

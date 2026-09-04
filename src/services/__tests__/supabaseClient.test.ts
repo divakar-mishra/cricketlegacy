@@ -11,9 +11,27 @@ describe('Supabase backend integration source', () => {
     expect(source).toContain('signInAnonymously');
     expect(source).toContain('currentRecoverableSupabaseUserId');
     expect(source).toContain('supabase.auth.getUser()');
+    expect(source).toContain('provider: authProvider(data.session.user)');
+    expect(source).toContain('displayName: authDisplayName(data.session.user)');
     expect(source).toContain("rpc('record_daily_verification'");
     expect(source).not.toContain('SERVICE_ROLE');
     expect(source).not.toContain('sb_secret');
+  });
+
+  it('uses the official mobile OAuth flow and upgrades anonymous users in place', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'auth.ts'), 'utf8');
+
+    expect(source).toContain(
+      "modules.authSession.makeRedirectUri({ scheme: 'coverdrive', path: 'auth/callback' })",
+    );
+    expect(source).toContain('supabase.auth.linkIdentity(credentials)');
+    expect(source).toContain('supabase.auth.signInWithOAuth(credentials)');
+    expect(source).toContain('skipBrowserRedirect: true');
+    expect(source).toContain('modules.webBrowser.openAuthSessionAsync');
+    expect(source).toContain('supabase.auth.setSession');
+    expect(source).toContain('supabase.auth.refreshSession()');
+    expect(source).toContain('synchronizePurchaseIdentity()');
+    expect(source).not.toContain('GOOGLE_CLIENT_SECRET');
   });
 
   it('ships RLS-protected cloud infrastructure and revokes direct economy/ranking writes', () => {

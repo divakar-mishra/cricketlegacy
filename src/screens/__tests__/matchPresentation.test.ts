@@ -47,6 +47,20 @@ describe('shared match presentation', () => {
     expect(source).toContain('animate={!fastMatchUi}');
   });
 
+  it('lets Simulate Match finish immediately even when the live match is paused', () => {
+    const simulateHandler = source.slice(
+      source.indexOf('const onSimToEnd = () => {'),
+      source.indexOf('const retrySettlementSave'),
+    );
+
+    expect(simulateHandler).toContain('instant.current = true');
+    expect(simulateHandler).toContain('manualPauseRef.current = false');
+    expect(simulateHandler).toContain('setManualPaused(false)');
+    expect(simulateHandler).toContain('stancePauseRef.current = false');
+    expect(simulateHandler).toContain('commentaryPauseRef.current = false');
+    expect(simulateHandler).toContain('guidePauseRef.current = false');
+  });
+
   it('uses a stable 2D live field and keeps detailed views post-match', () => {
     expect(source).toContain('<FieldView');
     expect(source).not.toContain('<StadiumScene3D');
@@ -69,10 +83,67 @@ describe('shared match presentation', () => {
 
   it('applies the selected Premium Clubhouse Stadium Noir palette to the live field', () => {
     expect(source).toContain('stadiumTheme={save?.seasonPassExperience?.selectedStadiumTheme}');
-    expect(fieldSource).toContain(
-      "NOIR: { outfield: '#050806', pitch: '#233D22', ring: '#B9F23D' }",
-    );
+    expect(fieldSource).toContain('NOIR: {');
+    expect(fieldSource).toContain("outfield: '#050806'");
+    expect(fieldSource).toContain("pitch: '#233D22'");
+    expect(fieldSource).toContain("ring: '#B9F23D'");
     expect(fieldSource).toContain("stadiumTheme === 'stadium_noir'");
+  });
+
+  it('keeps the delivery, players and shot on one physical pitch axis', () => {
+    expect(fieldSource).toContain('fieldGeometry(size)');
+    expect(fieldSource).toContain('deliveryBouncePoint(size, lastShot?.delivery)');
+    expect(fieldSource).toContain('fieldShotPath(size, lastShot)');
+    expect(fieldSource).toContain('inputRange: [0, 0.3, 0.46, 0.74, 1]');
+    expect(fieldSource).toContain('bowler.x - 5');
+    expect(fieldSource).toContain('bounce.x - 5');
+    expect(fieldSource).toContain('striker.x - 5');
+    expect(fieldSource).toContain('shotEnd.x - 5');
+    expect(fieldSource).toContain('d={deliveryPath}');
+  });
+
+  it('uses live match context for the upgraded stadium presentation', () => {
+    expect(source).toContain('delivery: ev.delivery');
+    expect(source).toContain('shot: ev.shot');
+    expect(source).toContain('dismissalType: ev.dismissal?.type');
+    expect(source).toContain('battingPrimaryColor={battingTeam?.primaryColor}');
+    expect(source).toContain('fieldingPrimaryColor={bowlingTeam?.primaryColor}');
+    expect(source).toContain('fieldSetting={visibleFieldSetting}');
+    expect(source).toContain('conditions={liveConditions}');
+    expect(fieldSource).toContain("role: 'fielder' | 'keeper' | 'bowler' | 'batter'");
+    expect(fieldSource).toContain('const graphics = useSettings((state) => state.graphics)');
+  });
+
+  it('adds quality-scaled stadium atmosphere and endpoint feedback without extending a ball', () => {
+    expect(fieldSource).toContain('const standAisles = useMemo(');
+    expect(fieldSource).toContain('const floodlights = useMemo(');
+    expect(fieldSource).toContain("graphics === 'high'");
+    expect(fieldSource).toContain("lastShot?.tone === 'wicket'");
+    expect(fieldSource).toContain('left: shotEnd.x - impactSize / 2');
+    expect(fieldSource).toContain('opacity: impactPulseOpacity');
+    expect(fieldSource).toContain('transform: [{ scale: stadiumPulseScale }]');
+  });
+
+  it('marks the user batter at the live striker or non-striker end', () => {
+    expect(source).toContain('userBatterPosition={');
+    expect(source).toContain('c.strikerId === userPlayerId');
+    expect(source).toContain("? 'striker'");
+    expect(source).toContain('c.nonStrikerId === userPlayerId');
+    expect(source).toContain("? 'nonStriker'");
+    expect(fieldSource).toContain("'YOU · ON STRIKE'");
+    expect(fieldSource).toContain("'YOU · NON-STRIKER'");
+    expect(fieldSource).toContain('stroke={colors.accentLight}');
+    expect(fieldSource).toContain("'. Your player is on strike'");
+    expect(fieldSource).toContain("'. Your player is the non-striker'");
+  });
+
+  it('tracks every delivery by its real over and exposes the moving next-ball slot', () => {
+    expect(source).toContain('const liveOverRef = useRef<{ overNumber: number; dots: Dot[] }>');
+    expect(source).toContain('previousOver.overNumber === ev.over');
+    expect(source).toContain("legal: ev.outcome !== 'WD' && ev.outcome !== 'NB'");
+    expect(source).toContain('Ball ${legalOverDots.length + 1} of ${ballsPerOver}');
+    expect(source).toContain('next && styles.dotNext');
+    expect(source).toContain('entering={dot ? FadeInDown.duration(180) : undefined}');
   });
 
   it('locks skip-to-batting after the first tap and hides irrelevant live missions', () => {
