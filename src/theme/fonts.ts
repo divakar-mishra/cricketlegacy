@@ -24,6 +24,7 @@ export const fonts = {
   medium: 'Inter_500Medium',
   semibold: 'Inter_600SemiBold',
   bold: 'Inter_700Bold',
+  signature: 'GreatVibes',
 } as const;
 
 /** Loads all app fonts. Returns true once ready (or if loading errored). */
@@ -36,6 +37,7 @@ export function useAppFonts(): boolean {
     Sora_600SemiBold,
     Sora_700Bold,
     Sora_800ExtraBold,
+    GreatVibes: require('../../assets/fonts/great-vibes/GreatVibes-Regular.ttf'),
   });
   return loaded || Boolean(error);
 }

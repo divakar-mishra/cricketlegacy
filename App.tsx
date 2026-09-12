@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, NavigationContainer, Theme } from '@react-navi
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { PlayerContractMoment } from './src/components/ContractMomentModal';
 import { useCallback, useEffect } from 'react';
 import { AppState, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -295,6 +296,7 @@ export default function App() {
               </NavigationContainer>
               <Onboarding />
               <GlassAlertHost />
+              <PlayerContractMoment />
             </GlassBlurProvider>
           </ModalQueueProvider>
         </SafeAreaProvider>

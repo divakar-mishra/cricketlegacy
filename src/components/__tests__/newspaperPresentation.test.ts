@@ -1,6 +1,7 @@
 import type { NewspaperStory } from '../../domain/types';
 import {
   newspaperArticleLabel,
+  newspaperDeskLabel,
   newspaperEditionDetail,
   newspaperFacts,
   newspaperFooter,
@@ -31,6 +32,16 @@ function story(overrides: Partial<NewspaperStory> = {}): NewspaperStory {
 }
 
 describe('newspaper presentation', () => {
+  it('uses event-specific desk labels without inventing an elimination stage', () => {
+    expect(newspaperDeskLabel(story())).toBe('MATCH REPORT');
+    expect(newspaperDeskLabel(story({ kind: 'PROMOTION' }))).toBe('SELECTION NEWS');
+    expect(newspaperDeskLabel(story({ kind: 'TROPHY' }))).toBe('CHAMPIONS EDITION');
+    expect(newspaperDeskLabel(story({ kind: 'MILESTONE' }))).toBe('RECORD BOOK');
+    expect(newspaperDeskLabel(story({ kind: 'ELIMINATION' }))).toBe('TOURNAMENT REVIEW');
+    expect(newspaperFooter(story({ kind: 'ELIMINATION', competitionName: 'World Cup' }))).toBe(
+      'WORLD CUP | SEASON 2026',
+    );
+  });
   it('separates the publication masthead from the persisted edition label', () => {
     expect(newspaperEditionDetail(story())).toBe('SEASON 2026');
     expect(newspaperEditionDetail(story({ edition: '' }))).toBe('SEASON 2026');

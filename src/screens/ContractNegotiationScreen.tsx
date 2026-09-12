@@ -14,6 +14,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import { Button, Card, ProgressBar, Screen, ScreenHeader } from '../components';
 import { AppText as Text } from '../components/AppText';
+import { ContractSheet } from '../components/ContractSheet';
 import {
   ContractDemand,
   contractOffer,
@@ -40,9 +41,6 @@ type Stage = 'VIEW_OFFER' | 'COUNTER' | 'RESULT' | 'SIGNED';
 
 function fmtSeasonSalary(value: number): string {
   return `${Math.round(value).toLocaleString()} coins/season`;
-}
-function fmtCoins(n: number): string {
-  return n.toLocaleString() + ' coins';
 }
 
 export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractNegotiation'>) {
@@ -94,25 +92,21 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
   };
 
   const doHoldOut = () => {
-    Alert.alert(
-      'Hold Out?',
-      'Form -3. The club may improve its offer.',
-      [
-        { text: 'Stay patient', style: 'cancel' },
-        {
-          text: 'Hold out',
-          onPress: () => {
-            const improved = holdOut(save);
-            setHeldImprovedOffer(improved);
-            setHeld(true);
-            setResultText('The club returned with a better offer.');
-            setClubOffer(improved);
-            setCounterOffer(null);
-            setStage('RESULT');
-          },
+    Alert.alert('Hold Out?', 'Form -3. The club may improve its offer.', [
+      { text: 'Stay patient', style: 'cancel' },
+      {
+        text: 'Hold out',
+        onPress: () => {
+          const improved = holdOut(save);
+          setHeldImprovedOffer(improved);
+          setHeld(true);
+          setResultText('The club returned with a better offer.');
+          setClubOffer(improved);
+          setCounterOffer(null);
+          setStage('RESULT');
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const doSign = (offer: ContractOffer) => {
@@ -132,18 +126,12 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
       <Screen scroll>
         <ScreenHeader title="Contract Signed!" onBack={() => navigation.goBack()} />
         <Animated.View entering={FadeInDown.duration(400)}>
-          <Card style={styles.signedCard}>
-            <Text style={styles.signedTitle}>✅ Deal Done</Text>
-            <Text style={styles.signedTeam}>{team?.name ?? 'Your club'}</Text>
-            <View style={styles.dealGrid}>
-              <DealItem label="Season salary" value={fmtSeasonSalary(signed.wage)} highlight />
-              <DealItem
-                label="Contract length"
-                value={`${signed.years} year${signed.years !== 1 ? 's' : ''}`}
-              />
-              <DealItem label="Signing bonus" value={fmtCoins(signed.signingBonus)} />
-            </View>
-          </Card>
+          <ContractSheet
+            club={team?.name ?? 'Your club'}
+            player={save.players[save.userPlayerId]?.name ?? 'Player'}
+            offer={signed}
+            signed
+          />
         </Animated.View>
         <Button
           label="Back to Hub"
@@ -177,16 +165,11 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
 
         <Text style={styles.section}>Terms on the table</Text>
         <Animated.View entering={FadeInDown.duration(300).delay(100)}>
-          <Card>
-            <View style={styles.dealGrid}>
-              <DealItem label="Season salary" value={fmtSeasonSalary(toSign.wage)} highlight />
-              <DealItem
-                label="Contract length"
-                value={`${toSign.years} year${toSign.years !== 1 ? 's' : ''}`}
-              />
-              <DealItem label="Signing bonus" value={fmtCoins(toSign.signingBonus)} />
-            </View>
-          </Card>
+          <ContractSheet
+            club={team?.name ?? 'Your club'}
+            player={save.players[save.userPlayerId]?.name ?? 'Player'}
+            offer={toSign}
+          />
         </Animated.View>
 
         <View style={styles.actions}>
@@ -338,17 +321,11 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
       />
 
       <Animated.View entering={FadeInDown.duration(320)}>
-        <Card style={[styles.offerCard, { borderColor: colors.accent }]}>
-          <Text style={styles.offerFrom}>📝 {team?.name ?? 'Club'} Offer</Text>
-          <View style={styles.dealGrid}>
-            <DealItem label="Season salary" value={fmtSeasonSalary(baseOffer.wage)} highlight />
-            <DealItem
-              label="Contract length"
-              value={`${baseOffer.years} year${baseOffer.years !== 1 ? 's' : ''}`}
-            />
-            <DealItem label="Signing bonus" value={fmtCoins(baseOffer.signingBonus)} />
-          </View>
-        </Card>
+        <ContractSheet
+          club={team?.name ?? 'Your club'}
+          player={save.players[save.userPlayerId]?.name ?? 'Player'}
+          offer={baseOffer}
+        />
       </Animated.View>
 
       {contractBoostStored > 0 ? (
@@ -375,42 +352,6 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
         />
       </View>
     </Screen>
-  );
-}
-
-function DealItem({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
-  const { colors } = useTheme();
-  return (
-    <View style={{ marginBottom: spacing.sm }}>
-      <Text
-        style={{
-          color: colors.textFaint,
-          fontSize: fontSize.xs,
-          textTransform: 'uppercase',
-          letterSpacing: 0.8,
-        }}
-      >
-        {label}
-      </Text>
-      <Text
-        style={{
-          color: highlight ? colors.accent : colors.text,
-          fontSize: highlight ? fontSize.xl : fontSize.md,
-          fontWeight: fontWeight.heavy,
-          marginTop: 2,
-        }}
-      >
-        {value}
-      </Text>
-    </View>
   );
 }
 

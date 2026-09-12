@@ -7,6 +7,21 @@ export interface NewspaperFact {
   unboxed?: boolean;
 }
 
+export function newspaperDeskLabel(story: NewspaperStory): string {
+  switch (story.kind) {
+    case 'TROPHY':
+      return 'CHAMPIONS EDITION';
+    case 'PROMOTION':
+      return 'SELECTION NEWS';
+    case 'MILESTONE':
+      return 'RECORD BOOK';
+    case 'ELIMINATION':
+      return 'TOURNAMENT REVIEW';
+    default:
+      return 'MATCH REPORT';
+  }
+}
+
 export interface NewspaperScorePanel {
   teamName: string;
   teamScore: string;
@@ -121,7 +136,7 @@ export function newspaperFacts(story: NewspaperStory): NewspaperFact[] {
 export function newspaperFooter(story: NewspaperStory): string {
   if (story.kind === 'TROPHY') return `CHAMPIONS | SEASON ${story.season}`;
   if (story.kind === 'ELIMINATION') {
-    return `${story.opponentName.toUpperCase()} | GROUP STAGE | SEASON ${story.season}`;
+    return `${(story.competitionName ?? story.opponentName).toUpperCase()} | SEASON ${story.season}`;
   }
   if (story.kind === 'PROMOTION') {
     return `NEW LEVEL | ${story.opponentName.toUpperCase()} | SEASON ${story.season}`;

@@ -29,6 +29,7 @@ import {
   SponsorBrandRow,
 } from '../components';
 import { AppText as Text } from '../components/AppText';
+import { ManagerAppointmentPaper } from '../components/ManagerAppointmentPaper';
 import { getAchievement } from '../game/achievements';
 import { ManagerStepType, resolveNextCareerStep } from '../game/careerStep';
 import { activeCompetitionTable } from '../game/competitionTable';
@@ -140,7 +141,6 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   } | null>(null);
   const [toastIdx, setToastIdx] = useState(0);
   const prevPendingLenRef = useRef(-1);
-  const appointmentShownRef = useRef<string | null>(null);
   const dismissedTips = useSettings((s) => s.dismissedTips);
   const dismissTip = useSettings((s) => s.dismissTip);
   const showManagerGuide = !dismissedTips.includes('manager_hub_guide');
@@ -159,19 +159,6 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
     }, [navigation]),
   );
 
-  useEffect(() => {
-    const appointment = save?.managerAppointmentPending;
-    if (!appointment) return;
-    const appointmentKey = `${appointment.teamId}:${appointment.appointedAt}`;
-    if (appointmentShownRef.current === appointmentKey) return;
-    appointmentShownRef.current = appointmentKey;
-    Alert.alert(
-      `NEW APPOINTMENT: ${appointment.clubName}`,
-      `Board confidence ${Math.round(save.boardConfidence ?? 75)} · ${save.managerGraceMatchesRemaining ?? 5}-match grace period`,
-      [{ text: 'Enter the office', onPress: acknowledgeManagerAppointment }],
-      { cancelable: false },
-    );
-  }, [acknowledgeManagerAppointment, save]);
 
   useEffect(() => {
     if (
@@ -510,6 +497,14 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
 
   return (
     <>
+      {save.managerAppointmentPending && (
+        <ManagerAppointmentPaper
+          club={save.managerAppointmentPending.clubName}
+          salary={save.managerProgression?.contractSalary}
+          year={season?.year}
+          onContinue={acknowledgeManagerAppointment}
+        />
+      )}
       <Screen
         scroll
         gradient={gradients.pitch}

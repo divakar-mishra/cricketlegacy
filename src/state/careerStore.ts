@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { presentSignedPlayerContract } from './contractPresentationStore';
 import { normalizeAvatarConfig } from '../avatar';
 import { QA_TOOLS_ENABLED, QA_WHALE_CLUB_BUDGET, QA_WHALE_COINS } from '../config/qa';
 import { ECONOMY } from '../data/gameConfig';
@@ -2696,8 +2697,13 @@ export const useCareer = create<CareerState>((set, get) => ({
   acceptAuctionOffer: (teamId) => {
     const save = get().save;
     if (!save) return { ok: false, reason: 'No save.' };
+    const agreedOffer = save.auctionOffers?.find(o => o.teamId === teamId);
     const res = applyAcceptOffer(save, teamId);
     if (res.ok) {
+      if (agreedOffer && save.franchiseContract) presentSignedPlayerContract(save, teamId, {
+        wage: save.franchiseContract.wage, years: save.franchiseContract.yearsLeft,
+        signingBonus: agreedOffer.signingBonus,
+      });
       analytics.logEvent(analytics.EVT.SEASON_ROLLOVER, { auctionMove: true });
       set({ save: { ...save } });
       void get().persist();
@@ -2716,8 +2722,13 @@ export const useCareer = create<CareerState>((set, get) => ({
   acceptDomesticClubOffer: (teamId) => {
     const save = get().save;
     if (!save) return { ok: false, reason: 'No save.' };
+    const agreedOffer = save.domesticClubOffers?.find(o => o.teamId === teamId);
     const result = applyAcceptDomesticClubOffer(save, teamId);
     if (result.ok) {
+      const contract = save.userPlayerId ? save.players[save.userPlayerId]?.contract : undefined;
+      if (agreedOffer && contract) presentSignedPlayerContract(save, teamId, {
+        wage: contract.wage, years: contract.yearsLeft, signingBonus: agreedOffer.signingBonus,
+      });
       analytics.logEvent(analytics.EVT.SEASON_ROLLOVER, { domesticMove: true });
       set({ save: { ...save } });
       void get().persist();
@@ -2799,6 +2810,7 @@ export const useCareer = create<CareerState>((set, get) => ({
       text: `Signed a new ${offer.years}-year contract.`,
     });
     analytics.logEvent(analytics.EVT.SEASON_ROLLOVER, { contractRenewed: true });
+    presentSignedPlayerContract(save, save.userTeamId, offer);
     set({ save: { ...save } });
     void get().persist();
     return { ok: true, bonus };
@@ -4342,6 +4354,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     });
     set({ save: { ...save } });
     void get().persist();
+    presentSignedPlayerContract(save, save.userTeamId, signedOffer);
     return { ok: true, bonus, offer: signedOffer };
   },
 

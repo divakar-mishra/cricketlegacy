@@ -17,6 +17,7 @@ import { Icon } from './Icon';
 import {
   newspaperArticleBody,
   newspaperArticleLabel,
+  newspaperDeskLabel,
   newspaperEditionDetail,
   newspaperFooter,
   newspaperScorePanel,
@@ -186,8 +187,29 @@ export function NewspaperModal({ story, onClose }: Props) {
                   <Text style={[styles.subheadline, narrow && styles.subheadlineNarrow]}>
                     {story.subheadline}
                   </Text>
-                  <Text style={styles.deskLine}>MATCH REPORT · THE CHRONICLE DESK</Text>
+                  <Text style={styles.deskLine}>
+                    {newspaperDeskLabel(story)} · THE CHRONICLE DESK
+                  </Text>
                 </View>
+
+                <View style={styles.editorialVisual}>
+                  <Image
+                    source={require('../../assets/generated/career-stadium.png')}
+                    style={styles.editorialImage}
+                    resizeMode="cover"
+                    accessible={false}
+                    fadeDuration={0}
+                  />
+                  <View style={styles.visualCaption}>
+                    <Text style={styles.visualSubject}>{story.playerName}</Text>
+                    <Text style={styles.visualEdition}>
+                      {story.kicker} · {story.format}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.illustrationCredit}>
+                  CRICKET LEGACY · EDITORIAL ILLUSTRATION
+                </Text>
 
                 {scorePanel ? (
                   <View style={[styles.scorePanel, compact && styles.scorePanelCompact]}>
@@ -231,7 +253,6 @@ export function NewspaperModal({ story, onClose }: Props) {
                   <Text style={styles.archiveLabel}>ARCHIVED TO CAREER SCRAPBOOK</Text>
                   <Text style={styles.footer}>{newspaperFooter(story)}</Text>
                 </View>
-                <Text style={styles.filedLine}>Filed in {story.playerName}’s career scrapbook</Text>
               </View>
             </View>
           </ScrollView>
@@ -274,6 +295,17 @@ export function NewspaperModal({ story, onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
+  editorialVisual: {
+    marginTop: 16,
+    backgroundColor: '#172820',
+    borderWidth: 1,
+    borderColor: '#b09b71',
+  },
+  editorialImage: { width: '100%', height: 150 },
+  visualCaption: { padding: 12, borderTopWidth: 3, borderColor: '#b69548' },
+  visualSubject: { color: '#fff7e7', fontSize: 23, fontFamily: 'serif', fontWeight: '800' },
+  visualEdition: { color: '#ead9af', fontSize: 11, marginTop: 4, letterSpacing: 0.6 },
+  illustrationCredit: { color: '#685742', fontSize: 8, marginTop: 4, letterSpacing: 0.6 },
   backdrop: {
     flex: 1,
     alignItems: 'center',
