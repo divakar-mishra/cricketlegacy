@@ -6,11 +6,11 @@ import {
   Card,
   Icon,
   MechanicInfoButton,
-  PlayerStatusBadges,
   Screen,
   ScreenHeader,
 } from '../components';
 import type { IconName } from '../components';
+import { SquadPlayerIdentity } from '../components/SquadPlayerIdentity';
 import { Tactics } from '../domain/types';
 import { BOWLER_PLAN_OPTIONS, FIELD_OPTIONS, TEAM_APPROACH_OPTIONS } from '../engine/intent';
 import { activeManagerClub } from '../game/managerClubState';
@@ -31,12 +31,6 @@ import {
   useThemedStyles,
 } from '../theme';
 
-const ROLE_ABBR: Record<string, string> = {
-  BATTER: 'BAT',
-  BOWLER: 'BOWL',
-  ALLROUNDER: 'AR',
-  WK_BATTER: 'WK',
-};
 const DEFAULT_TACTICS: Tactics = { batting: 'BALANCED', bowling: 'CONTAIN' };
 const BOWLER_ICONS: Record<string, IconName> = {
   ATTACK: 'flash',
@@ -323,20 +317,7 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
               style={[styles.row, isSel && styles.rowSel]}
             >
               <Text style={styles.num}>{i + 1}</Text>
-              <View style={styles.nameCell}>
-                <Text style={[styles.name, isUser && { color: colors.accent }]} numberOfLines={1}>
-                  {p.name}
-                </Text>
-                {isCaptain ? <Text style={styles.leaderBadge}>C</Text> : null}
-                {isViceCaptain ? <Text style={styles.leaderBadge}>VC</Text> : null}
-              </View>
-              <PlayerStatusBadges
-                captain={save.mode !== 'manager' && isUser && canEdit}
-                injured={Boolean(p.injury)}
-                fitness={save.managerCalendar ? p.condition : p.meta.fitness}
-                mood={p.morale}
-              />
-              <Text style={styles.role}>{ROLE_ABBR[p.role] ?? p.role}</Text>
+              <SquadPlayerIdentity player={p} save={save} captain={isCaptain || (save.mode !== 'manager' && isUser && canEdit)} viceCaptain={isViceCaptain} />
               <Text style={styles.ovr}>{p.overall}</Text>
               {canEdit ? (
                 <View style={styles.moveBtns}>
@@ -344,6 +325,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
                     onPress={() => move(i, -1)}
                     style={[styles.moveBtn, i === 0 && styles.moveDisabled]}
                     disabled={i === 0}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Move ${p.name} up the batting order`}
                   >
                     <Icon name="chevron-up" size={16} color={colors.text} />
                   </Pressable>
@@ -351,6 +334,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
                     onPress={() => move(i, 1)}
                     style={[styles.moveBtn, i === xiIds.length - 1 && styles.moveDisabled]}
                     disabled={i === xiIds.length - 1}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Move ${p.name} down the batting order`}
                   >
                     <Icon name="chevron-down" size={16} color={colors.text} />
                   </Pressable>
@@ -385,19 +370,7 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
                   }}
                   style={[styles.row, isBenchSel && styles.rowSel]}
                 >
-                  <View style={styles.nameCell}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {p.name}
-                    </Text>
-                    {isCaptain ? <Text style={styles.leaderBadge}>C</Text> : null}
-                    {isViceCaptain ? <Text style={styles.leaderBadge}>VC</Text> : null}
-                  </View>
-                  <PlayerStatusBadges
-                    injured={Boolean(p.injury)}
-                    fitness={save.managerCalendar ? p.condition : p.meta.fitness}
-                    mood={p.morale}
-                  />
-                  <Text style={styles.role}>{ROLE_ABBR[p.role] ?? p.role}</Text>
+                  <SquadPlayerIdentity player={p} save={save} captain={isCaptain} viceCaptain={isViceCaptain} />
                   <Text style={styles.ovr}>{p.overall}</Text>
                   {canEdit && (selected != null || isBenchSel) ? (
                     <Text style={styles.swapIn}>Swap</Text>
@@ -551,7 +524,7 @@ const makeStyles = (colors: ThemeColors) =>
       width: 56,
       textAlign: 'right',
     },
-    moveBtns: { flexDirection: 'row', gap: 4 },
+    moveBtns: { flexDirection: 'column', gap: 2 },
     moveBtn: {
       width: 30,
       height: 30,

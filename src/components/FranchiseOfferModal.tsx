@@ -129,7 +129,7 @@ export function FranchiseOfferModal({ save, offers, onAccept, onStay }: Props) {
               <Text style={styles.kicker}>T20 FRANCHISE AUCTION · FINAL CALL</Text>
               <Text style={styles.title}>The room is bidding for {user.name}</Text>
               <Text style={styles.intro}>
-                Compare the cricket opportunity first. Your domestic club does not change.
+                Choose your next T20 franchise.
               </Text>
             </View>
           </View>
@@ -216,7 +216,7 @@ export function FranchiseOfferModal({ save, offers, onAccept, onStay }: Props) {
                 </View>
               </View>
               <Text style={styles.contractFootnote}>
-                Separate T20 contract · First-Class and List A affiliation stays unchanged
+                T20 franchise contract
               </Text>
             </View>
           </ScrollView>

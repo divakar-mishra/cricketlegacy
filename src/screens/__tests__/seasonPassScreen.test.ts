@@ -55,6 +55,9 @@ describe('season pass screen contract', () => {
   it('uses the canonical claim calculation and persistent store action', () => {
     expect(seasonPassScreen).toContain('claimablePassRewards(pass)');
     expect(seasonPassScreen).toContain('claimPass()');
+    expect(seasonPassScreen).toContain('visualRewards: { itemIds: r.itemIds, saveId: save.id }');
+    expect(liveOpsCards.match(/visualRewards: \{ itemIds: reward.itemIds, saveId: save.id \}/g)).toHaveLength(2);
+    expect(seasonPassScreen).toContain('<RewardShowcase itemIds={[tier.premiumReward.item]} saveId={save.id} />');
     expect(seasonPassScreen).toContain('Season Pass reward claimed');
     expect(seasonPassScreen).toContain(
       'Coins: ${r.previousCoins.toLocaleString()} -> ${r.newCoins.toLocaleString()}',
@@ -74,11 +77,12 @@ describe('season pass screen contract', () => {
     expect(liveOpsCards).toContain('Tier {level}/{PASS_TIER_COUNT} reached');
   });
 
-  it('opens the real Season Pass route from the Store card', () => {
-    expect(purchaseScreen).toContain("p.id === 'season_pass'");
+  it('opens mode VIP collections from the Store while preserving the legacy route', () => {
+    expect(purchaseScreen).toContain("p.id === vipProductId(save?.mode ?? 'career')");
     expect(purchaseScreen).toContain("navigation.navigate('SeasonPass')");
-    expect(purchaseScreen).toContain('Boolean(save && isSeasonPassActive(save)) ||');
-    expect(purchaseScreen).toContain("import { isSeasonPassActive } from '../game/seasonPass'");
+    expect(purchaseScreen).toContain('hasModeVip(save) ||');
+    expect(seasonPassScreen).toContain('<VipCollectionsScreen');
+    expect(seasonPassScreen).toContain('isLegacySeasonPassActive');
     expect(purchaseScreen).toContain('!purchases.isProductAvailable(passProduct)');
     expect(purchaseScreen).not.toContain('onBuy(passProduct)');
   });

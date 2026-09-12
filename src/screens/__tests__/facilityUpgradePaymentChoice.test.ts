@@ -52,11 +52,11 @@ describe('facility upgrade payment choice UI', () => {
     expect(alert).toContain('disabled={button.disabled}');
   });
 
-  it('describes the ₹199 IAP as an optional shortcut while preserving cash and upkeep', () => {
+  it('describes the ₹99 IAP as an optional shortcut while preserving cash and upkeep', () => {
     expect(purchases).toContain("id: 'facility_upgrade_token'");
     expect(purchases).toContain(
       'Optional shortcut for one facility level. Club Balance upgrades stay available; normal upkeep still applies.',
     );
-    expect(purchases).toContain("priceString: '₹199'");
+    expect(purchases).toContain("priceString: '₹99'");
   });
 });

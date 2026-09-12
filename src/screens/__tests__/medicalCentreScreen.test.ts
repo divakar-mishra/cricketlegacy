@@ -23,18 +23,24 @@ describe('Manager Medical Centre', () => {
   });
 
   it('keeps the complete purchase, preview, confirmation and apply path', () => {
-    expect(medical).toContain("purchaseProduct('recovery_pack')");
+    expect(medical).toContain("showShortageOffer(save, 'conditioning'");
+    expect(medical).toContain("navigation.navigate('Purchase', { productId })");
     expect(medical).toContain("applySquadRecovery('token')");
-    expect(medical).toContain("Alert.alert(\n      'Apply Squad Recovery?'");
+    expect(medical).toContain("'Apply Squad Recovery?'");
     expect(medical).toContain('1 Recovery Token');
     expect(medical).toContain('Squad condition: ${averageCondition}% → ${averageAfterRecovery}%');
-    expect(medical).toContain('${affected.length} eligible players');
-    expect(medical).toContain('Does not heal injuries.');
+    expect(medical).toContain('${affected.length} eligible non-injured players');
     expect(medical).toContain('Cooldown: 3 fixtures or 7 days');
     expect(medical).toContain("{ text: 'Cancel', style: 'cancel' }");
   });
 
   it('keeps the recovery eligibility threshold and shows squad readiness', () => {
+    expect(medical).not.toContain('{recoveryOfferVisible ? (');
+    expect(medical).toContain('disabled={!recoveryOfferVisible}');
+    expect(medical).toContain('Squad already fit');
+    expect(medical).toContain('Recovery not needed yet');
+    expect(medical).toContain('if (!recoveryOfferVisible) return;');
+    expect(medical).toContain('Your tokens are kept until used.');
     expect(medical).toContain('const RECOVERY_THRESHOLD = 60;');
     expect(medical).toContain('const MINIMUM_TIRED_PLAYERS = 3;');
     expect(medical).toContain('Squad readiness');

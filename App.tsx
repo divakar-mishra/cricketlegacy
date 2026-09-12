@@ -8,6 +8,9 @@ import { AppState, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { syncMusicWithSettings } from './src/audio';
 import { ErrorBoundary, GlassAlertHost, GlassBlurProvider, Onboarding } from './src/components';
+import { AppIntegrityGate } from './src/components/AppIntegrityGate';
+import { AGE_DECLARATION_KEY, canUseAds, isAgeDeclaration } from './src/services/ageEligibility';
+import { getJSON } from './src/storage/storage';
 import { MONETIZATION } from './src/config/monetization';
 import { ModalQueueProvider } from './src/context/ModalQueueContext';
 import { RootStackParamList } from './src/navigation';
@@ -59,7 +62,7 @@ import { MilestoneCinematicScreen } from './src/screens/MilestoneCinematicScreen
 import { PlayerCosmeticsScreen } from './src/screens/PlayerCosmeticsScreen';
 import { TransferDeadlineDayScreen } from './src/screens/TransferDeadlineDayScreen';
 import { YouthGraduateCeremonyScreen } from './src/screens/YouthGraduateCeremonyScreen';
-import { ads, analytics, crash, notifications, purchases } from './src/services';
+import { ads, analytics, auth, crash, notifications, purchases } from './src/services';
 import { useCareer } from './src/state/careerStore';
 import { useAppFonts, useTheme } from './src/theme';
 
@@ -99,8 +102,16 @@ export default function App() {
     syncMusicWithSettings();
     analytics.logEvent(analytics.EVT.APP_OPEN);
     // Monetization providers. No-op in dev / Expo Go / when keys are absent.
-    void purchases.configurePurchases(MONETIZATION.revenueCat);
-    void ads.configureAds(MONETIZATION.admob);
+    void purchases
+      .configurePurchases(MONETIZATION.revenueCat)
+      .catch(() => undefined);
+    // Local sign-in hydration must not wait for the store's network handshake.
+    void auth.rehydrateAuth().catch(() => undefined);
+    // No startup age questionnaire. Preserve prior ad eligibility without
+    // inventing an adult declaration for new installs; UMP remains mandatory.
+    void getJSON<unknown>(AGE_DECLARATION_KEY)
+      .then((stored) => ads.configureAds(MONETIZATION.admob, isAgeDeclaration(stored) && canUseAds(stored)))
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -125,7 +136,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (passPeriodEndsAt == null || !Number.isFinite(passPeriodEndsAt)) return undefined;
+    if (passPeriodEndsAt == null || !Number.isFinite(passPeriodEndsAt))
+      return undefined;
     const passClockTargetAt =
       premiumEntitlementActive &&
       premiumEntitlementExpiresAt != null &&
@@ -153,7 +165,12 @@ export default function App() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [activeSaveId, passPeriodEndsAt, premiumEntitlementActive, premiumEntitlementExpiresAt]);
+  }, [
+    activeSaveId,
+    passPeriodEndsAt,
+    premiumEntitlementActive,
+    premiumEntitlementExpiresAt,
+  ]);
 
   useEffect(() => {
     if (!fontsReady) return undefined;
@@ -174,126 +191,131 @@ export default function App() {
           <ModalQueueProvider>
             <GlassBlurProvider target={<View style={{ flex: 1, backgroundColor: colors.bg }} />}>
               <StatusBar style={isDark ? 'light' : 'dark'} />
-              <NavigationContainer theme={navTheme}>
-                <Stack.Navigator
-                  initialRouteName="Splash"
-                  screenOptions={{
-                    headerShown: false,
-                    animation: 'slide_from_right',
-                    contentStyle: { backgroundColor: colors.bg },
-                  }}
-                >
-                  <Stack.Screen
-                    name="Splash"
-                    component={SplashScreen}
-                    options={{ animation: 'fade' }}
-                  />
-                  <Stack.Screen
-                    name="MainMenu"
-                    component={MainMenuScreen}
-                    options={{ animation: 'fade' }}
-                  />
-                  <Stack.Screen name="NewGame" component={NewGameScreen} />
-                  <Stack.Screen name="PlayerCreation" component={PlayerCreationScreen} />
-                  <Stack.Screen name="TeamSelect" component={TeamSelectScreen} />
-                  <Stack.Screen
-                    name="Match"
-                    component={MatchScreen}
-                    options={{ animation: 'fade' }}
-                  />
-                  <Stack.Screen name="SavedGames" component={SavedGamesScreen} />
-                  <Stack.Screen name="Settings" component={SettingsScreen} />
-                  <Stack.Screen name="CricketAcademy" component={CricketAcademyScreen} />
-                  <Stack.Screen name="Login" component={LoginScreen} />
-                  <Stack.Screen name="Purchase" component={PurchaseScreen} />
-                  <Stack.Screen
-                    name="CareerHub"
-                    component={CareerHubScreen}
-                    options={{ animation: 'fade' }}
-                  />
-                  <Stack.Screen name="ManagerHub" component={ManagerHubScreen} />
-                  <Stack.Screen name="Training" component={TrainingScreen} />
-                  <Stack.Screen name="ManagerLeadership" component={ManagerLeadershipScreen} />
-                  <Stack.Screen name="Squad" component={SquadScreen} />
-                  <Stack.Screen name="Transfers" component={TransfersScreen} />
-                  <Stack.Screen name="PlayerProfile" component={PlayerProfileScreen} />
-                  <Stack.Screen name="PlayerLife" component={PlayerLifeScreen} />
-                  <Stack.Screen name="Records" component={RecordsScreen} />
-                  <Stack.Screen
-                    name="Narrative"
-                    component={NarrativeScreen}
-                    options={{ animation: 'slide_from_bottom' }}
-                  />
-                  <Stack.Screen name="ClubOffice" component={ClubOfficeScreen} />
-                  <Stack.Screen name="MedicalCentre" component={MedicalCentreScreen} />
-                  <Stack.Screen name="ClubStadium" component={ClubStadiumScreen} />
-                  <Stack.Screen name="Academy" component={AcademyScreen} />
-                  <Stack.Screen
-                    name="Press"
-                    component={PressConferenceScreen}
-                    options={{ animation: 'slide_from_bottom' }}
-                  />
-                  <Stack.Screen name="SeasonPass" component={SeasonPassScreen} />
-                  <Stack.Screen name="PremiumClubhouse" component={PremiumClubhouseScreen} />
-                  <Stack.Screen name="LeagueEditor" component={LeagueEditorScreen} />
-                  <Stack.Screen name="StaffRecruitment" component={StaffRecruitmentScreen} />
-                  <Stack.Screen
-                    name="AwardsNight"
-                    component={AwardsNightScreen}
-                    options={{ animation: 'fade' }}
-                  />
-                  <Stack.Screen
-                    name="MilestoneCinematic"
-                    component={MilestoneCinematicScreen}
-                    options={{ animation: 'fade', presentation: 'transparentModal' }}
-                  />
-                  <Stack.Screen name="PlayerCosmetics" component={PlayerCosmeticsScreen} />
-                  <Stack.Screen
-                    name="NotificationInbox"
-                    component={NotificationInboxScreen}
-                    options={{ animation: 'slide_from_right' }}
-                  />
-                  <Stack.Screen
-                    name="DailyChallenge"
-                    component={DailyChallengeScreen}
-                    options={{ animation: 'slide_from_bottom' }}
-                  />
-                  <Stack.Screen
-                    name="BoardMeeting"
-                    component={BoardMeetingScreen}
-                    options={{ animation: 'fade', presentation: 'transparentModal' }}
-                  />
-                  <Stack.Screen
-                    name="HallOfFameCeremony"
-                    component={HallOfFameCeremonyScreen}
-                    options={{ animation: 'fade' }}
-                  />
-                  <Stack.Screen
-                    name="InjuryReport"
-                    component={InjuryReportScreen}
-                    options={{ animation: 'slide_from_bottom' }}
-                  />
-                  <Stack.Screen
-                    name="TransferDeadlineDay"
-                    component={TransferDeadlineDayScreen}
-                    options={{ animation: 'fade' }}
-                  />
-                  <Stack.Screen
-                    name="YouthGraduateCeremony"
-                    component={YouthGraduateCeremonyScreen}
-                    options={{ animation: 'fade' }}
-                  />
-                  <Stack.Screen name="InvestmentScreen" component={InvestmentScreen} />
-                  <Stack.Screen name="AcademyManagement" component={AcademyManagementScreen} />
-                  <Stack.Screen name="U19WorldCup" component={U19WorldCupScreen} />
-                  <Stack.Screen
-                    name="InternationalCalendar"
-                    component={InternationalCalendarScreen}
-                  />
-                  <Stack.Screen name="WageBreakdown" component={WageBreakdownScreen} />
-                  <Stack.Screen name="ContractNegotiation" component={ContractNegotiationScreen} />
-                </Stack.Navigator>
-              </NavigationContainer>
+                <AppIntegrityGate>
+                  <NavigationContainer theme={navTheme}>
+                    <Stack.Navigator
+                      initialRouteName="Splash"
+                      screenOptions={{
+                        headerShown: false,
+                        animation: 'slide_from_right',
+                        contentStyle: { backgroundColor: colors.bg },
+                      }}
+                    >
+                      <Stack.Screen
+                        name="Splash"
+                        component={SplashScreen}
+                        options={{ animation: 'fade' }}
+                      />
+                      <Stack.Screen
+                        name="MainMenu"
+                        component={MainMenuScreen}
+                        options={{ animation: 'fade' }}
+                      />
+                      <Stack.Screen name="NewGame" component={NewGameScreen} />
+                      <Stack.Screen name="PlayerCreation" component={PlayerCreationScreen} />
+                      <Stack.Screen name="TeamSelect" component={TeamSelectScreen} />
+                      <Stack.Screen
+                        name="Match"
+                        component={MatchScreen}
+                        options={{ animation: 'fade' }}
+                      />
+                      <Stack.Screen name="SavedGames" component={SavedGamesScreen} />
+                      <Stack.Screen name="Settings" component={SettingsScreen} />
+                      <Stack.Screen name="CricketAcademy" component={CricketAcademyScreen} />
+                      <Stack.Screen name="Login" component={LoginScreen} />
+                      <Stack.Screen name="Purchase" component={PurchaseScreen} />
+                      <Stack.Screen
+                        name="CareerHub"
+                        component={CareerHubScreen}
+                        options={{ animation: 'fade' }}
+                      />
+                      <Stack.Screen name="ManagerHub" component={ManagerHubScreen} />
+                      <Stack.Screen name="Training" component={TrainingScreen} />
+                      <Stack.Screen name="ManagerLeadership" component={ManagerLeadershipScreen} />
+                      <Stack.Screen name="Squad" component={SquadScreen} />
+                      <Stack.Screen name="Transfers" component={TransfersScreen} />
+                      <Stack.Screen name="PlayerProfile" component={PlayerProfileScreen} />
+                      <Stack.Screen name="PlayerLife" component={PlayerLifeScreen} />
+                      <Stack.Screen name="Records" component={RecordsScreen} />
+                      <Stack.Screen
+                        name="Narrative"
+                        component={NarrativeScreen}
+                        options={{ animation: 'slide_from_bottom' }}
+                      />
+                      <Stack.Screen name="ClubOffice" component={ClubOfficeScreen} />
+                      <Stack.Screen name="MedicalCentre" component={MedicalCentreScreen} />
+                      <Stack.Screen name="ClubStadium" component={ClubStadiumScreen} />
+                      <Stack.Screen name="Academy" component={AcademyScreen} />
+                      <Stack.Screen
+                        name="Press"
+                        component={PressConferenceScreen}
+                        options={{ animation: 'slide_from_bottom' }}
+                      />
+                      <Stack.Screen name="SeasonPass" component={SeasonPassScreen} />
+                      <Stack.Screen name="PremiumClubhouse" component={PremiumClubhouseScreen} />
+                      <Stack.Screen name="LeagueEditor" component={LeagueEditorScreen} />
+                      <Stack.Screen name="StaffRecruitment" component={StaffRecruitmentScreen} />
+                      <Stack.Screen
+                        name="AwardsNight"
+                        component={AwardsNightScreen}
+                        options={{ animation: 'fade' }}
+                      />
+                      <Stack.Screen
+                        name="MilestoneCinematic"
+                        component={MilestoneCinematicScreen}
+                        options={{ animation: 'fade', presentation: 'transparentModal' }}
+                      />
+                      <Stack.Screen name="PlayerCosmetics" component={PlayerCosmeticsScreen} />
+                      <Stack.Screen
+                        name="NotificationInbox"
+                        component={NotificationInboxScreen}
+                        options={{ animation: 'slide_from_right' }}
+                      />
+                      <Stack.Screen
+                        name="DailyChallenge"
+                        component={DailyChallengeScreen}
+                        options={{ animation: 'slide_from_bottom' }}
+                      />
+                      <Stack.Screen
+                        name="BoardMeeting"
+                        component={BoardMeetingScreen}
+                        options={{ animation: 'fade', presentation: 'transparentModal' }}
+                      />
+                      <Stack.Screen
+                        name="HallOfFameCeremony"
+                        component={HallOfFameCeremonyScreen}
+                        options={{ animation: 'fade' }}
+                      />
+                      <Stack.Screen
+                        name="InjuryReport"
+                        component={InjuryReportScreen}
+                        options={{ animation: 'slide_from_bottom' }}
+                      />
+                      <Stack.Screen
+                        name="TransferDeadlineDay"
+                        component={TransferDeadlineDayScreen}
+                        options={{ animation: 'fade' }}
+                      />
+                      <Stack.Screen
+                        name="YouthGraduateCeremony"
+                        component={YouthGraduateCeremonyScreen}
+                        options={{ animation: 'fade' }}
+                      />
+                      <Stack.Screen name="InvestmentScreen" component={InvestmentScreen} />
+                      <Stack.Screen name="AcademyManagement" component={AcademyManagementScreen} />
+                      <Stack.Screen name="U19WorldCup" component={U19WorldCupScreen} />
+                      <Stack.Screen
+                        name="InternationalCalendar"
+                        component={InternationalCalendarScreen}
+                      />
+                      <Stack.Screen name="WageBreakdown" component={WageBreakdownScreen} />
+                      <Stack.Screen
+                        name="ContractNegotiation"
+                        component={ContractNegotiationScreen}
+                      />
+                    </Stack.Navigator>
+                  </NavigationContainer>
+                </AppIntegrityGate>
               <Onboarding />
               <GlassAlertHost />
               <PlayerContractMoment />

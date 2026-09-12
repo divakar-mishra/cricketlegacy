@@ -14,6 +14,8 @@ import {
   SponsorMark,
 } from '../components';
 import { AppText as Text } from '../components/AppText';
+import { PLAYER_LIFE_ART, PlayerLifeAssetCard } from '../components/PlayerLifeAssetCard';
+import { VenueIllustration } from '../components/VenueIllustration';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import type { PlayerLifeMatch, SaveGame } from '../domain/types';
 import { getAchievement } from '../game/achievements';
@@ -334,6 +336,12 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
 
         {renderSectionTitle('Personal Bank')}
         <Card style={styles.panel}>
+          <View style={{ marginBottom: spacing.md }}>
+            <VenueIllustration
+              art={PLAYER_LIFE_ART['personal-bank']}
+              label="Personal bank illustration with a vault and service counter"
+            />
+          </View>
           <View style={styles.balanceBand}>
             <BalanceValue label="Wallet" value={save.wallet.coins} />
             <BalanceValue label="Bank" value={life.bankCoins} />
@@ -382,49 +390,28 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
         </Card>
 
         {renderSectionTitle('Property')}
-        <Card style={styles.listPanel}>
-          {PLAYER_PROPERTIES.map((asset, index) => (
-            <ActionRow
-              key={asset.id}
-              icon="home-outline"
-              title={asset.name}
-              detail={`+${asset.seasonalIncome.toLocaleString()} / season`}
-              action={life.propertyIds.includes(asset.id) ? 'Owned' : asset.cost.toLocaleString()}
-              disabled={
-                !financeUnlocked ||
-                life.propertyIds.includes(asset.id) ||
-                save.wallet.coins < asset.cost
-              }
-              last={index === PLAYER_PROPERTIES.length - 1}
-              onPress={() =>
-                resultAlert('Property purchased', buyPlayerAsset('PROPERTY', asset.id))
-              }
-            />
-          ))}
-        </Card>
+        {PLAYER_PROPERTIES.map((asset) => (
+          <PlayerLifeAssetCard
+            key={asset.id}
+            asset={asset}
+            owned={life.propertyIds.includes(asset.id)}
+            unlocked={financeUnlocked}
+            walletCoins={save.wallet.coins}
+            onBuy={() => resultAlert('Property purchased', buyPlayerAsset('PROPERTY', asset.id))}
+          />
+        ))}
 
         {renderSectionTitle('Businesses')}
-        <Card style={styles.listPanel}>
-          {PLAYER_BUSINESSES.map((asset, index) => (
-            <ActionRow
-              key={asset.id}
-              icon="briefcase-outline"
-              title={asset.name}
-              detail={`+${asset.seasonalIncome.toLocaleString()} / season`}
-              action={life.businessIds.includes(asset.id) ? 'Owned' : asset.cost.toLocaleString()}
-              disabled={
-                !financeUnlocked ||
-                life.businessIds.includes(asset.id) ||
-                save.wallet.coins < asset.cost
-              }
-              last={index === PLAYER_BUSINESSES.length - 1}
-              onPress={() =>
-                resultAlert('Business purchased', buyPlayerAsset('BUSINESS', asset.id))
-              }
-            />
-          ))}
-        </Card>
-
+        {PLAYER_BUSINESSES.map((asset) => (
+          <PlayerLifeAssetCard
+            key={asset.id}
+            asset={asset}
+            owned={life.businessIds.includes(asset.id)}
+            unlocked={financeUnlocked}
+            walletCoins={save.wallet.coins}
+            onBuy={() => resultAlert('Business purchased', buyPlayerAsset('BUSINESS', asset.id))}
+          />
+        ))}
       </>
     );
   };
@@ -735,7 +722,9 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
 
         {renderSectionTitle('Career Transfer')}
         <Card style={styles.panel}>
-          <Text style={styles.bodyText}>Export or replace this save. Purchases never transfer.</Text>
+          <Text style={styles.bodyText}>
+            Export or replace this save. Purchases never transfer.
+          </Text>
           <View style={styles.twoButtons}>
             <Button
               label="Export"
@@ -796,12 +785,12 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
 
   const page =
     tab === 'finance'
-        ? renderFinance()
-        : tab === 'media'
-          ? renderMedia()
-          : tab === 'legacy'
-            ? renderLegacy()
-            : renderOverview();
+      ? renderFinance()
+      : tab === 'media'
+        ? renderMedia()
+        : tab === 'legacy'
+          ? renderLegacy()
+          : renderOverview();
 
   return (
     <Screen scroll>
@@ -905,49 +894,6 @@ function SummaryRow({
         <Text style={styles.summaryLabel}>{label}</Text>
         <Text style={styles.summaryValue}>{value}</Text>
       </View>
-    </View>
-  );
-}
-
-function ActionRow({
-  icon,
-  title,
-  detail,
-  action,
-  disabled,
-  last,
-  onPress,
-}: {
-  icon: IconName;
-  title: string;
-  detail: string;
-  action: string;
-  disabled?: boolean;
-  last?: boolean;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <View style={[styles.actionRow, last && styles.lastRow]}>
-      <View style={styles.rowIcon}>
-        <Icon name={icon} size={20} color={colors.primaryLight} />
-      </View>
-      <View style={styles.flexText}>
-        <Text style={styles.rowTitle}>{title}</Text>
-        <Text style={styles.rowMeta}>{detail}</Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled }}
-        disabled={disabled}
-        style={[styles.rowAction, disabled && styles.rowActionDisabled]}
-        onPress={onPress}
-      >
-        <Text style={[styles.rowActionText, disabled && styles.rowActionTextDisabled]}>
-          {action}
-        </Text>
-      </Pressable>
     </View>
   );
 }

@@ -6,6 +6,7 @@
 import { STORY_EVENTS } from '../content/storyEvents';
 import { Player, RelationshipMemory, SaveGame } from '../domain/types';
 import { makeRng, Rng } from '../engine/rng';
+import { passContentCycleId } from './seasonPass';
 import {
   careerTier,
   PLAYER_RETIREMENT_OPTIONAL_AGE,
@@ -104,7 +105,7 @@ export function queueStoryForTrigger(
   if (!ev) return false;
   if (!save.story!.pendingEventIds.includes(ev.id)) save.story!.pendingEventIds.push(ev.id);
   if (ev.id.startsWith('pass_monthly_player_') && ev.id.endsWith('_opening')) {
-    save.seasonPassExperience!.playerStoryCycleId = save.pass!.seasonId;
+    save.seasonPassExperience!.playerStoryCycleId = passContentCycleId(save);
   }
   return true;
 }

@@ -5,6 +5,7 @@ jest.mock('react-native', () => ({
 (global as typeof globalThis & { __DEV__?: boolean }).__DEV__ = true;
 const {
   getProducts,
+  purchase,
   GRANTS,
   groupProductIdsByCategory,
   isProductAvailable,
@@ -33,13 +34,13 @@ describe('purchase catalog', () => {
       priceString: '₹499',
     });
     expect(products.find((product) => product.id === 'bundle_legend')).toMatchObject({
-      description: '40,000 coins · 1,200 gems · No ads · 60 energy · Cosmetics',
-      priceString: '₹999',
+      description: '40,000 coins · 1,200 gems · No ads · 60 Focus capacity · Cosmetics',
+      priceString: '₹899',
     });
     expect(products.find((product) => product.id === 'facility_upgrade_token')).toMatchObject({
-      priceString: '₹199',
+      priceString: '₹99',
     });
-    expect(products.some((product) => product.id === 'energy_refill')).toBe(false);
+    expect(products.find((product) => product.id === 'energy_refill')).toBeUndefined();
     expect(GRANTS.coins_medium).toEqual({ coins: 10_000 });
     expect(GRANTS.coins_large).toEqual({ coins: 20_000 });
     expect(GRANTS.bundle_legend).toEqual({
@@ -93,10 +94,10 @@ describe('purchase catalog', () => {
     });
   });
 
-  it('registers separate ₹499 repeat-purchasable save sponsors in their own modes', async () => {
-    expect(MODE_STORE_PRODUCT_IDS.career).toContain('player_save_sponsor');
+  it('postpones sponsor sales while preserving their save-bound classification', async () => {
+    expect(MODE_STORE_PRODUCT_IDS.career).not.toContain('player_save_sponsor');
     expect(MODE_STORE_PRODUCT_IDS.career).not.toContain('manager_save_sponsor');
-    expect(MODE_STORE_PRODUCT_IDS.manager).toContain('manager_save_sponsor');
+    expect(MODE_STORE_PRODUCT_IDS.manager).not.toContain('manager_save_sponsor');
     expect(MODE_STORE_PRODUCT_IDS.manager).not.toContain('player_save_sponsor');
     expect(isSaveSponsorProduct('player_save_sponsor')).toBe(true);
     expect(isSaveSponsorProduct('manager_save_sponsor')).toBe(true);
@@ -105,11 +106,30 @@ describe('purchase catalog', () => {
 
     const products = await getProducts();
     for (const id of ['player_save_sponsor', 'manager_save_sponsor']) {
-      expect(products.find((product) => product.id === id)).toMatchObject({
-        priceString: '₹499',
-        kind: 'consumable',
-      });
+      expect(products.find((product) => product.id === id)).toBeUndefined();
       expect(storeProductCategory(id)).toBe('NON_SUBSCRIPTION');
+    }
+  });
+
+  it('lists 14 products with Focus recovery included in Mental Coaching', async () => {
+    const products = await getProducts();
+    expect(products.map((product) => product.id).sort()).toEqual([
+      'player_vip', 'manager_vip', 'bundle_legend', 'manager_legend_pack',
+      'starter_pack', 'coins_medium', 'coins_large', 'gems_medium', 'gems_large',
+      'form_recovery', 'transfer_budget_sm', 'scout_full_reveal',
+      'facility_upgrade_token', 'recovery_pack',
+    ].sort());
+    expect(await purchase('energy_refill')).toMatchObject({ ok: false });
+    for (const [id, priceString] of [
+      ['form_recovery', '₹99'], ['transfer_budget_sm', '₹99'],
+      ['scout_full_reveal', '₹49'], ['facility_upgrade_token', '₹99'],
+      ['recovery_pack', '₹99'],
+    ]) {
+      expect(products.find((product) => product.id === id)).toMatchObject({ priceString, kind: 'consumable' });
+    }
+    for (const id of ['training_accelerator', 'contract_boost', 'player_save_sponsor', 'manager_save_sponsor']) {
+      expect(await purchase(id)).toMatchObject({ ok: false, productId: id });
+      expect(GRANTS[id]).toBeDefined();
     }
   });
 

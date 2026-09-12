@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, StyleSheet, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
+import { celebrationAppearance } from './celebrationPresentation';
 import { useSettings } from '../state/settingsStore';
 import { useColors } from '../theme';
 import { AppText as Text } from './AppText';
@@ -11,6 +14,7 @@ interface Props {
   trigger: number; // increment to fire a burst
   kind: CelebrationKind;
   theme?: 'classic' | 'floodlights';
+  cosmeticId?: string;
 }
 
 /** Particle budget scales with the Graphics-quality setting (previously unused). */
@@ -26,9 +30,13 @@ interface Spec {
   startX: number;
 }
 
-export function CelebrationOverlay({ trigger, kind, theme = 'classic' }: Props) {
+export function CelebrationOverlay({ trigger, kind, theme = 'classic', cosmeticId }: Props) {
   const colors = useColors();
   const graphics = useSettings((s) => s.graphics);
+  const reducedMotion = useReducedMotion();
+  const appearance = celebrationAppearance(cosmeticId);
+  const motion = appearance?.motion;
+  const floodlights = cosmeticId === 'pass_celebration_lights' || theme === 'floodlights';
   const COUNT = useRef(COUNT_FOR[graphics] ?? COUNT_FOR.high).current;
   const PALETTES: Record<Exclude<CelebrationKind, null>, string[]> = {
     four: [colors.primary, colors.primaryLight, colors.white],
@@ -59,26 +67,26 @@ export function CelebrationOverlay({ trigger, kind, theme = 'classic' }: Props) 
 
   useEffect(() => {
     if (!trigger || !kind) return;
-    const palette = theme === 'floodlights' ? ['#B9F23D', '#D5B56D', '#F5F7F4'] : PALETTES[kind];
+    const palette = appearance ? [appearance.color, '#F4E9CE', appearance.color] : PALETTES[kind];
     const rising = kind === 'wicket'; // wicket = shards fall from the top; others burst up
-    const next: Spec[] = anims.map(() => ({
+    const next: Spec[] = anims.map((_, i) => ({
       color: palette[Math.floor(Math.random() * palette.length)],
       size: 6 + Math.random() * 10,
-      startX: width * (0.15 + Math.random() * 0.7),
-      dx: (Math.random() - 0.5) * width * 0.8,
-      dy: rising ? height * (0.4 + Math.random() * 0.5) : -height * (0.25 + Math.random() * 0.4),
+      startX: motion === 'burst' || motion === 'orbit' ? width * .5 : width * (0.15 + Math.random() * 0.7),
+      dx: motion === 'orbit' ? Math.cos(i / anims.length * Math.PI * 2) * width * .35 : motion === 'sweep' ? width * .4 : (Math.random() - 0.5) * width * 0.8,
+      dy: motion === 'orbit' ? Math.sin(i / anims.length * Math.PI * 2) * height * .18 : motion === 'rain' || (!appearance && rising) ? height * .4 : -height * (.15 + Math.random() * .25),
       rot: (Math.random() - 0.5) * 720,
     }));
     setSpecs(next);
     for (const a of anims) a.setValue(0);
     centreAnim.setValue(0);
-    Animated.parallel([
+    const animation = Animated.parallel([
       Animated.stagger(
         12,
         anims.map((a) =>
           Animated.timing(a, {
             toValue: 1,
-            duration: 1100 + Math.random() * 500,
+            duration: reducedMotion ? 0 : 1100 + Math.random() * 500,
             useNativeDriver: true,
           }),
         ),
@@ -86,18 +94,20 @@ export function CelebrationOverlay({ trigger, kind, theme = 'classic' }: Props) 
       Animated.sequence([
         Animated.timing(centreAnim, {
           toValue: 1,
-          duration: 200,
+          duration: reducedMotion ? 0 : 200,
           useNativeDriver: true,
         }),
         Animated.delay(kind === 'win' || kind === 'hundred' ? 950 : 620),
         Animated.timing(centreAnim, { toValue: 2, duration: 260, useNativeDriver: true }),
       ]),
-    ]).start();
-  }, [trigger, theme]); // eslint-disable-line react-hooks/exhaustive-deps
+    ]);
+    animation.start();
+    return () => animation.stop(); // Replace, never queue bursts or hold up a delivery.
+  }, [trigger, theme, cosmeticId, reducedMotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!kind || specs.length === 0) return null;
 
-  const base = kind === 'wicket' ? -40 : height * 0.5;
+  const base = motion === 'rain' || (!appearance && kind === 'wicket') ? -40 : height * .35;
   const centreOpacity = centreAnim.interpolate({
     inputRange: [0, 0.18, 1, 1.65, 2],
     outputRange: [0, 1, 1, 1, 0],
@@ -111,11 +121,11 @@ export function CelebrationOverlay({ trigger, kind, theme = 'classic' }: Props) 
     outputRange: [0.45, 1.35, 1.7],
   });
   const label = LABELS[kind];
-  const labelColor = PALETTES[kind][0];
+  const labelColor = appearance?.color ?? PALETTES[kind][0];
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {theme === 'floodlights' && (
+      {floodlights && !reducedMotion && (
         <Animated.View style={[styles.floodlightWash, { opacity: centreOpacity }]}>
           <View style={[styles.lightBeam, styles.lightBeamLeft]} />
           <View style={[styles.lightBeam, styles.lightBeamRight]} />
@@ -128,17 +138,19 @@ export function CelebrationOverlay({ trigger, kind, theme = 'classic' }: Props) 
             top: height * 0.22,
             borderColor: labelColor,
             opacity: centreOpacity,
-            transform: [{ scale: centreScale }],
+            transform: [{ scale: reducedMotion ? 1 : centreScale }],
           },
         ]}
       >
-        <Animated.View
+        {!reducedMotion && <Animated.View
           style={[styles.ring, { borderColor: labelColor, transform: [{ scale: ringScale }] }]}
-        />
+        />}
+        {appearance && <Ionicons name={appearance.icon as keyof typeof Ionicons.glyphMap} size={28} color={labelColor} />}
         <Text style={[styles.title, { color: labelColor }]}>{label.title}</Text>
-        <Text style={styles.subtitle}>{label.subtitle}</Text>
+        <Text style={styles.subtitle}>{appearance?.label ?? label.subtitle}</Text>
       </Animated.View>
-      {specs.map((s, i) => {
+      {!reducedMotion && specs.map((s, i) => {
+        const motif = appearance && i % 4 === 0;
         const v = anims[i];
         const translateY = v.interpolate({ inputRange: [0, 1], outputRange: [base, base + s.dy] });
         const translateX = v.interpolate({ inputRange: [0, 1], outputRange: [0, s.dx] });
@@ -147,18 +159,21 @@ export function CelebrationOverlay({ trigger, kind, theme = 'classic' }: Props) 
         return (
           <Animated.View
             key={i}
+            testID="celebration-particle"
             style={{
               position: 'absolute',
               left: s.startX,
               top: 0,
-              width: s.size,
-              height: s.size * 0.6,
-              borderRadius: 2,
-              backgroundColor: s.color,
+              width: motif ? s.size + 12 : s.size,
+              height: motif ? s.size + 12 : motion === 'rain' ? s.size * 2 : motion === 'sweep' ? 3 : s.size * 0.6,
+              borderRadius: motion === 'orbit' || motion === 'rain' ? s.size : 2,
+              backgroundColor: motif ? 'transparent' : s.color,
               opacity,
               transform: [{ translateX }, { translateY }, { rotate }],
             }}
-          />
+          >
+            {motif && <Ionicons name={appearance.icon as keyof typeof Ionicons.glyphMap} size={s.size + 10} color={s.color} />}
+          </Animated.View>
         );
       })}
     </View>

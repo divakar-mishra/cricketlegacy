@@ -2,6 +2,7 @@ import { SAVE_SCHEMA_VERSION } from '../../domain/types';
 import { createManagerSave } from '../../game/createGame';
 import { startNewSeason } from '../../game/season';
 import { runMigrations } from '../migrate';
+import { grantModeVip } from '../../game/vip';
 
 describe('schema 41 manager lifespan', () => {
   it('derives a legacy manager age from completed seasons without changing results', () => {
@@ -33,6 +34,7 @@ describe('schema 41 manager lifespan', () => {
       seed: 41,
     });
     save.managerAge = 59;
+    grantModeVip(save, 'manager_vip');
     for (const fixture of Object.values(save.fixtures)) fixture.played = true;
     if (save.managerCalendar) save.managerCalendar.phase = 'OFF_SEASON';
 
@@ -40,9 +42,11 @@ describe('schema 41 manager lifespan', () => {
 
     expect(save.managerAge).toBe(60);
     expect(save.managerRetired).toBe(true);
+    expect(save.vipCollections?.owned).toHaveLength(12);
     const seasonAfterRetirement = save.currentSeasonId;
     startNewSeason(save);
     expect(save.currentSeasonId).toBe(seasonAfterRetirement);
     expect(save.managerAge).toBe(60);
+    expect(save.vipCollections?.owned).toHaveLength(12);
   });
 });

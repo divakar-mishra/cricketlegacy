@@ -1,3 +1,6 @@
+// Slot eligibility is pure; do not load the native authentication client.
+jest.mock('../../services/vipArchive', () => ({ syncVipArchive: jest.fn(async () => {}) }));
+
 import { makeCareerSave } from '../../game/__tests__/_depthHelpers';
 import { activateSeasonPass, SEASON_PASS_PERIOD_MS } from '../../game/seasonPass';
 import { BASE_MAX_SLOTS, firstFreeSlot, SlotView } from '../saveGames';

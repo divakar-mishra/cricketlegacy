@@ -9,7 +9,8 @@ const managerTraining = fs.readFileSync(
 describe('manager training presentation', () => {
   it('uses the cricket coach-board presentation without a currency dashboard', () => {
     expect(managerTraining).toContain('COACH&apos;S BOARD');
-    expect(managerTraining).toContain('styles.pitchDiagram');
+    expect(managerTraining).toContain('kind="training"');
+    expect(managerTraining).toContain('level={club.facilities.training}');
     expect(managerTraining).toContain('SESSION FOCUS');
     expect(managerTraining).not.toContain('Wallet');
     expect(managerTraining).not.toContain('coins');

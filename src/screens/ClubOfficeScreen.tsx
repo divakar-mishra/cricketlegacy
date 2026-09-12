@@ -48,6 +48,9 @@ import { useIsCompact } from '../hooks/useResponsive';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import { confirmFacilityUpgrade } from './facilityUpgradePrompt';
+import { showShortageOffer } from '../components/showShortageOffer';
+import { FacilityScene } from '../components/FacilityScene';
+import { GroundScene } from '../components/GroundScene';
 import {
   fontSize,
   fontWeight,
@@ -127,7 +130,8 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
   const upkeep = facilityUpkeep + groundUpkeep;
   const clubRating = calculateClubRating(save);
   const selectedOffice = save.seasonPassExperience?.selectedOfficeTheme ?? 'office_classic';
-  const managerLegendOffice = Boolean(save.inventory?.manager_legend_office_theme);
+  // A purchased default must never override an explicitly equipped collection.
+  const managerLegendOffice = selectedOffice === 'office_classic' && Boolean(save.inventory?.manager_legend_office_theme);
   const monthlyOffice = MONTHLY_PASS_CONTENT.find(
     (content) => content.office.themeId === selectedOffice,
   );
@@ -160,20 +164,12 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
       if (res.reason?.toLowerCase().includes('budget')) {
         Alert.alert(
           'Not enough budget',
-          'Add emergency club funds and retry this facility upgrade.',
+          'Use an optional facility token for one level, or save club funds and upgrade later. Normal upkeep still applies.',
           [
             { text: 'Later', style: 'cancel' },
             {
-              text: 'Emergency Funds',
-              onPress: () =>
-                void purchaseProduct('transfer_budget_sm').then((r) => {
-                  Alert.alert(
-                    r.ok ? 'Applied' : 'Purchase failed',
-                    r.ok
-                      ? `+${fmtMoney(500_000)} added to your transfer budget.`
-                      : (r.error ?? 'Please try again.'),
-                  );
-                }),
+              text: 'View facility token',
+              onPress: () => navigation.navigate('Purchase', { productId: 'facility_upgrade_token' }),
             },
           ],
         );
@@ -186,6 +182,8 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
   const doUpgrade = (kind: keyof Facilities, facilityLabel: string) => {
     const currentLevel = facilities[kind];
     if (currentLevel >= MAX_FACILITY) return;
+    if (team.budget < facilityUpgradeCost(currentLevel + 1) &&
+        showShortageOffer(save, 'facility', (productId) => navigation.navigate('Purchase', { productId }))) return;
     confirmFacilityUpgrade(
       {
         facilityLabel,
@@ -250,6 +248,12 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
             onPress={() => navigation.navigate('ClubStadium')}
             accessibilityLabel="Manage home ground"
           >
+            <GroundScene
+              capacityLevel={stadiumClub.stadium.capacityLevel}
+              experienceLevel={stadiumClub.stadium.experienceLevel}
+              accent={team.primaryColor}
+              compact
+            />
             <View style={styles.groundHeader}>
               <View style={styles.groundIcon}>
                 <Icon name="business-outline" size={22} color={colors.accentLight} />
@@ -323,7 +327,7 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
                   Alert.alert(
                     r.ok ? 'Applied' : 'Purchase failed',
                     r.ok
-                      ? `+${fmtMoney(500_000)} added to your transfer budget.`
+                      ? `+${fmtMoney(1_000_000)} added to your transfer budget.`
                       : (r.error ?? 'Please try again.'),
                   );
                 })
@@ -446,6 +450,7 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
                 compactActions && styles.infrastructureCardCompact,
               ]}
             >
+              <FacilityScene kind={kind} level={level} accent={team.primaryColor} compact />
               <View style={styles.facilityHeader}>
                 <View style={styles.facilityIcon}>
                   <Icon name={icon} size={20} color={colors.primaryLight} />
@@ -526,9 +531,7 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
         <View style={styles.resourceRow}>
           <View style={styles.resourceCopy}>
             <Text style={styles.staffName}>Elite Staff Search</Text>
-            <Text style={styles.finNote}>
-              3 stronger candidates this season
-            </Text>
+            <Text style={styles.finNote}>3 stronger candidates this season</Text>
           </View>
           <Button
             label={staffSearchUsed ? 'Completed' : `${MANAGER_ELITE_STAFF_SEARCH_GEMS} gems`}

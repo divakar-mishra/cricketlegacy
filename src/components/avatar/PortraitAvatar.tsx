@@ -1,9 +1,12 @@
 import { memo, useMemo } from 'react';
+import { ProfileFrame } from './ProfileFrame';
 import { Image, StyleSheet, View } from 'react-native';
 import { normalizeAvatarConfig, portraitAssetSource } from '../../avatar';
 import type { AvatarConfig } from '../../avatar';
+import { layeredPortraitArtwork, LAYERED_PORTRAIT_LAYOUT } from '../../avatar/layeredPortraits';
 
 interface PortraitAvatarProps {
+  kitId?: string;
   config?: Partial<AvatarConfig> | null;
   size?: number;
   frameId?: string;
@@ -12,73 +15,10 @@ interface PortraitAvatarProps {
   backgroundColor?: string;
 }
 
-const FRAME_PALETTES = {
-  normal: {
-    main: '#24D63B',
-    highlight: '#A4FF8A',
-    bevel: '#087529',
-  },
-  championship: {
-    main: '#E8B52F',
-    highlight: '#FFF19A',
-    bevel: '#765008',
-  },
-} as const;
-
-function ProfileFrame({ frameId, size }: { frameId?: string; size: number }) {
-  const palette = frameId === 'frame_gold' ? FRAME_PALETTES.championship : FRAME_PALETTES.normal;
-  const radius = size / 2;
-  const ringWidth = Math.max(3, Math.round(size * 0.07));
-  const highlightInset = Math.max(1, Math.round(size * 0.012));
-  const highlightWidth = Math.max(1, Math.round(size * 0.012));
-  const bevelInset = Math.max(2, ringWidth - Math.max(1, Math.round(size * 0.01)));
-  const bevelWidth = Math.max(1, Math.round(size * 0.018));
-
-  return (
-    <View pointerEvents="none" style={styles.frameOverlay}>
-      <View
-        style={[
-          styles.frameRing,
-          {
-            borderColor: palette.main,
-            borderRadius: radius,
-            borderWidth: ringWidth,
-          },
-        ]}
-      />
-      <View
-        style={[
-          styles.frameRing,
-          {
-            borderColor: palette.highlight,
-            borderRadius: radius - highlightInset,
-            borderWidth: highlightWidth,
-            bottom: highlightInset,
-            left: highlightInset,
-            right: highlightInset,
-            top: highlightInset,
-          },
-        ]}
-      />
-      <View
-        style={[
-          styles.frameRing,
-          {
-            borderColor: palette.bevel,
-            borderRadius: radius - bevelInset,
-            borderWidth: bevelWidth,
-            bottom: bevelInset,
-            left: bevelInset,
-            right: bevelInset,
-            top: bevelInset,
-          },
-        ]}
-      />
-    </View>
-  );
-}
+// Shared frame artwork is also used by cosmetic previews.
 
 function PortraitAvatarComponent({
+  kitId,
   config,
   size = 96,
   frameId,
@@ -88,6 +28,14 @@ function PortraitAvatarComponent({
 }: PortraitAvatarProps) {
   const safeConfig = useMemo(() => normalizeAvatarConfig(config), [config]);
   const source = portraitAssetSource(safeConfig.portraitId);
+  const artwork = layeredPortraitArtwork(safeConfig.portraitId, kitId);
+  const layerStyle = {
+    position: 'absolute' as const,
+    width: size * LAYERED_PORTRAIT_LAYOUT.width,
+    height: size * LAYERED_PORTRAIT_LAYOUT.height,
+    left: size * LAYERED_PORTRAIT_LAYOUT.left,
+    top: size * LAYERED_PORTRAIT_LAYOUT.top,
+  };
   const activeFrame = frameId ?? safeConfig.frameId;
   const borderRadius = size / 2;
 
@@ -99,7 +47,12 @@ function PortraitAvatarComponent({
       style={[styles.container, { width: size, height: size, borderRadius, backgroundColor }]}
       testID={testID}
     >
-      {source ? (
+      {artwork ? (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill} testID="layered-player-portrait">
+          <Image source={artwork.jersey} resizeMode="contain" style={layerStyle} testID="portrait-jersey-layer" accessibilityElementsHidden importantForAccessibility="no" />
+          <Image source={artwork.head} resizeMode="contain" style={layerStyle} testID="portrait-head-layer" accessibilityElementsHidden importantForAccessibility="no" />
+        </View>
+      ) : source ? (
         <Image
           source={source}
           resizeMode="cover"
@@ -124,19 +77,5 @@ const styles = StyleSheet.create({
   image: {
     height: '100%',
     width: '100%',
-  },
-  frameOverlay: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  frameRing: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
   },
 });

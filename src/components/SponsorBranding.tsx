@@ -1,4 +1,5 @@
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { kitBackArtwork, kitThumbnailArtwork } from '../avatar/layeredPortraits';
 import Svg, {
   Circle,
   Defs,
@@ -18,6 +19,7 @@ import {
 import { fontSize, fontWeight, radius, spacing, ThemeColors, useThemedStyles } from '../theme';
 import { AppText as Text } from './AppText';
 import type { LargeAvatarBrandingLayout } from './sponsorAvatarLayout';
+import { KitDesignLayer } from './KitDesign';
 
 export interface SponsorBrandRef {
   brandId?: string;
@@ -321,6 +323,7 @@ export function PortraitSponsorPrint({
 
 export function SponsoredKitPreview({
   kitColor,
+  kitId,
   earned,
   premium,
   side = 'front',
@@ -329,6 +332,7 @@ export function SponsoredKitPreview({
   style,
 }: {
   kitColor: string;
+  kitId?: string;
   earned?: SponsorBrandRef;
   premium?: SponsorBrandRef;
   side?: 'front' | 'back';
@@ -341,6 +345,8 @@ export function SponsoredKitPreview({
   const shade = mixHex(kitColor, '#05080F', 0.42);
   const panel = mixHex(kitColor, '#05080F', 0.62);
   const highlight = mixHex(kitColor, '#FFFFFF', 0.18);
+  const artwork = side === 'front' ? kitThumbnailArtwork(kitId) : kitBackArtwork(kitId);
+  const printColor = kitId === 'kit_white' ? '#1A2534' : '#F1E6C8';
   return (
     <View
       accessible
@@ -349,7 +355,7 @@ export function SponsoredKitPreview({
       style={[styles.kitPreview, style]}
       testID="sponsored-kit-preview"
     >
-      <Svg
+      {artwork ? <Image source={artwork} resizeMode="contain" style={{ width: '100%', height: '100%' }} accessibilityElementsHidden importantForAccessibility="no" /> : <Svg
         width="100%"
         height="100%"
         viewBox="0 0 320 260"
@@ -385,6 +391,7 @@ export function SponsoredKitPreview({
         <Path d="M73 49 98 69v157H86V107l-29 23-29-38Z" fill={panel} opacity="0.82" />
         <Path d="M247 49 222 69v157h12V107l29 23 29-38Z" fill={panel} opacity="0.82" />
         <Path d="M31 91 58 126M289 91l-27 35" stroke="#E6C66D" strokeWidth="5" />
+        <KitDesignLayer kitId={kitId} />
         <Path d="M99 202h122" stroke="#FFFFFF" strokeOpacity="0.12" strokeWidth="1.5" />
         <Path d="M100 70 221 190" stroke="#FFFFFF" strokeOpacity="0.06" strokeWidth="18" />
         <Path d="M102 224h116" stroke="#E6C66D" strokeWidth="3" strokeLinecap="round" />
@@ -402,7 +409,7 @@ export function SponsoredKitPreview({
         ) : (
           <Path d="M115 76h90" stroke="#FFFFFF" strokeOpacity="0.16" strokeWidth="2" />
         )}
-      </Svg>
+      </Svg>}
       {side === 'front' && earned ? (
         <SponsorLogo
           brand={earned}
@@ -422,11 +429,11 @@ export function SponsoredKitPreview({
         />
       ) : null}
       {side === 'back' ? (
-        <View pointerEvents="none" style={styles.kitBackPrint}>
-          <Text numberOfLines={1} adjustsFontSizeToFit style={styles.kitBackName}>
+        <View pointerEvents="none" style={[styles.kitBackPrint, artwork ? styles.texturedBackPrint : undefined]}>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.kitBackName, { color: printColor }]}>
             {shirtName}
           </Text>
-          <Text style={styles.kitBackNumber}>{shirtNumber}</Text>
+          <Text style={[styles.kitBackNumber, { color: printColor }]}>{shirtNumber}</Text>
         </View>
       ) : null}
     </View>
@@ -539,17 +546,20 @@ const makeStyles = (colors: ThemeColors) =>
       fontWeight: fontWeight.black,
       letterSpacing: 1.7,
       textAlign: 'center',
-      textShadowColor: 'rgba(0, 0, 0, 0.72)',
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 2,
+      opacity: 0.93,
+      textShadowColor: 'rgba(0, 0, 0, 0.3)',
+      textShadowOffset: { width: 0, height: 0.5 },
+      textShadowRadius: 0.5,
     },
     kitBackNumber: {
       color: '#FFFFFF',
       fontSize: 64,
       lineHeight: 70,
       fontWeight: fontWeight.black,
-      textShadowColor: 'rgba(0, 0, 0, 0.78)',
-      textShadowOffset: { width: 0, height: 2 },
-      textShadowRadius: 3,
+      opacity: 0.93,
+      textShadowColor: 'rgba(0, 0, 0, 0.3)',
+      textShadowOffset: { width: 0, height: 0.5 },
+      textShadowRadius: 0.5,
     },
+    texturedBackPrint: { top: '26%', left: '32%', right: '32%' },
   });

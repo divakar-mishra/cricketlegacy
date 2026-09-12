@@ -20,8 +20,10 @@ import Animated, {
 import { playHaptic } from '../audio';
 import { Button, Screen, ScreenHeader } from '../components';
 import { AppText as Text } from '../components/AppText';
+import { AwardArtwork } from '../components/AwardArtwork';
+import { buildAwardList, type Award } from '../components/awardPresentation';
+import { PlayerAvatar } from '../components/PlayerAvatar';
 import { SaveGame } from '../domain/types';
-import { seasonAwards } from '../game/progression';
 import { standings } from '../game/season';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
@@ -30,7 +32,6 @@ import {
   fontSize,
   fontWeight,
   radius,
-  shadow,
   spacing,
   ThemeColors,
   useTheme,
@@ -39,78 +40,15 @@ import {
 
 // ─── Award card data ──────────────────────────────────────────────────────────
 
-interface Award {
-  id: string;
-  emoji: string;
-  title: string;
-  winner: string;
-  stat: string;
-  color: string;
-}
-
-function buildAwardList(save: SaveGame, colors: ThemeColors): Award[] {
-  const nameOf = (id?: string) => (id ? (save.players[id]?.name ?? '---') : '---');
-  const awards = seasonAwards(save);
-  const table = standings(save);
-  const champion = table[0];
-  const championName = champion ? (save.teams[champion.teamId]?.name ?? '---') : '---';
-  const resultTeamId =
-    save.mode === 'career' ? (save.franchiseTeamId ?? save.userTeamId) : save.userTeamId;
-  const userTeam = resultTeamId ? save.teams[resultTeamId] : null;
-  const userPos = table.findIndex((r) => r.teamId === resultTeamId) + 1;
-
-  const awardList: Award[] = [
-    {
-      id: 'champion',
-      emoji: '🏆',
-      title: 'SEASON CHAMPIONS',
-      winner: championName,
-      stat: champion ? `${champion.won}W · ${champion.points} pts` : '---',
-      color: colors.accent,
-    },
-  ];
-
-  if (awards.topScorer?.playerId) {
-    awardList.push({
-      id: 'topScorer',
-      emoji: '🏏',
-      title: 'GOLDEN BAT',
-      winner: nameOf(awards.topScorer.playerId),
-      stat: `${awards.topScorer.runs} runs`,
-      color: colors.primary,
-    });
-  }
-
-  if (awards.topWicketTaker?.playerId) {
-    awardList.push({
-      id: 'topWickets',
-      emoji: '🎯',
-      title: 'GOLDEN BALL',
-      winner: nameOf(awards.topWicketTaker.playerId),
-      stat: `${awards.topWicketTaker.wickets} wickets`,
-      color: '#E5484D',
-    });
-  }
-
-  if (userPos >= 1 && userPos <= 3) {
-    awardList.push({
-      id: 'userResult',
-      emoji: userPos === 1 ? '👑' : userPos === 2 ? '🥈' : '🥉',
-      title: userPos === 1 ? 'YOU ARE CHAMPIONS!' : userPos === 2 ? 'RUNNERS-UP' : 'THIRD PLACE',
-      winner: userTeam?.name ?? '---',
-      stat: `Finished ${userPos}${userPos === 1 ? 'st' : userPos === 2 ? 'nd' : 'rd'}`,
-      color: userPos === 1 ? colors.accent : colors.primary,
-    });
-  }
-
-  return awardList;
-}
+// Award identities and statistics are resolved from canonical season state.
 
 // ─── Individual award reveal component ───────────────────────────────────────
 
-function AwardReveal({ award, index }: { award: Award; index: number }) {
+function AwardReveal({ award, index, save }: { award: Award; index: number; save: SaveGame }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const player = award.playerId ? save.players[award.playerId] : undefined;
+  const ownPlayer = save.mode === 'career' && award.playerId === save.userPlayerId;
 
   const scale = useSharedValue(0.3);
   const opacity = useSharedValue(0);
@@ -159,12 +97,17 @@ function AwardReveal({ award, index }: { award: Award; index: number }) {
         colors={[award.color + '22', colors.surface]}
         style={[styles.awardGradient, { borderColor: award.color }]}
       >
-        {/* Trophy emoji */}
+        {/* Illustrated award and the actual individual winner. Team awards stay team-owned. */}
         <Animated.View
           entering={ZoomIn.duration(400).delay(index * 200 + 250)}
-          style={styles.awardEmojiWrap}
+          style={styles.awardArtworkRow}
         >
-          <Text style={styles.awardEmoji}>{award.emoji}</Text>
+          <AwardArtwork kind={award.artwork} />
+          {player ? <PlayerAvatar name={player.name} role={player.role} size="md"
+            config={ownPlayer ? save.cosmetics?.avatarConfig : undefined}
+            kitId={ownPlayer ? save.cosmetics?.kit : undefined}
+            profileFrame={ownPlayer ? save.cosmetics?.profileFrame : undefined}
+            testID={`award-winner-${award.playerId}`} /> : null}
         </Animated.View>
 
         {/* Award info */}
@@ -231,92 +174,11 @@ export function AwardsNightScreen({ navigation }: ScreenProps<'AwardsNight'>) {
     );
   }
 
-  const nameOf = (id?: string) => (id ? (save.players[id]?.name ?? '—') : '—');
-  const awards = seasonAwards(save);
   const table = standings(save);
-  const champion = table[0];
-  const championName = champion ? (save.teams[champion.teamId]?.name ?? '—') : '—';
-  const resultTeamId =
-    save.mode === 'career' ? (save.franchiseTeamId ?? save.userTeamId) : save.userTeamId;
+  const resultTeamId = save.mode === 'career' ? (save.franchiseTeamId ?? save.userTeamId) : save.userTeamId;
   const userTeam = resultTeamId ? save.teams[resultTeamId] : null;
-  const userPos = table.findIndex((r) => r.teamId === resultTeamId) + 1;
-
-  // Build award list
-  const awardList: Award[] = [
-    {
-      id: 'champion',
-      emoji: '🏆',
-      title: 'SEASON CHAMPIONS',
-      winner: championName,
-      stat: champion ? `${champion.won}W · ${champion.points} pts` : '—',
-      color: colors.accent,
-    },
-  ];
-
-  if (awards.topScorer?.playerId) {
-    awardList.push({
-      id: 'topScorer',
-      emoji: '🏏',
-      title: 'GOLDEN BAT',
-      winner: nameOf(awards.topScorer.playerId),
-      stat: `${awards.topScorer.runs} runs`,
-      color: colors.primary,
-    });
-  }
-
-  if (awards.topWicketTaker?.playerId) {
-    awardList.push({
-      id: 'topWickets',
-      emoji: '🎯',
-      title: 'GOLDEN BALL',
-      winner: nameOf(awards.topWicketTaker.playerId),
-      stat: `${awards.topWicketTaker.wickets} wickets`,
-      color: '#E5484D',
-    });
-  }
-
-  if (userPos >= 1 && userPos <= 3) {
-    awardList.push({
-      id: 'userResult',
-      emoji: userPos === 1 ? '👑' : userPos === 2 ? '🥈' : '🥉',
-      title:
-        userPos === 1 ? 'YOU ARE CHAMPIONS!' : `${userPos === 2 ? 'RUNNERS-UP' : 'THIRD PLACE'}`,
-      winner: userTeam?.name ?? '—',
-      stat: `Finished ${userPos}${userPos === 1 ? 'st' : userPos === 2 ? 'nd' : 'rd'}`,
-      color: userPos === 1 ? colors.accent : colors.primary,
-    });
-  }
-
-  /*
-  // Auto-reveal awards one by one with escalating haptics
-  useEffect(() => {
-    playHaptic('notify-success');
-
-    const revealNext = (idx: number) => {
-      if (idx >= awardList.length) {
-        setTimeout(() => setShowContinue(true), 1200);
-        return;
-      }
-      setRevealed(idx + 1);
-      // Escalating haptic feedback — heavier for each reveal
-      const isChampion = idx === 0;
-      if (isChampion) {
-        setTimeout(() => {
-          playHaptic('impact-heavy');
-          setTimeout(() => playHaptic('impact-medium'), 180);
-          setTimeout(() => playHaptic('impact-light'), 350);
-        }, 300);
-      } else {
-        setTimeout(() => playHaptic('impact-medium'), 250);
-      }
-      revealTimer.current = setTimeout(() => revealNext(idx + 1), 1100);
-    };
-
-    // Start after short delay for cinematic effect
-    revealTimer.current = setTimeout(() => revealNext(0), 800);
-    return () => { if (revealTimer.current) clearTimeout(revealTimer.current); };
-  }, [awardList.length]);
-  */
+  const userPos = table.findIndex(r => r.teamId === resultTeamId) + 1;
+  const awardList = computedAwardList;
 
   return (
     <Screen scroll gradient={['#0D0A04', '#1A1305', '#0D0A04'] as any}>
@@ -356,7 +218,7 @@ export function AwardsNightScreen({ navigation }: ScreenProps<'AwardsNight'>) {
       {/* Awards, revealed one at a time */}
       <View style={styles.awardsGrid}>
         {awardList.slice(0, revealed).map((award, idx) => (
-          <AwardReveal key={award.id} award={award} index={idx} />
+          <AwardReveal key={award.id} award={award} index={idx} save={save} />
         ))}
       </View>
 
@@ -462,16 +324,13 @@ const makeStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       gap: spacing.sm,
     },
-    awardEmojiWrap: {
-      width: 72,
-      height: 72,
-      backgroundColor: colors.surfaceAlt,
-      borderRadius: 36,
+    awardArtworkRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.md,
       alignItems: 'center',
       justifyContent: 'center',
-      ...shadow.card,
     },
-    awardEmoji: { fontSize: 36 },
     awardTitle: {
       fontSize: fontSize.xs,
       fontWeight: fontWeight.black,

@@ -1,7 +1,7 @@
 {
   "appName": "Cricket Legacy",
   "site": {
-    "tagline": "Independent games and apps from Navi Mumbai.",
+    "tagline": "Independent games and apps from Maharashtra, India.",
     "description": "Sunlight creates thoughtful games and useful apps with clear support and transparent policies."
   },
   "products": [
@@ -30,7 +30,7 @@
     "legalName": "Divakar Mishra",
     "tradingName": "Sunlight",
     "entityType": "individual developer",
-    "location": "Navi Mumbai, Maharashtra, India",
+    "location": "Maharashtra, India",
     "email": "devsunlightpvt@gmail.com"
   },
   "effectiveDate": "2026-08-20",

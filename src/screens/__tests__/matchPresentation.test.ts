@@ -7,6 +7,19 @@ describe('shared match presentation', () => {
     path.join(__dirname, '..', '..', 'components', 'FieldView.tsx'),
     'utf8',
   );
+  const spriteSource = fs.readFileSync(path.join(__dirname, '..', '..', 'components', 'CricketerArtwork.tsx'), 'utf8');
+
+  it('shows only the ball during saving and retains error retry and durable completion', () => {
+    const settlement = source.slice(source.indexOf('// ---------- RESULT SETTLEMENT'),
+      source.indexOf('// ---------- EMPTY'));
+    expect(settlement).toContain("if (phase === 'saving' && result)");
+    expect(settlement).toContain('<CricketBallLoader />');
+    expect(settlement).not.toContain('Finalising this fixture');
+    expect(settlement).not.toContain('title="Saving result"');
+    expect(settlement).toContain("if (phase === 'save-error' && result)");
+    expect(settlement).toContain('void retrySettlementSave()');
+    expect(source).toMatch(/await persistCritical\(true\);\s*setPhase\('done'\)/);
+  });
 
   it('retains one recent feed plus a full multi-innings commentary archive', () => {
     expect(source).toContain('const commentaryArchiveRef = useRef<FeedItem[]>([])');
@@ -110,12 +123,13 @@ describe('shared match presentation', () => {
     expect(source).toContain('fieldingPrimaryColor={bowlingTeam?.primaryColor}');
     expect(source).toContain('fieldSetting={visibleFieldSetting}');
     expect(source).toContain('conditions={liveConditions}');
-    expect(fieldSource).toContain("role: 'fielder' | 'keeper' | 'bowler' | 'batter'");
+    expect(spriteSource).toContain("role: 'fielder' | 'keeper' | 'bowler' | 'batter'");
     expect(fieldSource).toContain('const graphics = useSettings((state) => state.graphics)');
   });
 
   it('adds quality-scaled stadium atmosphere and endpoint feedback without extending a ball', () => {
-    expect(fieldSource).toContain('const standAisles = useMemo(');
+    expect(fieldSource).toContain('<StadiumArchitecture');
+    expect(fieldSource).toContain("detailed={graphics !== 'low'}");
     expect(fieldSource).toContain('const floodlights = useMemo(');
     expect(fieldSource).toContain("graphics === 'high'");
     expect(fieldSource).toContain("lastShot?.tone === 'wicket'");

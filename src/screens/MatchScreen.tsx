@@ -1,4 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { PlayerAvatar } from '../components/PlayerAvatar';
+import { CricketBallLoader } from '../components/CricketBallLoader';
+import { personalCelebrationId } from '../components/celebrationPresentation';
+import { matchGroundAppearance } from '../components/venueVisuals';
 import {
   AppState,
   BackHandler,
@@ -163,6 +167,7 @@ interface Setup {
   awayTeamId: string;
   controlledTeamId?: string;
   venue: string;
+  stadiumId?: string;
   conditions: Conditions;
   format: Format;
   isTest: boolean;
@@ -581,7 +586,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const [result, setResult] = useState<PlayResult | null>(null);
   const [settlementError, setSettlementError] = useState<string | null>(null);
   const [lastShot, setLastShot] = useState<LastShot | null>(null);
-  const [celebration, setCelebration] = useState<{ trigger: number; kind: CelebrationKind }>({
+  const [fieldWidth, setFieldWidth] = useState(280);
+  const [celebration, setCelebration] = useState<{ trigger: number; kind: CelebrationKind; cosmeticId?: string }>({
     trigger: 0,
     kind: null,
   });
@@ -909,8 +915,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     reviewResolver.current = null;
   }, []);
 
-  const fireCelebration = useCallback((kind: CelebrationKind) => {
-    setCelebration((prev) => ({ trigger: prev.trigger + 1, kind }));
+  const fireCelebration = useCallback((kind: CelebrationKind, cosmeticId?: string) => {
+    setCelebration((prev) => ({ trigger: prev.trigger + 1, kind, cosmeticId }));
   }, []);
 
   const applyStep = useCallback(
@@ -1028,10 +1034,12 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       }
       // Sound + haptic + celebration juice (milestone takes priority).
       const showCinematic = speedMultRef.current === 1;
+      const personalEffect = personalCelebrationId({ mode, playerId: userPlayerId,
+        equippedId: save?.cosmetics?.celebration, event: ev, milestonePlayerId: step.milestone?.playerId });
       if (step.milestone) {
         moment(step.milestone.kind === 'HUNDRED' ? 'hundred' : 'fifty');
         if (showCinematic) {
-          fireCelebration(step.milestone.kind === 'HUNDRED' ? 'hundred' : 'fifty');
+          fireCelebration(step.milestone.kind === 'HUNDRED' ? 'hundred' : 'fifty', personalEffect);
         }
         flashBanner({
           text: `${step.milestone.kind === 'HUNDRED' ? 'HUNDRED! 💯' : 'FIFTY! 🎉'} ${nameOf(step.milestone.playerId)}`,
@@ -1040,7 +1048,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       } else if (ev.isWicket) {
         moment('wicket');
         if (showCinematic) {
-          fireCelebration('wicket');
+          fireCelebration('wicket', personalEffect);
           // Wicket cinematic: screen flash + camera shake
           wicketFlashOpacity.value = withSequence(
             withTiming(0.35, { duration: 60 }),
@@ -1058,7 +1066,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       } else if (ev.outcome === '6') {
         if (showCinematic) {
           moment('six');
-          fireCelebration('six');
+          fireCelebration('six', personalEffect);
         }
         if (showCinematic && ev.strikerId === userPlayerId) {
           flashBanner({ text: `SIX! ${nameOf(ev.strikerId)} launches it! 🚀`, tone: 'gold' });
@@ -1066,7 +1074,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       } else if (ev.outcome === '4') {
         if (showCinematic) {
           moment('four');
-          fireCelebration('four');
+          fireCelebration('four', personalEffect);
         }
         if (showCinematic && ev.strikerId === userPlayerId) {
           flashBanner({ text: `FOUR! ${nameOf(ev.strikerId)} finds the gap 🏏`, tone: 'accent' });
@@ -1095,6 +1103,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     },
     [
       drsEligible,
+      save?.cosmetics?.celebration,
       fireCelebration,
       flashBanner,
       mode,
@@ -1135,7 +1144,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           id: `interactive-bowling-${plan.toLowerCase()}`,
           decision: `${plan === 'VARY' ? 'Variation' : plan === 'ATTACK' ? 'Attack' : 'Contain'} bowling plan`,
           outcome: `${evidence.wickets} wickets and ${evidence.runs} runs from ${evidence.balls} balls.`,
-          evidence: `Observed after this plan was selected for ${evidence.selections} over${evidence.selections === 1 ? '' : 's'}; it does not claim a counterfactual result.`,
+          evidence: `Observed across ${evidence.selections} over${evidence.selections === 1 ? '' : 's'} with this plan.`,
           confidence: 'OBSERVED',
           tone:
             evidence.wickets > 0
@@ -1146,10 +1155,10 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         });
       }
       const res = daily
-        ? commitDailyChallengeMatch(match)
+        ? commitDailyChallengeMatch(match, 'caller')
         : intl
-          ? commitInternational(match)
-          : commitLiveMatch(match);
+          ? commitInternational(match, 'caller')
+          : commitLiveMatch(match, 'caller');
       if (!res) {
         // A second completion callback or a repaired legacy ledger must never
         // reopen/reward the fixture. Return to the hub instead of presenting a
@@ -1487,6 +1496,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       awayTeamId: started.live.awayTeamId,
       controlledTeamId: started.live.controlledTeamId,
       venue: activeFixture?.venue ?? (daily ? 'Daily Challenge Ground' : 'Neutral Cricket Ground'),
+      stadiumId: activeFixture?.stadiumId,
       conditions: started.live.conditions,
       format: started.live.format,
       isTest: started.live.isTest,
@@ -1596,26 +1606,23 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   };
 
   // ---------- RESULT SETTLEMENT ----------
-  if ((phase === 'saving' || phase === 'save-error') && result) {
+  if (phase === 'saving' && result) {
+    return <Screen><CricketBallLoader /></Screen>;
+  }
+  if (phase === 'save-error' && result) {
     return (
       <Screen>
-        <ScreenHeader title="Saving result" onBack={guardedGoBack} />
+        <ScreenHeader title="Couldn’t save result" onBack={guardedGoBack} />
         <Card>
           <Text style={styles.msg}>
-            {phase === 'saving'
-              ? 'Finalising this fixture…'
-              : 'This result is still on this screen but has not been confirmed on the device.'}
+            This result has not been saved yet. Please retry before leaving.
           </Text>
-          {phase === 'save-error' ? (
-            <>
-              {settlementError ? <Text style={styles.msg}>{settlementError}</Text> : null}
-              <Button
-                label="Retry save"
-                variant="gold"
-                onPress={() => void retrySettlementSave()}
-              />
-            </>
-          ) : null}
+          {settlementError ? <Text style={styles.msg}>{settlementError}</Text> : null}
+          <Button
+            label="Retry save"
+            variant="gold"
+            onPress={() => void retrySettlementSave()}
+          />
         </Card>
       </Screen>
     );
@@ -2518,9 +2525,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         <CelebrationOverlay
           trigger={celebration.trigger}
           kind={celebration.kind}
-          theme={
-            save.cosmetics?.celebration === 'pass_celebration_lights' ? 'floodlights' : 'classic'
-          }
+          cosmeticId={celebration.cosmeticId}
         />
       </>
     );
@@ -3079,6 +3084,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               <Card style={styles.creaseCard}>
                 <CreaseRow
                   name={nameOf(c.strikerId)}
+                  avatar={mode === 'career' && c.strikerId === userPlayerId ? <PlayerAvatar name={nameOf(c.strikerId)} config={save.cosmetics?.avatarConfig} kitId={save.cosmetics?.kit} profileFrame={save.cosmetics?.profileFrame} size="sm" /> : undefined}
                   onStrike
                   runs={c.strikerRuns}
                   balls={c.strikerBalls}
@@ -3086,12 +3092,14 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                 />
                 <CreaseRow
                   name={nameOf(c.nonStrikerId)}
+                  avatar={mode === 'career' && c.nonStrikerId === userPlayerId ? <PlayerAvatar name={nameOf(c.nonStrikerId)} config={save.cosmetics?.avatarConfig} kitId={save.cosmetics?.kit} profileFrame={save.cosmetics?.profileFrame} size="sm" /> : undefined}
                   runs={c.nonStrikerRuns}
                   balls={c.nonStrikerBalls}
                   isUser={c.nonStrikerId === save.userPlayerId}
                 />
                 <View style={styles.divider} />
                 <View style={styles.bowlerRow}>
+                  {mode === 'career' && c.bowlerId === userPlayerId ? <PlayerAvatar name={nameOf(c.bowlerId)} config={save.cosmetics?.avatarConfig} kitId={save.cosmetics?.kit} profileFrame={save.cosmetics?.profileFrame} size="sm" /> : null}
                   <Text style={styles.bowlerName} numberOfLines={1}>
                     🎯 {nameOf(c.bowlerId)}
                   </Text>
@@ -3103,13 +3111,30 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             ) : null}
 
             <View style={[styles.midRow, fastMatchUi && styles.midRowFast]}>
-              <View style={styles.fieldWrap}>
+              <View
+                style={styles.fieldWrap}
+                onLayout={({ nativeEvent }) =>
+                  setFieldWidth(Math.max(1, Math.min(420, nativeEvent.layout.width - 16)))
+                }
+              >
+                <View style={styles.groundBroadcastHeader}>
+                  <Text style={styles.groundBroadcastLabel} numberOfLines={1}>
+                    {setup?.venue ?? 'MATCH GROUND'}
+                  </Text>
+                  <Text style={styles.groundBroadcastTag}>LIVE</Text>
+                </View>
                 <FieldView
-                  size={fastMatchUi ? 220 : 280}
+                  size={fastMatchUi ? Math.min(220, fieldWidth) : fieldWidth}
+                  groundAppearance={matchGroundAppearance(setup?.stadiumId, save.managerClubs)}
+                  groundPrimaryColor={
+                    setup ? save.teams[setup.homeTeamId]?.primaryColor : undefined
+                  }
                   lastShot={lastShot}
                   stadiumTheme={save?.seasonPassExperience?.selectedStadiumTheme}
                   animate={!fastMatchUi}
                   userBatterPosition={userBatterPosition}
+                  userKitId={mode === 'career' ? save.cosmetics?.kit : undefined}
+                  userIsBowler={mode === 'career' && !!userPlayerId && c?.bowlerId === userPlayerId}
                   battingPrimaryColor={battingTeam?.primaryColor}
                   battingSecondaryColor={battingTeam?.secondaryColor}
                   fieldingPrimaryColor={bowlingTeam?.primaryColor}
@@ -3239,9 +3264,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         <CelebrationOverlay
           trigger={celebration.trigger}
           kind={celebration.kind}
-          theme={
-            save.cosmetics?.celebration === 'pass_celebration_lights' ? 'floodlights' : 'classic'
-          }
+          cosmeticId={celebration.cosmeticId}
         />
         <CommentaryArchive
           visible={commentaryOpen}
@@ -3338,12 +3361,14 @@ function ModeButton({
 }
 
 function CreaseRow({
+  avatar,
   name,
   runs,
   balls,
   onStrike,
   isUser,
 }: {
+  avatar?: React.ReactNode;
   name: string;
   runs: number;
   balls: number;
@@ -3354,6 +3379,7 @@ function CreaseRow({
   const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.creaseRow}>
+      {avatar}
       <Text style={[styles.creaseName, isUser && { color: colors.accent }]} numberOfLines={1}>
         {onStrike ? '🏏 ' : '   '}
         {name}
@@ -3845,6 +3871,26 @@ const makeStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
+    },
+    groundBroadcastHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.sm,
+      alignSelf: 'stretch',
+    },
+    groundBroadcastLabel: {
+      flex: 1,
+      color: colors.textMuted,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.bold,
+    },
+    groundBroadcastTag: {
+      color: colors.danger,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.heavy,
+      letterSpacing: 1,
     },
     overCol: {
       alignSelf: 'stretch',

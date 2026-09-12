@@ -8,6 +8,7 @@
  * overwhelming the home view.
  */
 import { useFocusEffect } from '@react-navigation/native';
+import { showShortageOffer } from '../components/showShortageOffer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -605,7 +606,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         resolveCalendar();
         break;
       case 'REFILL_ENERGY':
-        navigation.navigate('Purchase');
+        showShortageOffer(save, 'energy', (productId) => navigation.navigate('Purchase', { productId }));
         break;
       case 'PLAY_MATCH':
         void handlePlayMatch();
@@ -690,6 +691,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 primaryColor={team?.primaryColor}
                 secondaryColor={team?.secondaryColor}
                 config={save.cosmetics?.avatarConfig}
+                kitId={save.cosmetics?.kit}
                 profileFrame={save.cosmetics?.profileFrame}
                 earnedSponsor={sponsorBranding.earned}
                 premiumSponsor={sponsorBranding.premium}
@@ -2138,6 +2140,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 primaryColor={team?.primaryColor}
                 secondaryColor={team?.secondaryColor}
                 config={save.cosmetics?.avatarConfig}
+                kitId={save.cosmetics?.kit}
                 profileFrame={save.cosmetics?.profileFrame}
                 earnedSponsor={sponsorBranding.earned}
                 premiumSponsor={sponsorBranding.premium}

@@ -1,6 +1,7 @@
-import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
+import { showShortageOffer } from '../components/showShortageOffer';
+import { FacilityScene } from '../components/FacilityScene';
 import { AppText as Text, Button, Card, Icon, Screen, ScreenHeader } from '../components';
 import { injuryLabel } from '../game/injuries';
 import { managerControlledTeamId } from '../game/managerCalendar';
@@ -27,9 +28,7 @@ function average(values: number[]): number {
 
 export function MedicalCentreScreen({ navigation }: ScreenProps<'MedicalCentre'>) {
   const save = useCareer((state) => state.save);
-  const purchaseProduct = useCareer((state) => state.purchaseProduct);
   const applySquadRecovery = useCareer((state) => state.applySquadRecovery);
-  const [purchaseBusy, setPurchaseBusy] = useState(false);
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
 
@@ -93,13 +92,13 @@ export function MedicalCentreScreen({ navigation }: ScreenProps<'MedicalCentre'>
     });
   const medicalLevel = save.facilities?.medical ?? 1;
   const confirmTokenRecovery = () => {
+    if (!recoveryOfferVisible) return;
     Alert.alert(
       'Apply Squad Recovery?',
       [
         '1 Recovery Token',
         `Squad condition: ${averageCondition}% → ${averageAfterRecovery}%`,
-        `${affected.length} eligible players`,
-        'Does not heal injuries.',
+        `${affected.length} eligible non-injured players`,
         'Cooldown: 3 fixtures or 7 days',
       ].join('\n'),
       [
@@ -121,15 +120,7 @@ export function MedicalCentreScreen({ navigation }: ScreenProps<'MedicalCentre'>
   };
 
   const buyRecoveryToken = async () => {
-    setPurchaseBusy(true);
-    const result = await purchaseProduct('recovery_pack');
-    setPurchaseBusy(false);
-    Alert.alert(
-      result.ok ? 'Recovery token added' : 'Purchase failed',
-      result.ok
-        ? 'Token ready.'
-        : (result.error ?? 'Please try again.'),
-    );
+    showShortageOffer(save, 'conditioning', (productId) => navigation.navigate('Purchase', { productId }));
   };
 
   return (
@@ -141,6 +132,7 @@ export function MedicalCentreScreen({ navigation }: ScreenProps<'MedicalCentre'>
       />
 
       <Card style={styles.heroCard}>
+        <FacilityScene kind="medical" level={medicalLevel} accent={team.primaryColor} />
         <View style={styles.heroHeader}>
           <View style={styles.heroIcon}>
             <Icon name="medkit-outline" size={25} color={colors.primaryLight} />
@@ -185,7 +177,7 @@ export function MedicalCentreScreen({ navigation }: ScreenProps<'MedicalCentre'>
         </Card>
       </View>
 
-      {recoveryOfferVisible ? (
+      {(
         <>
           <Text style={styles.section}>Squad recovery</Text>
           <Card style={styles.recoveryCard}>
@@ -196,19 +188,28 @@ export function MedicalCentreScreen({ navigation }: ScreenProps<'MedicalCentre'>
               </View>
               <Icon name="fitness-outline" size={28} color={colors.info} />
             </View>
-            <Text style={styles.recoveryEffect}>Preview squad recovery</Text>
+            <Text style={styles.recoveryEffect}>
+              {recoveryOfferVisible
+                ? 'Preview squad recovery'
+                : 'Available when at least 3 players are below 60 condition. Your tokens are kept until used.'}
+            </Text>
             <Button
-              label={recoveryTokens > 0 ? 'Preview recovery · 1 token' : 'Buy 1 recovery token'}
+              label={!recoveryOfferVisible
+                ? squad.length > 0 && squad.every((player) => conditionFor(player) >= 100)
+                  ? 'Squad already fit'
+                  : 'Recovery not needed yet'
+                : recoveryTokens > 0 ? 'Preview recovery · 1 token' : 'Buy 1 recovery token'}
+              disabled={!recoveryOfferVisible}
               variant={recoveryTokens > 0 ? 'secondary' : 'gold'}
-              loading={purchaseBusy}
               style={styles.recoveryAction}
-              onPress={() =>
-                recoveryTokens > 0 ? confirmTokenRecovery() : void buyRecoveryToken()
-              }
+              onPress={() => {
+                if (!recoveryOfferVisible) return;
+                recoveryTokens > 0 ? confirmTokenRecovery() : void buyRecoveryToken();
+              }}
             />
           </Card>
         </>
-      ) : null}
+      )}
 
       <Text style={styles.section}>Needs attention</Text>
       <Card padded={false} style={styles.listCard}>

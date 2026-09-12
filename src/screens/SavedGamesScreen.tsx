@@ -82,7 +82,7 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
     <Screen scroll>
       <ScreenHeader
         title="Saved Games"
-        subtitle={`${BASE_MAX_SLOTS} standard slots · 1 Premium Pass slot`}
+        subtitle={`${BASE_MAX_SLOTS} standard slots · 1 mode VIP slot`}
         onBack={() => navigation.goBack()}
       />
 
@@ -91,7 +91,7 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
         <Tab label="Manager" active={mode === 'manager'} onPress={() => setMode('manager')} />
       </View>
 
-      {slots.map(({ slot, save }) => (
+      {slots.map(({ slot, save, unavailable }) => (
         <Card key={slot} style={styles.slot}>
           <View style={styles.slotHeader}>
             <Text style={styles.slotNo}>
@@ -103,7 +103,16 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
             ) : null}
           </View>
 
-          {save ? (
+          {unavailable ? (
+            <>
+              <Text style={styles.saveName}>Save needs recovery</Text>
+              <Text style={styles.saveSummary}>
+                This save could not be verified or decrypted. Your data is still here. Retry or
+                recover your cloud backup; do not uninstall the app.
+              </Text>
+              <Button label="Retry" onPress={() => void refresh()} />
+            </>
+          ) : save ? (
             <>
               <Text style={styles.saveName}>{saveTitle(save)}</Text>
               <Text style={styles.saveSummary}>{saveSubtitle(save)}</Text>
@@ -137,7 +146,7 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
               <Text style={styles.emptyPlus}>＋</Text>
               <Text style={styles.emptyText}>
                 {slot > BASE_MAX_SLOTS && !premiumSlotUnlocked
-                  ? 'Premium Pass slot locked'
+                  ? 'Mode VIP slot locked'
                   : `Empty — start a new ${mode === 'career' ? 'player' : 'manager'} career`}
               </Text>
             </Pressable>

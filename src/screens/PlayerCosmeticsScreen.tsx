@@ -19,12 +19,17 @@ import {
   WalletBar,
 } from '../components';
 import { AppText as Text } from '../components/AppText';
+import { KitThumbnail } from '../components/KitDesign';
+import { PortraitAvatar } from '../components/avatar';
 import {
   CELEBRATIONS,
   cosmeticCost,
   CosmeticOption,
   KIT_COLORS,
   kitColorHex,
+  ownsCosmetic,
+  ownsProfileFrame,
+  PROFILE_FRAMES,
 } from '../data/cosmetics';
 import { activeSponsorBranding } from '../game/sponsorship';
 import {
@@ -82,7 +87,7 @@ function CosmeticGrid({
             : isOwned
               ? 'owned'
               : opt.passExclusive
-                ? 'Season Pass reward'
+                ? 'Collection reward'
                 : `${opt.gemCost} gems`;
 
           return (
@@ -106,9 +111,7 @@ function CosmeticGrid({
                   ]}
                 >
                   {isColor ? (
-                    <View style={[styles.colorPreview, { backgroundColor: opt.preview }]}>
-                      {isSelected && <Text style={styles.colorCheck}>✓</Text>}
-                    </View>
+                    <KitThumbnail kitId={opt.id} />
                   ) : opt.previewIcon ? (
                     <View style={[styles.iconPreview, { backgroundColor: `${previewAccent}18` }]}>
                       <Ionicons
@@ -203,6 +206,7 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
     }),
   );
   const [kit, setKit] = useState<string>(equipped?.kit ?? 'kit_white');
+  const [profileFrame, setProfileFrame] = useState(equipped?.profileFrame ?? equipped?.avatarConfig?.frameId ?? 'frame_none');
   const [celebration, setCelebration] = useState<string>(equipped?.celebration ?? 'cel_wave');
   const [kitSide, setKitSide] = useState<'front' | 'back'>('front');
   const [shirtName, setShirtName] = useState<string>(
@@ -218,6 +222,9 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
   const ownedIds = new Set<string>(
     Object.keys(save?.inventory ?? {}).filter((id) => (save?.inventory?.[id] ?? 0) > 0),
   );
+  KIT_COLORS.forEach((item) => {
+    if (ownsCosmetic(save?.inventory, item.id)) ownedIds.add(item.id);
+  });
 
   if (!save) {
     return (
@@ -258,7 +265,7 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
         shirtName: normalizeShirtName(shirtName, player?.name),
         shirtNumber: normalizeShirtNumber(shirtNumber, player?.id),
         avatarConfig,
-        profileFrame: equipped?.profileFrame,
+        profileFrame,
         stadiumTheme: equipped?.stadiumTheme,
         officeTheme: equipped?.officeTheme,
       },
@@ -315,6 +322,7 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
         </View>
       </View>
       <SponsoredKitPreview
+        kitId={kit}
         kitColor={kitColorHex(kit) ?? '#F7F7F7'}
         earned={sponsorBranding.earned}
         premium={sponsorBranding.premium}
@@ -360,6 +368,7 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
 
       <Text style={styles.sectionTitle}>Portrait</Text>
       <PortraitPicker
+        kitId={kit}
         value={avatarConfig}
         onChange={(next) => {
           setAvatarConfig(next);
@@ -373,9 +382,31 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
         testID="player-cosmetics-avatar"
       />
 
-      {/* Kit color */}
+      <Text style={styles.sectionTitle}>Profile Frame</Text>
+      <View style={styles.optionGrid}>
+        {PROFILE_FRAMES.map((frame) => {
+          const unlocked = ownsProfileFrame(save.inventory, frame.id);
+          return (
+            <Pressable
+              key={frame.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${frame.label}${unlocked ? '' : ', locked'}`}
+              accessibilityState={{ selected: profileFrame === frame.id, disabled: !unlocked }}
+              disabled={!unlocked}
+              style={[styles.optionCell, styles.optionCard, profileFrame === frame.id && styles.optionCardSelected]}
+              onPress={() => { setProfileFrame(frame.id); setAvatarConfig({ ...avatarConfig, frameId: frame.id }); setHasChanges(true); }}
+            >
+              <PortraitAvatar config={avatarConfig} kitId={kit} frameId={frame.id} size={52} />
+              <Text style={styles.optionLabel}>{frame.label}</Text>
+              <Text style={styles.freeBadge}>{unlocked ? 'OWNED' : frame.id === 'frame_vip' ? '30-DAY VIP STREAK' : 'LEGEND / PASS'}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Kit designs */}
       <CosmeticGrid
-        title="Colours"
+        title="Kit Designs"
         options={KIT_COLORS}
         selected={kit}
         gems={gems}

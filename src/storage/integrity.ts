@@ -13,7 +13,10 @@ export interface SaveEnvelope {
 
 /** Deterministic FNV-1a checksum of a value's JSON form. */
 export function checksumOf(value: unknown): string {
-  const s = JSON.stringify(value) ?? '';
+  return checksumJSON(JSON.stringify(value) ?? '');
+}
+
+function checksumJSON(s: string): string {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
@@ -25,6 +28,12 @@ export function checksumOf(value: unknown): string {
 /** Wrap a save in a checksum envelope for writing. */
 export function wrapSave(save: SaveGame): SaveEnvelope {
   return { __env: 1, checksum: checksumOf(save), save };
+}
+
+/** Same envelope bytes as JSON.stringify(wrapSave(save)), with one save traversal. */
+export function serializeSaveEnvelope(save: SaveGame): string {
+  const json = JSON.stringify(save);
+  return `{"__env":1,"checksum":"${checksumJSON(json)}","save":${json}}`;
 }
 
 export function isEnvelope(raw: unknown): raw is SaveEnvelope {

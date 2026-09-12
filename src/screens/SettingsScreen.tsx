@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { setMusicEnabled } from '../audio';
+import { showAdPrivacyChoices } from '../services/ads';
 import { FranchiseOfferModal } from '../components/FranchiseOfferModal';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import {
@@ -278,6 +279,22 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
           </Card>
         </>
       ) : null}
+
+      <Button
+        label="Ad privacy choices"
+        variant="secondary"
+        onPress={() => {
+          void showAdPrivacyChoices().then((result) => {
+            if (result !== 'shown')
+              Alert.alert(
+                'Ad privacy choices',
+                result === 'not_required'
+                  ? 'Google does not currently require an ad privacy options form for this device.'
+                  : 'Ad privacy options are unavailable right now. Ads remain disabled until an eligible consent check succeeds.',
+              );
+          });
+        }}
+      />
 
       <Text style={styles.section}>Build Information</Text>
       <Card style={styles.group}>

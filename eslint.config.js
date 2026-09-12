@@ -5,6 +5,7 @@ const base = Array.isArray(expoConfig) ? expoConfig : [expoConfig];
 
 const ignores = [
   'dist/*',
+  'output/**',
   '.expo/*',
   'node_modules/*',
   'babel.config.js',

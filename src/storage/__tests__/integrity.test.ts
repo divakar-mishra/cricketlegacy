@@ -1,9 +1,15 @@
 import { SaveGame } from '../../domain/types';
-import { checksumOf, isEnvelope, unwrapSave, wrapSave } from '../integrity';
+import { checksumOf, isEnvelope, serializeSaveEnvelope, unwrapSave, wrapSave } from '../integrity';
 
 const fakeSave = (id = 's1'): SaveGame => ({ schemaVersion: 5, id } as unknown as SaveGame);
 
 describe('save integrity', () => {
+  it('serializes the existing envelope format identically with one save traversal', () => {
+    const save = { ...fakeSave(), text: 'Cricket 🏏 नाम "quoted"\n',
+      nested: { absent: undefined, values: [null, 1, 'a'] }, history: 'x'.repeat(700_000) };
+    expect(serializeSaveEnvelope(save)).toBe(JSON.stringify(wrapSave(save)));
+    expect(unwrapSave(JSON.parse(serializeSaveEnvelope(save)))).toEqual(JSON.parse(JSON.stringify(save)));
+  });
   it('wraps and unwraps a save round-trip', () => {
     const save = fakeSave();
     const env = wrapSave(save);

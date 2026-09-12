@@ -1,15 +1,21 @@
+import { useState } from 'react';
 import { ImageBackground, Pressable, StyleSheet, View } from 'react-native';
+import { RewardModal, type RewardModalData } from '../components/RewardModal';
+import { RewardShowcase } from '../components/RewardShowcase';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import { Button, ProgressBar, Screen, ScreenHeader } from '../components';
 import { AppText as Text } from '../components/AppText';
 import { MONTHLY_PASS_CONTENT } from '../data/seasonPassContent';
+import { ownsProfileFrame } from '../data/cosmetics';
 import { calculateClubRating, superstarAttractionChance } from '../game/manager';
 import {
   isSeasonPassActive,
-  monthlyBundleForCycle,
+  isLegacySeasonPassActive,
+  monthlyBundleForSave,
   SEASON_PASS_ITEM_LABELS,
 } from '../game/seasonPass';
+import { hasModeVip } from '../game/vip';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import {
@@ -24,6 +30,7 @@ import {
 } from '../theme';
 
 export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubhouse'>) {
+  const [rewardModal, setRewardModal] = useState<RewardModalData | null>(null);
   const save = useCareer((state) => state.save);
   const claimDrop = useCareer((state) => state.claimMonthlyPassDrop);
   const activateScenario = useCareer((state) => state.activatePassScenario);
@@ -44,11 +51,12 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
   const active = isSeasonPassActive(save);
   const experience = save.seasonPassExperience;
   const inventory = save.inventory ?? {};
-  const monthlyBundle = monthlyBundleForCycle(save.pass.seasonId);
+  const monthlyBundle = monthlyBundleForSave(save);
+  const vip = hasModeVip(save);
   const dropClaimed = experience?.monthlyDropCycleId === save.pass.seasonId;
   const selectedStadium = experience?.selectedStadiumTheme ?? 'stadium_classic';
   const selectedOffice = experience?.selectedOfficeTheme ?? 'office_classic';
-  const selectedFrame = experience?.selectedProfileFrame ?? 'frame_none';
+  const selectedFrame = save?.cosmetics?.profileFrame ?? experience?.selectedProfileFrame ?? 'frame_none';
   const monthlyCollectionLabel =
     save.mode === 'manager'
       ? monthlyBundle.office.label
@@ -85,7 +93,7 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
         >
           <View style={styles.heroShade} />
           <View style={styles.heroCopy}>
-            <Text style={styles.eyebrow}>{active ? 'PASS ACTIVE' : 'PREVIEW'}</Text>
+            <Text style={styles.eyebrow}>{active ? vip ? 'VIP ACTIVE' : 'LEGACY PASS ACTIVE' : 'PREVIEW'}</Text>
             <Text style={styles.heroTitle}>Make it yours.</Text>
           </View>
         </ImageBackground>
@@ -94,11 +102,13 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
       {!active && (
         <View style={styles.lockBand}>
           <Text style={styles.lockTitle}>Premium access is inactive</Text>
-          <Button label="View Season Pass" onPress={() => navigation.navigate('SeasonPass')} />
+          <Button label="View VIP collections" onPress={() => navigation.navigate('SeasonPass')} />
         </View>
       )}
 
-      <Text style={styles.section}>Monthly Cosmetic Drop</Text>
+      {!isLegacySeasonPassActive(save) || vip ? <Button label="Choose & claim collections" onPress={() => navigation.navigate('SeasonPass')} /> : <>
+      <Text style={styles.section}>Legacy Monthly Cosmetic Drop</Text>
+      <RewardShowcase itemIds={save.mode === 'career' ? [monthlyBundle.kit.id, monthlyBundle.celebration.id] : [monthlyBundle.office.inventoryId]} saveId={save.id} />
       <View style={styles.featureRow}>
         <View style={styles.featureCopy}>
           <Text style={styles.featureTitle}>{monthlyBundle.title} collection</Text>
@@ -117,14 +127,14 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
             ]
               .map((item) => SEASON_PASS_ITEM_LABELS[item] ?? item)
               .join(', ');
-            Alert.alert(
-              result.ok ? 'Monthly collection claimed' : 'Unavailable',
-              result.ok ? claimed : result.reason,
-            );
+            if (result.ok) setRewardModal({ title: 'Monthly collection claimed', items: [claimed],
+              visualRewards: { itemIds: result.items ?? [], saveId: save.id } });
+            else Alert.alert('Unavailable', result.reason);
           }}
         />
       </View>
-
+      </>}
+      <RewardModal data={rewardModal} onClose={() => setRewardModal(null)} />
       <Text style={styles.section}>Presentation Studio</Text>
       <PresentationRow
         title="Stadium Noir"
@@ -152,7 +162,7 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
               detail="Manager theme"
               selected={selectedOffice === content.office.themeId}
               locked={(inventory[content.office.inventoryId] ?? 0) <= 0}
-              lockLabel="Monthly drop"
+              lockLabel="Collection reward"
               onPress={() => applyPresentation({ officeTheme: content.office.themeId })}
             />
           ))}
@@ -163,7 +173,7 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
           title="Championship Frame"
           detail="Gold avatar frame"
           selected={selectedFrame === 'frame_gold'}
-          locked={(inventory.pass_frame_gold ?? 0) <= 0}
+          locked={!ownsProfileFrame(inventory, 'frame_gold')}
           onPress={() => applyPresentation({ profileFrame: 'frame_gold' })}
         />
       ) : null}

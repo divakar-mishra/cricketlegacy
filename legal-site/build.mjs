@@ -25,4 +25,10 @@ for (const [relativePath, html] of Object.entries(pages)) {
   fs.writeFileSync(destination, html, 'utf8');
 }
 fs.cpSync(path.join(siteRoot, 'static'), outputRoot, { recursive: true });
+// Use the app's canonical icon rather than maintaining a second website logo.
+fs.mkdirSync(path.join(outputRoot, 'images'), { recursive: true });
+fs.copyFileSync(
+  path.join(siteRoot, '..', 'assets', 'icon.png'),
+  path.join(outputRoot, 'images', 'cricket-legacy-icon.png'),
+);
 console.log(`Built ${Object.keys(pages).length} legal/support pages in legal-site/dist.`);

@@ -19,6 +19,7 @@ import { PortraitAvatar } from './PortraitAvatar';
 import { portraitPickerLayout } from './portraitPickerLayout';
 
 interface PortraitPickerProps {
+  kitId?: string;
   value: AvatarConfig;
   onChange: (config: AvatarConfig) => void;
   playerName?: string;
@@ -40,12 +41,14 @@ const GRID_GAP = spacing.sm;
 const GRID_PADDING = spacing.sm;
 
 const PortraitCard = memo(function PortraitCard({
+  kitId,
   portrait,
   selected,
   size,
   cardWidth,
   onPress,
 }: {
+  kitId?: string;
   portrait: PortraitAssetMetadata;
   selected: boolean;
   size: number;
@@ -67,6 +70,7 @@ const PortraitCard = memo(function PortraitCard({
       ]}
     >
       <PortraitAvatar
+        kitId={kitId}
         config={{ sex: portrait.sex, portraitId: portrait.id }}
         size={size}
         accessibilityLabel={`${label} preview`}
@@ -76,6 +80,7 @@ const PortraitCard = memo(function PortraitCard({
 });
 
 export function PortraitPicker({
+  kitId,
   value,
   onChange,
   playerName = 'Your player',
@@ -131,6 +136,7 @@ export function PortraitPicker({
       <View style={styles.previewSurface}>
         <PortraitAvatar
           config={safeValue}
+          kitId={kitId}
           size={layout.previewSize}
           accessibilityLabel={`${playerName} avatar preview`}
           testID={testID ? `${testID}-preview` : undefined}
@@ -200,6 +206,7 @@ export function PortraitPicker({
         {options.map((portrait) => (
           <PortraitCard
             key={portrait.id}
+            kitId={kitId}
             portrait={portrait}
             selected={portrait.id === safeValue.portraitId}
             size={layout.portraitSize}

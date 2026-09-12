@@ -11,6 +11,7 @@ import {
   SaveGame,
 } from '../domain/types';
 import { pickStadium, Stadium } from '../data/stadiums';
+import { grantRetirementCollections } from './vip';
 import { approachBias } from '../engine/intent';
 import { LiveMatch } from '../engine/liveMatch';
 import { makeRng, weightedSample } from '../engine/rng';
@@ -1995,6 +1996,7 @@ export function startNewSeason(save: SaveGame, options: StartNewSeasonOptions = 
     if (!save.managerCalendar) ensureIccFixtures(save);
     save.managerAge = Math.min(60, Math.max(35, save.managerAge ?? 35) + 1);
     if (save.managerAge >= 60) save.managerRetired = true;
+    if (save.managerRetired) grantRetirementCollections(save);
   }
 }
 

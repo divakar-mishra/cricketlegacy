@@ -43,7 +43,7 @@ function loadOAuthModules(): NonNullable<typeof oauthModules> | null {
   return oauthModules;
 }
 
-export type AuthProvider = 'guest' | 'google';
+export type AuthProvider = 'guest' | 'google' | 'email';
 
 export interface AuthUser {
   id: string;
@@ -81,7 +81,7 @@ function fromSupabaseSession(session: {
 }): AuthUser {
   return {
     id: session.userId,
-    provider: session.isAnonymous ? 'guest' : 'google',
+    provider: session.isAnonymous ? 'guest' : session.provider === 'email' ? 'email' : 'google',
     displayName: session.displayName,
     remoteId: session.userId,
   };
@@ -241,6 +241,49 @@ export async function signInGoogle(): Promise<AuthUser> {
   return user;
 }
 
+/** Prevent duplicate password requests from racing the stored account identity. */
+let emailSignInPending = false;
+
+/** Existing provisioned accounts only. No signup, local password storage or premium grants. */
+export async function signInEmail(email: string, password: string): Promise<AuthUser> {
+  if (emailSignInPending) throw new Error('Sign-in is already in progress.');
+  if (!email.trim() || !password) throw new Error('Enter your email and password.');
+  if (!isSupabaseBackendEnabled()) throw new Error('Email sign-in is not configured in this build.');
+  emailSignInPending = true;
+  let sessionCreated = false;
+  try {
+    if (!(await isOnline())) throw new Error('Connect to the internet to sign in.');
+    if (current || (await currentSupabaseSession())) {
+      throw new Error('Sign out of your current account before using email sign-in.');
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) throw new Error('Email sign-in is not configured in this build.');
+    clearPurchaseIdentity();
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    sessionCreated = Boolean(data.session);
+    if (error || !data.session) throw new Error('Unable to sign in. Check your credentials and try again.');
+    const verified = await supabase.auth.getUser();
+    if (verified.error || !verified.data.user || verified.data.user.is_anonymous ||
+        verified.data.user.id !== data.session.user.id) {
+      throw new Error('Account verification did not complete. Please try again.');
+    }
+    const user: AuthUser = {
+      id: verified.data.user.id,
+      remoteId: verified.data.user.id,
+      provider: 'email',
+    };
+    await setJSON(USER_KEY, user);
+    setCurrent(user);
+    void synchronizePurchaseIdentity().catch(() => { /* Store remains fail-closed; retry there. */ });
+    return user;
+  } catch (error) {
+    if (sessionCreated) await signOut();
+    throw error;
+  } finally {
+    emailSignInPending = false;
+  }
+}
+
 /** The currently signed-in user, or `null` if signed out. */
 export function currentUser(): AuthUser | null {
   return current;
@@ -262,7 +305,5 @@ export async function signOut(): Promise<void> {
   await removeKey(USER_KEY);
 }
 
-// Rehydrate the last signed-in user on load (guarded, never throws).
-void (async () => {
-  await rehydrateAuth();
-})();
+// App explicitly invokes rehydrateAuth at startup; importing this service alone
+// must not initialize a remote session.

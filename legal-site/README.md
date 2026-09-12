@@ -11,7 +11,8 @@ It currently generates:
 - `/products/cricket-legacy/` — Cricket Legacy product page
 - `/publisher/` — the single public legal-identity disclosure for Sunlight
 
-- `/privacy/`
+- `/products/cricket-legacy/privacy/` — app-specific policy for Play Console
+- `/privacy/` — compatibility copy for existing Cricket Legacy app links
 - `/terms/`
 - `/support/`
 - `/delete-account/`
@@ -55,6 +56,13 @@ published values. Change the policy effective date when those practices change.
 
 Run `npm run build:legal-site`. Output is written to `legal-site/dist` and is
 ignored by Git.
+
+The build copies the canonical `assets/icon.png` to
+`dist/images/cricket-legacy-icon.png`, used on the home and Cricket Legacy product
+pages. Updating the app icon therefore also updates the website on the next build.
+The local September 11 revision describes mode-specific permanent VIP and the
+new local age/UMP controls. Publish it alongside the matching app update after
+reviewing the effective/revision date; a successful build is not a deployment.
 
 ## Cloudflare Pages
 

@@ -13,6 +13,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(async () => undefined),
   removeItem: jest.fn(async () => undefined),
 }));
+jest.mock('../../services/vipArchive', () => ({ syncVipArchive: jest.fn(async () => {}) }));
 
 (global as typeof globalThis & { __DEV__?: boolean }).__DEV__ = true;
 
@@ -29,6 +30,23 @@ const originalPersist = useCareer.getState().persist;
 const originalPersistCritical = useCareer.getState().persistCritical;
 
 describe('career store youth live-match flow', () => {
+  it.each(['autosave', 'caller'] as const)('uses one persistence owner for %s completion', (persistence) => {
+    const save = makeCareerSave(919);
+    save.players[save.userPlayerId!].age = 18;
+    save.careerPathLevel = 'U19';
+    save.playerCalendar = undefined;
+    useCareer.getState().setActive(save, 'career', 1);
+    const persist = jest.fn(async () => undefined);
+    useCareer.setState({ persist });
+    const started = useCareer.getState().beginLiveMatch()!;
+    const match = runFixture(useCareer.getState().save!, started.fixtureId);
+    persist.mockClear();
+    expect(useCareer.getState().commitLiveMatch(match, persistence)).not.toBeNull();
+    expect(persist).toHaveBeenCalledTimes(persistence === 'autosave' ? 1 : 0);
+    expect(useCareer.getState().save!.fixtures[match.id].played).toBe(true);
+    expect(useCareer.getState().commitLiveMatch(match, persistence)).toBeNull();
+    expect(persist).toHaveBeenCalledTimes(persistence === 'autosave' ? 1 : 0);
+  });
   afterEach(() => {
     useCareer.setState({
       save: null,

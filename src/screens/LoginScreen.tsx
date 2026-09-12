@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Linking, Platform, StyleSheet, View } from 'react-native';
+import { Linking, Platform, StyleSheet, TextInput, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import { Button, Card, Emblem, Screen, ScreenHeader, AppText as Text } from '../components';
 import { ScreenProps } from '../navigation';
@@ -16,8 +16,30 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   const styles = useThemedStyles(makeStyles);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [emailForm, setEmailForm] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const onEmail = async () => {
+    if (busy) return;
+    setBusy(true);
+    setFlash(null);
+    try {
+      await auth.signInEmail(email, password);
+      setEmail('');
+      setEmailForm(false);
+      setFlash('Signed in with email. Purchase access is checked separately.');
+    } catch (error) {
+      Alert.alert('Email sign-in unavailable', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setPassword('');
+      setBusy(false);
+    }
+  };
 
   const onGuest = async () => {
+    setPassword('');
+    setEmailForm(false);
     setBusy(true);
     try {
       await auth.signInGuest();
@@ -35,6 +57,8 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   };
 
   const onGoogle = async () => {
+    setPassword('');
+    setEmailForm(false);
     setBusy(true);
     try {
       const googleUser = await auth.signInGoogle();
@@ -165,7 +189,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
           <Card style={styles.account}>
             <Text style={styles.accountLabel}>Signed in</Text>
             <Text style={styles.accountId} numberOfLines={1}>
-              {user.provider === 'guest' ? 'Guest profile' : (user.displayName ?? 'Google account')}
+              {user.provider === 'guest' ? 'Guest profile' : (user.displayName ?? (user.provider === 'email' ? 'Email account' : 'Google account'))}
             </Text>
           </Card>
           <View style={styles.buttons}>
@@ -196,16 +220,56 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
             onPress={onGoogle}
           />
           <Button label="Play as Guest" variant="primary" loading={busy} onPress={onGuest} />
+          <Button
+            label="Sign in with email"
+            variant="secondary"
+            disabled={busy}
+            onPress={() => setEmailForm(true)}
+          />
+          {emailForm ? (
+            <Card>
+              <Text style={styles.noteTitle}>Existing account / reviewer sign-in</Text>
+              <Text style={styles.noteText}>Use the account provided by support. This does not create an account or unlock purchases.</Text>
+              <TextInput
+                accessibilityLabel="Email address"
+                placeholder="Email address"
+                placeholderTextColor={styles.noteText.color}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                editable={!busy}
+                style={styles.input}
+              />
+              <TextInput
+                accessibilityLabel="Password"
+                placeholder="Password"
+                placeholderTextColor={styles.noteText.color}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="current-password"
+                editable={!busy}
+                style={styles.input}
+              />
+              <Button label="Sign in" onPress={onEmail} loading={busy} disabled={!email.trim() || !password} />
+              <Button label="Cancel" variant="secondary" disabled={busy} onPress={() => { setPassword(''); setEmailForm(false); }} />
+            </Card>
+          ) : null}
         </View>
       )}
 
       <Card style={styles.note}>
         <Text style={styles.noteTitle}>
-          {user?.provider === 'google' ? 'Recoverable account' : 'Local-only progress'}
+          {user && user.provider !== 'guest' ? 'Recoverable account' : 'Local-only progress'}
         </Text>
         <Text style={styles.noteText}>
-          {user?.provider === 'google'
-            ? 'Google sign-in protects purchase ownership and restores. Cloud save is unavailable.'
+          {user && user.provider !== 'guest'
+            ? 'Sign-in protects purchase ownership and restores. Cloud save is unavailable.'
             : 'Guest saves stay on this device and may be lost if the app is removed. Cloud save is unavailable.'}
         </Text>
       </Card>
@@ -224,6 +288,7 @@ const makeStyles = (colors: ThemeColors) =>
       paddingHorizontal: spacing.md,
     },
     buttons: { gap: spacing.md },
+    input: { color: colors.text, borderColor: colors.borderStrong, borderWidth: 1, borderRadius: 8, padding: spacing.md, marginVertical: spacing.sm, fontSize: fontSize.md },
     flash: { marginBottom: spacing.md, borderColor: colors.borderStrong },
     flashText: { color: colors.accent, fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
     account: { marginBottom: spacing.md },

@@ -175,6 +175,7 @@ function layout(config, { title, description, path, body }) {
   const pageId =
     {
       '/privacy/': 'privacy',
+      '/products/cricket-legacy/privacy/': 'privacy',
       '/terms/': 'terms',
       '/support/': 'support',
       '/delete-account/': 'delete-account',
@@ -218,7 +219,7 @@ function layout(config, { title, description, path, body }) {
       <p>${escapeHtml(config.publisher.location)}</p>
     </div>
     <div class="footer-links">
-      <a href="/privacy/">Privacy</a>
+      <a href="/products/cricket-legacy/privacy/">Cricket Legacy Privacy</a>
       <a href="/terms/">Terms</a>
       <a href="/delete-account/">Account deletion</a>
       <a href="/publisher/">Publisher</a>
@@ -240,8 +241,11 @@ function pageHeading(kicker, title, intro, config) {
 
 function privacyPage(config, age) {
   const retention = config.retention;
-  return `${pageHeading('Your data', 'Privacy Policy', `How ${config.publisher.tradingName} handles information in ${config.appName}.`, config)}
+  return `${pageHeading('Your data', `${config.appName} Privacy Policy`, `How ${config.publisher.tradingName} handles information in ${config.appName}.`, config)}
   <article>
+    <section><h2>Scope of this policy</h2>
+      <p>This policy applies specifically to ${escapeHtml(config.appName)} and its related support and web pages. It does not apply to other apps published by ${escapeHtml(config.publisher.tradingName)}; those apps have their own privacy policies.</p>
+    </section>
     <section><h2>Who is responsible</h2>
       <p>${escapeHtml(config.publisher.tradingName)} provides ${escapeHtml(config.appName)} and is responsible for the personal data described here. The legal operator is identified on the <a href="/publisher/">Publisher Information</a> page.</p>
       ${contactBlock(config)}
@@ -252,7 +256,8 @@ function privacyPage(config, age) {
         '<strong>Account and cloud data:</strong> an anonymous or linked account identifier, authentication records and cloud saves when the online backend is enabled.',
         `<strong>Purchases:</strong> product, entitlement, transaction status and pseudonymous verification identifiers supplied by Google Play, Apple or RevenueCat. ${escapeHtml(config.publisher.tradingName)} does not receive your full payment-card number.`,
         '<strong>Online play and security:</strong> leaderboard entries you submit, server timestamps, app/build version, fraud checks, IP address and service logs.',
-        '<strong>Advertising:</strong> Google Mobile Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices according to the build and your settings. Ad requests are configured as non-personalized, but that setting does not prevent all technical processing.',
+        '<strong>Age preferences:</strong> the app stores your self-declared age band, India/outside-India residence choice and, where applicable, parent or guardian permission on your device. It does not ask for a date of birth or upload these answers. This is a self-declaration, not verified identity or parental consent.',
+        '<strong>Advertising:</strong> Google Mobile Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices according to the build and your settings. The app does not initialize ads for users who declare they are under 18. For adults, ad initialization waits for the Google consent flow to permit requests. Ad privacy choices are available in Settings. Requests remain non-personalized, which does not prevent all technical processing.',
         '<strong>Support:</strong> your email address, message and attachments if you contact support.',
         '<strong>Device features:</strong> notification permission and locally scheduled reminders. The current app does not upload a push-notification token.',
       ])}
@@ -310,9 +315,11 @@ function termsPage(config, age) {
     <section><h2>Game progress and virtual items</h2>
       <p>Coins, gems, energy, tokens, passes, sponsorship rewards, cosmetics and similar items are licensed game content. They have no cash value, are not property, cannot be traded outside the app and may be adjusted to correct errors or maintain game balance. Local-only progress can be lost if the app or device data is removed.</p>
     </section>
-    <section><h2>Purchases, subscriptions and save-bound sponsors</h2>
-      <p>Google Play or Apple processes payment and supplies the final localized price, taxes and refund rules. A Season Pass renews automatically for the displayed billing period until you cancel it through your store account. Deleting the app or account does not cancel a subscription.</p>
-      <p>Eligible non-consumables and active subscriptions can be restored through the app. Consumed currency, boosts, tokens and other consumables are not restored. A permanent premium sponsor is an extra sponsor slot purchased for one selected save in one mode. It does not transfer to another save or mode. Its continuing benefits may require periodic online verification.</p>
+    <section><h2>Purchases, VIP and save-bound rewards</h2>
+      <p>The store processes payment and supplies the final localized price, taxes and refund rules. The current Android catalogue offers one-time purchases, not a recurring Season Pass. Player VIP and Manager VIP are permanent purchases for their respective modes; neither unlocks the other mode. Player Legend includes Player VIP, and Manager Legacy Edition includes Manager VIP.</p>
+      <p>VIP collection progress is earned through completed in-game seasons. Retirement grants remaining eligible collection cosmetics, not Coins, Gems, club funds or consumable rewards.</p>
+      <p>Eligible permanent purchases can be restored through the app. Currency, boosts and tokens, including those bundled with a permanent purchase, are granted once to the purchased save and are not reissued by restoring purchases or moving to another save. Local-only progress is not a cloud backup.</p>
+      <p>If you have a legacy subscription, it continues under its original store terms until cancelled. Deleting the app or account does not cancel it. Legacy save-bound sponsors remain attached to their original save and mode and may require periodic online verification; they are not offered in the current launch catalogue.</p>
       <p>Refunds, reversals, chargebacks or revocations may end future access, branding and stipends associated with that purchase. Rewards already used are not automatically reclaimed unless required to correct fraud or an error. Statutory consumer rights are not excluded.</p>
       <p><a href="https://play.google.com/store/account/subscriptions">Manage Google Play subscriptions</a> · <a href="https://apps.apple.com/account/subscriptions">Manage App Store subscriptions</a></p>
     </section>
@@ -398,7 +405,7 @@ function publisherPage(config) {
 
 function productCard(config, product) {
   return `<article class="product-card">
-    <div class="product-art product-art-${escapeHtml(product.slug)}" aria-hidden="true"><span class="pitch-mark"></span><span class="ball-mark"></span></div>
+    <div class="product-art product-art-${escapeHtml(product.slug)}">${product.slug === 'cricket-legacy' ? '<img class="app-icon" src="/images/cricket-legacy-icon.png" alt="Cricket Legacy app icon" width="512" height="512" loading="lazy">' : '<span class="pitch-mark" aria-hidden="true"></span><span class="ball-mark" aria-hidden="true"></span>'}</div>
     <div class="product-copy">
       <div class="meta-row"><span>${escapeHtml(product.kind)}</span><span>${escapeHtml(product.status)}</span></div>
       <h3>${escapeHtml(product.name)}</h3>
@@ -412,7 +419,7 @@ function productCard(config, product) {
 function homePage(config) {
   const body = `<section class="studio-hero">
     <div class="studio-hero-copy">
-      <p class="kicker">Independent studio · Navi Mumbai</p>
+      <p class="kicker">Independent studio · ${escapeHtml(config.publisher.location)}</p>
       <h1>${escapeHtml(config.publisher.tradingName)}</h1>
       <p class="lede">${escapeHtml(config.site.tagline)}</p>
       <p class="hero-detail">${escapeHtml(config.site.description)}</p>
@@ -439,7 +446,7 @@ function homePage(config) {
 function productPage(config, product) {
   const isPrimaryApp = product.name === config.appName;
   const legalCards = [
-    ['/privacy/', 'Privacy Policy', 'How Cricket Legacy and its providers handle information.'],
+    ['/products/cricket-legacy/privacy/', 'Cricket Legacy Privacy Policy', 'How Cricket Legacy and its providers handle information.'],
     ['/terms/', 'Terms & Conditions', 'Rules for using the game and its paid features.'],
     ['/support/', 'Support', 'Help with gameplay, purchases, access or privacy.'],
     ['/delete-account/', 'Delete account', 'Delete local data or request deletion of an online account.'],
@@ -451,7 +458,7 @@ function productPage(config, product) {
       <h2>${escapeHtml(product.headline)}</h2>
       <p>${escapeHtml(product.description)}</p>
     </div>
-    ${isPrimaryApp ? '<div class="score-motif" aria-hidden="true"><span>Player</span><strong>01</strong><i></i><span>Manager</span><strong>02</strong></div>' : '<div class="product-glyph" aria-hidden="true"><span></span></div>'}
+    ${isPrimaryApp ? '<div class="product-icon-panel"><img class="app-icon" src="/images/cricket-legacy-icon.png" alt="Cricket Legacy app icon" width="512" height="512"><div class="chip-row"><span>Player</span><span>Manager</span></div></div>' : '<div class="product-glyph" aria-hidden="true"><span></span></div>'}
   </section>
   <section class="highlight-grid" aria-label="${escapeHtml(product.name)} highlights">
     ${product.highlights.map((highlight, index) => `<article><span class="highlight-number">0${index + 1}</span><h3>${escapeHtml(highlight.title)}</h3><p>${escapeHtml(highlight.description)}</p></article>`).join('')}
@@ -492,6 +499,12 @@ function renderLegalSite(config) {
       title: 'Privacy Policy',
       description: `${config.appName} Privacy Policy.`,
       path: '/privacy/',
+      body: privacyPage(config, age),
+    }),
+    'products/cricket-legacy/privacy/index.html': layout(config, {
+      title: `${config.appName} Privacy Policy`,
+      description: `Privacy Policy specifically for ${config.appName}, published by ${config.publisher.tradingName}.`,
+      path: '/products/cricket-legacy/privacy/',
       body: privacyPage(config, age),
     }),
     'terms/index.html': layout(config, {

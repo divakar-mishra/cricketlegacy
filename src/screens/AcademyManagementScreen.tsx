@@ -3,6 +3,7 @@
  * Feature 2: shows current tier, students, revenue, upgrade path, founding year.
  */
 import { useState } from 'react';
+import { FacilityScene } from '../components/FacilityScene';
 import { StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
@@ -90,6 +91,11 @@ export function AcademyManagementScreen({ navigation }: ScreenProps<'AcademyMana
           {/* Current academy overview */}
           <Animated.View entering={FadeInDown.duration(300)}>
             <Card style={styles.academyCard}>
+              <FacilityScene
+                kind="academy"
+                level={academy.tier * 2 - 1}
+                levelLabel={`TIER ${academy.tier}`}
+              />
               <Text style={styles.academyName}>{academy.name}</Text>
               <Text style={styles.academyTier}>
                 Tier {academy.tier} — {TIER_NAME[academy.tier]}
@@ -130,6 +136,12 @@ export function AcademyManagementScreen({ navigation }: ScreenProps<'AcademyMana
                 <Card style={[styles.upgradeCard, !canAfford && { opacity: 0.6 }]}>
                   <Text style={styles.upgradeTier}>Upgrade to Tier {tier}</Text>
                   <Text style={styles.upgradeName}>{TIER_NAME[tier]}</Text>
+                  <FacilityScene
+                    kind="academy"
+                    level={tier * 2 - 1}
+                    compact
+                    levelLabel={`TIER ${tier} PREVIEW`}
+                  />
                   <View style={styles.upgradeDetails}>
                     <Text style={styles.upgradeDetail}>Cost: {cost.toLocaleString()} coins</Text>
                     <Text style={[styles.upgradeDetail, { color: colors.success }]}>
@@ -162,7 +174,7 @@ export function AcademyManagementScreen({ navigation }: ScreenProps<'AcademyMana
                 style={styles.input}
                 value={academyName}
                 onChangeText={setAcademyName}
-                placeholder="e.g. Virat Kohli Cricket Academy"
+                placeholder="e.g. Sunlight Cricket Academy"
                 placeholderTextColor={colors.textFaint}
                 maxLength={40}
               />
@@ -177,6 +189,12 @@ export function AcademyManagementScreen({ navigation }: ScreenProps<'AcademyMana
                 <Card style={[styles.upgradeCard, !canAfford && { opacity: 0.6 }]}>
                   <Text style={styles.upgradeTier}>Tier {tier}</Text>
                   <Text style={styles.upgradeName}>{TIER_NAME[tier]}</Text>
+                  <FacilityScene
+                    kind="academy"
+                    level={tier * 2 - 1}
+                    compact
+                    levelLabel={`TIER ${tier} PREVIEW`}
+                  />
                   <View style={styles.upgradeDetails}>
                     <Text style={styles.upgradeDetail}>Cost: {cost.toLocaleString()} coins</Text>
                     <Text style={[styles.upgradeDetail, { color: colors.success }]}>

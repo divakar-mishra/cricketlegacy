@@ -9,7 +9,7 @@ import { AppliedEffect, sanitizeNarrativeText } from './narrative';
 import { Rng } from '../engine/rng';
 import { clamp } from '../utils/math';
 import { MONTHLY_PASS_CONTENT } from '../data/seasonPassContent';
-import { ensureSeasonPassExperience, isSeasonPassActive, monthlyBundleForSave } from './seasonPass';
+import { ensureSeasonPassExperience, isSeasonPassActive, monthlyBundleForSave, passContentCycleId } from './seasonPass';
 
 export type MgrTrigger = 'PRE_SEASON' | 'POST_WIN' | 'POST_LOSS' | 'SEASON_END' | 'MEDIA';
 
@@ -58,7 +58,7 @@ const MONTHLY_PASS_MANAGER_EVENTS: MgrEvent[] = MONTHLY_PASS_CONTENT.flatMap((co
       condition: (save) =>
         isSeasonPassActive(save) &&
         monthlyBundleForSave(save).id === content.id &&
-        save.seasonPassExperience?.managerStoryCycleId !== save.pass?.seasonId,
+        save.seasonPassExperience?.managerStoryCycleId !== passContentCycleId(save),
       body: `${content.managerStory.hook} The leadership group needs one clear decision from you.`,
       choices: [
         {
@@ -597,7 +597,7 @@ export function queueManagerEvent(save: SaveGame, trigger: MgrTrigger, rng: Rng)
   save.managerStory!.flags[`lastAskedSeason:${chosen.id}`] = seasonYear;
   if (chosen.id.startsWith('pass_monthly_manager_') && chosen.id.endsWith('_opening')) {
     ensureSeasonPassExperience(save, save.pass?.seasonId);
-    save.seasonPassExperience!.managerStoryCycleId = save.pass!.seasonId;
+    save.seasonPassExperience!.managerStoryCycleId = passContentCycleId(save);
   }
   return true;
 }

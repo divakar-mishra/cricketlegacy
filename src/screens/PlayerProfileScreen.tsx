@@ -106,6 +106,7 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
           primaryColor={team?.primaryColor}
           secondaryColor={team?.secondaryColor}
           config={isUser ? save.cosmetics?.avatarConfig : undefined}
+          kitId={isUser ? save.cosmetics?.kit : undefined}
           profileFrame={isUser ? save.cosmetics?.profileFrame : undefined}
           earnedSponsor={sponsorBranding.earned}
           premiumSponsor={sponsorBranding.premium}

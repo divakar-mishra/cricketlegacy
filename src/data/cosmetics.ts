@@ -112,3 +112,34 @@ export function kitColorHex(id?: string): string | undefined {
   if (!id) return undefined;
   return KIT_COLORS.find((k) => k.id === id)?.preview;
 }
+
+/** Bundle ownership covers standard kits, never unclaimed Pass rewards. */
+export function ownsCosmetic(inventory: Record<string, number> | undefined, id: string): boolean {
+  if ((inventory?.[id] ?? 0) > 0) return true;
+  return (inventory?.kit_all_colors ?? 0) > 0 &&
+    KIT_COLORS.some((kit) => kit.id === id && !kit.passExclusive);
+}
+
+export const PROFILE_FRAMES = [
+  { id: 'frame_none', label: 'Classic', color: '#24D63B' },
+  { id: 'frame_gold', label: 'Legend Gold', color: '#E8B52F' },
+  { id: 'frame_vip', label: 'VIP Streak', color: '#A68BFA' },
+] as const;
+
+export function ownsProfileFrame(inventory: Record<string, number> | undefined, id: string): boolean {
+  if (id === 'frame_none') return true;
+  if (id === 'frame_gold') return (inventory?.avatar_legend_frame ?? 0) > 0 ||
+    (inventory?.pass_frame_gold ?? 0) > 0;
+  return id === 'frame_vip' && (inventory?.avatar_legend_vip ?? 0) > 0;
+}
+
+export type KitPattern = 'classic' | 'chevron' | 'sash' | 'pinstripe' | 'hoops' | 'split' | 'lightning';
+const KIT_PATTERNS: readonly KitPattern[] = ['chevron', 'sash', 'pinstripe', 'hoops', 'split', 'lightning'];
+export function kitDesign(id?: string): { pattern: KitPattern; trim: string } {
+  const index = KIT_COLORS.findIndex((kit) => kit.id === id);
+  if (index <= 0) return { pattern: 'classic', trim: '#234C39' };
+  return {
+    pattern: KIT_PATTERNS[(index - 1) % KIT_PATTERNS.length],
+    trim: KIT_COLORS[index].passExclusive ? '#F3CE72' : '#E9E4D5',
+  };
+}

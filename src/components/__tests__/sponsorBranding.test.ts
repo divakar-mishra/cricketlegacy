@@ -6,13 +6,14 @@ const avatarSource = fs.readFileSync(path.join(__dirname, '..', 'PlayerAvatar.ts
 const sponsorMarkSource = fs.readFileSync(path.join(__dirname, '..', 'SponsorMark.tsx'), 'utf8');
 
 describe('dynamic sponsor presentation', () => {
-  it('uses code-native SVG artwork and never edits or embeds a portrait asset', () => {
+  it('keeps sponsor marks dynamic over catalogue jersey artwork and the back preview', () => {
     expect(brandingSource).toContain("from 'react-native-svg'");
     expect(brandingSource).toContain('export function SponsoredKitPreview');
     expect(brandingSource).toContain('viewBox="0 0 320 260"');
     expect(brandingSource).toContain('<SvgLinearGradient id="kit-body"');
     expect(brandingSource).toContain('kitBackNumber');
-    expect(brandingSource).not.toContain('<Image');
+    expect(brandingSource).toContain('kitThumbnailArtwork(kitId)');
+    expect(brandingSource).toContain('<Image source={artwork}');
     expect(brandingSource).not.toContain('require(');
   });
 

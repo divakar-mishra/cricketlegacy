@@ -30,6 +30,7 @@ import { synchronizeSchema40PlayerAffiliations } from './schema40';
 import { synchronizeSchema41ManagerAge } from './schema41';
 import { synchronizeSchema42Portfolio } from './schema42';
 import { synchronizeSchema43InternationalRankingPeaks } from './schema43';
+import { ensureVipState } from '../game/vip';
 
 type AnySave = Record<string, unknown> & { schemaVersion?: number };
 type Migration = (save: AnySave) => AnySave;
@@ -57,6 +58,10 @@ function recomputePlayerOveralls(save: AnySave): void {
  * When bumping SAVE_SCHEMA_VERSION, add MIGRATIONS[oldVersion] here.
  */
 const MIGRATIONS: Record<number, Migration> = {
+  43: (save) => {
+    ensureVipState(save as unknown as SaveGame);
+    return save;
+  },
   // v2 → v3: career narrative (story events, relationships, sponsors,
   // brand/integrity/morale, timeline) + manager depth (staff, facilities,
   // academy, scouting, cup, richer finances). Every new field is optional and

@@ -17,7 +17,7 @@ describe('FranchiseOfferModal auction-room presentation', () => {
     expect(source).toContain('HAMMER BID');
     expect(source).toContain('SEASON SALARY');
     expect(source).toContain(
-      'Separate T20 contract · First-Class and List A affiliation stays unchanged',
+      'T20 franchise contract',
     );
   });
 

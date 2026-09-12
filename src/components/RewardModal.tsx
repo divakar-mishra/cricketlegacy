@@ -16,6 +16,7 @@ import {
 import { AppText as Text } from './AppText';
 import { Button } from './Button';
 import { Icon, IconName } from './Icon';
+import { RewardShowcase } from './RewardShowcase';
 import { SMOOTH_CARD_ZOOM, SMOOTH_MODAL_ENTER, SMOOTH_MODAL_EXIT } from './Motion';
 
 export interface RewardModalData {
@@ -25,6 +26,7 @@ export interface RewardModalData {
   items: string[];
   balances?: string[];
   icon?: IconName;
+  visualRewards?: { itemIds: string[]; saveId: string };
 }
 
 interface Props {
@@ -64,6 +66,7 @@ export function RewardModal({ data, onClose }: Props) {
             bounces={false}
             showsVerticalScrollIndicator={false}
           >
+            {data.visualRewards ? <RewardShowcase {...data.visualRewards} /> : null}
             {data.items.map((item, index) => (
               <View key={`${item}-${index}`} style={styles.rewardRow}>
                 <Icon name="checkmark-circle" size={18} color="#7FD89A" />

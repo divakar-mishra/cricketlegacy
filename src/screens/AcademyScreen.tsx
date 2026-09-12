@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
+import { FacilityScene } from '../components/FacilityScene';
 import {
   AppText as Text,
   Button,
@@ -18,6 +19,7 @@ import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import { fontSize, fontWeight, spacing, ThemeColors, useTheme, useThemedStyles } from '../theme';
 import { confirmFacilityUpgrade } from './facilityUpgradePrompt';
+import { showShortageOffer } from '../components/showShortageOffer';
 
 const ROLE_ABBR: Record<string, string> = {
   BATTER: 'BAT',
@@ -90,6 +92,8 @@ export function AcademyScreen({ navigation }: ScreenProps<'Academy'>) {
       Alert.alert('Cannot upgrade academy', 'No active club.');
       return;
     }
+    if (level < 5 && team.budget < upgradeCost &&
+        showShortageOffer(save, 'facility', (productId) => navigation.navigate('Purchase', { productId }))) return;
     confirmFacilityUpgrade(
       {
         facilityLabel: 'Youth Academy',
@@ -117,6 +121,7 @@ export function AcademyScreen({ navigation }: ScreenProps<'Academy'>) {
       />
 
       <Card style={styles.development}>
+        <FacilityScene kind="academy" level={level} accent={team?.primaryColor} />
         <View style={styles.developmentRow}>
           <View style={styles.developmentCopy}>
             <Text style={styles.developmentTitle}>Academy development</Text>

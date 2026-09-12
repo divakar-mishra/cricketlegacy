@@ -22,6 +22,7 @@ const ROLE_ICON: Record<string, string> = {
 };
 
 interface Props {
+  kitId?: string;
   name: string;
   role?: string;
   primaryColor?: string;
@@ -37,6 +38,7 @@ interface Props {
 }
 
 function PlayerAvatarComponent({
+  kitId,
   name,
   role = 'BATTER',
   primaryColor = '#1A6B3A',
@@ -69,6 +71,7 @@ function PlayerAvatarComponent({
   return (
     <View style={[styles.wrap, { width: px, height: px }]}>
       <PortraitAvatar
+        kitId={kitId}
         config={safeConfig}
         size={px}
         frameId={activeFrame}

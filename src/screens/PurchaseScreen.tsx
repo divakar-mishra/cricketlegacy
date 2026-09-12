@@ -8,6 +8,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useIsFocused } from '@react-navigation/native';
 import { Svg, Circle, Path, Rect } from 'react-native-svg';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import { AppText as Text } from '../components/AppText';
@@ -23,6 +24,7 @@ import {
 } from '../components';
 import { ScreenProps } from '../navigation';
 import { accountPurchases, ads, purchases } from '../services';
+import { authorizeReviewerAccess } from '../services/reviewerAccess';
 import { ECONOMY } from '../data/gameConfig';
 import {
   areAdsRemoved,
@@ -34,7 +36,7 @@ import {
 import { contractOffer } from '../game/career';
 import { formatClubCurrency } from '../game/finance';
 import { facilityUpgradeCost } from '../game/manager';
-import { isSeasonPassActive } from '../game/seasonPass';
+import { hasModeVip, vipProductId } from '../game/vip';
 import { premiumSponsorStoreUnlocked, premiumSponsorWeeklyRate } from '../game/sponsorship';
 import { useIsCompact } from '../hooks/useResponsive';
 import { useCareer } from '../state/careerStore';
@@ -195,10 +197,11 @@ function TrustBar({ storeName }: { storeName: string }) {
 // ─── Product row ──────────────────────────────────────────────────────────────
 
 const PURCHASE_ERROR_MESSAGE: Record<string, string> = {
+  no_save: 'Open a career before making a purchase.',
   already_active: 'This pass is already active.',
   already_owned: 'This item is already owned.',
   contract_boost_already_stored: 'Use your stored contract boost before buying another.',
-  no_recovery_needed: 'Form and confidence are already above this session target.',
+  no_recovery_needed: 'Form and confidence are already at least 99, and Focus is full.',
   facilities_maxed: 'Every club facility is already fully upgraded.',
   season_limit_reached: 'This season’s transfer-budget boost is already used.',
   manager_save_required: 'This item requires an active Manager Career save.',
@@ -239,10 +242,11 @@ function ProductRow({
   const { colors } = useTheme();
   const compact = useIsCompact(560);
   const [showDetails, setShowDetails] = useState(false);
-  const available = purchases.isProductAvailable(p) && !unavailableReason;
+  const hasSave = useCareer((s) => Boolean(s.save));
+  const available = hasSave && purchases.isProductAvailable(p) && !unavailableReason;
   const action = (
     <Button
-      label={owned ? 'Owned ✓' : available ? p.priceString : unavailableLabel}
+      label={owned ? 'Owned ✓' : !hasSave ? 'Open a career' : available ? p.priceString : unavailableLabel}
       size="sm"
       variant={owned ? 'secondary' : 'gold'}
       fullWidth={compact}
@@ -332,10 +336,12 @@ function ProductRow({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
+export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
   const save = useCareer((s) => s.save);
   const purchaseProduct = useCareer((s) => s.purchaseProduct);
   const restorePurchases = useCareer((s) => s.restorePurchases);
+  const claimReviewerAccess = useCareer((s) => s.claimReviewerAccess);
+  const [reviewerAccess, setReviewerAccess] = useState(false);
   const grantAdEnergy = useCareer((s) => s.grantAdEnergy);
   const refillEnergy = useCareer((s) => s.refillEnergy);
   const convertPlayerGems = useCareer((s) => s.convertPlayerGems);
@@ -344,6 +350,8 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
   const [products, setProducts] = useState<purchases.Product[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [catalogFailed, setCatalogFailed] = useState(false);
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
   const [starterPackOwned, setStarterPackOwned] = useState(true);
   const [expandedFeatureCard, setExpandedFeatureCard] = useState<string | null>(null);
   const rewardedEnergyPendingRef = useRef(false);
@@ -354,11 +362,24 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
 
   // The one-time Starter Pack starts only after the first completed match.
   const [nowTs, setNowTs] = useState(Date.now());
+  const isFocused = useIsFocused();
   useEffect(() => {
+    let cancelled = false;
+    setReviewerAccess(false);
+    if (isFocused) void authorizeReviewerAccess().then((allowed) => {
+      if (!cancelled) setReviewerAccess(allowed);
+    });
+    return () => { cancelled = true; };
+  }, [isFocused]);
+  const starterUnlockedAt = save?.experience?.starterPackUnlockedAt;
+  const starterOfferActive = !starterPackOwned && Boolean(starterUnlockedAt) &&
+    nowTs < starterUnlockedAt! + purchases.STARTER_PACK_OFFER_HOURS * 60 * 60 * 1000;
+  useEffect(() => {
+    if (!isFocused || !starterOfferActive) return;
+    setNowTs(Date.now());
     const t = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(t);
-  }, []);
-  const starterUnlockedAt = save?.experience?.starterPackUnlockedAt;
+  }, [isFocused, starterOfferActive]);
   const starterOfferMsLeft = starterUnlockedAt
     ? Math.max(0, starterUnlockedAt + purchases.STARTER_PACK_OFFER_HOURS * 60 * 60 * 1000 - nowTs)
     : 0;
@@ -372,6 +393,8 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
+    setCatalogFailed(false);
     void Promise.all([purchases.getProducts(), accountPurchases.hasStarterPackPurchase()]).then(
       ([p, starterOwned]) => {
         if (alive) {
@@ -380,28 +403,43 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
           setLoading(false);
         }
       },
-    );
+    ).catch(() => {
+      if (alive) {
+        setCatalogFailed(true);
+        setLoading(false);
+      }
+    });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [catalogAttempt]);
 
   const removeAds = areAdsRemoved(save?.entitlements);
 
   const completePurchase = async (p: purchases.Product) => {
+    if (busy != null) return;
+    if (!useCareer.getState().save) {
+      Alert.alert('Open a career', PURCHASE_ERROR_MESSAGE.no_save);
+      return;
+    }
     if (p.id === 'remove_ads' && removeAds) return;
     setBusy(p.id);
-    const res = await purchaseProduct(p.id);
-    if (res.ok && p.id === 'starter_pack') setStarterPackOwned(true);
-    setBusy(null);
-    Alert.alert(
-      res.ok ? 'Purchase complete ✓' : 'Purchase failed',
-      res.ok
-        ? purchases.isSaveSponsorProduct(p.id)
-          ? `${p.title} is now bound to this save.`
-          : `${p.title} applied to your account.`
-        : (PURCHASE_ERROR_MESSAGE[res.error ?? ''] ?? res.error ?? 'Please try again.'),
-    );
+    try {
+      const res = await purchaseProduct(p.id);
+      if (res.ok && p.id === 'starter_pack') setStarterPackOwned(true);
+      Alert.alert(
+        res.ok ? 'Purchase complete ✓' : 'Purchase failed',
+        res.ok
+          ? purchases.isSaveSponsorProduct(p.id)
+            ? `${p.title} is now bound to this save.`
+            : `${p.title} applied to your account.`
+          : (PURCHASE_ERROR_MESSAGE[res.error ?? ''] ?? res.error ?? 'Please try again.'),
+      );
+    } catch {
+      Alert.alert('Purchase unavailable', 'Could not complete the request. Check your connection and try again.');
+    } finally {
+      setBusy(null);
+    }
   };
 
   const onRestorePurchases = async () => {
@@ -452,6 +490,8 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
             `Could not reach ${storeName}. Check your connection and try again.`,
           );
       }
+    } catch {
+      Alert.alert('Restore failed', 'Check your connection and try again.');
     } finally {
       setBusy(null);
     }
@@ -486,7 +526,7 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
     starterPackOwned || !starterUnlockedAt || save?.firstPurchaseDone || starterOfferMsLeft <= 0
       ? undefined
       : products.find((p) => p.id === 'starter_pack');
-  const passProduct = products.find((p) => p.id === 'season_pass');
+  const passProduct = products.find((p) => p.id === vipProductId(save?.mode ?? 'career'));
   const legendProductId =
     save?.mode === 'manager'
       ? 'manager_legend_pack'
@@ -499,9 +539,14 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
   const coinProducts = products.filter((p) => p.id === 'coins_medium' || p.id === 'coins_large');
   const gemProducts = products.filter((p) => p.id === 'gems_medium' || p.id === 'gems_large');
   const energyLow = (save?.wallet.energy ?? 30) <= 8;
+  const suggestedProduct = products.find((product) => product.id === route.params?.productId &&
+    (save?.mode === 'career'
+      ? ['form_recovery', 'coins_medium', 'coins_large'].includes(product.id)
+      : ['transfer_budget_sm', 'facility_upgrade_token', 'recovery_pack'].includes(product.id)));
   const userPlayer = save?.userPlayerId ? save.players[save.userPlayerId] : undefined;
   const needsFormRecovery = Boolean(
-    userPlayer && (userPlayer.meta.form < 70 || userPlayer.meta.confidence < 65),
+    userPlayer && (userPlayer.meta.form < 99 || userPlayer.meta.confidence < 99 ||
+      (save?.wallet.energy ?? 0) < (save?.entitlements.removeAds ? ECONOMY.vipEnergyMax : ECONOMY.energyMax)),
   );
   const modeProductIds = save ? purchases.MODE_STORE_PRODUCT_IDS[save.mode] : [];
   const saveSponsorUnlocked = save ? premiumSponsorStoreUnlocked(save) : false;
@@ -551,7 +596,7 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
       }
       case 'form_recovery':
         return userPlayer
-          ? `Immediate: form ${Math.round(userPlayer.meta.form)}→${Math.max(70, Math.round(userPlayer.meta.form))} · confidence ${Math.round(userPlayer.meta.confidence)}→${Math.max(65, Math.round(userPlayer.meta.confidence))}`
+          ? `Form ${Math.round(userPlayer.meta.form)}→${Math.max(99, Math.round(userPlayer.meta.form))} · confidence ${Math.round(userPlayer.meta.confidence)}→${Math.max(99, Math.round(userPlayer.meta.confidence))} · Focus refill to ${save?.entitlements.removeAds ? ECONOMY.vipEnergyMax : ECONOMY.energyMax}`
           : undefined;
       case 'scout_full_reveal':
         return undefined;
@@ -596,17 +641,20 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
         return ['1,200 Gems in the active save'];
       case 'bundle_legend':
         return [
-          '40,000 Wallet Coins and 1,200 Gems',
-          'Permanent ad removal and a 60-energy cap',
-          'All kit colours and the Legend avatar frame',
-          'Does not buy stats, selection, trophies or Hall of Fame entry',
+          'One-time bundle purchase · No subscription',
+          '40,000 Wallet Coins and 1,200 Gems delivered once to the active Player save',
+          'Permanent ad removal and 60 Training Focus capacity',
+          'Includes Player VIP and its 12 earnable collections',
+          'All standard kit designs and the Legend Gold frame',
         ];
       case 'manager_legend_pack':
         return [
+          'One-time bundle purchase · No subscription',
+          'Includes permanent Manager VIP and its 12 earnable office collections',
+          '$1,000,000 fictional Club Balance delivered once to the purchased Manager save; not regranted on restore',
           'Board confidence raised to at least 82 and club reputation +3',
           'Two full-scout tokens, one facility token and one squad-conditioning token',
           'Legend boardroom presentation',
-          'Does not buy results, trophies or Hall of Fame entry',
         ];
       case 'season_pass':
         return [
@@ -615,6 +663,15 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
           'Every Player and Manager save keeps separate XP and reward claims',
           'League and club naming editor while Premium is active',
           'Active access removes ads for the pass period',
+        ];
+      case 'player_vip':
+      case 'manager_vip':
+        return [
+          `Permanent access across your ${product.id === 'player_vip' ? 'Player' : 'Manager'} saves only`,
+          product.id === 'player_vip' ? 'No ads · 60 Focus capacity · +20% match coins · Extra save slot' : 'No ads · +20% match coins · Extra save slot',
+          '12 collections · Choose one per completed in-game season',
+          'Retirement unlocks remaining collection cosmetics only — no Coins, Gems or cash rewards',
+          'Earned cosmetics stay available in future careers in the same mode',
         ];
       case 'remove_ads':
         return [
@@ -634,9 +691,8 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
         ];
       case 'form_recovery':
         return [
-          'Immediately raises form to at least 70',
-          'Immediately raises confidence to at least 65',
-          'Does not change permanent attributes',
+          'Immediately raises form and confidence to at least 99',
+          'Refills Focus to 36, or 60 with VIP, in this Player save',
         ];
       case 'scout_full_reveal':
         return [
@@ -653,11 +709,10 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
         return [
           'One squad-conditioning token',
           '+20 condition, +20 fitness and +15 morale for eligible non-injured players',
-          'Does not heal injuries',
         ];
       case 'transfer_budget_sm':
         return [
-          '$500,000 added to the current club budget',
+          '$1,000,000 fictional Club Balance added to the current club budget',
           'Limited to once per in-game season',
           'Unavailable during national-team duty',
         ];
@@ -705,7 +760,7 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
       return 'Your next-contract boost is already stored.';
     }
     if (product.id === 'form_recovery' && !needsFormRecovery) {
-      return 'Form and confidence are already above this session target.';
+      return 'Form and confidence are already at least 99, and Focus is full.';
     }
     if (product.id === 'facility_upgrade_token' && facilitiesMaxed) {
       return 'Every club facility is already fully upgraded.';
@@ -818,6 +873,15 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
 
       {save ? <WalletBar wallet={save.wallet} showEnergy={save.mode !== 'manager'} /> : null}
       <TrustBar storeName={storeName} />
+      {suggestedProduct ? (
+        <Card>
+          <Text>For your current action</Text>
+          <ProductRow p={suggestedProduct} busy={busy} onBuy={() => void onBuy(suggestedProduct)}
+            benefits={[suggestedProduct.description]} valueNote={valueNoteFor(suggestedProduct)}
+            unavailableReason={unavailableReason(suggestedProduct)}
+            unavailableLabel="Unavailable" />
+        </Card>
+      ) : null}
 
       {storeSetupPending ? (
         <View style={styles.storePendingCard}>
@@ -839,6 +903,11 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
             <Skeleton width={70} height={36} radius={18} />
           </Card>
         ))
+      ) : catalogFailed ? (
+        <Card>
+          <Text>Could not load the Store. Check your connection and try again.</Text>
+          <Button label="Retry" onPress={() => setCatalogAttempt((attempt) => attempt + 1)} />
+        </Card>
       ) : (
         <>
           {/* ── Starter Pack — highest prominence ── */}
@@ -895,7 +964,7 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                     }
                     variant="gold"
                     loading={busy === starterPack.id}
-                    disabled={!purchases.isProductAvailable(starterPack)}
+                    disabled={!save || busy != null || !purchases.isProductAvailable(starterPack)}
                     onPress={() => void onBuy(starterPack)}
                     style={{ marginTop: spacing.md }}
                   />
@@ -988,6 +1057,7 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                         </Pressable>
                       </View>
                       <Text style={styles.legendBundleTitle}>{legendBundleTitle}</Text>
+                      <Text style={styles.legendFrontDesc}>One-time bundle · No subscription</Text>
                     </View>
                   </View>
                   {expandedFeatureCard === legendProduct.id ? (
@@ -1004,12 +1074,12 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                   <Button
                     label={
                       purchases.isProductAvailable(legendProduct)
-                        ? `Buy · ${legendProduct.priceString}`
+                        ? `Buy · ${legendProduct.priceString} once`
                         : 'Coming soon'
                     }
                     variant="gold"
                     loading={busy === legendProduct.id}
-                    disabled={!purchases.isProductAvailable(legendProduct)}
+                    disabled={!save || busy != null || !purchases.isProductAvailable(legendProduct)}
                     onPress={() => void onBuy(legendProduct)}
                     style={{ marginTop: spacing.md }}
                   />
@@ -1046,7 +1116,7 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                     </View>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="Season Pass details"
+                      accessibilityLabel="Mode VIP details"
                       onPress={() =>
                         setExpandedFeatureCard((current) =>
                           current === passProduct.id ? null : passProduct.id,
@@ -1073,23 +1143,24 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
                     </View>
                   ) : (
                     <Text style={styles.passPerks}>
-                      20 tiers · {save?.mode === 'manager' ? 'Manager' : 'Player'} Career rewards
+                      12 collections · {save?.mode === 'manager' ? 'Manager' : 'Player'} only · One-time purchase
                     </Text>
                   )}
                 </View>
                 <Button
                   label={
-                    save && isSeasonPassActive(save)
+                    hasModeVip(save)
                       ? '✓ Active'
                       : purchases.isProductAvailable(passProduct)
                         ? passProduct.priceString
                         : 'Coming soon'
                   }
-                  variant={save && isSeasonPassActive(save) ? 'secondary' : 'primary'}
+                  variant={hasModeVip(save) ? 'secondary' : 'primary'}
                   size="sm"
                   fullWidth={false}
                   disabled={
-                    Boolean(save && isSeasonPassActive(save)) ||
+                    !save || busy != null ||
+                    hasModeVip(save) ||
                     !purchases.isProductAvailable(passProduct)
                   }
                   onPress={() => navigation.navigate('SeasonPass')}
@@ -1223,11 +1294,32 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
           )}
 
           <View style={styles.restoreBlock}>
+            {reviewerAccess ? <>
+              <Button
+                label="Reviewer access · Free"
+                variant="secondary"
+                fullWidth
+                disabled={!save || busy != null}
+                loading={busy === 'reviewer_access'}
+                onPress={() => {
+                  if (busy != null) return;
+                  setBusy('reviewer_access');
+                  void claimReviewerAccess().then(() => {
+                    Alert.alert('Reviewer access ready', save?.mode === 'manager'
+                      ? 'Scout and conditioning tokens are ready in Transfers and Medical Centre. Return here to replenish them for testing.'
+                      : 'Mental coaching applied: form and confidence at least 99, with Focus refilled.');
+                  }).catch((error: unknown) => {
+                    Alert.alert('Reviewer access unavailable', error instanceof Error ? error.message : 'Please retry.');
+                  }).finally(() => setBusy(null));
+                }}
+              />
+              <Text style={styles.restoreHint}>Complimentary review access. No purchase or charge.</Text>
+            </> : null}
             <Button
               label="Restore Purchases"
               variant="secondary"
               size="sm"
-              fullWidth={false}
+              fullWidth
               loading={busy === 'restore_purchases'}
               disabled={!save || busy != null}
               onPress={() => void onRestorePurchases()}
@@ -1235,8 +1327,8 @@ export function PurchaseScreen({ navigation }: ScreenProps<'Purchase'>) {
             />
             <Text style={styles.restoreHint}>
               {save
-                ? 'Restores permanent upgrades and active passes.'
-                : 'Open a career to restore purchases.'}
+                ? 'Restores permanent upgrades and active passes. Consumable rewards go to the active save at purchase and are not granted again on restore.'
+                : 'Open a Player or Manager career to buy or restore purchases.'}
             </Text>
           </View>
         </>
@@ -1637,9 +1729,9 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: spacing.xl,
       gap: spacing.xs,
     },
-    restoreButton: { minWidth: 190 },
+    restoreButton: { width: '100%', maxWidth: 360 },
     restoreHint: {
-      color: colors.textFaint,
+      color: colors.textMuted,
       fontSize: fontSize.xs,
       lineHeight: 17,
       textAlign: 'center',

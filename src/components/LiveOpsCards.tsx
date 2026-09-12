@@ -11,7 +11,7 @@ import {
   weeklyQuestsForMode,
   xpForTier,
 } from '../game/liveops';
-import { isSeasonPassActive, monthlyBundleForSave } from '../game/seasonPass';
+import { hasModeVip } from '../game/vip';
 import { RootStackParamList } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import { fontSize, fontWeight, spacing, ThemeColors, useTheme, useThemedStyles } from '../theme';
@@ -36,8 +36,7 @@ export function SeasonPassHomeCard() {
   if (!save?.pass) return null;
 
   const pass = save.pass;
-  const premiumActive = isSeasonPassActive(save);
-  const monthlyBundle = monthlyBundleForSave(save);
+  const premiumActive = hasModeVip(save);
   const modeLabel = save.mode === 'manager' ? 'MANAGER' : 'PLAYER';
   const level = passLevel(pass.xp);
   const claimable = claimablePassRewards(pass).length;
@@ -49,18 +48,18 @@ export function SeasonPassHomeCard() {
     <Card
       style={styles.homePassCard}
       onPress={() => navigation.navigate('SeasonPass')}
-      accessibilityLabel={`${modeLabel.toLowerCase()} Season Pass, ${monthlyBundle.title}, tier ${level} of ${PASS_TIER_COUNT}${claimable ? `, ${claimable} rewards ready` : ''}. Open reward track.`}
+      accessibilityLabel={`${modeLabel} VIP, ${save.vipCollections?.owned.length ?? 0} of 12 collections. Open collections and free rewards.`}
     >
       <View style={styles.homePassTopRow}>
         <View style={styles.homePassTicket}>
           <Text style={styles.homePassTicketIcon}>🎟</Text>
         </View>
         <View style={styles.homePassCopy}>
-          <Text style={styles.homePassEyebrow}>{modeLabel} SEASON PASS</Text>
+          <Text style={styles.homePassEyebrow}>{modeLabel} VIP</Text>
           <Text style={styles.homePassTitle}>
-            {monthlyBundle.title} · Tier {level}/{PASS_TIER_COUNT}
+            {save.vipCollections?.owned.length ?? 0}/12 collections
           </Text>
-          <Text style={styles.homePassMode}>{premiumActive ? 'Premium track' : 'Free track'}</Text>
+          <Text style={styles.homePassMode}>{premiumActive ? 'Permanent access' : 'Collections & free rewards'}</Text>
         </View>
         <Text style={[styles.homePassAction, claimable > 0 && { color: colors.success }]}>
           {claimable > 0 ? `${claimable} READY` : 'OPEN →'}
@@ -68,7 +67,7 @@ export function SeasonPassHomeCard() {
       </View>
       <ProgressBar value={progress} color={colors.accent} style={styles.homePassProgress} />
       <Text style={styles.homePassXp}>
-        {level >= PASS_TIER_COUNT ? 'TRACK COMPLETE' : `${pass.xp}/${nextTierXp} XP`}
+        {save.vipCollections?.credits ? `${save.vipCollections.credits} COLLECTION CLAIM${save.vipCollections.credits === 1 ? '' : 'S'} READY` : `FREE REWARDS · ${pass.xp}/${nextTierXp} XP`}
       </Text>
     </Card>
   );
@@ -153,6 +152,7 @@ export function LiveOpsCards({ compact = false }: LiveOpsCardsProps) {
                 if (reward.count <= 0) return;
                 setRewardModal({
                   title: 'Season Pass reward claimed',
+                  visualRewards: { itemIds: reward.itemIds, saveId: save.id },
                   items: reward.items,
                   balances: [
                     `Coins: ${reward.previousCoins.toLocaleString()} -> ${reward.newCoins.toLocaleString()}`,
@@ -279,7 +279,7 @@ export function LiveOpsCards({ compact = false }: LiveOpsCardsProps) {
         </>
       ) : null}
 
-      <Text style={styles.section}>Season Pass</Text>
+      <Text style={styles.section}>{pass.premium ? 'Legacy pass rewards' : 'Free career rewards'}</Text>
       <Card>
         <View style={styles.passHead}>
           <Text style={styles.passTier}>
@@ -310,6 +310,7 @@ export function LiveOpsCards({ compact = false }: LiveOpsCardsProps) {
               if (reward.count <= 0) return;
               setRewardModal({
                 title: 'Season Pass reward claimed',
+                visualRewards: { itemIds: reward.itemIds, saveId: save.id },
                 subtitle: `${reward.count} reward${reward.count === 1 ? '' : 's'} added`,
                 items: reward.items,
                 balances: [

@@ -1,6 +1,6 @@
 import { MONTHLY_PASS_CONTENT } from '../data/seasonPassContent';
 import { StoryEvent } from '../game/narrative';
-import { isSeasonPassActive, monthlyBundleForSave } from '../game/seasonPass';
+import { isSeasonPassActive, monthlyBundleForSave, passContentCycleId } from '../game/seasonPass';
 
 /** Two-step Player Career chain for every monthly content cycle. */
 export const MONTHLY_PASS_PLAYER_EVENTS: StoryEvent[] = MONTHLY_PASS_CONTENT.flatMap(
@@ -10,7 +10,7 @@ export const MONTHLY_PASS_PLAYER_EVENTS: StoryEvent[] = MONTHLY_PASS_CONTENT.fla
     const currentCycle = (save: Parameters<NonNullable<StoryEvent['condition']>>[0]['save']) =>
       isSeasonPassActive(save) &&
       monthlyBundleForSave(save).id === content.id &&
-      save.seasonPassExperience?.playerStoryCycleId !== save.pass?.seasonId;
+      save.seasonPassExperience?.playerStoryCycleId !== passContentCycleId(save);
     return [
       {
         id: openingId,

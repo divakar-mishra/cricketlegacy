@@ -18,6 +18,7 @@ import {
   ScreenHeader,
 } from '../components';
 import { AppText as Text } from '../components/AppText';
+import { RewardShowcase } from '../components/RewardShowcase';
 import { PUBLIC_RESOURCES, SUBSCRIPTION_MANAGEMENT_URLS } from '../config/legal';
 import {
   claimablePassRewards,
@@ -27,7 +28,8 @@ import {
   passTiersForMode,
   xpForTier,
 } from '../game/liveops';
-import { isSeasonPassActive, monthlyBundleForSave, SEASON_PASS_BENEFITS } from '../game/seasonPass';
+import { isLegacySeasonPassActive, isSeasonPassActive, monthlyBundleForSave, SEASON_PASS_BENEFITS } from '../game/seasonPass';
+import { VipCollectionsScreen } from './VipCollectionsScreen';
 import { ScreenProps } from '../navigation';
 import { purchases } from '../services';
 import { useCareer } from '../state/careerStore';
@@ -54,8 +56,8 @@ function fmtCountdown(secs: number): string {
 
 function rewardLabel(r: { coins?: number; item?: string }): string {
   const parts: string[] = [];
-  if (r.coins) parts.push(`🪙 ${r.coins} Coins`);
-  if (r.item) parts.push(`🎁 1x ${PASS_ITEM_LABELS[r.item] ?? 'Pass item'}`);
+  if (r.coins) parts.push(`${r.coins} Coins`);
+  if (r.item) parts.push(`1x ${PASS_ITEM_LABELS[r.item] ?? 'Pass item'}`);
   return parts.join(' + ');
 }
 
@@ -101,7 +103,13 @@ function SubscriptionPolicyLinks() {
   );
 }
 
-export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
+export function SeasonPassScreen(props: ScreenProps<'SeasonPass'>) {
+  const save = useCareer(s => s.save);
+  const [legacy, setLegacy] = useState(false);
+  return legacy && isLegacySeasonPassActive(save ?? undefined) ? <LegacySeasonPassScreen {...props} /> : <VipCollectionsScreen {...props} onLegacy={isLegacySeasonPassActive(save ?? undefined) ? () => setLegacy(true) : undefined} />;
+}
+
+function LegacySeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
   const save = useCareer((s) => s.save);
   const claimPass = useCareer((s) => s.claimPass);
   const purchaseProduct = useCareer((s) => s.purchaseProduct);
@@ -191,6 +199,7 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
         items: r.items,
         balances: [`Coins: ${r.previousCoins.toLocaleString()} -> ${r.newCoins.toLocaleString()}`],
         icon: 'trophy',
+        visualRewards: { itemIds: r.itemIds, saveId: save.id },
       });
       setTimeout(() => setClaimFlash(null), 3000);
     }
@@ -373,9 +382,6 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
                       </Text>
                     </>
                   )}
-                  <Text style={styles.passInfoFine}>
-                    Does not grant wins, selection or trophies.
-                  </Text>
                 </View>
               ) : null}
               <Button
@@ -435,6 +441,7 @@ export function SeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
                   </View>
 
                   <View style={styles.tierContent}>
+                    {tier.premiumReward.item ? <RewardShowcase itemIds={[tier.premiumReward.item]} saveId={save.id} /> : null}
                     {/* Free track */}
                     <View style={[styles.rewardRow, freeClaimed && styles.rewardClaimed]}>
                       <Text style={styles.rewardTrackLabel}>Free</Text>

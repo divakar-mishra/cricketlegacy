@@ -20,8 +20,8 @@ describe('app-wide Season Pass clock', () => {
     expect(appSource).toContain('Math.min(passPeriodEndsAt, premiumEntitlementExpiresAt)');
     expect(appSource).toContain('Math.min(remainingMs + 25, 3_600_000)');
     expect(appSource).toContain('if (timer) clearTimeout(timer)');
-    expect(appSource).toContain(
-      '}, [activeSaveId, passPeriodEndsAt, premiumEntitlementActive, premiumEntitlementExpiresAt]);',
+    expect(appSource).toMatch(
+      /\},\s*\[\s*activeSaveId,\s*passPeriodEndsAt,\s*premiumEntitlementActive,\s*premiumEntitlementExpiresAt,?\s*\]\);/,
     );
     expect(appSource).not.toContain("if (nextState === 'active') return;");
   });

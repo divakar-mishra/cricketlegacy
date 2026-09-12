@@ -33,6 +33,7 @@ __pycache__/
 *.tmp
 /test-artifacts/
 /coverage/
+/output/
 
 # Build outputs and generated metadata
 *.apk

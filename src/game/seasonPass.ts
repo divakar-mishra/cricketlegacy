@@ -7,6 +7,7 @@ import {
   monthlyContentForCycle,
 } from '../data/seasonPassContent';
 import { clamp } from '../utils/math';
+import { claimVipCollection, ensureVipState, hasModeVip } from './vip';
 
 export const SEASON_PASS_PRODUCT_ID = 'season_pass';
 export const SEASON_PASS_DAYS = 30;
@@ -74,6 +75,11 @@ export function seasonPassPeriod(now: number): PassPeriod {
 }
 
 export function isSeasonPassActive(save: SaveGame | undefined, now: number = Date.now()): boolean {
+  return hasModeVip(save) || isLegacySeasonPassActive(save, now);
+}
+
+/** Only the old timed purchase unlocks the retired paid XP ladder. */
+export function isLegacySeasonPassActive(save: SaveGame | undefined, now: number = Date.now()): boolean {
   const entitlement = save?.entitlements?.seasonPass;
   if (!entitlement?.premium) return false;
   // A device clock moved backwards cannot extend access beyond the last
@@ -96,7 +102,7 @@ export function ensureSeasonPassExperience(save: SaveGame, cycleId?: string): vo
   if (cycleId && !save.seasonPassExperience.scenarioCycleId) {
     // Preserve current-cycle progress when upgrading an existing save.
     save.seasonPassExperience.scenarioCycleId = cycleId;
-  } else if (cycleId && save.seasonPassExperience.scenarioCycleId !== cycleId) {
+  } else if (cycleId && save.seasonPassExperience.scenarioCycleId !== cycleId && !hasModeVip(save)) {
     save.seasonPassExperience.scenarioCycleId = cycleId;
     save.seasonPassExperience.activeScenarioId = undefined;
     save.seasonPassExperience.scenarios = {};
@@ -128,8 +134,9 @@ function carryLegacyExperienceCycle(save: SaveGame, fromCycleId: string, toCycle
 
 /** Keep the UTC calendar-month reward cycle and subscription access in sync. */
 export function synchronizeSeasonPassState(save: SaveGame, now: number = Date.now()): void {
+  ensureVipState(save);
   const period = seasonPassPeriod(now);
-  const active = isSeasonPassActive(save, now);
+  const active = isLegacySeasonPassActive(save, now);
   const previous = save.pass ? synchronizePassBalance(save.pass) : undefined;
   const carryLegacyProgress = Boolean(
     previous && previous.seasonId !== period.id && canCarryLegacyRollingCycle(previous, now),
@@ -198,7 +205,16 @@ export function monthlyBundleForCycle(cycleId: string): MonthlyPassContent {
 }
 
 export function monthlyBundleForSave(save: SaveGame): MonthlyPassContent {
+  if (hasModeVip(save)) {
+    return MONTHLY_PASS_CONTENT.find(item => item.id === save.vipCollections?.selectedId)
+      ?? MONTHLY_PASS_CONTENT.find(item => !save.vipCollections?.owned.includes(item.id))
+      ?? MONTHLY_PASS_CONTENT[0];
+  }
   return monthlyBundleForCycle(save.pass?.seasonId ?? seasonPassPeriod(Date.now()).id);
+}
+
+export function passContentCycleId(save: SaveGame): string | undefined {
+  return hasModeVip(save) ? `vip-collection:${monthlyBundleForSave(save).id}` : save.pass?.seasonId;
 }
 
 export function claimMonthlyCosmeticDrop(
@@ -206,6 +222,7 @@ export function claimMonthlyCosmeticDrop(
   now: number = Date.now(),
 ): { ok: boolean; item?: string; items?: string[]; rewardItem?: string; reason?: string } {
   synchronizeSeasonPassState(save, now);
+  if (hasModeVip(save)) return claimVipCollection(save);
   if (!isSeasonPassActive(save, now)) return { ok: false, reason: 'Premium Pass is not active.' };
   const cycleId = save.pass!.seasonId;
   if (save.seasonPassExperience!.monthlyDropCycleId === cycleId) {
@@ -233,7 +250,7 @@ export function activateSeasonPassScenario(
 ): { ok: boolean; reason?: string } {
   synchronizeSeasonPassState(save, now);
   if (!isSeasonPassActive(save, now)) return { ok: false, reason: 'Premium Pass is not active.' };
-  const featured = monthlyBundleForCycle(save.pass!.seasonId).scenario;
+  const featured = monthlyBundleForSave(save).scenario;
   if (scenarioId !== featured.id) {
     return { ok: false, reason: 'This scenario is not featured in the current cycle.' };
   }

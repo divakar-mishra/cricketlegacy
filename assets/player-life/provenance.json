@@ -1,0 +1,41 @@
+{
+  "method": "Built-in imagegen, stylized-concept; original generated artwork, no CLI fallback.",
+  "delivery": "1020x680 WebP, quality 85. Resizing/encoding only; no compositing edits to game assets.",
+  "assets": [
+    {
+      "id": "personal-bank",
+      "prompt": "Use case: stylized-concept. Create one finished mobile cricket-management game illustration, landscape 3:2. Match the existing game's stylised 2.5D isometric dioramas: chunky cream buildings, teal roofs, soft blue windows, geometric lime-green trees, smooth painted low-poly surfaces, soft daylight shadows, isolated on seamless charcoal navy #243044. Fixed high three-quarter camera, entire rectangular plot and roof fit with comfortable margins. Polished architectural miniature, readable at phone size, no text, logos, watermarks, UI, numbers or people. A personal banking branch: compact cream stone building with modest columns, teal roof, an open-front cutaway showing a round steel vault door behind a wood-and-teal service counter, small tiled forecourt and two geometric trees. Not a mansion or a gold pile.",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-4c712d7f-cbda-4b90-bfa7-d72c30e54cc3.png"
+    },
+    {
+      "id": "starter-apartment",
+      "prompt": "Use case: stylized-concept. Create one finished mobile cricket-management game illustration, landscape 3:2. Match the existing game's stylised 2.5D isometric dioramas: chunky cream buildings, teal roofs, soft blue windows, geometric lime-green trees, smooth painted low-poly surfaces, soft daylight shadows, isolated on seamless charcoal navy #243044. Fixed high three-quarter camera, entire rectangular plot and roof fit with comfortable margins. Polished architectural miniature, readable at phone size, no text, logos, watermarks, UI, numbers or people. City Apartment property: compact contemporary three-storey residential apartment building, cream facade, teal flat roof and awnings, distinct blue-glass balconies with small planter boxes, one shared front entrance and tiny paved urban courtyard. No sprawling estate.",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-5aa27988-27f3-4dfd-a2eb-d6668b93f55b.png"
+    },
+    {
+      "id": "family-house",
+      "prompt": "Use case: stylized-concept. Create one finished mobile cricket-management game illustration, landscape 3:2. Match the existing game's stylised 2.5D isometric dioramas: chunky cream buildings, teal roofs, soft blue windows, geometric lime-green trees, smooth painted low-poly surfaces, soft daylight shadows, isolated on seamless charcoal navy #243044. Fixed high three-quarter camera, entire rectangular plot and roof fit with comfortable margins. Polished architectural miniature, readable at phone size, no text, logos, watermarks, UI, numbers or people. Family House property: welcoming detached two-storey cream home with teal pitched roof, porch, side garage, fenced green garden, a small wooden bench and a cricket bat leaning beside the porch. Not an apartment block.",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-321240dd-4a4d-4b9a-b649-00ba2601780b.png"
+    },
+    {
+      "id": "legacy-estate",
+      "prompt": "Use case: stylized-concept. Create one finished mobile cricket-management game illustration, landscape 3:2. Match the existing game's stylised 2.5D isometric dioramas: chunky cream buildings, teal roofs, soft blue windows, geometric lime-green trees, smooth painted low-poly surfaces, soft daylight shadows, isolated on seamless charcoal navy #243044. Fixed high three-quarter camera, entire rectangular plot and roof fit with comfortable margins. Polished architectural miniature, readable at phone size, no text, logos, watermarks, UI, numbers or people. Legacy Estate property: elegant large cream residence with symmetrical wings and teal roofs, sheltered entrance, landscaped lawn with hedges, curved tiled driveway and a small ornamental fountain. Tasteful established cricket-star home, not a royal palace.",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-3e7fd6f5-40bd-4841-b565-2cd98da800e8.png"
+    },
+    {
+      "id": "bat-workshop",
+      "prompt": "Use case: stylized-concept. Create one finished mobile cricket-management game illustration, landscape 3:2. Match the existing game's stylised 2.5D isometric dioramas: chunky cream buildings, teal roofs, soft blue windows, geometric lime-green trees, smooth painted low-poly surfaces, soft daylight shadows, isolated on seamless charcoal navy #243044. Fixed high three-quarter camera, entire rectangular plot and roof fit with comfortable margins. Polished architectural miniature, readable at phone size, no text, logos, watermarks, UI, numbers or people. Bat Workshop business: a compact open-front cream workshop with teal roof, clearly visible wooden cricket bats on wall racks, wood workbench with a partly shaped bat, stacks of pale willow blanks, hand tools and a small shop counter; modest paved forecourt and trees. Cricket bats must have straight broad blades and narrow handles, not tennis rackets.",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-f3bc5be3-4004-4f34-8967-18713747b823.png"
+    },
+    {
+      "id": "fitness-studio",
+      "prompt": "Use case: stylized-concept. Create one finished mobile cricket-management game illustration, landscape 3:2. Match the existing game's stylised 2.5D isometric dioramas: chunky cream buildings, teal roofs, soft blue windows, geometric lime-green trees, smooth painted low-poly surfaces, soft daylight shadows, isolated on seamless charcoal navy #243044. Fixed high three-quarter camera, entire rectangular plot and roof fit with comfortable margins. Polished architectural miniature, readable at phone size, no text, logos, watermarks, UI, numbers or people. Performance Studio business: modern cream sports fitness studio with teal flat roof and open-front glass cutaway showing exercise bikes, weight bench, dumbbell rack, stretching mats and a short green agility strip. Landscaped compact plot. No medical beds or cricket practice nets.",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-f4826468-4342-496c-819f-2e23feff6aaf.png"
+    },
+    {
+      "id": "media-company",
+      "prompt": "Use case: stylized-concept. Create one finished mobile cricket-management game illustration, landscape 3:2. Match the existing game's stylised 2.5D isometric dioramas: chunky cream buildings, teal roofs, soft blue windows, geometric lime-green trees, smooth painted low-poly surfaces, soft daylight shadows, isolated on seamless charcoal navy #243044. Fixed high three-quarter camera, entire rectangular plot and roof fit with comfortable margins. Polished architectural miniature, readable at phone size, no text, logos, watermarks, UI, numbers or people. Sports Media Company business: cream and blue-glass two-storey broadcast studio with teal roof, one satellite dish on roof, open-front cutaway showing two cameras on tripods pointed at a curved sports desk, studio lights and a screen with a simple cricket pitch graphic but no text. Small entrance courtyard with geometric trees.",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-c34fc9b7-f849-46b8-bb49-a1312b41c57c.png"
+    }
+  ]
+}

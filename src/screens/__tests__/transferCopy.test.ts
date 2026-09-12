@@ -73,7 +73,9 @@ describe('manager transfer screen copy', () => {
     expect(transferScreen).toContain('runTransferAction');
     expect(transferScreen).toContain('pendingTransferAction');
     expect(transferScreen).toContain('pending={Boolean(pendingTransferAction)}');
-    expect(transferScreen).toContain('disabled={!canAfford || actionPending}');
+    // Insufficient funds opens the approved shortage offer; pending actions and
+    // closed windows/full squads still block duplicate or invalid submissions.
+    expect(transferScreen).toContain('disabled={!transferWindowOpen || squadFull || actionPending}');
     expect(transferScreen).toContain('disabled={!canLoan || actionPending}');
     expect(transferScreen).toMatch(
       /disabled=\{\s*!transferWindowOpen\s*\|\|\s*team\.playerIds\.length >= squadCap\s*\|\|\s*actionPending\s*\}/,

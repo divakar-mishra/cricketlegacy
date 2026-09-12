@@ -11,6 +11,7 @@ const customizerSource = fs.readFileSync(
   path.join(__dirname, '..', 'avatar', 'PortraitPicker.tsx'),
   'utf8',
 );
+const frameSource = fs.readFileSync(path.join(__dirname, '..', 'avatar', 'ProfileFrame.tsx'), 'utf8');
 const pickerLayoutSource = fs.readFileSync(
   path.join(__dirname, '..', 'avatar', 'portraitPickerLayout.ts'),
   'utf8',
@@ -42,9 +43,10 @@ describe('fixed player portraits', () => {
     expect(rendererSource).toContain("height: '100%'");
     expect(rendererSource).toContain("width: '100%'");
     expect(rendererSource).toContain('<ProfileFrame frameId={activeFrame} size={size} />');
-    expect(rendererSource).toContain("frameId === 'frame_gold'");
-    expect(rendererSource).toContain("main: '#24D63B'");
-    expect(rendererSource).toContain("main: '#E8B52F'");
+    expect(frameSource).toContain("frameId === 'frame_gold'");
+    expect(frameSource).toContain('stroke="#24D63B"');
+    expect(frameSource).toContain('legend-engraved-frame');
+    expect(frameSource).toContain('vip-segmented-frame');
     expect(rendererSource).toContain('const borderRadius = size / 2');
     expect(rendererSource).not.toContain("frameId === 'frame_none') return null");
     expect(rendererSource).not.toContain('<Svg');

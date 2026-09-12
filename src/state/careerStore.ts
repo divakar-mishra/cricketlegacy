@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { presentSignedPlayerContract } from './contractPresentationStore';
+import { authorizeReviewerAccess } from '../services/reviewerAccess';
+import { applyReviewerSupplies } from '../game/reviewerAccess';
+import { withProtectedWallet } from '../security/protectedWallet';
 import { normalizeAvatarConfig } from '../avatar';
 import { QA_TOOLS_ENABLED, QA_WHALE_CLUB_BUDGET, QA_WHALE_COINS } from '../config/qa';
 import { ECONOMY } from '../data/gameConfig';
@@ -244,7 +247,6 @@ import {
 } from '../game/season';
 import {
   isInternationalFixture,
-  nextInternationalFixtureId,
   prepareInternationalCalendar,
   releaseFromInternationalTourIfOutOfForm,
 } from '../game/intlCalendar';
@@ -338,13 +340,17 @@ import { ingestSaveIntoHallOfFame } from '../storage/hallOfFame';
 import { useHallOfFame } from './hofStore';
 import { useSettings } from './settingsStore';
 import { updateSeasonPassBranding } from '../game/domesticBranding';
-import { isPassExclusiveCosmetic } from '../data/cosmetics';
+import { chooseVipCollection, claimVipCollection, ensureVipState, grantModeVip, grantRetirementCollections, hasModeVip, settleVipSeason, vipProductId } from '../game/vip';
+import { syncVipArchive } from '../services/vipArchive';
+import { isPassExclusiveCosmetic, ownsCosmetic, ownsProfileFrame } from '../data/cosmetics';
+import { canEquipReward, rewardPresentation } from '../game/rewardPresentation';
 import {
   activateSeasonPass,
   activateSeasonPassScenario as activatePassScenario,
   claimMonthlyCosmeticDrop,
   claimSeasonPassScenarioReward as claimPassScenarioReward,
   isSeasonPassActive,
+  isLegacySeasonPassActive,
   passTrainingMultiplier,
   recordSeasonPassScenarioMatch,
   seasonPassPeriod,
@@ -385,6 +391,7 @@ export interface PassRewardClaim {
   coins: number;
   count: number;
   items: string[];
+  itemIds: string[];
 }
 
 export interface PlayResult {
@@ -610,6 +617,7 @@ function finalizePlayerRetirement(save: SaveGame, year: number): { epitaph: stri
   if (!user || user.retired) return null;
   user.retired = true;
   save.flags.retired = true;
+  grantRetirementCollections(save);
   save.flags.playerRetirementRecommended = false;
   const epitaph = careerEpitaph(save);
   addTimeline(save, {
@@ -816,6 +824,8 @@ interface CareerState {
   synchronizeSeasonPassClock: (now?: number) => Promise<boolean>;
   /** Best-effort autosave. Failures are captured in state instead of becoming unhandled rejections. */
   persist: () => Promise<void>;
+  chooseVipCollection: (id: string) => { ok: boolean; reason?: string };
+  claimVipCollection: () => Promise<{ ok: boolean; items: string[]; reason?: string }>;
   /** User-visible/transactional save. Rejects when durable storage does not confirm the write. */
   persistCritical: (immediate?: boolean) => Promise<void>;
   scheduleReminders: () => void;
@@ -823,9 +833,9 @@ interface CareerState {
   /** Simulate consecutive team fixtures while the career player is not in the XI. */
   advanceWhileBenched: () => BenchedAdvanceOutcome;
   beginLiveMatch: () => { fixtureId: string; live: LiveMatch } | null;
-  commitLiveMatch: (match: MatchState) => PlayResult | null;
+  commitLiveMatch: (match: MatchState, persistence?: 'autosave' | 'caller') => PlayResult | null;
   beginInternational: () => { live: LiveMatch } | null;
-  commitInternational: (match: MatchState) => PlayResult | null;
+  commitInternational: (match: MatchState, persistence?: 'autosave' | 'caller') => PlayResult | null;
   train: (group: TrainGroup) => Promise<TrainOutcome>;
   setTactics: (tactics: Tactics, fixtureId?: string) => void;
   reorderXI: (playerIds: string[]) => void;
@@ -908,6 +918,7 @@ interface CareerState {
   qaGrantClubBudget: () => Promise<{ ok: boolean; balance?: number; reason?: string }>;
   qaRefillEnergy: () => boolean;
   claimPass: () => PassRewardClaim;
+  equipOwnedReward: (itemId: string, expectedSaveId: string) => { ok: boolean; reason?: string };
   claimMonthlyPassDrop: () => {
     ok: boolean;
     item?: string;
@@ -946,6 +957,7 @@ interface CareerState {
   ) => ScoutOutcome;
   purchaseProduct: (productId: string) => Promise<{ ok: boolean; error?: string }>;
   restorePurchases: () => Promise<RestorePurchasesOutcome>;
+  claimReviewerAccess: () => Promise<void>;
   /** Called by UI after achievement toasts are shown. */
   clearPendingAchievements: () => void;
   clear: () => void;
@@ -963,7 +975,7 @@ interface CareerState {
   /** Begin a standalone Daily Challenge match honouring its format + pitch. */
   beginDailyChallengeMatch: () => { live: LiveMatch } | null;
   /** Commit a Daily Challenge match: evaluate the target + grant the reward. */
-  commitDailyChallengeMatch: (match: MatchState) => PlayResult | null;
+  commitDailyChallengeMatch: (match: MatchState, persistence?: 'autosave' | 'caller') => PlayResult | null;
   // VIP Energy + streak
   refreshEnergyWithVip: () => void;
   tickVipStreak: () => { days: number; reward: { gems?: number; title?: string } | null };
@@ -1043,6 +1055,9 @@ function persistenceErrorMessage(error: unknown): string {
 }
 
 async function persistActiveSave(save: SaveGame, ref: ActiveRef, immediate = false): Promise<void> {
+  const traceSave = typeof __DEV__ !== 'undefined' && __DEV__ ||
+    process.env.EXPO_PUBLIC_QA_TOOLS === 'true';
+  const startedAt = traceSave ? performance.now() : 0;
   synchronizeSchema14State(save);
   synchronizeSchema15State(save);
   synchronizeSchema18State(save);
@@ -1065,12 +1080,26 @@ async function persistActiveSave(save: SaveGame, ref: ActiveRef, immediate = fal
   // `played: false`. `writeSave` already serializes each slot, so immediate
   // enqueueing preserves mutation order without blocking callers that use the
   // normal fire-and-forget autosave path.
-  void immediate;
+  const preparedAt = traceSave ? performance.now() : 0;
   await writeSave(ref.mode, ref.slot, save);
+  const writtenAt = traceSave ? performance.now() : 0;
   await setLastPlayed(ref.mode, ref.slot);
+  const persistedAt = traceSave ? performance.now() : 0;
+  await syncVipArchive(save);
+  if (traceSave) {
+    // QA-only durations: no save contents, account identifiers or credentials.
+    console.info('[save timing]', {
+      critical: immediate,
+      prepareMs: Math.round(preparedAt - startedAt),
+      queuedWriteMs: Math.round(writtenAt - preparedAt),
+      lastPlayedMs: Math.round(persistedAt - writtenAt),
+      vipArchiveMs: Math.round(performance.now() - persistedAt),
+      totalMs: Math.round(performance.now() - startedAt),
+    });
+  }
 }
 
-export const useCareer = create<CareerState>((set, get) => ({
+export const useCareer = create<CareerState>(withProtectedWallet((set, get) => ({
   save: null,
   ref: null,
   persistenceError: null,
@@ -1078,6 +1107,8 @@ export const useCareer = create<CareerState>((set, get) => ({
   lastPromotion: null,
 
   setActive: (save, mode, slot) => {
+    ensureVipState(save);
+    if (save.flags?.retired || (save.userPlayerId && save.players[save.userPlayerId]?.retired)) grantRetirementCollections(save);
     const liveopsNow = Date.now();
     const loadedPassCycleId = save.pass?.seasonId;
     const loadedCalendarPassCycle = /^pass-\d{4}-\d{2}$/.test(loadedPassCycleId ?? '');
@@ -1137,6 +1168,37 @@ export const useCareer = create<CareerState>((set, get) => ({
     }
     set({ save, ref: { mode, slot }, targetFixtureId: undefined, persistenceError: null });
     const loadedSaveId = save.id;
+    // Compare only the small archive-owned portion, never serialize the whole
+    // career just to decide whether a background refresh needs another save.
+    const vipState = (value: SaveGame) => JSON.stringify([
+      value.entitlements.modeVip, value.entitlements.removeAds,
+      value.vipEnergyBonusActive, value.vipCollections, value.inventory,
+    ]);
+    const beforeLocalArchive = vipState(save);
+    void syncVipArchive(save).then(async () => {
+      if (get().save?.id !== loadedSaveId) return;
+      if (vipState(save) !== beforeLocalArchive) set({ save: { ...get().save! } });
+      const ownershipAtRequest = get().save?.entitlements.modeVip;
+      const snapshot = await purchases.getPermanentVipSnapshot();
+      const current = get().save;
+      if (!snapshot || !current || current.id !== loadedSaveId) return;
+      // A checkout/restore completed while the refresh was in flight wins over its stale verdict.
+      if (current.entitlements.modeVip !== ownershipAtRequest) return;
+      const beforeOwnershipRefresh = vipState(current);
+      const source = current.mode === 'career' && snapshot.ids.includes('bundle_legend') ? 'bundle_legend'
+        : current.mode === 'manager' && snapshot.ids.includes('manager_legend_pack') ? 'manager_legend_pack'
+        : snapshot.ids.includes(vipProductId(current.mode)) ? vipProductId(current.mode)
+        : snapshot.ids.includes('remove_ads') ? 'legacy' : undefined;
+      if (source) {
+        grantModeVip(current, source, snapshot.accountId);
+      }
+      await syncVipArchive(current, { accountId: snapshot.accountId, owned: Boolean(source), source });
+      if (get().save?.id !== loadedSaveId) return;
+      if (vipState(current) !== beforeOwnershipRefresh) {
+        set({ save: { ...get().save! } });
+        await get().persist();
+      }
+    }).catch(error => crash.captureException(error, { context: 'vip.archive.load' }));
     void purchases.getEntitlementSnapshot('season_pass').then((snapshot) => {
       const current = get().save;
       if (!current || current.id !== loadedSaveId || snapshot.status === 'UNAVAILABLE') return;
@@ -1155,6 +1217,10 @@ export const useCareer = create<CareerState>((set, get) => ({
       ) {
         current.entitlements.seasonPass.premium = false;
         synchronizeSeasonPassState(current);
+      } else {
+        // Most careers have no legacy subscription. An unchanged inactive
+        // response must not trigger another encrypted save and full UI update.
+        return;
       }
       set({ save: { ...current } });
       void get().persist();
@@ -1214,7 +1280,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     const save = get().save;
     if (!save) return false;
     const period = seasonPassPeriod(now);
-    const premiumActive = isSeasonPassActive(save, now);
+    const premiumActive = isLegacySeasonPassActive(save, now);
     if (
       save.pass?.seasonId === period.id &&
       save.pass.periodStartedAt === period.startsAt &&
@@ -1478,7 +1544,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     return { fixtureId, live };
   },
 
-  commitLiveMatch: (match) => {
+  commitLiveMatch: (match, persistence = 'autosave') => {
     const { save, ref } = get();
     if (!save) return null;
     const scheduledFixture = save.fixtures[match.id];
@@ -1885,7 +1951,9 @@ export const useCareer = create<CareerState>((set, get) => ({
       pendingAchievementIds: newAchievements.length ? newAchievements : get().pendingAchievementIds,
       lastPromotion: promotion.promoted ? promotion : null,
     });
-    void get().persist();
+    // MatchScreen owns the awaited durable write and retry UI. Do not enqueue
+    // a duplicate full-career autosave immediately before that critical save.
+    if (persistence === 'autosave') void get().persist();
     return {
       match,
       fixtureId: match.id,
@@ -1908,14 +1976,21 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (!save || !save.userPlayerId || !save.capped) return null;
     validateSeasonState(save);
     prepareInternationalCalendar(save);
-    const fixtureId = nextInternationalFixtureId(save);
-    if (!fixtureId || !playerCalendarAllowsFixture(save, fixtureId)) return null;
+    // Use the same canonical choice as Home. A separate international sort can
+    // choose another tour in the same week, which the player calendar rejects.
+    const fixtureId = nextUserFixtureId(save);
+    if (
+      !fixtureId ||
+      !isInternationalFixture(save.fixtures[fixtureId]) ||
+      save.fixtures[fixtureId].played ||
+      !playerCalendarAllowsFixture(save, fixtureId)
+    ) return null;
     resolveNationalDutyConflict(save, fixtureId);
     const live = createLiveMatch(save, fixtureId, save.userPlayerId);
     return { live };
   },
 
-  commitInternational: (match) => {
+  commitInternational: (match, persistence = 'autosave') => {
     const { save } = get();
     if (!save || !save.userPlayerId) return null;
     const experienceBefore = captureExperienceSnapshot(save);
@@ -2066,7 +2141,7 @@ export const useCareer = create<CareerState>((set, get) => ({
       });
     }
     set({ save: { ...save } });
-    void get().persist();
+    if (persistence === 'autosave') void get().persist();
     return {
       match,
       fixtureId: match.id,
@@ -2497,6 +2572,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (!save) return;
     if (save.mode === 'manager' && save.managerRetired) return;
     if (!seasonComplete(save)) return;
+    if (save.currentSeasonId) settleVipSeason(save, save.currentSeasonId);
     // Capture the assignment that owned the completed season before promotion
     // changes the current level. This is the settlement boundary: the ELITE
     // season that earns a National appointment still belongs to the club,
@@ -3067,6 +3143,7 @@ export const useCareer = create<CareerState>((set, get) => ({
         previousCoins: 0,
         newCoins: 0,
         items: [],
+        itemIds: [],
       };
     }
     ensureLiveops(save);
@@ -3075,6 +3152,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     let coins = 0;
     let count = 0;
     const items: string[] = [];
+    const itemIds: string[] = [];
     for (const c of claimable) {
       const tier = passTiersForMode(save.mode).find((t) => t.tier === c.tier);
       if (!tier) continue;
@@ -3087,6 +3165,7 @@ export const useCareer = create<CareerState>((set, get) => ({
       // Legacy crates still open immediately. New pass cosmetics are durable
       // inventory items that can be equipped in the Premium Clubhouse.
       if (reward.item) {
+        itemIds.push(reward.item);
         if (reward.item.startsWith('crate_')) {
           const loot = crateContents(reward.item);
           coins += loot.coins;
@@ -3111,7 +3190,37 @@ export const useCareer = create<CareerState>((set, get) => ({
       previousCoins,
       newCoins: save.wallet.coins,
       items,
+      itemIds,
     };
+  },
+
+  equipOwnedReward: (itemId, expectedSaveId) => {
+    const save = get().save;
+    if (!save || save.id !== expectedSaveId) return { ok: false, reason: 'This reward belongs to a different save.' };
+    const item = rewardPresentation(itemId);
+    if (!item || !canEquipReward(save, itemId)) return { ok: false, reason: 'Claim this reward in this career first.' };
+    if (item.kind === 'stadium') return get().savePassPresentation({ stadiumTheme: item.equippedId });
+    if (item.kind === 'office') return get().savePassPresentation({ officeTheme: item.equippedId });
+    const current = save.cosmetics ?? { avatar: 'avatar_custom', kit: 'kit_white', celebration: 'cel_wave' };
+    return get().saveCosmetics({ ...current, [item.kind === 'frame' ? 'profileFrame' : item.kind]: item.equippedId }, {});
+  },
+
+  chooseVipCollection: (id) => {
+    const save = get().save;
+    if (!save) return { ok: false, reason: 'No active save.' };
+    const result = chooseVipCollection(save, id);
+    if (result.ok) { set({ save: { ...save } }); void get().persist(); }
+    return result;
+  },
+
+  claimVipCollection: async () => {
+    const save = get().save;
+    if (!save) return { ok: false, items: [], reason: 'No active save.' };
+    const result = claimVipCollection(save);
+    if (!result.ok) return result;
+    set({ save: { ...save } });
+    try { await get().persistCritical(true); return result; }
+    catch { return { ok: false, items: [], reason: 'Could not save the collection. Retry saving before closing the app.' }; }
   },
 
   claimMonthlyPassDrop: () => {
@@ -3160,7 +3269,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (input.officeTheme && !owns(input.officeTheme.replace('office_', 'pass_office_'))) {
       return { ok: false, reason: 'Claim this office theme first.' };
     }
-    if (input.profileFrame && !owns(input.profileFrame.replace('frame_', 'pass_frame_'))) {
+    if (input.profileFrame && !ownsProfileFrame(save.inventory, input.profileFrame)) {
       return { ok: false, reason: 'Claim this profile frame first.' };
     }
     if (input.stadiumTheme) experience.selectedStadiumTheme = input.stadiumTheme;
@@ -3389,7 +3498,11 @@ export const useCareer = create<CareerState>((set, get) => ({
   saveCosmetics: (selection, selectionCosts) => {
     const save = get().save;
     if (!save) return { ok: false, spent: 0, reason: 'No active save.' };
-    const owned = (id: string) => (save.inventory?.[id] ?? 0) > 0;
+    const owned = (id: string) => ownsCosmetic(save.inventory, id);
+    const frame = selection.profileFrame ?? selection.avatarConfig?.frameId ?? 'frame_none';
+    if (!ownsProfileFrame(save.inventory, frame)) {
+      return { ok: false, spent: 0, reason: 'Unlock this profile frame first.' };
+    }
     const lockedPassItem = [selection.avatar, selection.kit, selection.celebration].find(
       (id) => isPassExclusiveCosmetic(id) && !owned(id),
     );
@@ -3410,13 +3523,17 @@ export const useCareer = create<CareerState>((set, get) => ({
     }
     save.cosmetics = {
       ...selection,
+      profileFrame: frame,
       avatarConfig: selection.avatarConfig
         ? normalizeAvatarConfig({
             ...selection.avatarConfig,
-            ...(selection.profileFrame ? { frameId: selection.profileFrame } : {}),
+            frameId: frame,
           })
         : undefined,
     };
+    if (save.seasonPassExperience) {
+      save.seasonPassExperience.selectedProfileFrame = frame;
+    }
     set({ save: { ...save } });
     void get().persist();
     return { ok: true, spent: spend };
@@ -3426,6 +3543,11 @@ export const useCareer = create<CareerState>((set, get) => ({
     analytics.logEvent(analytics.EVT.PURCHASE_INITIATED, { productId });
     const currentSave = get().save;
     if (!currentSave) return { ok: false, error: 'no_save' };
+    if (productId === 'season_pass' || productId === 'remove_ads') return { ok: false, error: 'retired_product' };
+    if (productId === 'player_vip' || productId === 'manager_vip') {
+      if (productId !== vipProductId(currentSave.mode)) return { ok: false, error: 'wrong_vip_mode' };
+      if (hasModeVip(currentSave)) return { ok: false, error: 'already_owned' };
+    }
     const managerOnlyProducts = new Set([
       'transfer_budget_sm',
       'scout_full_reveal',
@@ -3443,6 +3565,10 @@ export const useCareer = create<CareerState>((set, get) => ({
     ]);
     if (managerOnlyProducts.has(productId) && currentSave.mode !== 'manager') {
       return { ok: false, error: 'manager_save_required' };
+    }
+    if (productId === 'manager_legend_pack' &&
+        (!currentSave.userTeamId || !currentSave.teams[currentSave.userTeamId])) {
+      return { ok: false, error: 'no_club' };
     }
     if (
       (productId === 'transfer_budget_sm' || productId === 'manager_legend_pack') &&
@@ -3510,9 +3636,11 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (productId === 'contract_boost' && inventoryCount(currentSave, 'contract_boost_token') > 0) {
       return { ok: false, error: 'contract_boost_already_stored' };
     }
-    if (productId === 'form_recovery' && currentSave.userPlayerId) {
-      const player = currentSave.players[currentSave.userPlayerId];
-      if (player && player.meta.form >= 70 && player.meta.confidence >= 65) {
+    if (productId === 'form_recovery') {
+      const player = currentSave.userPlayerId ? currentSave.players[currentSave.userPlayerId] : undefined;
+      if (!player) return { ok: false, error: 'player_career_required' };
+      if (player.meta.form >= 99 && player.meta.confidence >= 99 &&
+          regenEnergy(currentSave.wallet, Date.now(), visibleEnergyCap(currentSave)).energy >= visibleEnergyCap(currentSave)) {
         return { ok: false, error: 'no_recovery_needed' };
       }
     }
@@ -3547,6 +3675,10 @@ export const useCareer = create<CareerState>((set, get) => ({
     const save = get().save;
     if (!save) return { ok: false, error: 'no_save' };
     if (save.id !== currentSave.id) return { ok: false, error: 'active_save_changed' };
+    if (productId === 'manager_legend_pack' &&
+        (managerClubOperationsPaused(save) || !save.userTeamId || !save.teams[save.userTeamId])) {
+      return { ok: false, error: 'club_unavailable' };
+    }
     if (!res.purchaseToken?.trim()) return { ok: false, error: 'missing_transaction_id' };
     const ledgerEntry = purchaseLedger.createLedgerEntry({
       result: { ...res, purchaseToken: res.purchaseToken.trim() },
@@ -3572,6 +3704,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     save.flags = { ...(save.flags ?? {}), [tokenFlag]: true };
     save.firstPurchaseDone = true;
     if (grant.entitlement?.removeAds) save.entitlements.removeAds = true;
+    if (productId === vipProductId(save.mode)) grantModeVip(save, productId, res.accountId);
     if (productId === 'starter_pack') {
       // Deliver the advertised "Remove Ads (7 days)" as a real timed grant.
       const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -3594,6 +3727,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     analytics.logEvent(analytics.EVT.PURCHASE, { productId });
     // Legend Bundle: also grant removeAds + VIP energy cap
     if (productId === 'bundle_legend') {
+      grantModeVip(save, 'bundle_legend', res.accountId);
       save.entitlements.removeAds = true;
       save.vipEnergyBonusActive = true;
       save.inventory = {
@@ -3606,8 +3740,8 @@ export const useCareer = create<CareerState>((set, get) => ({
 
     // ── Manager-specific IAP ──────────────────────────────────────────────
     if (productId === 'transfer_budget_sm' && save.userTeamId) {
-      save.teams[save.userTeamId].budget += 500_000;
-      if (save.finances) save.finances.transferBudget += 500_000;
+      save.teams[save.userTeamId].budget += 1_000_000;
+      if (save.finances) save.finances.transferBudget += 1_000_000;
       save.flags = { ...(save.flags ?? {}), [budgetSeasonFlag!]: true };
       recordPremiumAssistance(save, 'transfer_budget_sm');
     }
@@ -3619,7 +3753,12 @@ export const useCareer = create<CareerState>((set, get) => ({
       );
     }
     if (productId === 'manager_legend_pack') {
+      grantModeVip(save, 'manager_legend_pack', res.accountId);
       applyManagerLegendBacking(save);
+      // One-time purchase grant only. Restore/ownership refresh never pays club cash.
+      const club = save.teams[save.userTeamId!];
+      club.budget += 1_000_000;
+      if (save.finances) save.finances.transferBudget = club.budget;
       setInventoryCount(
         save,
         'scout_full_reveal_token',
@@ -3661,8 +3800,9 @@ export const useCareer = create<CareerState>((set, get) => ({
     if (productId === 'form_recovery' && save.userPlayerId) {
       const user = save.players[save.userPlayerId];
       if (user) {
-        user.meta.form = Math.max(user.meta.form, 70);
-        user.meta.confidence = Math.max(user.meta.confidence, 65);
+        user.meta.form = Math.max(user.meta.form, 99);
+        user.meta.confidence = Math.max(user.meta.confidence, 99);
+        save.wallet = { ...save.wallet, energy: Math.max(save.wallet.energy, visibleEnergyCap(save)), energyUpdatedAt: Date.now() };
       }
     }
     if (productId === 'training_accelerator' && save.userPlayerId) {
@@ -3705,6 +3845,25 @@ export const useCareer = create<CareerState>((set, get) => ({
     }
   },
 
+  claimReviewerAccess: async () => {
+    const original = get().save;
+    if (!original) throw new Error('Open a career first.');
+    if (!(await authorizeReviewerAccess())) {
+      throw new Error('Reviewer access could not be verified. Check your account and connection.');
+    }
+    const save = get().save;
+    if (save !== original) throw new Error('Career changed. Please try again.');
+    if (!applyReviewerSupplies(save, visibleEnergyCap(save))) {
+      throw new Error('Open a Player career or a domestic Manager club.');
+    }
+    set({ save: { ...save } });
+    // Repeating after failure only tops up to the same minimum; no money or
+    // purchase ledger is touched. Never report success before durable saving.
+    try { await get().persistCritical(true); } catch {
+      throw new Error('Reviewer access was not saved. Please retry.');
+    }
+  },
+
   restorePurchases: async () => {
     const activeSave = get().save;
     if (!activeSave) {
@@ -3728,10 +3887,15 @@ export const useCareer = create<CareerState>((set, get) => ({
     for (const r of providerResult.purchases) {
       if (!r.ok) continue;
       if (r.productId === 'remove_ads') {
-        save.entitlements.removeAds = true;
+        grantModeVip(save, 'legacy', r.accountId);
+        restoredProductIds.push(r.productId);
+      }
+      if (r.productId === vipProductId(save.mode)) {
+        grantModeVip(save, r.productId, r.accountId);
         restoredProductIds.push(r.productId);
       }
       if (r.productId === 'bundle_legend' && save.mode === 'career') {
+        grantModeVip(save, 'bundle_legend', r.accountId);
         save.entitlements.removeAds = true;
         save.vipEnergyBonusActive = true;
         save.inventory = {
@@ -3744,10 +3908,10 @@ export const useCareer = create<CareerState>((set, get) => ({
       }
       if (
         r.productId === 'manager_legend_pack' &&
-        save.mode === 'manager' &&
-        !managerClubOperationsPaused(save)
+        save.mode === 'manager'
       ) {
-        applyManagerLegendBacking(save);
+        grantModeVip(save, 'manager_legend_pack', r.accountId);
+        if (!managerClubOperationsPaused(save)) applyManagerLegendBacking(save);
         restoredProductIds.push(r.productId);
       }
       if (r.productId === 'season_pass' && r.entitlement) {
@@ -3768,6 +3932,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     }
     set({ save: { ...save } });
     try {
+      await syncVipArchive(save, undefined, true);
       await get().persistCritical(true);
     } catch {
       return {
@@ -3845,7 +4010,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     return live ? { live } : null;
   },
 
-  commitDailyChallengeMatch: (match) => {
+  commitDailyChallengeMatch: (match, persistence = 'autosave') => {
     const { save, ref } = get();
     if (
       !save ||
@@ -3889,7 +4054,7 @@ export const useCareer = create<CareerState>((set, get) => ({
     });
     experience.lastMatchImpact = impact;
     set({ save: { ...save } });
-    void get().persist();
+    if (persistence === 'autosave') void get().persist();
     return {
       match,
       fixtureId: match.id,
@@ -4431,4 +4596,4 @@ export const useCareer = create<CareerState>((set, get) => ({
     (save as any)._lastCheckedUserRuns = userRuns;
     (save as any)._lastCheckedRivalRuns = rivalRuns;
   },
-}));
+})));

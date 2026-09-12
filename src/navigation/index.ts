@@ -10,7 +10,7 @@ export type RootStackParamList = {
   Settings: undefined;
   CricketAcademy: undefined;
   Login: undefined;
-  Purchase: undefined;
+  Purchase: { productId?: string } | undefined;
   CareerHub: undefined;
   ManagerHub: undefined;
   Match: { intl?: boolean; daily?: boolean } | undefined;

@@ -512,6 +512,7 @@ export interface AuctionAssistantState {
 }
 
 export interface Entitlements {
+  modeVip?: { mode: GameMode; owned: boolean; source: string; accountId?: string };
   /** Permanent ad removal + VIP perks (60 energy cap, +20% match coins). */
   removeAds: boolean;
   /** Epoch millis until which ads are suppressed by a *timed* grant (e.g. the
@@ -1196,7 +1197,7 @@ export interface ManagerJobOffer {
 }
 
 /** Current canonical save schema. Bump + add a migration on any shape change. */
-export const SAVE_SCHEMA_VERSION = 43;
+export const SAVE_SCHEMA_VERSION = 44;
 
 export type CareerArchetype = 'PRODIGY' | 'LATE_BLOOMER' | 'SPECIALIST' | 'COMEBACK';
 export type CoachPersonality = 'DEVELOPER' | 'TACTICIAN' | 'DISCIPLINARIAN' | 'MENTOR';
@@ -1520,6 +1521,14 @@ export interface SaveGame {
   inventory?: Record<string, number>; // cosmetic/consumable items (from the pass, events)
   cosmetics?: PlayerCosmetics; // equipped player look (career mode)
   seasonPassExperience?: SeasonPassExperienceState;
+  vipCollections?: {
+    version: 1;
+    mode: GameMode;
+    owned: string[];
+    selectedId?: string;
+    settledSeasons: string[];
+    credits: number;
+  };
   experience?: CareerExperienceState;
   seasonPassBranding?: SeasonPassBrandingState;
   // ---- Career narrative & life (career mode, all optional) ----

@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
+import { showShortageOffer } from '../components/showShortageOffer';
+import { ffpBlockReason } from '../game/finance';
 import {
   AppText as Text,
   Button,
@@ -355,6 +357,15 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
       return;
     }
     const value = computeValue(p);
+    if (team.budget < value) {
+      const wageBlock = ffpBlockReason(save, p);
+      if (wageBlock) { showFlash(wageBlock, false); return; }
+      if (!showShortageOffer(save, 'transfer',
+        (productId) => navigation.navigate('Purchase', { productId }), value - team.budget)) {
+        showFlash('Not enough club funds. Choose a cheaper target or build your club balance.', false);
+      }
+      return;
+    }
     const interest = isManager ? rivalInterestCount(save, p.id) : 0;
     const rep = isManager ? save.scoutReports?.find((r) => r.playerId === p.id) : undefined;
     const scoutLine = isManager
@@ -584,8 +595,6 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
   const renderRow = ({ item: p }: { item: Player }) => {
     if (tab === 'market') {
       const value = computeValue(p);
-      const canAfford =
-        transferWindowOpen && team.budget >= value && team.playerIds.length < squadCap;
       const rep = isManager ? save.scoutReports?.find((r) => r.playerId === p.id) : undefined;
       const fullReport = !isManager || Boolean(rep && rep.uncertainty <= 0);
       const shownOvr = !isManager
@@ -672,7 +681,7 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
                 variant={signVariant}
                 fullWidth={false}
                 style={styles.rowAction}
-                disabled={!canAfford || actionPending}
+                disabled={!transferWindowOpen || squadFull || actionPending}
                 onPress={() => onSign(p)}
               />
             </View>

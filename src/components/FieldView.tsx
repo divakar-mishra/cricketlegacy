@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactElement } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import Svg, {
   Circle,
   Defs,
@@ -18,6 +19,12 @@ import type { Conditions, Dismissal } from '../domain/types';
 import type { FieldSetting } from '../engine/intent';
 import { useSettings } from '../state/settingsStore';
 import { useColors } from '../theme';
+import { AppText } from './AppText';
+import { kitColorHex, kitDesign } from '../data/cosmetics';
+import { Cricketer, type CricketerProps } from './CricketerArtwork';
+import { StadiumArchitecture } from './StadiumArchitecture';
+import { cricketerScale, deliveryCaption, visualRunningCount } from './fieldPresentation';
+import { GroundAppearance, standSections } from './venueVisuals';
 import {
   deliveryBouncePoint,
   fieldGeometry,
@@ -45,6 +52,8 @@ export interface LastShot {
 }
 
 interface Props {
+  userKitId?: string;
+  userIsBowler?: boolean;
   size?: number;
   lastShot?: LastShot | null;
   stadiumTheme?: string;
@@ -56,17 +65,10 @@ interface Props {
   fieldingSecondaryColor?: string;
   fieldSetting?: FieldSetting;
   conditions?: Conditions;
+  groundAppearance?: GroundAppearance;
+  groundPrimaryColor?: string;
 }
 
-interface CricketerProps {
-  x: number;
-  y: number;
-  rotation?: number;
-  scale?: number;
-  primary: string;
-  secondary: string;
-  role: 'fielder' | 'keeper' | 'bowler' | 'batter';
-}
 
 interface CricketerSpriteProps extends CricketerProps {
   fieldSize: number;
@@ -75,10 +77,10 @@ interface CricketerSpriteProps extends CricketerProps {
 
 const FIELD_PALETTES = {
   STANDARD: {
-    outfield: '#0E2A1A',
-    outfieldLight: '#17482A',
+    outfield: '#123D2C',
+    outfieldLight: '#236747',
     pitch: '#B9915A',
-    ring: '#176536',
+    ring: '#65996B',
     rope: '#F4E4A1',
     stand: '#171D28',
   },
@@ -100,151 +102,9 @@ const PITCH_TONE: Record<Conditions['pitch'], string> = {
   CRACKED: '#947149',
 };
 
-function Cricketer({
-  x,
-  y,
-  rotation = 0,
-  scale = 1,
-  primary,
-  secondary,
-  role,
-}: CricketerProps): ReactElement {
-  const transform = 'translate(' + x + ' ' + y + ') rotate(' + rotation + ') scale(' + scale + ')';
-  const outline = '#06100B';
-  const skin = '#B87550';
-
-  if (role === 'batter') {
-    return (
-      <G transform={transform}>
-        <Ellipse cx={0} cy={7.6} rx={8.2} ry={2.8} fill="#020504" opacity={0.44} />
-        <Line x1={-2.8} y1={2.6} x2={-4.1} y2={8.2} stroke={outline} strokeWidth={4.5} />
-        <Line x1={2.5} y1={2.6} x2={3.7} y2={8.2} stroke={outline} strokeWidth={4.5} />
-        <Rect x={-5.5} y={3.5} width={3.2} height={5.7} rx={1} fill="#F4E8C8" />
-        <Rect x={2.1} y={3.5} width={3.2} height={5.7} rx={1} fill="#F4E8C8" />
-        <Path
-          d="M -5,-0.8 Q 0,-3.6 5,-0.8 L 4.1,4.5 Q 0,6 -4.1,4.5 Z"
-          fill={primary}
-          stroke="#FFFFFF"
-          strokeWidth={0.9}
-        />
-        <Line x1={-3.7} y1={1} x2={3.9} y2={1} stroke={secondary} strokeWidth={1.7} />
-        <Line x1={3.7} y1={0.2} x2={6.2} y2={3.7} stroke={skin} strokeWidth={2.3} />
-        <Line x1={-3.8} y1={0.1} x2={2.5} y2={3.1} stroke={skin} strokeWidth={2.3} />
-        <Line x1={5.9} y1={1.8} x2={8.8} y2={9.7} stroke="#5A321A" strokeWidth={4} />
-        <Line x1={5.9} y1={1.8} x2={8.8} y2={9.7} stroke="#E3B866" strokeWidth={2.4} />
-        <Circle cx={0} cy={-5.2} r={3.35} fill={skin} stroke={outline} strokeWidth={0.9} />
-        <Path d="M -3.5,-5.2 A 3.5,3.5 0 0 1 3.5,-5.2 L 3.1,-7.2 L -3.1,-7.2 Z" fill={outline} />
-        <Line x1={-3.3} y1={-4.6} x2={3.7} y2={-4.6} stroke={secondary} strokeWidth={1.1} />
-        <Line x1={2.7} y1={-4.6} x2={3.8} y2={-1.8} stroke="#E7EDF4" strokeWidth={0.65} />
-      </G>
-    );
-  }
-
-  if (role === 'bowler') {
-    return (
-      <G transform={transform}>
-        <Ellipse cx={0} cy={7.8} rx={7.4} ry={2.6} fill="#020504" opacity={0.44} />
-        <Line x1={-2} y1={3} x2={-5.8} y2={8.5} stroke={outline} strokeWidth={4} />
-        <Line x1={2.1} y1={3} x2={4.8} y2={7.2} stroke={outline} strokeWidth={4} />
-        <Line x1={-2} y1={3} x2={-5.8} y2={8.5} stroke={primary} strokeWidth={2.4} />
-        <Line x1={2.1} y1={3} x2={4.8} y2={7.2} stroke={primary} strokeWidth={2.4} />
-        <Path
-          d="M -4.8,-1.2 Q 0,-3.7 4.8,-0.6 L 3.8,4.8 Q -0.5,6 -4.2,4.2 Z"
-          fill={primary}
-          stroke="#FFFFFF"
-          strokeWidth={0.9}
-        />
-        <Line x1={-3.2} y1={0.6} x2={3.7} y2={0.6} stroke={secondary} strokeWidth={1.7} />
-        <Path
-          d="M -3.8,-0.7 Q -7,-4.3 -4.7,-8.5 Q -3.1,-10.5 -0.9,-8.9"
-          fill="none"
-          stroke={skin}
-          strokeWidth={2.5}
-          strokeLinecap="round"
-        />
-        <Circle cx={-0.7} cy={-9.2} r={1.75} fill="#C72F36" stroke="#FFFFFF" strokeWidth={0.65} />
-        <Path
-          d="M 4,-0.2 Q 7.1,1.4 5.5,5"
-          fill="none"
-          stroke={skin}
-          strokeWidth={2.4}
-          strokeLinecap="round"
-        />
-        <Circle cx={0.4} cy={-5.1} r={3.1} fill={skin} stroke={outline} strokeWidth={0.9} />
-        <Path d="M -2.8,-5.7 Q 0.5,-8 3.5,-5.4" fill={primary} stroke={secondary} strokeWidth={1} />
-      </G>
-    );
-  }
-
-  if (role === 'keeper') {
-    return (
-      <G transform={transform}>
-        <Ellipse cx={0} cy={6.7} rx={9.2} ry={3.1} fill="#020504" opacity={0.44} />
-        <Path d="M -2.4,2.5 L -7.1,7.2" stroke={outline} strokeWidth={5} strokeLinecap="round" />
-        <Path d="M 2.4,2.5 L 7.1,7.2" stroke={outline} strokeWidth={5} strokeLinecap="round" />
-        <Path d="M -2.4,2.5 L -7.1,7.2" stroke="#F4E8C8" strokeWidth={3} strokeLinecap="round" />
-        <Path d="M 2.4,2.5 L 7.1,7.2" stroke="#F4E8C8" strokeWidth={3} strokeLinecap="round" />
-        <Path
-          d="M -5.2,-0.5 Q 0,-3.4 5.2,-0.5 L 4.2,4.1 Q 0,5.7 -4.2,4.1 Z"
-          fill={primary}
-          stroke="#FFFFFF"
-          strokeWidth={0.9}
-        />
-        <Line x1={-3.7} y1={1} x2={3.7} y2={1} stroke={secondary} strokeWidth={1.7} />
-        <Path d="M -4.2,0.2 L -8,4" stroke={skin} strokeWidth={2.4} strokeLinecap="round" />
-        <Path d="M 4.2,0.2 L 8,4" stroke={skin} strokeWidth={2.4} strokeLinecap="round" />
-        <Circle cx={-8.1} cy={4.1} r={2.35} fill={secondary} stroke="#FFFFFF" strokeWidth={0.8} />
-        <Circle cx={8.1} cy={4.1} r={2.35} fill={secondary} stroke="#FFFFFF" strokeWidth={0.8} />
-        <Circle cx={0} cy={-4.9} r={3.25} fill={skin} stroke={outline} strokeWidth={0.9} />
-        <Path
-          d="M -3.2,-5.2 A 3.3,3.3 0 0 1 3.2,-5.2"
-          fill={outline}
-          stroke={secondary}
-          strokeWidth={1.1}
-        />
-      </G>
-    );
-  }
-
-  return (
-    <G transform={transform}>
-      <Ellipse cx={0} cy={6.8} rx={7} ry={2.5} fill="#020504" opacity={0.4} />
-      <Line x1={-2.3} y1={2.7} x2={-3.8} y2={7.4} stroke={outline} strokeWidth={4} />
-      <Line x1={2.3} y1={2.7} x2={3.8} y2={7.4} stroke={outline} strokeWidth={4} />
-      <Line x1={-2.3} y1={2.7} x2={-3.8} y2={7.4} stroke={primary} strokeWidth={2.4} />
-      <Line x1={2.3} y1={2.7} x2={3.8} y2={7.4} stroke={primary} strokeWidth={2.4} />
-      <Path
-        d="M -4.8,-0.6 Q 0,-3.1 4.8,-0.6 L 3.8,4.6 Q 0,5.9 -3.8,4.6 Z"
-        fill={primary}
-        stroke="#FFFFFF"
-        strokeWidth={0.85}
-      />
-      <Line x1={-3.5} y1={1} x2={3.5} y2={1} stroke={secondary} strokeWidth={1.6} />
-      <Line
-        x1={-4.1}
-        y1={0.1}
-        x2={-7.1}
-        y2={3.8}
-        stroke={skin}
-        strokeWidth={2.2}
-        strokeLinecap="round"
-      />
-      <Line
-        x1={4.1}
-        y1={0.1}
-        x2={7.1}
-        y2={3.8}
-        stroke={skin}
-        strokeWidth={2.2}
-        strokeLinecap="round"
-      />
-      <Circle cx={0} cy={-4.6} r={3} fill={skin} stroke={outline} strokeWidth={0.85} />
-      <Path d="M -3,-4.9 Q 0,-7.1 3,-4.9" fill={primary} stroke={secondary} strokeWidth={1} />
-    </G>
-  );
-}
 
 function CricketerSprite({
+  kitId,
   x,
   y,
   rotation,
@@ -255,11 +115,12 @@ function CricketerSprite({
   fieldSize,
   style,
 }: CricketerSpriteProps): ReactElement {
-  const spriteSize = fieldSize * 0.115;
+  const spriteSize = fieldSize * 0.135;
 
   return (
     <Animated.View
       pointerEvents="none"
+      testID={`live-player-${role}`}
       style={[
         styles.cricketerSprite,
         {
@@ -272,15 +133,41 @@ function CricketerSprite({
       ]}
     >
       <Svg width={spriteSize} height={spriteSize} viewBox="-16 -16 32 32">
+        {role === 'batter' ? (
+          <Ellipse cx={0} cy={1} rx={12} ry={11} fill="#E4CB8E" opacity={0.12} />
+        ) : null}
         <Cricketer
+          kitId={kitId}
           x={0}
           y={0}
           rotation={rotation}
           scale={scale}
-          primary={primary}
-          secondary={secondary}
+          primary={kitId ? kitColorHex(kitId) ?? primary : primary}
+          secondary={kitId ? kitDesign(kitId).trim : secondary}
           role={role}
         />
+        {role !== 'fielder' ? (
+          <G>
+            <Rect
+              x={-8}
+              y={11}
+              width={16}
+              height={4.8}
+              rx={2}
+              fill={role === 'batter' ? '#F4E8C8' : '#102737'}
+            />
+            <SvgText
+              x={0}
+              y={14.7}
+              textAnchor="middle"
+              fontSize={4}
+              fontWeight="800"
+              fill={role === 'batter' ? '#17262D' : '#FFFFFF'}
+            >
+              {role === 'batter' ? 'BAT' : role === 'keeper' ? 'WK' : 'BWL'}
+            </SvgText>
+          </G>
+        ) : null}
       </Svg>
     </Animated.View>
   );
@@ -337,6 +224,8 @@ function readableDescriptor(value?: string): string {
 }
 
 export function FieldView({
+  userKitId,
+  userIsBowler = false,
   size = 240,
   lastShot,
   stadiumTheme,
@@ -348,10 +237,17 @@ export function FieldView({
   fieldingSecondaryColor,
   fieldSetting = 'BALANCED',
   conditions,
+  groundAppearance,
+  groundPrimaryColor,
 }: Props) {
   const colors = useColors();
   const graphics = useSettings((state) => state.graphics);
+  const reducedMotion = useReducedMotion();
+  const motionEnabled = animate && !reducedMotion && graphics !== 'low';
+  const caption = deliveryCaption(lastShot);
   const palette = stadiumTheme === 'stadium_noir' ? FIELD_PALETTES.NOIR : FIELD_PALETTES.STANDARD;
+  const capacityLevel = groundAppearance?.capacityLevel ?? 1;
+  const experienceLevel = groundAppearance?.experienceLevel ?? 1;
   const toneColors: Record<LastShot['tone'], string> = {
     normal: colors.textMuted,
     four: colors.primaryLight,
@@ -363,7 +259,6 @@ export function FieldView({
     fieldGeometry(size);
   const layout = fieldSetting as FieldLayout;
   const fielders = fieldingPositions(size, layout);
-  const glyphScale = size / 280;
   const batterPrimary = battingPrimaryColor ?? colors.accentDark;
   const batterSecondary = battingSecondaryColor ?? colors.accentLight;
   const fielderPrimary = fieldingPrimaryColor ?? colors.info;
@@ -412,8 +307,10 @@ export function FieldView({
   const crowd = useMemo(
     () =>
       Array.from({ length: crowdCount }, (_, index) => {
-        const angle = (index / crowdCount) * Math.PI * 2 + (index % 3) * 0.025;
-        const ring = groundR + (stadiumR - groundR) * (0.36 + (index % 3) * 0.2);
+        const sections = standSections(capacityLevel);
+        const section = sections[index % sections.length];
+        const angle = ((section + 0.18 + ((index * 7) % 11) / 17) * Math.PI) / 6;
+        const ring = groundR + (stadiumR - groundR) * (0.32 + (index % 3) * 0.16);
         return {
           x: cx + Math.cos(angle) * ring,
           y: cy + Math.sin(angle) * ring,
@@ -423,6 +320,7 @@ export function FieldView({
       }),
     [
       batterPrimary,
+      capacityLevel,
       colors.accent,
       colors.textMuted,
       crowdCount,
@@ -433,19 +331,6 @@ export function FieldView({
       size,
       stadiumR,
     ],
-  );
-  const standAisles = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, index) => {
-        const angle = (index / 12) * Math.PI * 2;
-        return {
-          x1: cx + Math.cos(angle) * groundR * 1.08,
-          y1: cy + Math.sin(angle) * groundR * 1.08,
-          x2: cx + Math.cos(angle) * stadiumR * 0.95,
-          y2: cy + Math.sin(angle) * stadiumR * 0.95,
-        };
-      }),
-    [cx, cy, groundR, stadiumR],
   );
   const floodlights = useMemo(
     () =>
@@ -495,9 +380,9 @@ export function FieldView({
     if (!lastShot) return;
     ballT.stopAnimation();
     roleT.stopAnimation();
-    ballT.setValue(animate ? 0 : 1);
-    roleT.setValue(animate ? 0 : 1);
-    if (!animate) return;
+    ballT.setValue(motionEnabled ? 0 : 1);
+    roleT.setValue(motionEnabled ? 0 : 1);
+    if (!motionEnabled) return;
 
     const motion = Animated.parallel([
       Animated.sequence([
@@ -517,7 +402,7 @@ export function FieldView({
     motion.start();
 
     return () => motion.stop();
-  }, [animate, lastShot?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [motionEnabled, lastShot?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ballColor = lastShot ? toneColors[lastShot.tone] : colors.text;
   const translateX = ballT.interpolate({
@@ -591,7 +476,7 @@ export function FieldView({
     outputRange: [1, 1, 1.12, 1.04, 1],
   });
 
-  const runCount = Math.max(0, Math.min(3, lastShot?.runs ?? 0));
+  const runCount = motionEnabled ? visualRunningCount(lastShot) : 0;
   const crossingX = nonStriker.x - striker.x;
   const crossingY = nonStriker.y - striker.y;
   const runnerInputRange =
@@ -745,579 +630,614 @@ export function FieldView({
     striker.y;
 
   return (
-    <View
-      style={{ width: size, height: size }}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={accessibilityLabel}
-    >
-      <Svg width={size} height={size} viewBox={'0 0 ' + size + ' ' + size}>
-        <Defs>
-          <RadialGradient id="field-outfield" cx="46%" cy="42%" rx="62%" ry="62%">
-            <Stop offset="0%" stopColor={palette.outfieldLight} />
-            <Stop offset="100%" stopColor={palette.outfield} />
-          </RadialGradient>
-          <SvgLinearGradient id="field-pitch" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor={pitchColor} />
-            <Stop offset="55%" stopColor={palette.pitch} />
-            <Stop offset="100%" stopColor={pitchColor} />
-          </SvgLinearGradient>
-        </Defs>
+    <>
+      <View
+        style={{ width: size, height: size }}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={accessibilityLabel}
+      >
+        <Svg width={size} height={size} viewBox={'0 0 ' + size + ' ' + size}>
+          <Defs>
+            <RadialGradient id="field-outfield" cx="46%" cy="42%" rx="62%" ry="62%">
+              <Stop offset="0%" stopColor={palette.outfieldLight} />
+              <Stop offset="100%" stopColor={palette.outfield} />
+            </RadialGradient>
+            <SvgLinearGradient id="field-pitch" x1="0%" y1="0%" x2="100%" y2="100%">
+              <Stop offset="0%" stopColor={pitchColor} />
+              <Stop offset="55%" stopColor={palette.pitch} />
+              <Stop offset="100%" stopColor={pitchColor} />
+            </SvgLinearGradient>
+          </Defs>
 
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={stadiumR}
-          fill="#080B10"
-          stroke={colors.borderStrong}
-          strokeWidth={2}
-        />
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={stadiumR * 0.96}
-          fill={palette.stand}
-          stroke={colors.textFaint}
-          strokeWidth={1}
-        />
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={stadiumR * 0.89}
-          fill="none"
-          stroke={colors.borderStrong}
-          strokeWidth={Math.max(1, size * 0.006)}
-          opacity={0.78}
-        />
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={stadiumR * 0.79}
-          fill="none"
-          stroke={stadiumTheme === 'stadium_noir' ? palette.rope : colors.textFaint}
-          strokeWidth={1}
-          opacity={0.54}
-        />
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={groundR * 1.08}
-          fill="#0A0E12"
-          stroke={colors.border}
-          strokeWidth={2}
-        />
-        {graphics !== 'low' ? (
-          <G stroke={colors.borderStrong} strokeWidth={1.25} opacity={0.76}>
-            {standAisles.map((aisle, index) => (
-              <Line key={'stand-aisle-' + index} {...aisle} />
-            ))}
-          </G>
-        ) : null}
-        {crowd.map((spectator, index) => (
-          <Circle
-            key={'crowd-' + index}
-            cx={spectator.x}
-            cy={spectator.y}
-            r={spectator.radius}
-            fill={spectator.color}
-            opacity={0.76}
+          <StadiumArchitecture
+            size={size}
+            capacityLevel={capacityLevel}
+            experienceLevel={experienceLevel}
+            accent={groundPrimaryColor ?? fielderPrimary}
+            noir={stadiumTheme === 'stadium_noir'}
+            detailed={graphics !== 'low'}
           />
-        ))}
-        {graphics !== 'low' ? (
-          <G>
-            {floodlights.map((light, index) => (
-              <G key={'floodlight-' + index}>
-                <Circle
-                  cx={light.x}
-                  cy={light.y}
-                  r={size * 0.025}
-                  fill={palette.rope}
-                  opacity={0.12}
-                />
-                <Circle
-                  cx={light.x}
-                  cy={light.y}
-                  r={size * 0.012}
-                  fill={colors.white}
-                  stroke={palette.rope}
-                  strokeWidth={1}
-                  opacity={0.94}
-                />
-                <Circle cx={light.x} cy={light.y} r={size * 0.004} fill={colors.white} />
-              </G>
-            ))}
-          </G>
-        ) : null}
-        <SvgText
-          x={cx}
-          y={size * 0.064}
-          fill={colors.textMuted}
-          fontSize={Math.max(6.5, size * 0.025)}
-          fontWeight="700"
-          textAnchor="middle"
-          letterSpacing={1}
-        >
-          STRIKER END
-        </SvgText>
-        <SvgText
-          x={cx}
-          y={size * 0.958}
-          fill={colors.textMuted}
-          fontSize={Math.max(6.5, size * 0.025)}
-          fontWeight="700"
-          textAnchor="middle"
-          letterSpacing={1}
-        >
-          BOWLER END
-        </SvgText>
-
-        <Circle cx={cx} cy={cy} r={groundR} fill="url(#field-outfield)" />
-        {graphics !== 'low' ? (
-          <G opacity={stadiumTheme === 'stadium_noir' ? 0.16 : 0.2}>
-            <Circle cx={cx} cy={cy} r={groundR * 0.82} fill={palette.outfieldLight} />
-            <Circle cx={cx} cy={cy} r={groundR * 0.64} fill={palette.outfield} />
-            <Circle cx={cx} cy={cy} r={groundR * 0.46} fill={palette.outfieldLight} />
-            <Circle cx={cx} cy={cy} r={groundR * 0.28} fill={palette.outfield} />
-          </G>
-        ) : null}
-        {graphics === 'high' ? (
-          <G fill={palette.rope} opacity={stadiumTheme === 'stadium_noir' ? 0.07 : 0.04}>
-            {floodlights.map((light, index) => (
-              <Path key={'floodlight-beam-' + index} d={light.beam} />
-            ))}
-          </G>
-        ) : null}
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={groundR}
-          fill="none"
-          stroke={colors.white}
-          strokeWidth={3.8}
-          opacity={0.8}
-        />
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={groundR - 2.3}
-          fill="none"
-          stroke={palette.rope}
-          strokeWidth={2.1}
-        />
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={innerR}
-          fill="none"
-          stroke={palette.ring}
-          strokeWidth={1.25}
-          strokeDasharray="5 5"
-          opacity={0.9}
-        />
-
-        <Rect
-          x={cx - pitchWidth / 2 + size * 0.008}
-          y={pitchTop + size * 0.012}
-          width={pitchWidth}
-          height={pitchHeight}
-          rx={3}
-          fill="#020504"
-          opacity={0.36}
-        />
-        <Rect
-          x={cx - pitchWidth / 2}
-          y={pitchTop}
-          width={pitchWidth}
-          height={pitchHeight}
-          rx={2}
-          fill="url(#field-pitch)"
-          stroke="#E3C48C"
-          strokeWidth={0.8}
-          opacity={0.96}
-        />
-        {graphics !== 'low' ? (
-          <G opacity={0.28}>
-            <Line
-              x1={cx - pitchWidth * 0.28}
-              y1={pitchTop}
-              x2={cx - pitchWidth * 0.28}
-              y2={pitchTop + pitchHeight}
-              stroke="#FFF0C4"
-              strokeWidth={0.8}
-            />
-            <Line
-              x1={cx + pitchWidth * 0.28}
-              y1={pitchTop}
-              x2={cx + pitchWidth * 0.28}
-              y2={pitchTop + pitchHeight}
-              stroke="#6F4E2C"
-              strokeWidth={0.8}
-            />
-          </G>
-        ) : null}
-        {conditions?.pitch === 'CRACKED' ? (
-          <G opacity={0.55}>
-            <Path
-              d={'M ' + (cx - 7) + ' ' + (cy - 18) + ' l 4 6 -3 7 5 8 -4 8'}
-              fill="none"
-              stroke="#5B3B25"
-              strokeWidth={1}
-            />
-            <Path
-              d={'M ' + (cx + 8) + ' ' + (cy + 6) + ' l -3 5 4 6 -3 7'}
-              fill="none"
-              stroke="#5B3B25"
-              strokeWidth={0.9}
-            />
-          </G>
-        ) : null}
-        {conditions?.pitch === 'DUSTY' && graphics === 'high' ? (
-          <G fill="#6E4D2F" opacity={0.32}>
-            <Circle cx={cx - 7} cy={cy - 22} r={1.5} />
-            <Circle cx={cx + 5} cy={cy + 19} r={1.2} />
-            <Circle cx={cx - 3} cy={cy + 3} r={1} />
-          </G>
-        ) : null}
-        <Line
-          x1={cx - size * 0.09}
-          y1={strikerStumpY}
-          x2={cx + size * 0.09}
-          y2={strikerStumpY}
-          stroke={colors.white}
-          strokeWidth={1.5}
-          opacity={0.9}
-        />
-        <Line
-          x1={cx - size * 0.09}
-          y1={bowlerStumpY}
-          x2={cx + size * 0.09}
-          y2={bowlerStumpY}
-          stroke={colors.white}
-          strokeWidth={1.5}
-          opacity={0.9}
-        />
-        <Stumps x={cx} y={strikerStumpY} direction={-1} size={size} color={colors.white} />
-        <Stumps x={cx} y={bowlerStumpY} direction={1} size={size} color={colors.white} />
-
-        {lastShot ? (
-          <G>
-            <Path
-              d={deliveryPath}
-              fill="none"
-              stroke={colors.white}
-              strokeWidth={1.35}
-              strokeDasharray="3 4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={0.34}
-            />
+          {crowd.map((spectator, index) => (
             <Circle
-              cx={bounce.x}
-              cy={bounce.y}
-              r={size * 0.012}
-              fill="none"
-              stroke={colors.white}
-              strokeWidth={0.9}
-              opacity={0.5}
+              key={'crowd-' + index}
+              cx={spectator.x}
+              cy={spectator.y}
+              r={spectator.radius}
+              fill={spectator.color}
+              opacity={0.76}
             />
-            <Circle
-              cx={striker.x}
-              cy={striker.y}
-              r={size * 0.014}
-              fill={ballColor}
-              opacity={0.22}
-            />
-            {showShotPath ? (
-              <Path
-                d={trajectory}
-                fill="none"
-                stroke={ballColor}
-                strokeWidth={lastShot.tone === 'six' ? 2.25 : 2.6}
-                strokeDasharray={lastShot.tone === 'six' ? '5 3' : undefined}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity={0.72}
-              />
-            ) : null}
-          </G>
-        ) : null}
-
-        {caught ? (
-          <G>
-            <Circle
-              cx={fieldActionPoint.x}
-              cy={fieldActionPoint.y}
-              r={size * 0.035}
-              fill={colors.danger}
-              opacity={0.14}
-            />
-            <Circle
-              cx={fieldActionPoint.x}
-              cy={fieldActionPoint.y}
-              r={size * 0.025}
-              fill="none"
-              stroke={colors.danger}
-              strokeWidth={1.6}
-            />
-          </G>
-        ) : null}
-        {runOut ? (
-          <Circle
-            cx={nonStriker.x}
-            cy={nonStriker.y}
-            r={size * 0.032}
-            fill="none"
-            stroke={colors.danger}
-            strokeWidth={2}
-          />
-        ) : null}
-        {lastShot?.dismissalType === 'LBW' ? (
-          <Circle
-            cx={striker.x}
-            cy={striker.y + size * 0.016}
-            r={size * 0.03}
-            fill={colors.danger}
-            opacity={0.24}
-          />
-        ) : null}
-        {wicketAtStriker ? (
-          <G stroke={colors.danger} strokeWidth={1.8} strokeLinecap="round">
-            <Line
-              x1={cx - size * 0.014}
-              y1={strikerStumpY - size * 0.032}
-              x2={cx - size * 0.035}
-              y2={strikerStumpY - size * 0.045}
-            />
-            <Line
-              x1={cx + size * 0.014}
-              y1={strikerStumpY - size * 0.032}
-              x2={cx + size * 0.036}
-              y2={strikerStumpY - size * 0.018}
-            />
-          </G>
-        ) : null}
-
-        <G>
-          {userBatter && userBadgeLabel ? (
+          ))}
+          {graphics !== 'low' ? (
             <G>
-              <Circle
-                cx={userBatter.x}
-                cy={userBatter.y}
-                r={size * 0.034}
-                fill="none"
-                stroke={colors.accentLight}
-                strokeWidth={2.1}
-              />
-              <Circle
-                cx={userBatter.x}
-                cy={userBatter.y}
-                r={size * 0.042}
-                fill="none"
-                stroke={colors.accent}
-                strokeWidth={0.8}
-                opacity={0.6}
-              />
-              <Rect
-                x={userBadgeX}
-                y={userBadgeY}
-                width={userBadgeWidth}
-                height={userBadgeHeight}
-                rx={userBadgeHeight / 2}
-                fill="#10131E"
-                stroke={colors.accentLight}
-                strokeWidth={1.2}
-              />
-              <Circle
-                cx={userBadgeX + userBadgeHeight * 0.52}
-                cy={userBadgeY + userBadgeHeight / 2}
-                r={userBadgeHeight * 0.2}
-                fill={colors.accent}
-              />
-              <SvgText
-                x={userBadgeX + userBadgeWidth * 0.57}
-                y={userBadgeY + userBadgeHeight * 0.69}
-                fill={colors.white}
-                fontSize={Math.max(6.3, size * 0.024)}
-                fontWeight="700"
-                textAnchor="middle"
-              >
-                {userBadgeLabel}
-              </SvgText>
+              {floodlights.map((light, index) => (
+                <G key={'floodlight-' + index}>
+                  <Circle
+                    cx={light.x}
+                    cy={light.y}
+                    r={size * 0.025}
+                    fill={palette.rope}
+                    opacity={0.12}
+                  />
+                  <Circle
+                    cx={light.x}
+                    cy={light.y}
+                    r={size * 0.012}
+                    fill={colors.white}
+                    stroke={palette.rope}
+                    strokeWidth={1}
+                    opacity={0.94}
+                  />
+                  <Circle cx={light.x} cy={light.y} r={size * 0.004} fill={colors.white} />
+                </G>
+              ))}
             </G>
           ) : null}
-        </G>
+          <Rect
+            x={cx - size * 0.17}
+            y={size * 0.12}
+            width={size * 0.34}
+            height={size * 0.034}
+            rx={3}
+            fill="#10191F"
+          />
+          <Rect
+            x={cx - size * 0.17}
+            y={size * 0.86}
+            width={size * 0.34}
+            height={size * 0.034}
+            rx={3}
+            fill="#10191F"
+          />
+          <SvgText
+            x={cx}
+            y={size * 0.146}
+            fill="#D4DDDA"
+            fontSize={Math.max(6.5, size * 0.025)}
+            fontWeight="700"
+            textAnchor="middle"
+            letterSpacing={1}
+          >
+            STRIKER END
+          </SvgText>
+          <SvgText
+            x={cx}
+            y={size * 0.886}
+            fill="#D4DDDA"
+            fontSize={Math.max(6.5, size * 0.025)}
+            fontWeight="700"
+            textAnchor="middle"
+            letterSpacing={1}
+          >
+            BOWLER END
+          </SvgText>
 
-        {conditions?.weather === 'OVERCAST' ? (
-          <Circle cx={cx} cy={cy} r={groundR} fill="#C7D4DD" opacity={0.045} />
-        ) : conditions?.weather === 'HUMID' ? (
-          <Circle cx={cx} cy={cy} r={groundR} fill="#8BC9B3" opacity={0.035} />
-        ) : null}
-      </Svg>
+          <Circle cx={cx} cy={cy} r={groundR} fill="url(#field-outfield)" />
+          {graphics !== 'low' ? (
+            <G opacity={stadiumTheme === 'stadium_noir' ? 0.16 : 0.2}>
+              <Circle cx={cx} cy={cy} r={groundR * 0.82} fill={palette.outfieldLight} />
+              <Circle cx={cx} cy={cy} r={groundR * 0.64} fill={palette.outfield} />
+              <Circle cx={cx} cy={cy} r={groundR * 0.46} fill={palette.outfieldLight} />
+              <Circle cx={cx} cy={cy} r={groundR * 0.28} fill={palette.outfield} />
+            </G>
+          ) : null}
+          {graphics === 'high' ? (
+            <G fill={palette.rope} opacity={stadiumTheme === 'stadium_noir' ? 0.07 : 0.04}>
+              {floodlights.map((light, index) => (
+                <Path key={'floodlight-beam-' + index} d={light.beam} />
+              ))}
+            </G>
+          ) : null}
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={groundR}
+            fill="none"
+            stroke={colors.white}
+            strokeWidth={3.8}
+            opacity={0.8}
+          />
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={groundR - 2.3}
+            fill="none"
+            stroke={palette.rope}
+            strokeWidth={2.1}
+          />
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={innerR}
+            fill="none"
+            stroke={palette.ring}
+            strokeWidth={1.25}
+            strokeDasharray="5 5"
+            opacity={0.9}
+          />
 
-      {majorEvent ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.stadiumPulse,
-            {
-              left: cx - groundR,
-              top: cy - groundR,
-              width: groundR * 2,
-              height: groundR * 2,
-              borderRadius: groundR,
-              borderColor: eventPulseColor,
-              opacity: stadiumPulseOpacity,
-              transform: [{ scale: stadiumPulseScale }],
-            },
-          ]}
-        />
-      ) : null}
+          <Rect
+            x={cx - pitchWidth / 2 + size * 0.008}
+            y={pitchTop + size * 0.012}
+            width={pitchWidth}
+            height={pitchHeight}
+            rx={3}
+            fill="#020504"
+            opacity={0.36}
+          />
+          <Rect
+            x={cx - pitchWidth / 2}
+            y={pitchTop}
+            width={pitchWidth}
+            height={pitchHeight}
+            rx={2}
+            fill="url(#field-pitch)"
+            stroke="#E3C48C"
+            strokeWidth={0.8}
+            opacity={0.96}
+          />
+          {graphics !== 'low' ? (
+            <G opacity={0.28}>
+              <Line
+                x1={cx - pitchWidth * 0.28}
+                y1={pitchTop}
+                x2={cx - pitchWidth * 0.28}
+                y2={pitchTop + pitchHeight}
+                stroke="#FFF0C4"
+                strokeWidth={0.8}
+              />
+              <Line
+                x1={cx + pitchWidth * 0.28}
+                y1={pitchTop}
+                x2={cx + pitchWidth * 0.28}
+                y2={pitchTop + pitchHeight}
+                stroke="#6F4E2C"
+                strokeWidth={0.8}
+              />
+            </G>
+          ) : null}
+          {conditions?.pitch === 'CRACKED' ? (
+            <G opacity={0.55}>
+              <Path
+                d={'M ' + (cx - 7) + ' ' + (cy - 18) + ' l 4 6 -3 7 5 8 -4 8'}
+                fill="none"
+                stroke="#5B3B25"
+                strokeWidth={1}
+              />
+              <Path
+                d={'M ' + (cx + 8) + ' ' + (cy + 6) + ' l -3 5 4 6 -3 7'}
+                fill="none"
+                stroke="#5B3B25"
+                strokeWidth={0.9}
+              />
+            </G>
+          ) : null}
+          {conditions?.pitch === 'DUSTY' && graphics === 'high' ? (
+            <G fill="#6E4D2F" opacity={0.32}>
+              <Circle cx={cx - 7} cy={cy - 22} r={1.5} />
+              <Circle cx={cx + 5} cy={cy + 19} r={1.2} />
+              <Circle cx={cx - 3} cy={cy + 3} r={1} />
+            </G>
+          ) : null}
+          <Line
+            x1={cx - size * 0.09}
+            y1={strikerStumpY}
+            x2={cx + size * 0.09}
+            y2={strikerStumpY}
+            stroke={colors.white}
+            strokeWidth={1.5}
+            opacity={0.9}
+          />
+          <Line
+            x1={cx - size * 0.09}
+            y1={bowlerStumpY}
+            x2={cx + size * 0.09}
+            y2={bowlerStumpY}
+            stroke={colors.white}
+            strokeWidth={1.5}
+            opacity={0.9}
+          />
+          <Stumps x={cx} y={strikerStumpY} direction={-1} size={size} color={colors.white} />
+          <Stumps x={cx} y={bowlerStumpY} direction={1} size={size} color={colors.white} />
 
-      {majorEvent ? (
-        <>
+          {lastShot ? (
+            <G>
+              <Path
+                d={deliveryPath}
+                fill="none"
+                stroke={colors.white}
+                strokeWidth={1.35}
+                strokeDasharray="3 4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.34}
+              />
+              <Circle
+                cx={bounce.x}
+                cy={bounce.y}
+                r={size * 0.012}
+                fill="none"
+                stroke={colors.white}
+                strokeWidth={0.9}
+                opacity={0.5}
+              />
+              <Circle
+                cx={striker.x}
+                cy={striker.y}
+                r={size * 0.014}
+                fill={ballColor}
+                opacity={0.22}
+              />
+              {showShotPath ? (
+                <Path
+                  d={trajectory}
+                  fill="none"
+                  stroke={ballColor}
+                  strokeWidth={lastShot.tone === 'six' ? 2.25 : 2.6}
+                  strokeDasharray={lastShot.tone === 'six' ? '5 3' : undefined}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={0.72}
+                />
+              ) : null}
+            </G>
+          ) : null}
+
+          {caught ? (
+            <G>
+              <Circle
+                cx={fieldActionPoint.x}
+                cy={fieldActionPoint.y}
+                r={size * 0.035}
+                fill={colors.danger}
+                opacity={0.14}
+              />
+              <Circle
+                cx={fieldActionPoint.x}
+                cy={fieldActionPoint.y}
+                r={size * 0.025}
+                fill="none"
+                stroke={colors.danger}
+                strokeWidth={1.6}
+              />
+            </G>
+          ) : null}
+          {runOut ? (
+            <Circle
+              cx={nonStriker.x}
+              cy={nonStriker.y}
+              r={size * 0.032}
+              fill="none"
+              stroke={colors.danger}
+              strokeWidth={2}
+            />
+          ) : null}
+          {lastShot?.dismissalType === 'LBW' ? (
+            <Circle
+              cx={striker.x}
+              cy={striker.y + size * 0.016}
+              r={size * 0.03}
+              fill={colors.danger}
+              opacity={0.24}
+            />
+          ) : null}
+          {wicketAtStriker ? (
+            <G stroke={colors.danger} strokeWidth={1.8} strokeLinecap="round">
+              <Line
+                x1={cx - size * 0.014}
+                y1={strikerStumpY - size * 0.032}
+                x2={cx - size * 0.035}
+                y2={strikerStumpY - size * 0.045}
+              />
+              <Line
+                x1={cx + size * 0.014}
+                y1={strikerStumpY - size * 0.032}
+                x2={cx + size * 0.036}
+                y2={strikerStumpY - size * 0.018}
+              />
+            </G>
+          ) : null}
+
+          <G>
+            {userBatter && userBadgeLabel ? (
+              <G>
+                <Circle
+                  cx={userBatter.x}
+                  cy={userBatter.y}
+                  r={size * 0.034}
+                  fill="none"
+                  stroke={colors.accentLight}
+                  strokeWidth={2.1}
+                />
+                <Circle
+                  cx={userBatter.x}
+                  cy={userBatter.y}
+                  r={size * 0.042}
+                  fill="none"
+                  stroke={colors.accent}
+                  strokeWidth={0.8}
+                  opacity={0.6}
+                />
+                <Rect
+                  x={userBadgeX}
+                  y={userBadgeY}
+                  width={userBadgeWidth}
+                  height={userBadgeHeight}
+                  rx={userBadgeHeight / 2}
+                  fill="#10131E"
+                  stroke={colors.accentLight}
+                  strokeWidth={1.2}
+                />
+                <Circle
+                  cx={userBadgeX + userBadgeHeight * 0.52}
+                  cy={userBadgeY + userBadgeHeight / 2}
+                  r={userBadgeHeight * 0.2}
+                  fill={colors.accent}
+                />
+                <SvgText
+                  x={userBadgeX + userBadgeWidth * 0.57}
+                  y={userBadgeY + userBadgeHeight * 0.69}
+                  fill={colors.white}
+                  fontSize={Math.max(6.3, size * 0.024)}
+                  fontWeight="700"
+                  textAnchor="middle"
+                >
+                  {userBadgeLabel}
+                </SvgText>
+              </G>
+            ) : null}
+          </G>
+
+          {conditions?.weather === 'OVERCAST' ? (
+            <Circle cx={cx} cy={cy} r={groundR} fill="#C7D4DD" opacity={0.045} />
+          ) : conditions?.weather === 'HUMID' ? (
+            <Circle cx={cx} cy={cy} r={groundR} fill="#8BC9B3" opacity={0.035} />
+          ) : null}
+        </Svg>
+
+        {majorEvent ? (
           <Animated.View
             pointerEvents="none"
             style={[
-              styles.impactPulse,
+              styles.stadiumPulse,
               {
-                left: shotEnd.x - impactSize / 2,
-                top: shotEnd.y - impactSize / 2,
-                width: impactSize,
-                height: impactSize,
-                borderRadius: impactSize / 2,
+                left: cx - groundR,
+                top: cy - groundR,
+                width: groundR * 2,
+                height: groundR * 2,
+                borderRadius: groundR,
                 borderColor: eventPulseColor,
-                opacity: impactPulseOpacity,
-                transform: [{ scale: impactPulseScale }],
+                opacity: stadiumPulseOpacity,
+                transform: [{ scale: stadiumPulseScale }],
               },
             ]}
           />
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.impactCore,
-              {
-                left: shotEnd.x - size * 0.014,
-                top: shotEnd.y - size * 0.014,
-                width: size * 0.028,
-                height: size * 0.028,
-                borderRadius: size * 0.014,
-                backgroundColor: eventPulseColor,
-                opacity: impactPulseOpacity,
-                transform: [{ scale: impactCoreScale }],
-              },
-            ]}
-          />
-        </>
-      ) : null}
+        ) : null}
 
-      {fielders.map((fielder, index) => {
-        const reacting = reaction?.index === index;
+        {majorEvent ? (
+          <>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.impactPulse,
+                {
+                  left: shotEnd.x - impactSize / 2,
+                  top: shotEnd.y - impactSize / 2,
+                  width: impactSize,
+                  height: impactSize,
+                  borderRadius: impactSize / 2,
+                  borderColor: eventPulseColor,
+                  opacity: impactPulseOpacity,
+                  transform: [{ scale: impactPulseScale }],
+                },
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.impactCore,
+                {
+                  left: shotEnd.x - size * 0.014,
+                  top: shotEnd.y - size * 0.014,
+                  width: size * 0.028,
+                  height: size * 0.028,
+                  borderRadius: size * 0.014,
+                  backgroundColor: eventPulseColor,
+                  opacity: impactPulseOpacity,
+                  transform: [{ scale: impactCoreScale }],
+                },
+              ]}
+            />
+          </>
+        ) : null}
 
-        return (
-          <CricketerSprite
-            key={'fielder-' + index}
-            x={fielder.x}
-            y={fielder.y}
-            rotation={faceCentreRotation(fielder.x, fielder.y, cx, cy)}
-            scale={glyphScale * 0.98}
-            primary={fielderPrimary}
-            secondary={fielderSecondary}
-            role="fielder"
-            fieldSize={size}
-            style={
-              reacting
-                ? {
-                    transform: [
-                      { translateX: fielderTranslateX },
-                      { translateY: fielderTranslateY },
-                      { scale: fielderScale },
-                    ],
-                  }
-                : undefined
-            }
-          />
-        );
-      })}
-      <CricketerSprite
-        x={keeper.x}
-        y={keeper.y}
-        rotation={180}
-        scale={glyphScale * 1.14}
-        primary={fielderPrimary}
-        secondary={fielderSecondary}
-        role="keeper"
-        fieldSize={size}
-        style={{ transform: [{ translateY: keeperTranslateY }, { scale: keeperScale }] }}
-      />
-      <CricketerSprite
-        x={bowler.x}
-        y={bowler.y}
-        scale={glyphScale * 1.2}
-        primary={fielderPrimary}
-        secondary={fielderSecondary}
-        role="bowler"
-        fieldSize={size}
-        style={{ transform: [{ translateY: bowlerTranslateY }, { rotate: bowlerRotate }] }}
-      />
-      <CricketerSprite
-        x={nonStriker.x}
-        y={nonStriker.y}
-        scale={glyphScale * 1.1}
-        primary={batterPrimary}
-        secondary={batterSecondary}
-        role="batter"
-        fieldSize={size}
-        style={{ transform: [{ translateX: nonStrikerRunX }, { translateY: nonStrikerRunY }] }}
-      />
-      <CricketerSprite
-        x={striker.x}
-        y={striker.y}
-        rotation={180}
-        scale={glyphScale * 1.2}
-        primary={batterPrimary}
-        secondary={batterSecondary}
-        role="batter"
-        fieldSize={size}
-        style={{
-          transform: [
-            { translateX: strikerRunX },
-            { translateY: strikerRunY },
-            { rotate: batterRotate },
-            { scale: batterScale },
-          ],
-        }}
-      />
+        {fielders.map((fielder, index) => {
+          const reacting = reaction?.index === index;
 
-      {lastShot ? (
-        <>
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.ballShadow,
-              {
-                opacity: shadowOpacity,
-                transform: [{ translateX }, { translateY }, { scale: shadowScale }],
-              },
-            ]}
-          />
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.ball,
-              {
-                backgroundColor: ballColor,
-                opacity: ballOpacity,
-                transform: [{ translateX }, { translateY }, { scale }],
-              },
-            ]}
-          />
-        </>
-      ) : null}
-    </View>
+          return (
+            <CricketerSprite
+              key={'fielder-' + index}
+              x={fielder.x}
+              y={fielder.y}
+              rotation={faceCentreRotation(fielder.x, fielder.y, cx, cy)}
+              scale={cricketerScale('fielder')}
+              primary={fielderPrimary}
+              secondary={fielderSecondary}
+              role="fielder"
+              fieldSize={size}
+              style={
+                reacting
+                  ? {
+                      transform: [
+                        { translateX: fielderTranslateX },
+                        { translateY: fielderTranslateY },
+                        { scale: fielderScale },
+                      ],
+                    }
+                  : undefined
+              }
+            />
+          );
+        })}
+        <CricketerSprite
+          x={keeper.x}
+          y={keeper.y}
+          rotation={180}
+          scale={cricketerScale('keeper')}
+          primary={fielderPrimary}
+          secondary={fielderSecondary}
+          role="keeper"
+          fieldSize={size}
+          style={{ transform: [{ translateY: keeperTranslateY }, { scale: keeperScale }] }}
+        />
+        <CricketerSprite
+          x={bowler.x}
+          kitId={userIsBowler ? userKitId : undefined}
+          y={bowler.y}
+          scale={cricketerScale('bowler')}
+          primary={fielderPrimary}
+          secondary={fielderSecondary}
+          role="bowler"
+          fieldSize={size}
+          style={{ transform: [{ translateY: bowlerTranslateY }, { rotate: bowlerRotate }] }}
+        />
+        <CricketerSprite
+          x={nonStriker.x}
+          kitId={userBatterPosition === 'nonStriker' ? userKitId : undefined}
+          y={nonStriker.y}
+          scale={cricketerScale('batter')}
+          primary={batterPrimary}
+          secondary={batterSecondary}
+          role="batter"
+          fieldSize={size}
+          style={{ transform: [{ translateX: nonStrikerRunX }, { translateY: nonStrikerRunY }] }}
+        />
+        <CricketerSprite
+          x={striker.x}
+          kitId={userBatterPosition === 'striker' ? userKitId : undefined}
+          y={striker.y}
+          rotation={180}
+          scale={cricketerScale('batter')}
+          primary={batterPrimary}
+          secondary={batterSecondary}
+          role="batter"
+          fieldSize={size}
+          style={{
+            transform: [
+              { translateX: strikerRunX },
+              { translateY: strikerRunY },
+              { rotate: batterRotate },
+              { scale: batterScale },
+            ],
+          }}
+        />
+
+        {lastShot ? (
+          <>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.ballShadow,
+                {
+                  opacity: shadowOpacity,
+                  transform: [{ translateX }, { translateY }, { scale: shadowScale }],
+                },
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.ball,
+                {
+                  backgroundColor: '#FAF1DA',
+                  opacity: ballOpacity,
+                  transform: [{ translateX }, { translateY }, { scale }],
+                },
+              ]}
+            >
+              <View style={styles.ballSeam} />
+            </Animated.View>
+          </>
+        ) : null}
+      </View>
+      <View style={[styles.broadcastCaption, { width: size, borderTopColor: colors.border }]}>
+        <View
+          style={[
+            styles.resultMark,
+            { backgroundColor: colors.bgElevated, borderColor: ballColor },
+          ]}
+        >
+          <AppText
+            style={[styles.resultNumber, { color: lastShot ? ballColor : colors.textMuted }]}
+          >
+            {caption.mark}
+          </AppText>
+        </View>
+        <View style={styles.captionCopy}>
+          <AppText style={[styles.captionTitle, { color: colors.text }]} numberOfLines={1}>
+            {caption.title}
+          </AppText>
+          {caption.detail ? (
+            <AppText style={[styles.captionDetail, { color: colors.textMuted }]} numberOfLines={1}>
+              {caption.detail}
+            </AppText>
+          ) : null}
+        </View>
+      </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  broadcastCaption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+  },
+  resultMark: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultNumber: { fontSize: 21, fontWeight: '800' },
+  captionCopy: { flex: 1, minWidth: 0, gap: 2 },
+  captionTitle: { fontSize: 13, fontWeight: '700' },
+  captionDetail: { fontSize: 10, textTransform: 'capitalize' },
+  ballSeam: {
+    width: 3,
+    height: 7,
+    borderLeftWidth: 0.8,
+    borderRightWidth: 0.8,
+    borderColor: '#A33F3F',
+    transform: [{ rotate: '-30deg' }],
+    alignSelf: 'center',
+  },
   cricketerSprite: {
     position: 'absolute',
   },

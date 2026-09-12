@@ -117,6 +117,33 @@ Read the sections relevant to the task. These are durable product constraints di
 
 ## Economy, Store and Season Pass
 
+- September 11 final revision: merge the unlaunched `energy_refill` into
+  `form_recovery` (Mental Coaching Session), ₹99. Raise form and confidence to
+  at least 99 and top up Player Focus to 36 (60 with VIP). Preserve higher
+  values; block checkout only when all benefits are already satisfied. Keep
+  14 products, with no standalone refill. Offer dismissible shortage popups with
+  matching products and existing free alternatives; never auto-purchase.
+
+- September 11 launch override: sell the existing nine VIP/bundle/currency
+  products plus `form_recovery` (₹99), `transfer_budget_sm` (₹99 for $1,000,000
+  fictional club funds, once per season, unavailable on national duty),
+  `scout_full_reveal` (₹49), `facility_upgrade_token` (₹99) and `recovery_pack`
+  (₹99): 14 total. Postpone training accelerator, contract boost and both paid
+  save sponsors. Preserve existing ownership, inventory and reward handling.
+
+### September 8, 2026 override: separate permanent VIP
+
+- September 9 Manager Legacy investment: grant $1,000,000 fictional Club Balance
+  once to the purchased Manager save, never Wallet Coins or a restore/retirement
+  payout. Preserve the existing toolkit and other benefits.
+
+- New purchases use Player VIP (`player_vip`) and Manager VIP (`manager_vip`), ₹449 once each. Each applies across saves of its own mode only; it never grants the other mode.
+- Twelve existing themed collections are selectable in any order. One canonical completed in-game season earns one collection claim, with no expiry. Progress/claims are save-local; earned collection cosmetics carry into future careers on the same account and mode.
+- Both Player and Manager retirement grant remaining mode-appropriate collection cosmetics, never coins or consumable rewards (Manager extension approved September 9). Existing retirement eligibility stays unchanged; Manager uses its existing age-60 endpoint.
+- September 9: Manager Legacy includes Manager VIP, including verified existing-owner restores. Its approved reference price is ₹899; never restore toolkit tokens. Player Legend retains 1,200 Gems at ₹899 plus its existing benefits; the owner approved its one-time bundle advantage. Clearly label bundles as one-time purchases and retirement as cosmetics-only (no Coins, Gems or cash rewards).
+- New VIP replaces the paid tier track; useful free rewards remain. Preserve existing VIP and mode-appropriate pass benefits. Existing legacy shared permanent ownership and active timed subscriptions are preserved as legacy exceptions, not sold anew.
+- `docs/VIP_COLLECTIONS.md` defines current implementation and separate store/cloud release steps. The older subscription-specific bullets below apply only to legacy subscription handling, not new sales.
+
 - Wallet Coins, Gems, Training Focus/Energy, Club Balance and transfer budget have separate meanings. Never convert or relabel Wallet Coins as club finance.
 - Player coin income and training costs must be audited across a full career, not tuned from only season one. Manager seasonal cash must not make every upgrade trivial.
 - Store sections must never be empty without an explicit unavailable/loading state. Visible Buy buttons must work or be visibly disabled with the real reason.
@@ -146,6 +173,10 @@ Read the sections relevant to the task. These are durable product constraints di
 - QA APKs embed their JavaScript bundle and use the `qa` build type. They are debug-signed internal artifacts, not store releases.
 
 ## Legal and release constraints
+
+- September 11 public website override: display Maharashtra, India rather than
+  Navi Mumbai throughout website copy and metadata. This does not change private
+  store/payment/KYC records or invent a new legal address.
 
 - Publisher: Divakar Mishra, individual developer trading as Sunlight, Navi Mumbai, Maharashtra, India; contact `devsunlightpvt@gmail.com`.
 - Approved age policy: 18+ in India and 13+ elsewhere. The app is not directed to children and must not be placed in a children/families category.

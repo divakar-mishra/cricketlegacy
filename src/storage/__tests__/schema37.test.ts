@@ -110,6 +110,10 @@ describe('schema 37 dynamic sponsor branding', () => {
     eraseBrandFields(legacy);
     eraseBrandFields(expected);
     expected.schemaVersion = SAVE_SCHEMA_VERSION;
+    // Later migrations add empty VIP collection bookkeeping, not ownership or rewards.
+    expected.vipCollections = {
+      version: 1, mode: 'manager', owned: [], settledSeasons: [], credits: 0,
+    };
 
     const migrated = runMigrations(JSON.parse(JSON.stringify(legacy)))!;
     eraseBrandFields(migrated);

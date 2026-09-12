@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { playHaptic } from '../audio';
+import { showShortageOffer } from '../components/showShortageOffer';
 import { PlayerDevelopmentPanel } from '../components/PlayerDevelopmentPanel';
 import {
   Button,
@@ -361,8 +362,12 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
                       variant={groupTrainable && !blockedByCap ? 'primary' : 'secondary'}
                       fullWidth={false}
                       loading={isBusy}
-                      disabled={!groupTrainable || blockedByCap || !canAfford || !!busyGroup}
-                      onPress={() => void onTrain(group.id)}
+                      disabled={!groupTrainable || blockedByCap || !!busyGroup}
+                      onPress={() => {
+                        if (!canAfford && showShortageOffer(save, 'coins',
+                          (productId) => navigation.navigate('Purchase', { productId }), cost - save.wallet.coins)) return;
+                        void onTrain(group.id);
+                      }}
                     />
                   </View>
                   {attrs.map((attr) => (

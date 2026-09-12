@@ -17,8 +17,9 @@ interface OversizedStorageMigrationModule {
   migrateLegacyValue(key: string, chunkSize: number): Promise<boolean>;
 }
 
-const oversizedStorageMigration =
-  requireOptionalNativeModule<OversizedStorageMigrationModule>('OversizedStorageMigrationModule');
+const oversizedStorageMigration = requireOptionalNativeModule<OversizedStorageMigrationModule>(
+  'OversizedStorageMigrationModule',
+);
 
 function manifestKey(key: string): string {
   return `${key}${CHUNK_MANIFEST_SUFFIX}`;
@@ -53,10 +54,15 @@ async function readManifest(key: string): Promise<ChunkManifest | null> {
 }
 
 async function readChunkedValue(key: string, manifest: ChunkManifest): Promise<string> {
+  const keys = Array.from({ length: manifest.chunkCount },
+    (_, index) => chunkKey(key, manifest.generation, index));
+  const rows = new Map(await AsyncStorage.multiGet(keys));
   const chunks: string[] = [];
   for (let index = 0; index < manifest.chunkCount; index += 1) {
-    const chunk = await AsyncStorage.getItem(chunkKey(key, manifest.generation, index));
-    if (chunk == null) throw new Error(`Missing storage chunk ${index + 1}/${manifest.chunkCount}.`);
+    // Reconstruct in manifest order, never in the database's result order.
+    const chunk = rows.get(keys[index]);
+    if (chunk == null)
+      throw new Error(`Missing storage chunk ${index + 1}/${manifest.chunkCount}.`);
     chunks.push(chunk);
   }
   const raw = chunks.join('');
@@ -65,7 +71,9 @@ async function readChunkedValue(key: string, manifest: ChunkManifest): Promise<s
 }
 
 async function readStoredValue(key: string): Promise<string | null> {
-  const manifest = await readManifest(key);
+  const rawManifest = await AsyncStorage.getItem(manifestKey(key));
+  const manifest = parseManifest(rawManifest);
+  if (rawManifest !== null && !manifest) throw new Error('Invalid storage manifest.');
   if (manifest) return readChunkedValue(key, manifest);
   return AsyncStorage.getItem(key);
 }
@@ -102,12 +110,25 @@ function splitIntoChunks(raw: string): string[] {
 
 async function removeManifestChunks(key: string, manifest: ChunkManifest | null): Promise<void> {
   if (!manifest) return;
-  for (let index = 0; index < manifest.chunkCount; index += 1) {
-    await AsyncStorage.removeItem(chunkKey(key, manifest.generation, index));
-  }
+  await AsyncStorage.multiRemove(Array.from({ length: manifest.chunkCount },
+    (_, index) => chunkKey(key, manifest.generation, index)));
 }
 
 /** Thin typed JSON wrapper around AsyncStorage. */
+export async function getJSONStrict<T>(key: string): Promise<T | null> {
+  let raw: string | null;
+  try {
+    raw = await readStoredValue(key);
+  } catch (error) {
+    if (!(await migrateOversizedLegacyRow(key, error))) throw error;
+    raw = await readStoredValue(key);
+  }
+  if (raw === null) return null;
+  const parsed = JSON.parse(raw) as T;
+  if (parsed === null) throw new Error('Stored JSON null is not an empty slot.');
+  return parsed;
+}
+
 export async function getJSON<T>(key: string): Promise<T | null> {
   try {
     const raw = await readStoredValue(key);
@@ -145,9 +166,10 @@ export async function setJSON(key: string, value: unknown): Promise<void> {
 
     const generation = `${Date.now().toString(36)}-${(chunkGeneration += 1).toString(36)}`;
     const chunks = splitIntoChunks(raw);
-    for (let index = 0; index < chunks.length; index += 1) {
-      await AsyncStorage.setItem(chunkKey(key, generation, index), chunks[index]);
-    }
+    // One native batch/SQLite transaction, instead of a round trip and
+    // transaction for every chunk. Publish the manifest only after success.
+    await AsyncStorage.multiSet(chunks.map((chunk, index) =>
+      [chunkKey(key, generation, index), chunk] as [string, string]));
     const nextManifest: ChunkManifest = {
       __chunked: 1,
       generation,

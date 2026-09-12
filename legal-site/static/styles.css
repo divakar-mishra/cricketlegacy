@@ -385,15 +385,15 @@ h3 {
 }
 
 .product-art-cricket-legacy {
-  background:
-    linear-gradient(90deg, transparent 49.65%, rgba(239, 232, 213, 0.5) 49.65% 50.35%, transparent 50.35%),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 2.4rem, transparent 2.4rem 4.8rem),
-    linear-gradient(155deg, #2c6a43, #173b2a 55%, #0d251a);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(circle, #173b2a, #0d251a);
 }
 
 .product-art-cricket-legacy::before,
 .product-art-cricket-legacy::after {
-  content: "";
+  content: none;
   position: absolute;
   left: 50%;
   width: 10rem;
@@ -802,3 +802,11 @@ footer strong {
     transition: none !important;
   }
 }
+:root { --app-icon-max-size: 280px; }
+.product-art .app-icon, .product-icon-panel .app-icon {
+  display: block;
+  width: min(100%, var(--app-icon-max-size));
+  height: auto;
+  object-fit: contain;
+}
+.product-icon-panel { display: grid; justify-items: center; gap: 16px; padding: 24px; }

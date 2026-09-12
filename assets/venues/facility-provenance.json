@@ -1,0 +1,56 @@
+{
+  "method": "Built-in image generation (stylized-concept). Academy level 3 supplied as style reference, not an edit target. No CLI/API fallback.",
+  "delivery": "1020x680 WebP quality 85, resized/converted with sharp only; original PNGs retained.",
+  "assets": [
+    {
+      "file": "training-1.webp",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-77f1f9ba-505d-4668-993c-0acc12344a27.png",
+      "prompt": "Create a game facility asset matching the attached reference's exact stylised 2.5D isometric diorama style: chunky cream buildings, flat teal roofs, soft blue windows, fresh grass, geometric trees, smooth painted surfaces, friendly daylight, seamless charcoal navy backdrop. Landscape 3:2, whole plot fits with comfortable margins, no text/logos/UI/people/watermarks. This is a separate facility, not an academy. Fixed high three-quarter camera. Facility: training, visual progression level 1 of 5. Exactly ONE outdoor cricket practice net lane with tan pitch, white creases and wickets; compact equipment pavilion behind with bats and kit rack; small agility ladder and cones on adjacent grass."
+    },
+    {
+      "file": "training-2.webp",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-59a3c044-8a11-4a24-9a4a-1f99b1ec2531.png",
+      "prompt": "Create a game facility asset matching the attached reference's exact stylised 2.5D isometric diorama style: chunky cream buildings, flat teal roofs, soft blue windows, fresh grass, geometric trees, smooth painted surfaces, friendly daylight, seamless charcoal navy backdrop. Landscape 3:2, whole plot fits with comfortable margins, no text/logos/UI/people/watermarks. This is a separate facility, not an academy. Fixed high three-quarter camera. Facility: training, visual progression level 2 of 5. Exactly TWO parallel outdoor cricket practice net lanes with tan pitches, white creases and wickets; compact equipment pavilion behind with bats and kit rack; small agility ladder and cones on adjacent grass."
+    },
+    {
+      "file": "training-3.webp",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-7bd40ca7-eb53-4bce-b733-42a10465c7bd.png",
+      "prompt": "Create a game facility asset matching the attached reference's exact stylised 2.5D isometric diorama style: chunky cream buildings, flat teal roofs, soft blue windows, fresh grass, geometric trees, smooth painted surfaces, friendly daylight, seamless charcoal navy backdrop. Landscape 3:2, whole plot fits with comfortable margins, no text/logos/UI/people/watermarks. This is a separate facility, not an academy. Fixed high three-quarter camera. Facility: training, visual progression level 3 of 5. Exactly THREE parallel outdoor cricket practice net lanes with tan pitches, white creases and wickets; compact equipment pavilion behind with bats and kit rack; small agility ladder and cones on adjacent grass."
+    },
+    {
+      "file": "training-4.webp",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-525e992f-e0aa-4575-b0f9-d9550516aa8c.png",
+      "prompt": "Create a game facility asset matching the attached reference's exact stylised 2.5D isometric diorama style: chunky cream buildings, flat teal roofs, soft blue windows, fresh grass, geometric trees, smooth painted surfaces, friendly daylight, seamless charcoal navy backdrop. Landscape 3:2, whole plot fits with comfortable margins, no text/logos/UI/people/watermarks. This is a separate facility, not an academy. Fixed high three-quarter camera. Facility: training, visual progression level 4 of 5. Exactly THREE outdoor cricket net lanes, equipment pavilion behind; add a clearly visible covered training hall at right, open front showing indoor practice strip. Grass agility ladder and cones."
+    },
+    {
+      "file": "training-5.webp",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-da4da462-2a70-4318-b469-b3433199f9f8.png",
+      "prompt": "Create a game facility asset matching the attached reference's exact stylised 2.5D isometric diorama style: chunky cream buildings, flat teal roofs, soft blue windows, fresh grass, geometric trees, smooth painted surfaces, friendly daylight, seamless charcoal navy backdrop. Landscape 3:2, whole plot fits with comfortable margins, no text/logos/UI/people/watermarks. This is a separate facility, not an academy. Fixed high three-quarter camera. Facility: training, visual progression level 5 of 5. Performance campus with exactly THREE outdoor cricket net lanes, equipment pavilion behind, covered training hall right, additional modern two-storey fitness wing, small organised agility lawn. Not a stadium."
+    },
+    {
+      "file": "medical-1.webp",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-ead28770-c7fe-42a9-bbcc-f8f55d8944f2.png",
+      "prompt": "Create a game facility asset matching the attached reference's exact stylised 2.5D isometric diorama style: chunky cream buildings, flat teal roofs, soft blue windows, fresh grass, geometric trees, smooth painted surfaces, friendly daylight, seamless charcoal navy backdrop. Landscape 3:2, whole plot fits with comfortable margins, no text/logos/UI/people/watermarks. This is a separate facility, not an academy. Fixed high three-quarter camera. Facility: medical, visual progression level 1 of 5. Small cream physiotherapy clinic as an open-front cutaway, exactly ONE padded teal treatment couch clearly visible inside; small cabinet, equipment trolley, teal flat roof, grass plot and two trees. No crosses or medical emblems."
+    },
+    {
+      "file": "medical-2.webp",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-0f55ef8e-6a2c-4c01-be1c-b6c2347a61c7.png",
+      "prompt": "Create a game facility asset matching the attached reference's exact stylised 2.5D isometric diorama style: chunky cream buildings, flat teal roofs, soft blue windows, fresh grass, geometric trees, smooth painted surfaces, friendly daylight, seamless charcoal navy backdrop. Landscape 3:2, whole plot fits with comfortable margins, no text/logos/UI/people/watermarks. This is a separate facility, not an academy. Fixed high three-quarter camera. Facility: medical, visual progression level 2 of 5. Same compact cream open-front physiotherapy clinic, expanded width with exactly TWO clearly visible padded teal treatment couches, cabinet and trolley, teal roof, grass plot trees. No crosses or medical emblems."
+    },
+    {
+      "file": "medical-3.webp",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-3527ee56-dff0-4c97-a57e-83c86e3f5ba9.png",
+      "prompt": "Create a game facility asset matching the attached reference's exact stylised 2.5D isometric diorama style: chunky cream buildings, flat teal roofs, soft blue windows, fresh grass, geometric trees, smooth painted surfaces, friendly daylight, seamless charcoal navy backdrop. Landscape 3:2, whole plot fits with comfortable margins, no text/logos/UI/people/watermarks. This is a separate facility, not an academy. Fixed high three-quarter camera. Facility: medical, visual progression level 3 of 5. Cream open-front physiotherapy clinic with TWO padded treatment couches, adjacent clearly visible rehabilitation exercise area with teal floor mats and parallel walking rails; teal roof grass plot trees. No crosses or medical emblems."
+    },
+    {
+      "file": "medical-4.webp",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-4090520c-bc7e-4c87-9f87-5c4a54537bac.png",
+      "prompt": "Create a game facility asset matching the attached reference's exact stylised 2.5D isometric diorama style: chunky cream buildings, flat teal roofs, soft blue windows, fresh grass, geometric trees, smooth painted surfaces, friendly daylight, seamless charcoal navy backdrop. Landscape 3:2, whole plot fits with comfortable margins, no text/logos/UI/people/watermarks. This is a separate facility, not an academy. Fixed high three-quarter camera. Facility: medical, visual progression level 4 of 5. Cream open-front clinic with TWO treatment couches and rehabilitation exercise area with mats and walking rails; add a separate recovery wing with recliner chairs visible. Teal roofs, grass plot trees. No crosses or medical emblems."
+    },
+    {
+      "file": "medical-5.webp",
+      "original": "/Users/divakarmishra/.codex/generated_images/01a038e0-4367-7450-a655-5c037e061a47/exec-fb1d44e3-37be-4f05-82d7-79dc7c5326fb.png",
+      "prompt": "Create a game facility asset matching the attached reference's exact stylised 2.5D isometric diorama style: chunky cream buildings, flat teal roofs, soft blue windows, fresh grass, geometric trees, smooth painted surfaces, friendly daylight, seamless charcoal navy backdrop. Landscape 3:2, whole plot fits with comfortable margins, no text/logos/UI/people/watermarks. This is a separate facility, not an academy. Fixed high three-quarter camera. Facility: medical, visual progression level 5 of 5. Sports-health campus: cream open-front clinic with TWO treatment couches, rehabilitation gym with exercise bikes mats and walking rails, recovery wing with recliners, upper blue-glass consulting floor and landscaped courtyard. Teal roofs grass plot trees. No crosses or medical emblems."
+    }
+  ]
+}

@@ -16,7 +16,7 @@ const root = path.join(__dirname, '..', '..', '..');
 const approvedFacts = {
   appName: 'Cricket Legacy',
   site: {
-    tagline: 'Independent games and apps from Navi Mumbai.',
+    tagline: 'Independent games and apps from Maharashtra, India.',
     description: 'Sunlight publisher site.',
   },
   products: [
@@ -39,7 +39,7 @@ const approvedFacts = {
     legalName: 'Divakar Mishra',
     tradingName: 'Sunlight',
     entityType: 'individual developer',
-    location: 'Navi Mumbai, Maharashtra, India',
+    location: 'Maharashtra, India',
     email: 'devsunlightpvt@gmail.com',
   },
   effectiveDate: '2026-09-01',
@@ -54,6 +54,33 @@ const approvedFacts = {
 };
 
 describe('Cloudflare legal and support site', () => {
+  it('provides an app-specific privacy route while preserving the old app link', () => {
+    const pages = renderLegalSite({ ...approvedFacts, agePolicy: 'india_18_elsewhere_13' });
+    const privacy = pages['products/cricket-legacy/privacy/index.html'];
+    expect(privacy).toContain('<h1>Cricket Legacy Privacy Policy</h1>');
+    expect(privacy).toContain('data-legal-page="privacy"');
+    expect(privacy).toContain('It does not apply to other apps');
+    expect(pages['privacy/index.html']).toContain('It does not apply to other apps');
+    expect(pages['products/cricket-legacy/index.html']).toContain('href="/products/cricket-legacy/privacy/"');
+  });
+  it('omits city-level location from every production page and metadata', () => {
+    const config = JSON.parse(fs.readFileSync(path.join(root, 'legal-site', 'legal.config.json'), 'utf8'));
+    expect(config.publisher.location).toBe('Maharashtra, India');
+    for (const html of Object.values(renderLegalSite(config))) {
+      expect(html).not.toMatch(/Navi\s+Mumbai/i);
+      expect(html).toContain('Maharashtra, India');
+    }
+  });
+  it('describes permanent mode-specific VIP and one-time currency grants', () => {
+    const pages = renderLegalSite({ ...approvedFacts, agePolicy: 'india_18_elsewhere_13' });
+    const terms = pages['terms/index.html'];
+    expect(terms).toContain('one-time purchases, not a recurring Season Pass');
+    expect(terms).toContain('neither unlocks the other mode');
+    expect(terms).toContain('not Coins, Gems, club funds or consumable rewards');
+    expect(terms).toContain('are not reissued by restoring purchases');
+    expect(terms).toContain('If you have a legacy subscription');
+    expect(terms).not.toContain('A Season Pass renews automatically');
+  });
   it.each(Object.keys(AGE_POLICIES))('renders every route for age policy %s', (agePolicy) => {
     const pages = renderLegalSite({ ...approvedFacts, agePolicy });
     expect(Object.keys(pages).sort()).toEqual([
@@ -61,13 +88,14 @@ describe('Cloudflare legal and support site', () => {
       'index.html',
       'privacy/index.html',
       'products/cricket-legacy/index.html',
+      'products/cricket-legacy/privacy/index.html',
       'publisher/index.html',
       'support/index.html',
       'terms/index.html',
     ]);
     for (const html of Object.values(pages)) {
       expect(html).toContain('devsunlightpvt@gmail.com');
-      expect(html).toContain('Navi Mumbai, Maharashtra, India');
+      expect(html).toContain('Maharashtra, India');
       expect(html).not.toContain('Sunlight Pvt');
     }
     expect(
@@ -94,6 +122,8 @@ describe('Cloudflare legal and support site', () => {
       'data-legal-page="product"',
     );
     expect(pages['products/cricket-legacy/index.html']).toContain('Player Career');
+    expect(pages['index.html']).toContain('src="/images/cricket-legacy-icon.png"');
+    expect(pages['products/cricket-legacy/index.html']).toContain('alt="Cricket Legacy app icon"');
     expect(pages['products/cricket-legacy/index.html']).toContain('<span>Player</span>');
     expect(pages['products/cricket-legacy/index.html']).toContain('<span>Manager</span>');
     expect(pages['products/cricket-legacy/index.html']).not.toContain('<span>PLR</span>');

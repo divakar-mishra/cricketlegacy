@@ -130,7 +130,7 @@ export type ProductKind = 'coins' | 'gems' | 'consumable' | 'entitlement';
 export type StoreProductCategory = 'SUBSCRIPTION' | 'NON_SUBSCRIPTION';
 export type SaveSponsorProductId = 'player_save_sponsor' | 'manager_save_sponsor';
 export type RestorableProductId =
-  'remove_ads' | 'bundle_legend' | 'manager_legend_pack' | 'season_pass';
+  'remove_ads' | 'player_vip' | 'manager_vip' | 'bundle_legend' | 'manager_legend_pack' | 'season_pass';
 
 const SAVE_SPONSOR_PRODUCT_IDS = new Set<SaveSponsorProductId>([
   'player_save_sponsor',
@@ -144,6 +144,8 @@ const SAVE_SPONSOR_PRODUCT_IDS = new Set<SaveSponsorProductId>([
  * or move a purchase that was explicitly bound to one save.
  */
 const RESTORABLE_PRODUCT_IDS = new Set<RestorableProductId>([
+  'player_vip',
+  'manager_vip',
   'remove_ads',
   'bundle_legend',
   'manager_legend_pack',
@@ -227,6 +229,7 @@ export interface Product {
 export interface PurchaseResult {
   ok: boolean;
   productId: string;
+  accountId?: string;
   /** Store/provider purchase token. Used by the career store to prevent duplicate grants. */
   purchaseToken?: string;
   /** PENDING purchases must not be fulfilled. */
@@ -308,6 +311,20 @@ export async function getEntitlementSnapshot(productId: string): Promise<Entitle
   } catch {
     return { status: 'UNAVAILABLE' };
   }
+}
+
+/** Permanent ownership refresh, including legacy products. UNAVAILABLE never revokes offline access. */
+export async function getPermanentVipSnapshot(): Promise<{ accountId: string; ids: RestorableProductId[] } | null> {
+  if (MOCK_MODE || !(await synchronizePurchaseIdentity())) return null;
+  const accountId = _rcAppUserId;
+  const epoch = _rcIdentityEpoch;
+  const RC = loadRevenueCat();
+  if (!RC || !accountId) return null;
+  try {
+    const info = await RC.getCustomerInfo();
+    if (epoch !== _rcIdentityEpoch || accountId !== _rcAppUserId) return null;
+    return { accountId, ids: restorableProductIdsFromCustomerInfo(info) };
+  } catch { return null; }
 }
 
 /** RevenueCat 10.x exposes the store identity on the transaction object. */
@@ -403,25 +420,25 @@ const CATALOG: readonly ExtendedProduct[] = [
   {
     id: 'bundle_legend',
     title: 'Player Legend Edition',
-    description: '40,000 coins · 1,200 gems · No ads · 60 energy · Cosmetics',
-    priceString: '₹999',
+    description: '40,000 coins · 1,200 gems · No ads · 60 Focus capacity · Cosmetics',
+    priceString: '₹899',
     kind: 'entitlement',
-    badge: 'Best Value',
+    badge: 'One-time bundle',
   },
 
   // --- Entitlements ---
   {
-    id: 'remove_ads',
-    title: 'VIP Upgrade + Remove Ads',
-    description: 'No ads · 60 energy · +20% match coins',
-    priceString: '₹299',
+    id: 'player_vip',
+    title: 'Player VIP',
+    description: 'Permanent Player access · No ads · 12 collectible sets',
+    priceString: '₹449',
     kind: 'entitlement',
   },
   {
-    id: 'season_pass',
-    title: 'Season Pass Premium',
-    description: '30 days · Rewards, stories, themes and no ads',
-    priceString: '₹299',
+    id: 'manager_vip',
+    title: 'Manager VIP',
+    description: 'Permanent Manager access · No ads · 12 office collections',
+    priceString: '₹449',
     kind: 'entitlement',
     badge: 'Most Popular',
   },
@@ -431,16 +448,16 @@ const CATALOG: readonly ExtendedProduct[] = [
   {
     id: 'manager_legend_pack',
     title: 'Manager Legacy Edition',
-    description: 'Permanent backing · Boardroom · Toolkit',
-    priceString: '₹599',
+    description: 'Manager VIP · $1,000,000 Club Balance · Boardroom · Toolkit',
+    priceString: '₹899',
     kind: 'entitlement',
     badge: 'Manager',
   },
   {
     id: 'transfer_budget_sm',
     title: 'Transfer Budget Boost',
-    description: '+₹500,000 transfer budget · Once per season',
-    priceString: '₹149',
+    description: '+$1,000,000 fictional Club Balance · Once per season',
+    priceString: '₹99',
     kind: 'consumable',
     badge: 'Manager',
   },
@@ -457,7 +474,7 @@ const CATALOG: readonly ExtendedProduct[] = [
     title: 'Instant Facility Upgrade',
     description:
       'Optional shortcut for one facility level. Club Balance upgrades stay available; normal upkeep still applies.',
-    priceString: '₹199',
+    priceString: '₹99',
     kind: 'consumable',
     badge: 'Manager',
   },
@@ -465,7 +482,7 @@ const CATALOG: readonly ExtendedProduct[] = [
     id: 'recovery_pack',
     title: 'Squad Conditioning Pack',
     description:
-      '1 token gives non-injured players +20 condition, +20 fitness and +15 morale. No injury healing.',
+      '1 token gives non-injured players +20 condition, +20 fitness and +15 morale.',
     priceString: '₹99',
     kind: 'consumable',
   },
@@ -484,8 +501,8 @@ const CATALOG: readonly ExtendedProduct[] = [
     id: 'form_recovery',
     title: 'Mental Coaching Session',
     description:
-      'Sets form to at least 70 and confidence to at least 65. Attributes stay unchanged.',
-    priceString: '₹49',
+      'Form and confidence to at least 99 · Full Focus: 36, or 60 with VIP · This Player save',
+    priceString: '₹99',
     kind: 'consumable',
   },
   {
@@ -514,20 +531,25 @@ const CATALOG: readonly ExtendedProduct[] = [
   },
 ];
 
+// Keep metadata and fulfilment for existing rewards; postpone new sales.
+const POSTPONED_PRODUCT_IDS: ReadonlySet<string> = new Set([
+  'training_accelerator', 'contract_boost', 'player_save_sponsor', 'manager_save_sponsor',
+]);
+const LAUNCH_CATALOG = CATALOG.filter((product) => !POSTPONED_PRODUCT_IDS.has(product.id));
+
 /** Products intentionally surfaced in each active career mode. */
 export const MODE_STORE_PRODUCT_IDS = {
-  career: ['training_accelerator', 'contract_boost', 'form_recovery', 'player_save_sponsor'],
+  career: ['form_recovery'],
   manager: [
     'scout_full_reveal',
     'facility_upgrade_token',
     'recovery_pack',
     'transfer_budget_sm',
-    'manager_save_sponsor',
   ],
 } as const;
 
 /** Account-wide products that remain useful in either career mode. */
-export const SHARED_STORE_PRODUCT_IDS = ['remove_ads'] as const;
+export const SHARED_STORE_PRODUCT_IDS: readonly string[] = [];
 
 /** What each catalog product grants on success (business-facing, not applied here). */
 export const GRANTS: Readonly<Record<string, PurchaseGrant>> = {
@@ -538,6 +560,8 @@ export const GRANTS: Readonly<Record<string, PurchaseGrant>> = {
   gems_large: { gems: 1_200 },
   bundle_legend: { coins: 40_000, gems: 1_200, entitlement: { removeAds: true } },
   remove_ads: { entitlement: { removeAds: true } },
+  player_vip: { entitlement: {} },
+  manager_vip: { entitlement: {} },
   season_pass: { entitlement: {} },
   // Manager-specific (budget injections handled in store, not wallet)
   transfer_budget_sm: { coins: 0 }, // handled specially in store
@@ -572,10 +596,10 @@ export async function getProducts(): Promise<ExtendedProduct[]> {
   if (!MOCK_MODE && (await synchronizePurchaseIdentity()) && isStoreReady()) {
     try {
       const RC = loadRevenueCat();
-      const ids = CATALOG.map((p) => p.id);
+      const ids = LAUNCH_CATALOG.map((p) => p.id);
       const store = await fetchStoreProducts(RC, ids);
       const priceById = new Map(store.map((s) => [s.identifier, s.priceString]));
-      return CATALOG.map((p) => ({
+      return LAUNCH_CATALOG.map((p) => ({
         ...p,
         priceString: priceById.get(p.id) ?? PRICE_UNAVAILABLE,
       }));
@@ -584,9 +608,9 @@ export async function getProducts(): Promise<ExtendedProduct[]> {
     }
   }
   if (!MOCK_MODE) {
-    return CATALOG.map((p) => ({ ...p, priceString: PRICE_UNAVAILABLE }));
+    return LAUNCH_CATALOG.map((p) => ({ ...p, priceString: PRICE_UNAVAILABLE }));
   }
-  return CATALOG.map((p) => ({ ...p }));
+  return LAUNCH_CATALOG.map((p) => ({ ...p }));
 }
 
 /**
@@ -595,10 +619,20 @@ export async function getProducts(): Promise<ExtendedProduct[]> {
  * downstream entitlement/wallet flow can be tested without a store.
  */
 export async function purchase(productId: string): Promise<PurchaseResult> {
+  // The unreleased standalone refill was merged into Mental Coaching.
+  if (productId === 'energy_refill') {
+    return { ok: false, productId, error: 'retired_product' };
+  }
+  if (productId === 'season_pass' || productId === 'remove_ads') {
+    return { ok: false, productId, error: 'retired_product' };
+  }
   const product = CATALOG.find((p) => p.id === productId);
   if (!product) return { ok: false, productId, error: 'unknown_product' };
   if (isSaveSponsorProduct(productId) && !isSaveSponsorCheckoutReady()) {
     return { ok: false, productId, error: 'save_sponsor_checkout_not_ready' };
+  }
+  if (POSTPONED_PRODUCT_IDS.has(productId)) {
+    return { ok: false, productId, error: 'This product is not available at launch.' };
   }
 
   if (MOCK_MODE) {
@@ -622,6 +656,14 @@ export async function purchase(productId: string): Promise<PurchaseResult> {
     };
   }
 
+  if (process.env.EXPO_PUBLIC_PLAY_INTEGRITY_ENABLED === 'true') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const integrity: typeof import('./appIntegrity') = require('./appIntegrity');
+    const verdict = await integrity.checkAppIntegrity(true);
+    if (verdict !== 'VERIFIED' && verdict !== 'SKIPPED') {
+      return { ok: false, productId, error: 'Connect to verify the official Google Play installation before purchasing.' };
+    }
+  }
   if (!(await synchronizePurchaseIdentity())) {
     return { ok: false, productId, error: 'recoverable_sign_in_required' };
   }
@@ -629,10 +671,18 @@ export async function purchase(productId: string): Promise<PurchaseResult> {
   if (!RC || !_rcConfigured) return { ok: false, productId, error: 'not_configured' };
 
   try {
+    const purchaseAccountId = _rcAppUserId;
+    const purchaseEpoch = _rcIdentityEpoch;
+    if (isRestorableProduct(productId) && activeProviderEntitlement(await RC.getCustomerInfo(), productId)) {
+      return { ok: false, productId, error: 'already_owned_restore_purchases' };
+    }
     const store = await fetchStoreProducts(RC, [productId]);
     const sku = store.find((s) => s.identifier === productId);
     if (!sku) return { ok: false, productId, error: 'unavailable' };
     const result = await RC.purchaseStoreProduct(sku);
+    if (purchaseEpoch !== _rcIdentityEpoch || purchaseAccountId !== _rcAppUserId) {
+      return { ok: false, productId, error: 'purchase_account_changed' };
+    }
     const token = providerTransactionIdentifier(result);
     if (!token) return { ok: false, productId, error: 'missing_transaction_id' };
     const now = Date.now();
@@ -647,12 +697,17 @@ export async function purchase(productId: string): Promise<PurchaseResult> {
     if (productId === 'season_pass' && !entitlement) {
       return { ok: false, productId, error: 'season_pass_entitlement_inactive' };
     }
+    if ((productId === 'player_vip' || productId === 'manager_vip') &&
+      !activeProviderEntitlement(result.customerInfo, productId)) {
+      return { ok: false, productId, error: 'vip_entitlement_inactive' };
+    }
     return {
       ok: true,
       productId,
       purchaseToken: token,
       purchaseState: 'PURCHASED',
       verificationState: 'VERIFIED',
+      accountId: purchaseAccountId ?? undefined,
       entitlement,
     };
   } catch (e) {
@@ -691,7 +746,12 @@ export async function restore(): Promise<RestoreResult> {
     return { status: 'NOT_CONFIGURED', purchases: [], error: 'not_configured' };
   }
   try {
+    const restoreAccountId = _rcAppUserId;
+    const restoreEpoch = _rcIdentityEpoch;
     const info = await RC.restorePurchases();
+    if (restoreEpoch !== _rcIdentityEpoch || restoreAccountId !== _rcAppUserId) {
+      return { status: 'FAILED', purchases: [], error: 'purchase_account_changed' };
+    }
     const ids = restorableProductIdsFromCustomerInfo(info);
     const now = Date.now();
     const restored = ids.flatMap((productId): PurchaseResult[] => {
@@ -708,6 +768,7 @@ export async function restore(): Promise<RestoreResult> {
           productId,
           purchaseState: 'PURCHASED' as const,
           verificationState: 'VERIFIED' as const,
+          accountId: restoreAccountId ?? undefined,
           entitlement,
         },
       ];

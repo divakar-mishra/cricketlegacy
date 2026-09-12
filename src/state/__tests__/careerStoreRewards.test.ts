@@ -1,4 +1,15 @@
 import type { DailyChallenge } from '../../domain/types';
+jest.mock('../../services/vipArchive', () => ({ syncVipArchive: jest.fn(async () => {}) }));
+
+// This suite tests fulfilment; native AES/Keystore and durable storage have their
+// own integration tests in encryptedSaves.test.ts. AsyncStorage here is a no-op.
+jest.mock('../../storage/saveEncryption', () => ({
+  openSave: async () => null,
+  verifySaveIdentity: async () => null,
+  sealSave: async () => ({ __env: 2, algorithm: 'AES-256-GCM', data: 'test-only' }),
+  markSaveSealed: async () => undefined,
+  deleteSaveKey: async () => undefined,
+}));
 
 jest.mock('react-native', () => ({
   InteractionManager: {
@@ -38,6 +49,44 @@ const { purchases } = jest.requireActual<typeof import('../../services')>('../..
 const originalPersist = useCareer.getState().persist;
 const originalPersistCritical = useCareer.getState().persistCritical;
 
+describe('owned reward quick equip', () => {
+  beforeEach(() => useCareer.setState({ persist: jest.fn(async () => {}) }));
+  afterEach(() => useCareer.setState({ persist: originalPersist }));
+  it('equips an owned kit without spending or granting rewards and preserves identity', () => {
+    const save = makeCareerSave();
+    save.inventory = { pass_kit_noir: 1 };
+    save.cosmetics = { avatar: 'avatar_custom', kit: 'kit_white', celebration: 'cel_wave', shirtName: 'PRESCOTT', shirtNumber: 17 };
+    useCareer.getState().setActive(save, 'career', 1);
+    const before = { ...useCareer.getState().save!.wallet };
+    expect(useCareer.getState().equipOwnedReward('pass_kit_noir', save.id).ok).toBe(true);
+    expect(useCareer.getState().save!.cosmetics).toMatchObject({ kit: 'pass_kit_noir', shirtName: 'PRESCOTT', shirtNumber: 17 });
+    expect(useCareer.getState().save!.wallet).toEqual(before);
+    expect(useCareer.getState().save!.inventory?.pass_kit_noir).toBe(1);
+  });
+  it('rejects locked rewards, unknown IDs and popups from another save', () => {
+    const save = makeCareerSave();
+    useCareer.getState().setActive(save, 'career', 1);
+    for (const [item, id] of [['pass_kit_noir', save.id], ['unknown', save.id], ['pass_kit_noir', 'another-save']]) {
+      expect(useCareer.getState().equipOwnedReward(item, id).ok).toBe(false);
+    }
+  });
+  it('keeps player cosmetics out of Manager saves even when legacy inventory contains them', () => {
+    const save = makeManagerSave();
+    save.inventory = { pass_kit_noir: 1, pass_frame_gold: 1, pass_celebration_lights: 1, pass_office_noir: 1 };
+    useCareer.getState().setActive(save, 'manager', 1);
+    for(const id of ['pass_kit_noir', 'pass_frame_gold', 'pass_celebration_lights']) expect(useCareer.getState().equipOwnedReward(id, save.id).ok).toBe(false);
+    expect(useCareer.getState().equipOwnedReward('pass_office_noir', save.id).ok).toBe(true);
+    expect(useCareer.getState().save?.seasonPassExperience?.selectedOfficeTheme).toBe('office_noir');
+  });
+  it('maps the claimed frame inventory ID to the actual equipped frame', () => {
+    const save = makeCareerSave();
+    save.inventory = { pass_frame_gold: 1 };
+    useCareer.getState().setActive(save, 'career', 1);
+    expect(useCareer.getState().equipOwnedReward('pass_frame_gold', save.id).ok).toBe(true);
+    expect(useCareer.getState().save?.cosmetics?.profileFrame).toBe('frame_gold');
+  });
+});
+
 function unlockPlayerSponsorStore(save: ReturnType<typeof makeCareerSave>): void {
   save.careerPathLevel = 'DOMESTIC';
   ensureSponsorshipState(save).seniorDomesticDebutFixtureId = 'verified-domestic-debut';
@@ -59,6 +108,57 @@ const challenge: DailyChallenge = {
 };
 
 describe('career reward integrity', () => {
+  it.each([false, true])('refills Focus to the correct cap, once per receipt (VIP %s)', async (vip) => {
+    const save = makeCareerSave();
+    save.entitlements.removeAds = vip;
+    save.wallet.energy = 0;
+    save.wallet.energyUpdatedAt = Date.now();
+    useCareer.getState().setActive(save, 'career', 1);
+    jest.spyOn(purchases, 'purchase').mockResolvedValue({
+      ok: true, productId: 'form_recovery', purchaseToken: `focus-${vip}`,
+      purchaseState: 'PURCHASED', verificationState: 'LOCAL_MOCK',
+    });
+    const coins = save.wallet.coins;
+    await expect(useCareer.getState().purchaseProduct('form_recovery')).resolves.toEqual({ ok: true });
+    const after = useCareer.getState().save!;
+    expect(after.wallet.energy).toBe(vip ? 60 : 36);
+    expect(after.wallet.coins).toBe(coins);
+    expect(after.players[after.userPlayerId!].meta.form).toBe(99);
+    expect(after.players[after.userPlayerId!].meta.confidence).toBe(99);
+    await expect(useCareer.getState().purchaseProduct('form_recovery')).resolves.toMatchObject({ ok: false });
+    after.wallet.energy = 5;
+    after.players[after.userPlayerId!].meta.form = 40;
+    await useCareer.getState().purchaseProduct('form_recovery');
+    expect(useCareer.getState().save!.wallet.energy).toBe(5);
+    expect(useCareer.getState().save!.players[after.userPlayerId!].meta.form).toBe(40);
+  });
+
+  it.each(['energy', 'form', 'confidence'])('allows coaching when only %s needs recovery', async (needed) => {
+    const save = makeCareerSave();
+    const player = save.players[save.userPlayerId!];
+    save.entitlements.removeAds = false;
+    player.meta.form = needed === 'form' ? 40 : 100;
+    player.meta.confidence = needed === 'confidence' ? 40 : 100;
+    save.wallet.energy = needed === 'energy' ? 0 : 36;
+    save.wallet.energyUpdatedAt = Date.now();
+    useCareer.getState().setActive(save, 'career', 1);
+    jest.spyOn(purchases, 'purchase').mockResolvedValue({
+      ok: true, productId: 'form_recovery', purchaseToken: `coaching-only-${needed}`,
+      purchaseState: 'PURCHASED', verificationState: 'LOCAL_MOCK',
+    });
+    await expect(useCareer.getState().purchaseProduct('form_recovery')).resolves.toEqual({ ok: true });
+    const after = useCareer.getState().save!;
+    expect(after.wallet.energy).toBe(36);
+    expect(after.players[after.userPlayerId!].meta.form).toBe(needed === 'form' ? 99 : 100);
+    expect(after.players[after.userPlayerId!].meta.confidence).toBe(needed === 'confidence' ? 99 : 100);
+  });
+
+  it('rejects Mental Coaching in Manager mode before checkout', async () => {
+    useCareer.getState().setActive(makeManagerSave(), 'manager', 1);
+    const checkout = jest.spyOn(purchases, 'purchase');
+    await expect(useCareer.getState().purchaseProduct('form_recovery')).resolves.toMatchObject({ ok: false, error: 'player_career_required' });
+    expect(checkout).not.toHaveBeenCalled();
+  });
   afterEach(() => {
     jest.restoreAllMocks();
     useCareer.setState({
@@ -131,6 +231,8 @@ describe('career reward integrity', () => {
     const afterSecond = useCareer.getState().save!;
 
     expect(first.count).toBe(4);
+    expect(first.itemIds).toEqual(['pass_kit_noir']);
+    expect(second.itemIds).toEqual([]);
     expect(first.coins).toBeGreaterThan(0);
     expect(first).not.toHaveProperty('gems');
     expect(first.items.length).toBeGreaterThan(0);
@@ -866,6 +968,9 @@ describe('career reward integrity', () => {
     incoming.contract = { wage: 1_000_000, yearsLeft: 2 };
     save.finances!.wageBudgetPerSeason = 1;
     const wageBudgetBefore = save.finances!.wageBudgetPerSeason;
+    const clubBudgetBefore = save.teams[save.userTeamId!].budget;
+    const transferBudgetBefore = save.finances!.transferBudget;
+    const walletBefore = { ...save.wallet };
     expect(ffpBlockReason(save, incoming)).toBe('Over the wage budget (FFP).');
     useCareer.getState().setActive(save, 'manager', 1);
     jest.spyOn(purchases, 'purchase').mockResolvedValue({
@@ -882,6 +987,14 @@ describe('career reward integrity', () => {
 
     const after = useCareer.getState().save!;
     expect(after.finances?.wageBudgetPerSeason).toBe(wageBudgetBefore);
+    expect(after.teams[after.userTeamId!].budget).toBe(clubBudgetBefore + 1_000_000);
+    expect(after.finances?.transferBudget).toBe(transferBudgetBefore + 1_000_000);
+    expect(after.wallet.coins).toBe(walletBefore.coins);
+    expect(after.wallet.gems).toBe(walletBefore.gems);
+    await expect(useCareer.getState().purchaseProduct('transfer_budget_sm')).resolves.toEqual({
+      ok: false, error: 'season_limit_reached',
+    });
+    expect(useCareer.getState().save!.teams[after.userTeamId!].budget).toBe(clubBudgetBefore + 1_000_000);
     expect(ffpBlockReason(after, incoming)).toBe('Over the wage budget (FFP).');
   });
 
@@ -1023,6 +1136,7 @@ describe('career reward integrity', () => {
     const save = makeManagerSave();
     const team = save.teams[save.userTeamId!];
     const startingReputation = team.reputation;
+    const startingBudget = team.budget;
     useCareer.getState().setActive(save, 'manager', 1);
     jest.spyOn(purchases, 'purchase').mockResolvedValue({
       ok: true,
@@ -1038,13 +1152,14 @@ describe('career reward integrity', () => {
 
     const after = useCareer.getState().save!;
     expect(after.inventory?.manager_legend_backing).toBe(1);
+    expect(after.teams[after.userTeamId!].budget).toBe(startingBudget + 1_000_000);
     expect(after.inventory?.manager_legend_office_theme).toBe(1);
     expect(after.inventory?.scout_full_reveal_token).toBe(2);
     expect(after.inventory?.facility_upgrade_token).toBe(1);
     expect(after.inventory?.squad_recovery_token).toBe(1);
     expect(after.boardConfidence).toBeGreaterThanOrEqual(82);
     expect(after.teams[after.userTeamId!].reputation).toBe(Math.min(95, startingReputation + 3));
-    expect(after.entitlements.removeAds).toBeFalsy();
+    expect(after.entitlements.removeAds).toBe(true);
   });
 
   it('restores Player Legend ownership only into Player Career', async () => {

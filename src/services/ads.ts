@@ -35,6 +35,9 @@ export const MOCK_MODE = typeof __DEV__ !== 'undefined' && __DEV__ && ALLOW_LOCA
 type AdMobModule = any; // no static types — the dep may be absent
 let _admob: AdMobModule | null | undefined;
 let _adsConfigured = false;
+let _adultEligible = false;
+let _configuration: Promise<void> | undefined;
+let _privacyBusy = false;
 let _unitIds: { rewarded?: string; interstitial?: string } = {};
 
 function loadAdMob(): AdMobModule | null {
@@ -55,23 +58,78 @@ function loadAdMob(): AdMobModule | null {
  */
 export async function configureAds(
   unitIds: { rewarded?: string; interstitial?: string } = {},
+  adultEligible = false,
 ): Promise<void> {
+  _adultEligible = adultEligible;
+  if (!adultEligible) {
+    _adsConfigured = false;
+    return;
+  }
   if (MOCK_MODE || _adsConfigured) return;
+  if (_configuration) return _configuration;
   const M = loadAdMob();
   if (!M) return;
   _unitIds = unitIds;
+  _configuration = (async () => {
+    try {
+      // Fail closed if UMP is absent, errors or does not allow ad requests.
+      const consent = await M.AdsConsent?.gatherConsent({ tagForUnderAgeOfConsent: false });
+      if (!_adultEligible || consent?.canRequestAds !== true) return;
+      const init = (M.default ?? M.mobileAds)?.();
+      if (!init?.initialize) return;
+      await init.initialize();
+      _adsConfigured = _adultEligible;
+    } catch {
+      _adsConfigured = false;
+    }
+  })();
   try {
-    const init = (M.default ?? M.mobileAds)?.();
-    await init?.initialize?.();
-    _adsConfigured = true;
+    await _configuration;
+  } finally {
+    _configuration = undefined;
+  }
+}
+
+export async function showAdPrivacyChoices(): Promise<'shown' | 'not_required' | 'unavailable'> {
+  if (!_adultEligible || _privacyBusy) return 'unavailable';
+  const M = loadAdMob();
+  if (!M?.AdsConsent) return 'unavailable';
+  _privacyBusy = true;
+  _adsConfigured = false;
+  try {
+    if (_configuration) await _configuration;
+    _adsConfigured = false;
+    const info = await M.AdsConsent.requestInfoUpdate({ tagForUnderAgeOfConsent: false });
+    const required = info?.privacyOptionsRequirementStatus === 'REQUIRED';
+    const result = required ? await M.AdsConsent.showPrivacyOptionsForm() : info;
+    if (result?.canRequestAds === true && _adultEligible) {
+      const init = (M.default ?? M.mobileAds)?.();
+      if (init?.initialize) {
+        await init.initialize();
+        _adsConfigured = _adultEligible;
+      }
+    }
+    return required ? 'shown' : 'not_required';
   } catch {
-    /* leave unconfigured — show* helpers will no-op */
+    _adsConfigured = false;
+    return 'unavailable';
+  } finally {
+    _privacyBusy = false;
+  }
+}
+
+async function mayRequestAds(): Promise<boolean> {
+  if (!_adultEligible || !_adsConfigured || _privacyBusy) return false;
+  try {
+    return (await loadAdMob()?.AdsConsent?.getConsentInfo())?.canRequestAds === true;
+  } catch {
+    return false;
   }
 }
 
 /** Whether a live ad backend is ready (SDK loaded + initialised). */
 export function isAdsReady(): boolean {
-  return _adsConfigured && loadAdMob() != null;
+  return _adultEligible && !_privacyBusy && _adsConfigured && loadAdMob() != null;
 }
 
 /** Real rewarded ad — resolves completed=true only on EARNED_REWARD. */
@@ -196,6 +254,7 @@ export function isReady(kind: AdKind): boolean {
  */
 export async function showRewarded(adsEnabled = true): Promise<{ completed: boolean }> {
   if (!adsEnabled) return { completed: false };
+  if (!(await mayRequestAds())) return { completed: false };
   if (!(await isOnline())) return { completed: false };
 
   if (MOCK_MODE) {
@@ -217,6 +276,7 @@ export async function showRewarded(adsEnabled = true): Promise<{ completed: bool
  */
 export async function showInterstitial(adsEnabled = true): Promise<boolean> {
   if (!adsEnabled) return false;
+  if (!(await mayRequestAds())) return false;
   if (!(await isOnline())) return false;
 
   if (MOCK_MODE) {

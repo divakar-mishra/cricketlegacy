@@ -1,4 +1,5 @@
 import type { SaveGame } from '../../domain/types';
+jest.mock('../../services/vipArchive', () => ({ syncVipArchive: jest.fn(async () => {}) }));
 
 jest.mock('react-native', () => ({
   InteractionManager: {
@@ -113,7 +114,11 @@ describe('National Manager retained-club action guards', () => {
     const save = makeManagerSave(9_202) as SaveGame;
     save.managerCareerLevel = 'NATIONAL';
     useCareer.getState().setActive(save, 'manager', 1);
-    useCareer.setState({ persist: jest.fn(async () => undefined) });
+    // This suite verifies club fulfilment, not the native encrypted storage boundary.
+    useCareer.setState({
+      persist: jest.fn(async () => undefined),
+      persistCritical: jest.fn(async () => undefined),
+    });
     const active = useCareer.getState().save!;
     const clubId = active.userTeamId!;
     const before = clone({
@@ -136,11 +141,13 @@ describe('National Manager retained-club action guards', () => {
     });
 
     await expect(useCareer.getState().restorePurchases()).resolves.toEqual({
-      status: 'NOTHING_APPLICABLE',
-      count: 0,
-      productIds: [],
+      status: 'RESTORED',
+      count: 1,
+      productIds: ['manager_legend_pack'],
     });
     const after = useCareer.getState().save!;
+    // Account-wide Manager VIP restores even while club-specific backing is paused.
+    expect(after.entitlements.modeVip).toMatchObject({ mode: 'manager', owned: true });
     expect({
       reputation: after.teams[clubId].reputation,
       boardConfidence: after.boardConfidence,

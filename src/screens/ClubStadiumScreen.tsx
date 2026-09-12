@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
+import { GroundDevelopment } from '../components/GroundDevelopment';
 import { AppText as Text, Button, Card, Icon, Screen, ScreenHeader } from '../components';
 import { Format, TicketPreset } from '../domain/types';
 import { formatClubCurrency } from '../game/finance';
@@ -141,7 +142,7 @@ export function ClubStadiumScreen({ navigation }: ScreenProps<'ClubStadium'>) {
           onPress: () => {
             const result = upgradeStadium();
             Alert.alert(
-              result.ok ? 'Expansion started' : 'Cannot expand',
+              result.ok ? 'Ground expanded' : 'Cannot expand',
               result.ok
                 ? `Capacity is now ${integer(STADIUM_CAPACITY[result.level ?? nextCapacityLevel])}.`
                 : (result.reason ?? 'Unavailable.'),
@@ -195,6 +196,12 @@ export function ClubStadiumScreen({ navigation }: ScreenProps<'ClubStadium'>) {
             <Text style={styles.balanceValue}>{formatClubCurrency(team.budget)}</Text>
           </View>
         </View>
+        <GroundDevelopment
+          key={club.teamId}
+          capacityLevel={capacityLevel}
+          experienceLevel={experienceLevel}
+          accent={team.primaryColor}
+        />
         <View style={styles.heroStats}>
           <Stat label="Capacity" value={integer(summary?.capacity ?? stadiumCapacity(stadium))} />
           <Stat label="Fan base" value={integer(summary?.fanBase ?? stadium.fanBase)} />

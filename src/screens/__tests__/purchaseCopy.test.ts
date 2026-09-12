@@ -39,7 +39,7 @@ describe('purchase screen copy', () => {
     expect(purchaseScreen).toContain('disabled={!available || owned');
     expect(purchaseScreen).toContain('disabled={!save || busy != null}');
     expect(purchaseScreen).toContain('Restores permanent upgrades and active passes.');
-    expect(purchaseScreen).toContain('Open a career to restore purchases.');
+    expect(purchaseScreen).toContain('Open a Player or Manager career to buy or restore purchases.');
   });
 
   it('stacks store actions before Pixel-class cards can crush their copy', () => {
@@ -113,7 +113,7 @@ describe('purchase screen copy', () => {
     expect(purchases).toContain("'facility_upgrade_token'");
     expect(purchases).toContain("'recovery_pack'");
     expect(purchases).toContain("'transfer_budget_sm'");
-    expect(purchases).toContain("export const SHARED_STORE_PRODUCT_IDS = ['remove_ads']");
+    expect(purchases).toContain('export const SHARED_STORE_PRODUCT_IDS: readonly string[] = []');
     expect(purchaseScreen).toContain('Player Career Tools');
     expect(purchaseScreen).toContain('Manager Career Tools');
     expect(purchaseScreen).toContain('Account Upgrade');
@@ -175,12 +175,13 @@ describe('purchase screen copy', () => {
     );
     expect(purchases).not.toContain("id: 'energy_refill'");
     expect(purchaseScreen).toContain('40,000 Wallet Coins and 1,200 Gems');
-    expect(purchases).toContain('No ads · 60 energy · +20% match coins');
-    expect(purchases).toContain('+₹500,000 transfer budget · Once per season');
+    expect(purchaseScreen).toContain('No ads · 60 Focus capacity · +20% match coins');
+    expect(purchases).toContain('+$1,000,000 fictional Club Balance · Once per season');
     expect(purchases).toContain('+25% next renewal wage and signing bonus');
-    expect(purchases).toContain('No injury healing.');
+    expect(purchases).toContain('1 token gives non-injured players +20 condition');
     expect(purchases).toContain('1.5× gains · Next 3 sessions');
-    expect(purchases).toContain('Permanent backing · Boardroom · Toolkit');
+    expect(purchases).toContain('Manager VIP · $1,000,000 Club Balance · Boardroom · Toolkit');
+    expect(purchaseScreen).toContain('$1,000,000 fictional Club Balance delivered once to the purchased Manager save; not regranted on restore');
     expect(purchaseScreen).toContain('club reputation +3');
     expect(purchaseScreen).toContain('hideUnavailableReason={false}');
     expect(purchaseScreen).not.toContain('Google Play setup pending.');

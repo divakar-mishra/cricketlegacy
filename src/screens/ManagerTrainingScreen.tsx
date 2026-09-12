@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FacilityScene } from '../components/FacilityScene';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
   AppText as Text,
@@ -158,9 +159,7 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
 
   const saveTrainingPlan = () => {
     const saved = setPlan({ focus: selectedFocus, intensity: selectedIntensity });
-    setSaveMessage(
-      saved ? 'Plan saved' : 'Plan could not be saved.',
-    );
+    setSaveMessage(saved ? 'Plan saved' : 'Plan could not be saved.');
   };
 
   return (
@@ -170,10 +169,7 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
       footer={
         <View style={styles.footer}>
           <Text style={[styles.footerStatus, saveMessage && styles.footerStatusSaved]}>
-            {saveMessage ??
-              (planChanged
-                ? 'Unsaved changes'
-                : 'Automatic after fixtures')}
+            {saveMessage ?? (planChanged ? 'Unsaved changes' : 'Automatic after fixtures')}
           </Text>
           <Button
             label={planChanged ? 'SAVE TRAINING PLAN' : 'PLAN SAVED'}
@@ -201,28 +197,15 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
           <MechanicInfoButton topicId="manager-training" size={32} style={styles.infoButton} />
         </View>
 
-        <View style={styles.pitchDiagram} accessible={false}>
-          <View style={styles.boundaryOval} />
-          <View style={styles.pitchStrip}>
-            <View style={[styles.crease, styles.creaseTop]} />
-            <View style={[styles.crease, styles.creaseBottom]} />
-            <View style={[styles.wicket, styles.wicketTop]}>
-              <View style={styles.stump} />
-              <View style={styles.stump} />
-              <View style={styles.stump} />
-            </View>
-            <View style={[styles.wicket, styles.wicketBottom]}>
-              <View style={styles.stump} />
-              <View style={styles.stump} />
-              <View style={styles.stump} />
-            </View>
-          </View>
-          <View style={[styles.tacticMarker, { left: '18%', top: '28%' }]} />
-          <View style={[styles.tacticMarker, { right: '17%', top: '22%' }]} />
-          <View style={[styles.tacticMarker, { left: '23%', bottom: '18%' }]} />
-          <View style={[styles.tacticMarker, { right: '21%', bottom: '24%' }]} />
-          <View style={styles.tacticArrow} />
-        </View>
+        <Text style={styles.boardSectionLabel}>
+          TRAINING GROUND · LEVEL {club.facilities.training}/5
+        </Text>
+        <FacilityScene
+          kind="training"
+          level={club.facilities.training}
+          accent={team.primaryColor}
+          caption={false}
+        />
 
         <Text style={styles.boardSectionLabel}>SESSION FOCUS</Text>
         <View style={styles.focusGrid}>
@@ -442,75 +425,6 @@ const makeStyles = (colors: ThemeColors) =>
       letterSpacing: 0.8,
     },
     infoButton: { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: BOARD.frame },
-    pitchDiagram: {
-      position: 'relative',
-      height: 112,
-      overflow: 'hidden',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: 'rgba(243,235,215,0.45)',
-      borderRadius: radius.sm,
-      backgroundColor: BOARD.greenDeep,
-      marginTop: spacing.sm,
-    },
-    boundaryOval: {
-      position: 'absolute',
-      top: 8,
-      right: 24,
-      bottom: 8,
-      left: 24,
-      borderWidth: 1,
-      borderColor: 'rgba(243,235,215,0.48)',
-      borderRadius: 80,
-    },
-    pitchStrip: {
-      position: 'relative',
-      width: 48,
-      height: 92,
-      borderWidth: 1,
-      borderColor: 'rgba(243,235,215,0.66)',
-      backgroundColor: 'rgba(199,169,107,0.17)',
-    },
-    crease: {
-      position: 'absolute',
-      right: -8,
-      left: -8,
-      height: 1,
-      backgroundColor: BOARD.chalk,
-    },
-    creaseTop: { top: 15 },
-    creaseBottom: { bottom: 15 },
-    wicket: {
-      position: 'absolute',
-      left: 16,
-      width: 14,
-      height: 8,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    },
-    wicketTop: { top: 4 },
-    wicketBottom: { bottom: 4 },
-    stump: { width: 2, height: 8, borderRadius: 1, backgroundColor: BOARD.chalk },
-    tacticMarker: {
-      position: 'absolute',
-      width: 12,
-      height: 12,
-      borderWidth: 2,
-      borderColor: BOARD.chalk,
-      borderRadius: 6,
-    },
-    tacticArrow: {
-      position: 'absolute',
-      right: '31%',
-      bottom: 31,
-      width: 38,
-      height: 18,
-      borderTopWidth: 2,
-      borderRightWidth: 2,
-      borderColor: BOARD.leather,
-      transform: [{ rotate: '-18deg' }],
-    },
     boardSectionLabel: {
       color: BOARD.chalkMuted,
       fontSize: 10,

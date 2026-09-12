@@ -135,7 +135,7 @@ describe('premium sponsor backend contract', () => {
       signOut.indexOf('getSupabaseClient()?.auth.signOut()'),
     );
     expect(purchases).not.toContain('RC.logOut()');
-    expect(app).toContain('void purchases.configurePurchases(MONETIZATION.revenueCat)');
+    expect(app).toMatch(/void purchases\s*\.configurePurchases\(MONETIZATION\.revenueCat\)/);
   });
 
   it('fails closed behind server product, app, store and environment allowlists', () => {

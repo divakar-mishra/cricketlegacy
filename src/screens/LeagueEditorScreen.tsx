@@ -122,7 +122,7 @@ export function LeagueEditorScreen({ navigation }: ScreenProps<'LeagueEditor'>) 
       })}
 
       <Button
-        label={active ? 'Apply Names' : 'Premium Pass Required'}
+        label={active ? 'Apply Names' : 'Mode VIP Required'}
         variant={active ? 'gold' : 'ghost'}
         disabled={!active}
         onPress={submit}

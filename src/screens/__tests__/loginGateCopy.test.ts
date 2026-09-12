@@ -4,6 +4,13 @@ import path from 'path';
 const loginSource = fs.readFileSync(path.join(__dirname, '..', 'LoginScreen.tsx'), 'utf8');
 
 describe('Login offline-first copy', () => {
+  it('offers a server-backed existing-account login without a purchase bypass', () => {
+    expect(loginSource).toContain('auth.signInEmail(email, password)');
+    expect(loginSource).toContain('secureTextEntry');
+    expect(loginSource).toContain('setPassword(\'\')');
+    expect(loginSource).toContain('This does not create an account or unlock purchases.');
+    expect(loginSource).not.toContain('signUp(');
+  });
   it('does not present account verification as a launch requirement', () => {
     expect(loginSource).toContain('label="Play as Guest"');
     expect(loginSource).toContain('label="Continue with Google"');

@@ -31,6 +31,7 @@ import { synchronizeManagerClubState } from './managerClubState';
 import { passStaffSigningMultiplier, passSuperstarInterestBonus } from './seasonPass';
 import { XI_SIZE } from './squad';
 import { stadiumSeasonUpkeep } from './stadiumManagement';
+import { grantRetirementCollections } from './vip';
 
 /* ---------------- Constants ---------------- */
 
@@ -169,6 +170,7 @@ export function ensureManagerDepth(save: SaveGame): void {
     save.managerAge = Math.min(60, 35 + Math.max(0, save.careerSeasons ?? 0));
   }
   save.managerRetired = Boolean(save.managerRetired || save.managerAge >= 60);
+  if (save.managerRetired) grantRetirementCollections(save);
   ensureContracts(save);
   synchronizeManagerClubState(save);
 }
