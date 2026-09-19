@@ -63,6 +63,7 @@ import { PlayerCosmeticsScreen } from './src/screens/PlayerCosmeticsScreen';
 import { TransferDeadlineDayScreen } from './src/screens/TransferDeadlineDayScreen';
 import { YouthGraduateCeremonyScreen } from './src/screens/YouthGraduateCeremonyScreen';
 import { ads, analytics, auth, crash, notifications, purchases } from './src/services';
+import { startTelemetry } from './src/services/telemetry';
 import { useCareer } from './src/state/careerStore';
 import { useAppFonts, useTheme } from './src/theme';
 
@@ -98,6 +99,7 @@ export default function App() {
   useEffect(() => {
     // Best-effort platform wiring — all safe no-ops without the native side.
     crash.installGlobalHandler();
+    const stopTelemetry = startTelemetry();
     notifications.configureForegroundHandler();
     syncMusicWithSettings();
     analytics.logEvent(analytics.EVT.APP_OPEN);
@@ -112,6 +114,7 @@ export default function App() {
     void getJSON<unknown>(AGE_DECLARATION_KEY)
       .then((stored) => ads.configureAds(MONETIZATION.admob, isAgeDeclaration(stored) && canUseAds(stored)))
       .catch(() => undefined);
+    return stopTelemetry;
   }, []);
 
   useEffect(() => {

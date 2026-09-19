@@ -8,6 +8,7 @@ module.exports = {
   moduleNameMapper: {
     '^expo/virtual/env$': '<rootDir>/src/test/expoVirtualEnv.js',
     '^expo-modules-core$': '<rootDir>/src/test/expoModulesCore.js',
+    '^expo-application$': '<rootDir>/src/test/expoApplication.js',
     '\\.(png|jpe?g|webp)$': '<rootDir>/src/test/assetMock.js',
   },
   // Engine/content tests are pure TS; allow transforming ESM-only deps if needed.

@@ -38,6 +38,14 @@ describe('player creation attribute dashboard', () => {
     expect(source).toContain('scrollResetKey={step}');
   });
 
+  it('keeps four-option selectors aligned across phone and tablet widths', () => {
+    expect(source).toContain('const isFourOptionRow = options.length === 4');
+    expect(source).toContain('const isWideFourOptionRow = isFourOptionRow && width >= 600');
+    expect(source).toContain('styles.chipHalf');
+    expect(source).toContain('styles.chipQuarter');
+    expect(source).toContain('numberOfLines={1}');
+  });
+
   it('explains ratings and the reserved club without repeated prose', () => {
     expect(source).toContain('Active Grade A OVR');
     expect(source).toContain('Reserved Tier 3 club');

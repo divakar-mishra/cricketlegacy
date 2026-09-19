@@ -21,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { playHaptic } from '../audio';
 import { AppText as Text } from '../components/AppText';
+import { useManagedTimers } from '../hooks/useManagedTimers';
 import { ScreenProps } from '../navigation';
 import { fonts, fontSize, fontWeight, spacing, ThemeColors, useThemedStyles } from '../theme';
 
@@ -131,6 +132,7 @@ export function MilestoneCinematicScreen({ navigation, route }: ScreenProps<'Mil
   const { kind, playerName, detail } = route.params;
   const styles = useThemedStyles(makeStyles);
   const config = getConfig(kind, playerName, detail);
+  const timers = useManagedTimers();
 
   // Scale in the big emoji
   const heroScale = useSharedValue(0.1);
@@ -138,7 +140,7 @@ export function MilestoneCinematicScreen({ navigation, route }: ScreenProps<'Mil
 
   useEffect(() => {
     playHaptic('notify-success');
-    setTimeout(() => playHaptic('impact-heavy'), 300);
+    timers.schedule('milestone-haptic', () => playHaptic('impact-heavy'), 300);
 
     heroScale.value = withTiming(1, { duration: 200 });
     glow.value = withRepeat(
@@ -148,15 +150,19 @@ export function MilestoneCinematicScreen({ navigation, route }: ScreenProps<'Mil
     );
 
     // Auto-dismiss after 4 seconds
-    const timer = setTimeout(() => navigation.goBack(), 4000);
-    return () => clearTimeout(timer);
-  }, [navigation, heroScale, glow]);
+    timers.schedule('milestone-dismiss', () => navigation.goBack(), 4000);
+  }, [navigation, heroScale, glow, timers]);
 
   const heroStyle = useAnimatedStyle(() => ({ transform: [{ scale: heroScale.value }] }));
   const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value }));
 
   return (
-    <Pressable style={{ flex: 1 }} onPress={() => navigation.goBack()}>
+    <Pressable
+      style={{ flex: 1 }}
+      onPress={() => navigation.goBack()}
+      accessibilityRole="button"
+      accessibilityLabel={`${config.headline}. ${config.subtitle}. Dismiss`}
+    >
       <LinearGradient
         colors={config.gradientColors}
         start={{ x: 0.5, y: 0 }}

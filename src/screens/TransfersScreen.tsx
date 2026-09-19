@@ -127,7 +127,13 @@ function BidWarModal({
   const detailMaxHeight = Math.max(190, Math.min(300, windowHeight * 0.28));
 
   return (
-    <Modal transparent animationType="fade">
+    <Modal
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        if (!pending) onWithdraw();
+      }}
+    >
       <View style={styles.bidOverlay}>
         <Animated.View entering={FadeInDown.duration(220)} style={[styles.bidCard, shadow.card]}>
           {/* Header */}
@@ -933,6 +939,8 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
         {(['market', 'squad', 'loan'] as const).map((t) => (
           <Pressable
             key={t}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === t }}
             onPress={() => setTab(t)}
             style={[styles.tab, tab === t && styles.tabActive]}
           >
@@ -978,6 +986,8 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
         {(['ALL', 'BATTER', 'BOWLER', 'ALLROUNDER', 'WK_BATTER'] as FilterRole[]).map((r) => (
           <Pressable
             key={r}
+            accessibilityRole="button"
+            accessibilityState={{ selected: filterRole === r }}
             onPress={() => setFilterRole(r)}
             style={[styles.filterChip, filterRole === r && styles.filterChipActive]}
           >
@@ -998,6 +1008,8 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
         {(['OVR', 'AGE_ASC', 'AGE_DESC', 'VALUE'] as SortField[]).map((s) => (
           <Pressable
             key={s}
+            accessibilityRole="button"
+            accessibilityState={{ selected: sortField === s }}
             onPress={() => setSortField(s)}
             style={[styles.filterChip, sortField === s && styles.filterChipActive]}
           >
@@ -1113,6 +1125,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
     tab: {
       flex: 1,
+      minHeight: 44,
       paddingVertical: spacing.sm,
       borderRadius: radius.md,
       backgroundColor: colors.surface,
@@ -1126,6 +1139,7 @@ const makeStyles = (colors: ThemeColors) =>
 
     // Search + filter
     searchInput: {
+      minHeight: 44,
       borderRadius: radius.md,
       borderWidth: 1.5,
       paddingHorizontal: spacing.md,
@@ -1136,12 +1150,14 @@ const makeStyles = (colors: ThemeColors) =>
     filterRow: { marginBottom: spacing.xs },
     filterContent: { gap: spacing.xs, paddingRight: spacing.md },
     filterChip: {
+      minHeight: 44,
       paddingHorizontal: spacing.md,
-      paddingVertical: 5,
+      paddingVertical: spacing.sm,
       borderRadius: radius.pill,
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
+      justifyContent: 'center',
     },
     filterChipActive: { backgroundColor: colors.primaryDark, borderColor: colors.primary },
     filterChipText: {

@@ -224,7 +224,6 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
           <Text style={styles.scoutText}>
             Assessed ~{scoutRep.knownOverall} OVR · Certainty{' '}
             {Math.round((1 - scoutRep.uncertainty) * 100)}%
-            {scoutRep.recommended ? ' · Recommended' : ''}
           </Text>
         </Card>
       ) : null}

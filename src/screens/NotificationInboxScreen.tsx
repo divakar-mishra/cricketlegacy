@@ -13,6 +13,7 @@ import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import { Screen, ScreenHeader } from '../components';
 import { AppText as Text } from '../components/AppText';
 import { InboxMessage, InboxMessageKind } from '../domain/types';
+import { useManagedTimers } from '../hooks/useManagedTimers';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import {
@@ -69,6 +70,7 @@ export function NotificationInboxScreen({ navigation }: ScreenProps<'Notificatio
   const styles = useThemedStyles(makeStyles);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<FilterKind>('all');
+  const timers = useManagedTimers();
 
   const allMessages: InboxMessage[] = [...(save?.inbox ?? [])].sort(
     (a, b) => b.timestamp - a.timestamp,
@@ -94,9 +96,9 @@ export function NotificationInboxScreen({ navigation }: ScreenProps<'Notificatio
   const onDelete = useCallback(
     (id: string) => {
       setDismissed((prev) => new Set(prev).add(id));
-      setTimeout(() => deleteInboxMessage(id), 350);
+      timers.schedule(`delete:${id}`, () => deleteInboxMessage(id), 350);
     },
-    [deleteInboxMessage],
+    [deleteInboxMessage, timers],
   );
 
   const onClearAll = () => {
@@ -118,7 +120,12 @@ export function NotificationInboxScreen({ navigation }: ScreenProps<'Notificatio
         onBack={() => navigation.goBack()}
         right={
           allMessages.length > 0 ? (
-            <Pressable onPress={onClearAll} style={{ padding: spacing.xs }}>
+            <Pressable
+              onPress={onClearAll}
+              accessibilityRole="button"
+              accessibilityLabel="Clear all inbox messages"
+              style={styles.clearAll}
+            >
               <Text
                 style={{
                   color: colors.danger,
@@ -145,6 +152,9 @@ export function NotificationInboxScreen({ navigation }: ScreenProps<'Notificatio
           return (
             <Pressable
               key={tab.key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`${tab.label}${tab.key === 'unread' && unreadCount > 0 ? `, ${unreadCount}` : ''}`}
               style={[styles.filterChip, isActive && styles.filterChipActive]}
               onPress={() => setFilter(tab.key)}
             >
@@ -185,6 +195,9 @@ export function NotificationInboxScreen({ navigation }: ScreenProps<'Notificatio
                 <Pressable
                   onPress={() => onRead(msg)}
                   onLongPress={() => onDelete(msg.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${msg.title}. ${msg.body}${msg.actionScreen ? '. Tap to view' : ''}`}
+                  accessibilityHint="Long press to delete this message"
                   style={[
                     styles.msgCard,
                     { borderLeftColor: meta.accent },
@@ -241,12 +254,21 @@ const makeStyles = (colors: ThemeColors) =>
     filterScroll: { flexGrow: 0, marginBottom: spacing.sm },
     filterContent: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingVertical: spacing.xs },
     filterChip: {
+      minHeight: 44,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs + 2,
       borderRadius: radius.pill,
       backgroundColor: colors.surfaceAlt,
       borderWidth: 1,
       borderColor: colors.border,
+      justifyContent: 'center',
+    },
+    clearAll: {
+      minHeight: 44,
+      minWidth: 64,
+      paddingHorizontal: spacing.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     filterChipActive: {
       backgroundColor: colors.primary,

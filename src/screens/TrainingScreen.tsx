@@ -32,6 +32,7 @@ import {
   trainingSessionLimit,
 } from '../game/progression';
 import { nextUserFixtureId } from '../game/season';
+import { useManagedTimers } from '../hooks/useManagedTimers';
 import { trainingAttributeCeiling } from '../game/youthBalance';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
@@ -68,6 +69,7 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
   const [busyGroup, setBusyGroup] = useState<TrainGroup | null>(null);
   const [showDevelopment, setShowDevelopment] = useState(false);
   const popupCounter = useRef(0);
+  const timers = useManagedTimers();
 
   const showPopup = useCallback(
     (
@@ -137,7 +139,7 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
 
     if (!res.ok) {
       setFlash(res.reason ?? 'Cannot train right now.');
-      setTimeout(() => setFlash(null), 2500);
+      timers.schedule('training-flash', () => setFlash(null), 2500);
       return;
     }
 
@@ -340,7 +342,7 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.groupTitle}>{group.label}</Text>
                       {analystRecommended ? (
-                        <Text style={styles.recommendedLabel}>Analyst recommendation</Text>
+                        <Text style={styles.recommendedLabel}>Analyst focus</Text>
                       ) : null}
                       <Text style={styles.groupAvg}>
                         Avg {groupAvg} · {groupLeft} left

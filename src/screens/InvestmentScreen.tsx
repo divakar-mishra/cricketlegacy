@@ -298,7 +298,12 @@ export function InvestmentScreen({ navigation }: ScreenProps<'InvestmentScreen'>
 
       <Modal transparent visible={Boolean(trade)} animationType="fade" onRequestClose={closeTrade}>
         <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeTrade} />
+          <Pressable
+            accessible={false}
+            importantForAccessibility="no"
+            style={StyleSheet.absoluteFill}
+            onPress={closeTrade}
+          />
           <View style={styles.tradeSheet}>
             <Text style={styles.tradeKicker}>
               {trade?.kind === 'SELL' ? 'SELL HOLDING' : 'INVEST'}

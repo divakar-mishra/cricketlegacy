@@ -46,6 +46,7 @@ import { nextUserFixturesByCompetition } from '../game/season';
 import { activeSponsorBranding } from '../game/sponsorship';
 import { isDeadlineDay } from '../game/transferMarket';
 import { useIsCompact } from '../hooks/useResponsive';
+import { useManagedTimers } from '../hooks/useManagedTimers';
 import { useT } from '../i18n';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
@@ -139,6 +140,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
     played: number;
     total: number;
   } | null>(null);
+  const timers = useManagedTimers();
   const [toastIdx, setToastIdx] = useState(0);
   const prevPendingLenRef = useRef(-1);
   const dismissedTips = useSettings((s) => s.dismissedTips);
@@ -396,7 +398,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
       const result = advanceManagerCalendar(12);
       if (result?.kind === 'IN_PROGRESS') {
         setCalendarSimulation({ played: result.played ?? 0, total: result.total ?? 1 });
-        setTimeout(step, 40);
+        timers.schedule('manager-calendar-step', step, 40);
         return;
       }
       setCalendarSimulation(null);
@@ -419,8 +421,8 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
         subtitle: championId
           ? `${save.teams[championId]?.name ?? 'Champions'} won your division`
           : isNationalManager
-            ? 'The national programme and domestic world have advanced'
-            : 'The domestic world has advanced',
+            ? 'The national programme and domestic world have progressed'
+            : 'The domestic world has progressed',
         icon: 'calendar',
         items: [
           `Competition: ${formatLabel}`,
@@ -447,7 +449,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
             : [],
       });
     };
-    setTimeout(step, 80);
+    timers.schedule('manager-calendar-step', step, 80);
   };
 
   const runNextStep = () => {
@@ -890,7 +892,12 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
           onPress={onSaveExit}
         />
       </Screen>
-      <Modal transparent visible={Boolean(calendarSimulation)} animationType="fade">
+      <Modal
+        transparent
+        visible={Boolean(calendarSimulation)}
+        animationType="fade"
+        onRequestClose={() => undefined}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.simulationPanel} accessibilityLiveRegion="polite">
             <ActivityIndicator size="large" color={colors.accent} />

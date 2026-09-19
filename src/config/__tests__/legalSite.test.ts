@@ -202,4 +202,17 @@ describe('Cloudflare legal and support site', () => {
     expect(readme).toContain('Build command: `npm run build:legal-site`');
     expect(readme).toContain('Build output directory: `legal-site/dist`');
   });
+
+  it('discloses optional Firebase diagnostics and automatic Analytics data', () => {
+    const checkedIn = JSON.parse(fs.readFileSync(path.join(root, 'legal-site', 'legal.config.json'), 'utf8'));
+    const pages = renderLegalSite(checkedIn);
+    for (const route of ['privacy/index.html', 'products/cricket-legacy/privacy/index.html']) {
+      expect(pages[route]).toContain('13 September 2026');
+      expect(pages[route]).toContain('Firebase Analytics');
+      expect(pages[route]).toContain('Firebase Crashlytics');
+      expect(pages[route]).toContain('approximate location from masked IP addresses');
+      expect(pages[route]).toContain('purchase/subscription events');
+      expect(pages[route]).toContain('off by default');
+    }
+  });
 });

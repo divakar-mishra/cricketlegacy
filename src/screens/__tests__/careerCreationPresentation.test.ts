@@ -19,6 +19,9 @@ describe('compact career creation', () => {
     expect(newGame).not.toContain('details={[');
     expect(newGame).not.toContain('detailPill');
     expect(newGame).not.toContain("subtitle={t('newgame.subtitle')}");
+    expect(newGame).not.toContain('badge=');
+    expect(newGame).not.toContain('Recommended');
+    expect(newGame).not.toContain('Advanced');
   });
 
   it('uses the same country dropdown for player and manager creation', () => {

@@ -32,7 +32,8 @@ describe('Manager wallet resource desk', () => {
     expect(player.morale).toBe(Math.min(100, moraleBefore + 1));
     expect(first.detail).toContain(report.topBatter.name);
     expect(first.detail).toContain(report.topBowler.name);
-    expect(first.detail).toContain('Recommended plan');
+    expect(first.detail).toContain('Match plan');
+    expect(first.detail).not.toContain('Recommended plan');
     expect(save.managerResources?.transactions).toHaveLength(1);
   });
 

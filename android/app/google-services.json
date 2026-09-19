@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "956451115822",
-    "project_id": "test-e7934",
-    "storage_bucket": "test-e7934.firebasestorage.app"
+    "project_number": "63627721355",
+    "project_id": "cricket-legacy",
+    "storage_bucket": "cricket-legacy.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:956451115822:android:8036ceb2d44e525d83a0bf",
+        "mobilesdk_app_id": "1:63627721355:android:c51c60c0677d21943d728e",
         "android_client_info": {
           "package_name": "com.coverdrive.cricket"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCnAoZqFt_5kQkCEN2IzYQCm2ydkQwN1sE"
+          "current_key": "AIzaSyDsUHZIpc6ZRsjEfjINtvYMpErvV-tPdzk"
         }
       ],
       "services": {

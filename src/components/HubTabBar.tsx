@@ -86,7 +86,14 @@ const makeStyles = (colors: ThemeColors) =>
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.xs,
     },
-    tab: { flex: 1, alignItems: 'center', paddingVertical: 2, gap: 2 },
+    tab: {
+      flex: 1,
+      minHeight: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 2,
+      gap: 2,
+    },
     indicator: {
       position: 'absolute',
       top: -spacing.sm,

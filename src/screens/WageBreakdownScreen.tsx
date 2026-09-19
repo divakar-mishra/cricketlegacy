@@ -6,7 +6,9 @@
  * Weekly framing makes costs feel concrete and creates natural IAP moments
  * ("I need to renew Smith — he's only on $3k/week but leaves next season").
  */
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import React, { useCallback } from 'react';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import { Button, Card, ProgressBar, Screen, ScreenHeader } from '../components';
@@ -46,6 +48,18 @@ export function WageBreakdownScreen({ navigation }: ScreenProps<'WageBreakdown'>
   const renewDeal = useCareer((s) => s.renewDeal);
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const onRenew = useCallback(
+    (player: Player) => {
+      const res = renewDeal(player.id, 2);
+      Alert.alert(
+        res.ok ? 'Contract renewed' : 'Cannot renew',
+        res.ok
+          ? `${player.name} signed for 2 more years. Fee: ${formatClubCurrency(res.cost)}.`
+          : (res.reason ?? 'Unavailable.'),
+      );
+    },
+    [renewDeal],
+  );
 
   if (!save || !save.userTeamId) {
     return (
@@ -91,16 +105,6 @@ export function WageBreakdownScreen({ navigation }: ScreenProps<'WageBreakdown'>
   const budgetUsePct = Math.min(1, totalAnnualWage / wageCap);
   const barColor =
     budgetUsePct > 0.9 ? colors.danger : budgetUsePct > 0.7 ? colors.warning : colors.success;
-
-  const onRenew = (player: Player) => {
-    const res = renewDeal(player.id, 2);
-    Alert.alert(
-      res.ok ? 'Contract renewed' : 'Cannot renew',
-      res.ok
-        ? `${player.name} signed for 2 more years. Fee: ${bud(res.cost)}.`
-        : (res.reason ?? 'Unavailable.'),
-    );
-  };
 
   return (
     <Screen>
@@ -160,68 +164,81 @@ export function WageBreakdownScreen({ navigation }: ScreenProps<'WageBreakdown'>
       </View>
 
       {/* Player list */}
-      <ScrollView
+      <FlashList
+        data={squad}
+        keyExtractor={(player) => player.id}
+        renderItem={({ item: player }) => (
+          <WageRow
+            player={player}
+            wageCap={wageCap}
+            userPlayerId={save.userPlayerId}
+            canRenew={isManager && player.id !== save.userPlayerId}
+            onRenew={onRenew}
+          />
+        )}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }}
         showsVerticalScrollIndicator={false}
-      >
-        {squad.map((p, index) => (
-          <Animated.View key={p.id} entering={FadeInDown.duration(200).delay(index * 25)}>
-            <View style={[styles.row, p.id === save.userPlayerId && styles.rowUser]}>
-              <View style={styles.nameCol}>
-                <Text
-                  style={[
-                    styles.playerName,
-                    p.id === save.userPlayerId && { color: colors.accent },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {p.name}
-                  {p.id === save.userPlayerId ? ' ★' : ''}
-                </Text>
-                <Text style={styles.playerMeta}>
-                  {ROLE_ABBR[p.role] ?? p.role} · OVR {p.overall}
-                  {(p.contract?.yearsLeft ?? 2) <= 1 ? (
-                    <Text style={{ color: colors.danger }}>
-                      {(p.contract?.yearsLeft ?? 0) === 0
-                        ? ' · Out of contract'
-                        : ' · Expiring soon'}
-                    </Text>
-                  ) : (
-                    ` · ${p.contract?.yearsLeft ?? '?'}yr left`
-                  )}
-                </Text>
-              </View>
-              <View style={styles.wageCol}>
-                {(() => {
-                  const annual = playerWage(p);
-                  const pct = wageCap > 0 ? annual / wageCap : 0;
-                  const wageColor =
-                    pct > 0.15 ? colors.danger : pct > 0.08 ? colors.warning : colors.success;
-                  return (
-                    <>
-                      <Text style={[styles.wageAmount, { color: wageColor }]}>{wk(annual)}</Text>
-                      <Text style={styles.wageAnnual}>{bud(annual)}/yr</Text>
-                    </>
-                  );
-                })()}
-                {isManager && p.id !== save.userPlayerId && (p.contract?.yearsLeft ?? 2) <= 1 ? (
-                  <Button
-                    label="Renew"
-                    size="sm"
-                    variant="secondary"
-                    fullWidth={false}
-                    style={{ marginTop: 6 }}
-                    onPress={() => onRenew(p)}
-                  />
-                ) : null}
-              </View>
-            </View>
-          </Animated.View>
-        ))}
-      </ScrollView>
+      />
     </Screen>
   );
 }
+
+const WageRow = React.memo(function WageRow({
+  player,
+  wageCap,
+  userPlayerId,
+  canRenew,
+  onRenew,
+}: {
+  player: Player;
+  wageCap: number;
+  userPlayerId?: string;
+  canRenew: boolean;
+  onRenew: (player: Player) => void;
+}) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const annual = playerWage(player);
+  const pct = wageCap > 0 ? annual / wageCap : 0;
+  const wageColor = pct > 0.15 ? colors.danger : pct > 0.08 ? colors.warning : colors.success;
+  const isUser = player.id === userPlayerId;
+  const yearsLeft = player.contract?.yearsLeft ?? 2;
+
+  return (
+    <View style={[styles.row, isUser && styles.rowUser]}>
+      <View style={styles.nameCol}>
+        <Text style={[styles.playerName, isUser && { color: colors.accent }]} numberOfLines={1}>
+          {player.name}
+          {isUser ? ' ★' : ''}
+        </Text>
+        <Text style={styles.playerMeta}>
+          {ROLE_ABBR[player.role] ?? player.role} · OVR {player.overall}
+          {yearsLeft <= 1 ? (
+            <Text style={{ color: colors.danger }}>
+              {yearsLeft === 0 ? ' · Out of contract' : ' · Expiring soon'}
+            </Text>
+          ) : (
+            ` · ${yearsLeft}yr left`
+          )}
+        </Text>
+      </View>
+      <View style={styles.wageCol}>
+        <Text style={[styles.wageAmount, { color: wageColor }]}>{fmtWeekly(annual)}</Text>
+        <Text style={styles.wageAnnual}>{formatClubCurrency(annual)}/yr</Text>
+        {canRenew && yearsLeft <= 1 ? (
+          <Button
+            label="Renew"
+            size="sm"
+            variant="secondary"
+            fullWidth={false}
+            style={{ marginTop: 6 }}
+            onPress={() => onRenew(player)}
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+});
 
 function LegendDot({ color, label }: { color: string; label: string }) {
   const { colors } = useTheme();

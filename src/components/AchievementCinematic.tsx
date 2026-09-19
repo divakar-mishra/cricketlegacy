@@ -13,6 +13,7 @@ import Animated, {
   FadeIn,
   FadeOut,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withRepeat,
@@ -49,6 +50,7 @@ interface Props {
 }
 
 export function AchievementCinematic({ achievement, onDismiss }: Props) {
+  const reducedMotion = useReducedMotion();
   const scale = useSharedValue(0);
   const iconScale = useSharedValue(0);
   const ring1 = useSharedValue(0.8);
@@ -57,28 +59,35 @@ export function AchievementCinematic({ achievement, onDismiss }: Props) {
   useEffect(() => {
     if (!achievement) return;
     haptics.impact();
-    scale.value = withTiming(1, { duration: 200 });
-    iconScale.value = withDelay(100, withTiming(1, { duration: 200 }));
-    ring1.value = withDelay(
-      300,
-      withRepeat(
-        withSequence(withTiming(1.2, { duration: 900 }), withTiming(0.8, { duration: 900 })),
-        -1,
-        true,
-      ),
-    );
-    ring2.value = withDelay(
-      500,
-      withRepeat(
-        withSequence(withTiming(1.3, { duration: 1100 }), withTiming(0.7, { duration: 1100 })),
-        -1,
-        true,
-      ),
-    );
+    if (reducedMotion) {
+      scale.value = 1;
+      iconScale.value = 1;
+      ring1.value = 1;
+      ring2.value = 1;
+    } else {
+      scale.value = withTiming(1, { duration: 200 });
+      iconScale.value = withDelay(100, withTiming(1, { duration: 200 }));
+      ring1.value = withDelay(
+        300,
+        withRepeat(
+          withSequence(withTiming(1.2, { duration: 900 }), withTiming(0.8, { duration: 900 })),
+          -1,
+          true,
+        ),
+      );
+      ring2.value = withDelay(
+        500,
+        withRepeat(
+          withSequence(withTiming(1.3, { duration: 1100 }), withTiming(0.7, { duration: 1100 })),
+          -1,
+          true,
+        ),
+      );
+    }
 
     const timer = setTimeout(onDismiss, AUTO_DISMISS_MS);
     return () => clearTimeout(timer);
-  }, [achievement]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [achievement, reducedMotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cardStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }));
@@ -102,7 +111,12 @@ export function AchievementCinematic({ achievement, onDismiss }: Props) {
       style={styles.overlay}
       pointerEvents="box-none"
     >
-      <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${achievement.title}. Dismiss achievement`}
+        style={StyleSheet.absoluteFill}
+        onPress={onDismiss}
+      />
       <Animated.View style={[styles.card, cardStyle]}>
         <LinearGradient colors={cfg.bg} style={styles.gradient}>
           {/* Pulsing rings behind the icon */}
@@ -159,7 +173,13 @@ export function AchievementCinematic({ achievement, onDismiss }: Props) {
         </LinearGradient>
 
         {/* Dismiss hint */}
-        <Pressable onPress={onDismiss} style={styles.dismissHint} hitSlop={12}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Continue"
+          onPress={onDismiss}
+          style={styles.dismissHint}
+          hitSlop={12}
+        >
           <Text style={styles.dismissText}>Tap to continue</Text>
         </Pressable>
       </Animated.View>

@@ -298,16 +298,24 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
 
       <Text style={styles.section}>Build Information</Text>
       <Card style={styles.group}>
+        <Text style={styles.rowLabel}>Optional diagnostics</Text>
+        <Text style={styles.qaBalance}>
+          Share gameplay usage or crash diagnostics with Google Firebase to help improve the game.
+          Both are optional and off by default. No account names, emails or save contents are
+          attached. You can turn either off here at any time. See Privacy Policy above.
+        </Text>
+        <ToggleRow
+          label="Usage analytics"
+          value={s.usageAnalytics}
+          onChange={s.setUsageAnalytics}
+        />
+        <Divider />
+        <ToggleRow label="Crash reports" value={s.crashReports} onChange={s.setCrashReports} />
+      </Card>
+      <Card style={styles.group}>
         <InfoRow label="Version" value={BUILD_INFO.appVersion} />
         <Divider />
-        <InfoRow
-          label="Build"
-          value={
-            BUILD_INFO.platform === 'android'
-              ? BUILD_INFO.androidVersionCode
-              : BUILD_INFO.iosBuildNumber
-          }
-        />
+        <InfoRow label="Build" value={BUILD_INFO.nativeBuildVersion} />
       </Card>
     </Screen>
   );

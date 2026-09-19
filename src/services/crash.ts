@@ -1,4 +1,20 @@
-/** Local crash facade used by the app shell and React error boundary. */
+import { canSendCrashes, firebaseCrashes } from './telemetry';
+
+/** Never send raw messages or context (they can contain account/save data). */
+export function sanitizedException(error: unknown): Error {
+  const safe = new Error('Application error');
+  safe.name =
+    error instanceof TypeError ? 'TypeError' : error instanceof RangeError ? 'RangeError' : 'Error';
+  const frames =
+    error instanceof Error
+      ? (error.stack ?? '').split('\n').flatMap((line) => {
+          const match = line.match(/(?:index\.android\.bundle|index\.bundle):(\d+):(\d+)/);
+          return match ? [`    at bundle (index.android.bundle:${match[1]}:${match[2]})`] : [];
+        })
+      : [];
+  safe.stack = `${safe.name}: ${safe.message}\n${frames.slice(0, 30).join('\n')}`;
+  return safe;
+}
 
 const IS_DEV: boolean = ((): boolean => {
   const globalState = globalThis as { __DEV__?: boolean };
@@ -15,6 +31,13 @@ interface ErrorUtilsShape {
 export function captureException(error: unknown, context?: Record<string, unknown>): void {
   if (IS_DEV) {
     console.error('[crash] exception', error, context ?? {});
+  }
+  if (!canSendCrashes()) return;
+  try {
+    const c = firebaseCrashes();
+    c.recordError(c.getCrashlytics(), sanitizedException(error));
+  } catch {
+    /* Reporting must never cause another failure. */
   }
 }
 

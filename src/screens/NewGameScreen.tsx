@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { Card, Screen, ScreenHeader, AppText as Text } from '../components';
 import { useT } from '../i18n';
 import { ScreenProps } from '../navigation';
-import { fontSize, fontWeight, radius, spacing, ThemeColors, useThemedStyles } from '../theme';
+import { fontSize, fontWeight, spacing, ThemeColors, useThemedStyles } from '../theme';
 
 export function NewGameScreen({ navigation }: ScreenProps<'NewGame'>) {
   const t = useT();
@@ -13,7 +13,6 @@ export function NewGameScreen({ navigation }: ScreenProps<'NewGame'>) {
       <ModeCard
         icon="🏏"
         title={t('newgame.playerTitle')}
-        badge="Recommended"
         description={t('newgame.playerDesc')}
         onPress={() => navigation.navigate('PlayerCreation')}
       />
@@ -21,7 +20,6 @@ export function NewGameScreen({ navigation }: ScreenProps<'NewGame'>) {
       <ModeCard
         icon="📋"
         title={t('newgame.managerTitle')}
-        badge="Advanced"
         description={t('newgame.managerDesc')}
         onPress={() => navigation.navigate('TeamSelect')}
       />
@@ -32,13 +30,11 @@ export function NewGameScreen({ navigation }: ScreenProps<'NewGame'>) {
 function ModeCard({
   icon,
   title,
-  badge,
   description,
   onPress,
 }: {
   icon: string;
   title: string;
-  badge: string;
   description: string;
   onPress: () => void;
 }) {
@@ -50,9 +46,6 @@ function ModeCard({
         <Text style={styles.title} numberOfLines={1}>
           {title}
         </Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge}</Text>
-        </View>
       </View>
       <Text style={styles.desc}>{description}</Text>
     </Card>
@@ -71,13 +64,4 @@ const makeStyles = (colors: ThemeColors) =>
     icon: { fontSize: 30 },
     title: { color: colors.text, fontSize: fontSize.xl, fontWeight: fontWeight.heavy, flex: 1 },
     desc: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
-    badge: {
-      backgroundColor: colors.surfaceMuted,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radius.pill,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 3,
-    },
-    badgeText: { color: colors.accent, fontSize: fontSize.xs, fontWeight: fontWeight.semibold },
   });

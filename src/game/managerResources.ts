@@ -169,7 +169,7 @@ export function executeManagerResourceAction(
     state.totalCoinsSpent += cost;
     const report = buildOppositionReport(save, scopeId);
     detail = report
-      ? `${report.opponentName}: ${report.topBatter.name} is the main batting threat; ${report.topBowler.name} leads the attack. ${report.weakness} Recommended plan: ${report.recommendedTactics.batting} batting, ${report.recommendedTactics.bowling} bowling, ${report.recommendedTactics.field} field. XI preparation: +2 form and +1 morale.`
+      ? `${report.opponentName}: ${report.topBatter.name} is the main batting threat; ${report.topBowler.name} leads the attack. ${report.weakness} Match plan: ${report.recommendedTactics.batting} batting, ${report.recommendedTactics.bowling} bowling, ${report.recommendedTactics.field} field. XI preparation: +2 form and +1 morale.`
       : `Opposition analysis prepared for ${selected.length} selected players: +2 form and +1 morale for the upcoming fixture.`;
   } else if (action === 'EMERGENCY_TEAM_TALK') {
     const lowestMorale = team.playerIds

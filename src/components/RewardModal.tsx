@@ -51,7 +51,12 @@ export function RewardModal({ data, onClose }: Props) {
         exiting={SMOOTH_MODAL_EXIT}
         style={styles.backdrop}
       >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable
+          accessible={false}
+          importantForAccessibility="no"
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+        />
         <Animated.View entering={SMOOTH_CARD_ZOOM} style={[styles.card, shadow.card]}>
           <View style={styles.iconWrap}>
             <Icon name={data.icon ?? 'gift'} size={30} color="#F7D06E" />

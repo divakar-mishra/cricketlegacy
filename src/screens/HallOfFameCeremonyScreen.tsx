@@ -21,6 +21,7 @@ import Svg, { Circle, Defs, Path, Polygon, RadialGradient, Stop } from 'react-na
 import { moment, playHaptic } from '../audio';
 import { Button, Screen } from '../components';
 import { AppText as Text } from '../components/AppText';
+import { useManagedTimers } from '../hooks/useManagedTimers';
 import { ScreenProps } from '../navigation';
 import {
   fonts,
@@ -214,14 +215,15 @@ export function HallOfFameCeremonyScreen({ navigation, route }: ScreenProps<'Hal
   const cardY = useSharedValue(50);
   const cardOpacity = useSharedValue(0);
   const glowOpacity = useSharedValue(0);
+  const timers = useManagedTimers();
 
   useEffect(() => {
     // The plaque reveal (and its haptics) only fire once the highlight reel ends.
     if (phase !== 'plaque') return;
     moment('trophy');
     playHaptic('notify-success');
-    setTimeout(() => playHaptic('impact-heavy'), 500);
-    setTimeout(() => playHaptic('impact-medium'), 1000);
+    timers.schedule('hall-heavy-haptic', () => playHaptic('impact-heavy'), 500);
+    timers.schedule('hall-medium-haptic', () => playHaptic('impact-medium'), 1000);
 
     sealScale.value = withDelay(120, withTiming(1, { duration: 200 }));
     sealOpacity.value = withDelay(200, withTiming(1, { duration: 500 }));

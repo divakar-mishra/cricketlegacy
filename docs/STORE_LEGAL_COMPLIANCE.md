@@ -2,6 +2,13 @@
 
 Status date: 2026-08-20
 
+> Historical audit: for the September 13 Firebase integration, live policy
+> deployment, Data safety changes and published closed-test status, start with
+> [the release record](PLAY_CONSOLE_RELEASE_LOG_2026-09-13.md). Statements below
+> about Firebase being absent, hosting pending and Console setup pending are
+> superseded there. Legacy subscription/product notes also require the current
+> approved product rules; this historical audit is not today's release checklist.
+
 This is an engineering compliance audit, not legal advice. Final policy wording
 must be approved by the developer's legal adviser and must match the production
 build, backend, SDK settings and store-console declarations.

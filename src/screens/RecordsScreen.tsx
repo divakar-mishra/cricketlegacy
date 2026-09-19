@@ -139,6 +139,9 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
           return (
             <Pressable
               key={t.key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: sel }}
+              accessibilityLabel={t.label}
               onPress={() => setMainTab(t.key)}
               style={[styles.mainTab, sel && styles.mainTabActive]}
             >
@@ -306,6 +309,9 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                     return (
                       <Pressable
                         key={option.key}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected }}
+                        accessibilityLabel={option.label}
                         onPress={() => setStatView(option.key)}
                         style={[styles.statViewButton, selected && styles.statViewButtonActive]}
                       >
@@ -381,6 +387,9 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                     return (
                       <Pressable
                         key={kind}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected }}
+                        accessibilityLabel={label}
                         onPress={() => setManagerStatKind(kind)}
                         style={[styles.managerStatTab, selected && styles.managerStatTabSelected]}
                       >
@@ -528,6 +537,9 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
               return (
                 <Pressable
                   key={f}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: sel }}
+                  accessibilityLabel={label}
                   onPress={() => setAchFilter(f)}
                   style={[styles.chip, sel && styles.chipActive]}
                 >
@@ -662,8 +674,11 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
               {(['players', 'managers'] as HofTab[]).map((t) => {
                 const sel = hofTab === t;
                 return (
-                  <Pressable
-                    key={t}
+                <Pressable
+                  key={t}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: sel }}
+                  accessibilityLabel={t === 'players' ? 'Players' : 'Managers'}
                     onPress={() => setHofTab(t)}
                     style={[styles.chip, sel && styles.chipActive]}
                   >
@@ -1150,7 +1165,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
     statViewButton: {
       minWidth: '31%',
-      minHeight: 38,
+      minHeight: 44,
       flexGrow: 1,
       alignItems: 'center',
       justifyContent: 'center',
@@ -1216,7 +1231,7 @@ const makeStyles = (colors: ThemeColors) =>
     managerStatTab: {
       flexGrow: 1,
       flexBasis: 120,
-      minHeight: 40,
+      minHeight: 44,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: spacing.sm,
@@ -1287,18 +1302,18 @@ const makeStyles = (colors: ThemeColors) =>
     },
     mainTabRow: {
       flexGrow: 0,
-      height: 44,
+      height: 48,
       marginTop: spacing.md,
       marginBottom: spacing.md,
     },
     mainTabContent: {
-      minHeight: 44,
+      minHeight: 48,
       alignItems: 'center',
       gap: spacing.sm,
       paddingHorizontal: 0,
     },
     mainTab: {
-      height: 40,
+      height: 44,
       minWidth: 92,
       alignItems: 'center',
       justifyContent: 'center',
@@ -1361,7 +1376,7 @@ const makeStyles = (colors: ThemeColors) =>
     chip: {
       flex: 1,
       minWidth: 0,
-      minHeight: 40,
+      minHeight: 44,
       paddingHorizontal: spacing.md,
       paddingVertical: 6,
       borderRadius: radius.sm,

@@ -8,6 +8,10 @@ export type Language = 'en' | 'hi';
 
 interface SettingsState {
   sound: boolean;
+  usageAnalytics: boolean;
+  crashReports: boolean;
+  setUsageAnalytics: (v: boolean) => void;
+  setCrashReports: (v: boolean) => void;
   music: boolean;
   haptics: boolean;
   notifications: boolean;
@@ -38,6 +42,8 @@ interface SettingsState {
 }
 
 const DEFAULTS = {
+  usageAnalytics: false,
+  crashReports: false,
   sound: true,
   music: true,
   haptics: true,
@@ -56,6 +62,8 @@ export const useSettings = create<SettingsState>()(
     (set) => ({
       ...DEFAULTS,
       hasHydrated: false,
+      setUsageAnalytics: (usageAnalytics) => set({ usageAnalytics }),
+      setCrashReports: (crashReports) => set({ crashReports }),
       setSound: (sound) => set({ sound }),
       setMusic: (music) => set({ music }),
       setHaptics: (haptics) => set({ haptics }),
@@ -80,6 +88,8 @@ export const useSettings = create<SettingsState>()(
       name: 'cricket:settings',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
+        usageAnalytics: s.usageAnalytics,
+        crashReports: s.crashReports,
         sound: s.sound,
         music: s.music,
         haptics: s.haptics,

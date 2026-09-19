@@ -8,7 +8,12 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { moment } from '../audio';
 import { fonts, fontSize, fontWeight, radius, shadow, spacing, useTheme } from '../theme';
@@ -41,6 +46,7 @@ export const Button = React.memo(function Button({
   style,
 }: Props) {
   const { colors, gradients } = useTheme();
+  const reducedMotion = useReducedMotion();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
 
@@ -50,14 +56,24 @@ export const Button = React.memo(function Button({
   }));
 
   const handlePressIn = useCallback(() => {
+    if (reducedMotion) {
+      scale.value = 1;
+      opacity.value = 0.88;
+      return;
+    }
     scale.value = withTiming(0.96, { duration: 80 });
     opacity.value = withTiming(0.88, { duration: 80 });
-  }, [scale, opacity]);
+  }, [scale, opacity, reducedMotion]);
 
   const handlePressOut = useCallback(() => {
+    if (reducedMotion) {
+      scale.value = 1;
+      opacity.value = 1;
+      return;
+    }
     scale.value = withTiming(1, { duration: 120 });
     opacity.value = withTiming(1, { duration: 120 });
-  }, [scale, opacity]);
+  }, [scale, opacity, reducedMotion]);
 
   const handlePress = useCallback(() => {
     if (!onPress) return;

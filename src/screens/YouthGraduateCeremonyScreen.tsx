@@ -21,6 +21,7 @@ import Svg, { Path, Polygon, Text as SvgText } from 'react-native-svg';
 import { playHaptic } from '../audio';
 import { Button, Screen } from '../components';
 import { AppText as Text } from '../components/AppText';
+import { useManagedTimers } from '../hooks/useManagedTimers';
 import { ScreenProps } from '../navigation';
 import {
   fonts,
@@ -137,6 +138,7 @@ export function YouthGraduateCeremonyScreen({
   const nameOpacity = useSharedValue(0);
   const pulse = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
+  const timers = useManagedTimers();
 
   const starPositions = [
     { x: 30, y: 80, color: colors.accent, delay: 500 },
@@ -151,7 +153,7 @@ export function YouthGraduateCeremonyScreen({
 
   useEffect(() => {
     playHaptic('notify-success');
-    setTimeout(() => playHaptic('impact-heavy'), 400);
+    timers.schedule('graduate-haptic', () => playHaptic('impact-heavy'), 400);
 
     jerseyScale.value = withDelay(120, withTiming(1, { duration: 200 }));
     nameY.value = withDelay(360, withTiming(0, { duration: 220 }));
@@ -172,7 +174,7 @@ export function YouthGraduateCeremonyScreen({
         true,
       ),
     );
-  }, [glowOpacity, jerseyScale, nameOpacity, nameY, pulse]);
+  }, [glowOpacity, jerseyScale, nameOpacity, nameY, pulse, timers]);
 
   const jerseyStyle = useAnimatedStyle(() => ({ transform: [{ scale: jerseyScale.value }] }));
   const nameStyle = useAnimatedStyle(() => ({

@@ -44,13 +44,24 @@ export function StarterPackModal({ visible, onPurchase, onDismiss }: Props) {
   if (!visible || !queueVisible) return null;
 
   return (
-    <Modal transparent animationType="none" statusBarTranslucent visible={queueVisible}>
+    <Modal
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      visible={queueVisible}
+      onRequestClose={onDismiss}
+    >
       <Animated.View
         entering={SMOOTH_MODAL_ENTER}
         exiting={SMOOTH_MODAL_EXIT}
         style={styles.backdrop}
       >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />
+        <Pressable
+          accessible={false}
+          importantForAccessibility="no"
+          style={StyleSheet.absoluteFill}
+          onPress={onDismiss}
+        />
         <Animated.View entering={SMOOTH_CARD_ZOOM} style={styles.card}>
           <LinearGradient
             colors={['#17211B', '#0B100D', '#17211B'] as [string, string, string]}
@@ -97,7 +108,13 @@ export function StarterPackModal({ visible, onPurchase, onDismiss }: Props) {
             Google Play shows the price before purchase.
           </Text>
 
-          <Pressable onPress={onDismiss} style={styles.dismissBtn} hitSlop={12}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss starter pack"
+            onPress={onDismiss}
+            style={styles.dismissBtn}
+            hitSlop={12}
+          >
             <Text style={[styles.dismissText, { color: colors.textMuted }]}>Maybe later</Text>
           </Pressable>
         </Animated.View>

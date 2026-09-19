@@ -50,6 +50,7 @@ import { FranchiseOfferModal } from '../components/FranchiseOfferModal';
 import { DomesticClubOfferModal } from '../components/DomesticClubOfferModal';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { StarterPackModal } from '../components/StarterPackModal';
+import { useManagedTimers } from '../hooks/useManagedTimers';
 import { getCountry } from '../data/countries';
 import { ECONOMY } from '../data/gameConfig';
 import type { CareerCompetitionStatScope, NewspaperStory, PlayerStats } from '../domain/types';
@@ -241,6 +242,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   const [canClaimDaily, setCanClaimDaily] = useState(false);
   const [rewardModal, setRewardModal] = useState<RewardModalData | null>(null);
   const [contractFlash, setContractFlash] = useState<string | null>(null);
+  const timers = useManagedTimers();
   const [showStarterPack, setShowStarterPack] = useState(false);
   const starterPackShownRef = useRef(false);
   const [toastIdx, setToastIdx] = useState(0);
@@ -589,7 +591,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     const result = resolvePlayerWeek(choice);
     if (result.ok && result.outcome) {
       setContractFlash(result.outcome);
-      setTimeout(() => setContractFlash(null), 2400);
+      timers.schedule('contract-flash', () => setContractFlash(null), 2400);
     } else if (result.reason) {
       Alert.alert('Calendar', result.reason);
     }
@@ -624,10 +626,10 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               : false;
           setContractFlash(
             selectedNext
-              ? `${outcome.simulated} team fixture${outcome.simulated === 1 ? '' : 's'} advanced. You are back in the XI.`
-              : `${outcome.simulated} team fixture${outcome.simulated === 1 ? '' : 's'} advanced while you were outside the XI.`,
+              ? `${outcome.simulated} team fixture${outcome.simulated === 1 ? '' : 's'} completed. You are back in the XI.`
+              : `${outcome.simulated} team fixture${outcome.simulated === 1 ? '' : 's'} completed while you were outside the XI.`,
           );
-          setTimeout(() => setContractFlash(null), 3200);
+          timers.schedule('contract-flash', () => setContractFlash(null), 3200);
         } else if (outcome.reason) {
           Alert.alert('Team selection', outcome.reason);
         }

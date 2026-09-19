@@ -160,7 +160,13 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
 function Tab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   const styles = useThemedStyles(makeStyles);
   return (
-    <Pressable onPress={onPress} style={[styles.tab, active && styles.tabActive]}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
+      style={[styles.tab, active && styles.tabActive]}
+    >
       <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
     </Pressable>
   );

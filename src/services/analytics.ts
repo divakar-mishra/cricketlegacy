@@ -1,44 +1,8 @@
-/**
- * Typed analytics facade with optional Firebase Analytics forwarding.
- *
- * Uses a lazy require() so the native module is only loaded in EAS Dev/Prod
- * builds. Falls back to console-only logging in Expo Go, web, and Jest — the
- * app never crashes if the dependency is absent.
- *
- * ─── Setup (one-time) ────────────────────────────────────────────────────────
- *  1. npx expo install @react-native-firebase/app @react-native-firebase/analytics expo-build-properties
- *  2. app.json → plugins: add "@react-native-firebase/app" and
- *     ["expo-build-properties", { "ios": { "useFrameworks": "static" } }]
- *  3. Firebase console → create project → add Android app (package
- *     com.coverdrive.cricket) + iOS app (same bundle) → download the
- *     google-services.json / GoogleService-Info.plist and reference them in
- *     app.json (android.googleServicesFile / ios.googleServicesFile).
- *  4. eas build --profile development (Expo Go can't run native Firebase).
- *
- * Once the native module is present, analytics auto-enables (no flag to flip)
- * and Firebase collects D1/D7 retention automatically from first_open /
- * session_start. The EVT events below add the conversion funnel on top.
- * ─────────────────────────────────────────────────────────────────────────────
- */
-
-const IS_DEV: boolean = ((): boolean => {
-  const g = globalThis as { __DEV__?: boolean };
-  return typeof g.__DEV__ === 'boolean' ? g.__DEV__ : false;
-})();
+import { canSendAnalytics, firebaseAnalytics } from './telemetry';
 
 type AnalyticsParamValue = string | number | boolean;
 type AnalyticsParams = Record<string, AnalyticsParamValue>;
 
-interface AnalyticsEvent {
-  name: string;
-  params?: AnalyticsParams;
-  ts: number;
-}
-
-/**
- * Canonical event-name taxonomy. Keep event names stable and snake_cased so
- * they remain compatible with Firebase/GA naming rules.
- */
 export const EVT = {
   APP_OPEN: 'app_open',
   ONBOARDING_COMPLETE: 'onboarding_complete',
@@ -61,59 +25,51 @@ export const EVT = {
   LEGACY_CONTRIBUTION: 'legacy_contribution',
 } as const;
 
-// ─── In-memory ring buffer (debug + offline queuing) ─────────────────────────
-const RING_CAPACITY = 200;
-const ring: AnalyticsEvent[] = [];
-
-function record(event: AnalyticsEvent): void {
-  ring.push(event);
-  if (ring.length > RING_CAPACITY) ring.shift();
-}
-
-// ─── Firebase lazy accessor (auto-enables when the native module is present) ───
-type FirebaseAnalytics = {
-  logEvent: (n: string, p?: object) => Promise<void>;
-  setUserProperty: (k: string, v: string) => Promise<void>;
+// Only aggregate values and fixed enums leave the device, never arbitrary text/IDs.
+const numericKeys = new Set(['streak', 'coins', 'energy', 'last_slide', 'coin_cost']);
+const booleanKeys = new Set([
+  'won',
+  'tie',
+  'retired',
+  'weekly',
+  'auctionMove',
+  'domesticMove',
+  'contractRenewed',
+  'managerJobMove',
+]);
+const enumValues: Record<string, readonly string[]> = {
+  mode: ['career', 'manager'],
+  difficulty: ['easy', 'normal', 'hard', 'pro', 'EASY', 'NORMAL', 'HARD', 'PRO'],
+  format: ['T20', 'ODI', 'TEST', 'FC', 'LIST_A'],
 };
-
-let _fb: FirebaseAnalytics | null | undefined;
-
-function getFirebase(): FirebaseAnalytics | null {
-  if (_fb !== undefined) return _fb;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('@react-native-firebase/analytics').default;
-    _fb = mod(); // auto-initialises from google-services once the dep is installed
-  } catch {
-    _fb = null; // Expo Go / web / Jest / dependency not installed → console-only
+export function sanitizeAnalyticsParams(
+  params: AnalyticsParams = {},
+): Record<string, string | number> {
+  const clean: Record<string, string | number> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (numericKeys.has(key) && typeof value === 'number' && Number.isFinite(value))
+      clean[key] = value;
+    if (booleanKeys.has(key) && typeof value === 'boolean') clean[key] = Number(value);
+    if (typeof value === 'string' && enumValues[key]?.includes(value)) clean[key] = value;
   }
-  return _fb ?? null;
+  return clean;
 }
-
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-/** Logs a single analytics event. Always buffers locally; forwards to Firebase when available. */
 export function logEvent(name: string, params?: AnalyticsParams): void {
-  const event: AnalyticsEvent = params
-    ? { name, params, ts: Date.now() }
-    : { name, ts: Date.now() };
-  record(event);
-  if (IS_DEV) {
-    console.log(`[analytics] ${name}`, params ?? {});
-  }
-  const fb = getFirebase();
-  if (fb) {
-    fb.logEvent(name, params).catch(() => {});
+  if (!canSendAnalytics() || !Object.values(EVT).includes(name as (typeof EVT)[keyof typeof EVT]))
+    return;
+  try {
+    const a = firebaseAnalytics();
+    a.logEvent(a.getAnalytics(), name, sanitizeAnalyticsParams(params));
+  } catch {
+    /* Never interrupt gameplay. */
   }
 }
-
-/** Associates a user-scoped property with subsequent events (e.g. cohort, mode). */
 export function setUserProperty(key: string, value: AnalyticsParamValue): void {
-  if (IS_DEV) {
-    console.log(`[analytics] user.${key} = ${String(value)}`);
-  }
-  const fb = getFirebase();
-  if (fb) {
-    fb.setUserProperty(key, String(value)).catch(() => {});
+  if (!canSendAnalytics() || key !== 'mode' || !enumValues.mode.includes(String(value))) return;
+  try {
+    const a = firebaseAnalytics();
+    void a.setUserProperty(a.getAnalytics(), key, String(value)).catch(() => undefined);
+  } catch {
+    /* Unsupported native runtime. */
   }
 }

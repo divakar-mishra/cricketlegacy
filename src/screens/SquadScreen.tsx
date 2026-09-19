@@ -210,6 +210,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
             <Pressable
               key={o.value}
               disabled={!canEdit}
+              accessibilityRole="button"
+              accessibilityLabel={`Batting approach: ${o.label}`}
               accessibilityState={{ selected: sel, disabled: !canEdit }}
               onPress={() => setTactics({ ...tactics, batting: o.value })}
               style={[styles.chip, sel && styles.chipActive, !canEdit && styles.chipDisabled]}
@@ -228,6 +230,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
             <Pressable
               key={o.value}
               disabled={!canEdit}
+              accessibilityRole="button"
+              accessibilityLabel={`Bowling plan: ${o.label}`}
               accessibilityState={{ selected: sel, disabled: !canEdit }}
               onPress={() => setTactics({ ...tactics, bowling: o.value })}
               style={[styles.chip, sel && styles.chipActive, !canEdit && styles.chipDisabled]}
@@ -251,6 +255,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
             <Pressable
               key={o.value}
               disabled={!canEdit}
+              accessibilityRole="button"
+              accessibilityLabel={`Field setting: ${o.label}`}
               accessibilityState={{ selected: sel, disabled: !canEdit }}
               onPress={() => setTactics({ ...tactics, field: o.value })}
               style={[styles.chip, sel && styles.chipActive, !canEdit && styles.chipDisabled]}
@@ -312,6 +318,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
             <Pressable
               key={id}
               disabled={!canEdit}
+              accessibilityRole="button"
+              accessibilityLabel={`${p.name}, batting position ${i + 1}, overall ${p.overall}`}
               accessibilityState={{ selected: isSel, disabled: !canEdit }}
               onPress={() => swapBenchIntoSlot(i)}
               style={[styles.row, isSel && styles.rowSel]}
@@ -360,6 +368,8 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
                 <Pressable
                   key={id}
                   disabled={!canEdit}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${p.name}, bench, overall ${p.overall}`}
                   accessibilityState={{ selected: isBenchSel, disabled: !canEdit }}
                   onPress={() => {
                     if (selected != null) swapIn(id);
@@ -526,8 +536,8 @@ const makeStyles = (colors: ThemeColors) =>
     },
     moveBtns: { flexDirection: 'column', gap: 2 },
     moveBtn: {
-      width: 30,
-      height: 30,
+      width: 44,
+      height: 44,
       borderRadius: radius.sm,
       backgroundColor: colors.surfaceAlt,
       borderWidth: 1,

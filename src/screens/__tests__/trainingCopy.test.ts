@@ -41,7 +41,8 @@ describe('training clarity copy', () => {
     expect(source).toContain('label={');
     expect(source).toContain('`Train · ${cost}`');
     expect(source).toContain('Analyst focus:');
-    expect(source).toContain('Analyst recommendation');
+    expect(source).toContain('Analyst focus');
+    expect(source).not.toContain('Analyst recommendation');
     expect(source).toContain('activeAnalysis?.recommendedTrainingGroup === group.id');
     expect(source).toContain("? 'Stage cap reached'");
     expect(source).toContain("'Season limit reached'");

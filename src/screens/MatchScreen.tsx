@@ -2037,7 +2037,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                         </Text>
                         <Text style={styles.preparationLine}>{managerReport.recommendation}</Text>
                         <Button
-                          label="Apply Recommended Plan"
+                          label="Apply Scouting Plan"
                           variant="secondary"
                           size="sm"
                           onPress={applyRecommendedPlan}

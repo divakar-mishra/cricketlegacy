@@ -243,6 +243,7 @@ function privacyPage(config, age) {
   const retention = config.retention;
   return `${pageHeading('Your data', `${config.appName} Privacy Policy`, `How ${config.publisher.tradingName} handles information in ${config.appName}.`, config)}
   <article>
+    <p class="effective">Privacy update: 13 September 2026 — optional Firebase Analytics and Crashlytics diagnostics.</p>
     <section><h2>Scope of this policy</h2>
       <p>This policy applies specifically to ${escapeHtml(config.appName)} and its related support and web pages. It does not apply to other apps published by ${escapeHtml(config.publisher.tradingName)}; those apps have their own privacy policies.</p>
     </section>
@@ -259,6 +260,7 @@ function privacyPage(config, age) {
         '<strong>Age preferences:</strong> the app stores your self-declared age band, India/outside-India residence choice and, where applicable, parent or guardian permission on your device. It does not ask for a date of birth or upload these answers. This is a self-declaration, not verified identity or parental consent.',
         '<strong>Advertising:</strong> Google Mobile Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices according to the build and your settings. The app does not initialize ads for users who declare they are under 18. For adults, ad initialization waits for the Google consent flow to permit requests. Ad privacy choices are available in Settings. Requests remain non-personalized, which does not prevent all technical processing.',
         '<strong>Support:</strong> your email address, message and attachments if you contact support.',
+        '<strong>Optional diagnostics:</strong> if you enable Usage analytics in Settings, Google Firebase Analytics processes app-instance identifiers, app/device information, sessions and limited gameplay events to measure usage. Its SDK may also derive approximate location from masked IP addresses and collect in-app purchase/subscription events, including product and price information. This does not give us your payment-card details or precise GPS location. If you enable Crash reports, Firebase Crashlytics processes installation identifiers, app/device diagnostics, session information and crash traces to diagnose failures. Both choices are off by default and can be withdrawn in Settings. We do not attach account names, emails or save contents to Firebase reports. Analytics advertising-ID collection and advertising consent are disabled. Turning these options off stops future reporting; it does not automatically erase reports already received by Google. Provider retention and deletion procedures apply to previously received data; contact us using the details above for a privacy request.',
         '<strong>Device features:</strong> notification permission and locally scheduled reminders. The current app does not upload a push-notification token.',
       ])}
       <p>The public legal site does not intentionally set advertising or analytics cookies. Cloudflare may process ordinary network and security logs when it hosts these pages.</p>
@@ -273,7 +275,7 @@ function privacyPage(config, age) {
       <p>Depending on the context and applicable law, processing is based on providing the service you request, your consent, legitimate service-security interests, or a legal obligation. You may withdraw consent for optional processing, although this does not affect earlier lawful processing.</p>
     </section>
     <section><h2>Service providers and disclosures</h2>
-      <p>Information may be processed for ${escapeHtml(config.publisher.tradingName)} by Supabase (authentication and cloud data), RevenueCat (purchase entitlement management), Google Play and Apple (billing), Google Mobile Ads (advertising), and Cloudflare (site delivery and security). Their handling is also governed by their own terms and privacy notices.</p>
+      <p>Information may be processed for ${escapeHtml(config.publisher.tradingName)} by Supabase (authentication and cloud data), RevenueCat (purchase entitlement management), Google Play and Apple (billing), Google Mobile Ads (advertising), Google Firebase Analytics and Crashlytics (optional usage and crash diagnostics), and Cloudflare (site delivery and security). Their handling is also governed by their own terms and privacy notices.</p>
       <p>Information may also be disclosed when required by law, to protect users or the service, or in connection with a business transfer. ${escapeHtml(config.publisher.tradingName)} does not sell personal data. Public leaderboard information is shared publicly only when that feature is enabled and you submit an entry.</p>
     </section>
     <section><h2>Storage, transfers and retention</h2>

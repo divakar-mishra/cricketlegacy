@@ -184,7 +184,8 @@ describe('shared match presentation', () => {
     );
     expect(source).not.toContain('Review the opponent, choose a plan and confirm preparation');
     expect(source).not.toContain('Opposition unit ratings are out of 100');
-    expect(source).toContain('Apply Recommended Plan');
+    expect(source).toContain('Apply Scouting Plan');
+    expect(source).not.toContain('Apply Recommended Plan');
     expect(source).toContain('tacticSelectionSummary(managerReport.recommendedTactics)');
     expect(source).toContain('style={styles.fieldRestrictionCallout}');
     expect(source).toContain('{fieldRestriction(setup.format, 0).label}');

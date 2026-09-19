@@ -242,7 +242,7 @@ export function PremiumClubhouseScreen({ navigation }: ScreenProps<'PremiumClubh
         );
       })}
 
-      <Text style={styles.section}>Advanced Analytics</Text>
+      <Text style={styles.section}>Career Analytics</Text>
       <View style={styles.analyticsGrid}>
         {save.mode === 'career' ? (
           <>

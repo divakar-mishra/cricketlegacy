@@ -30,6 +30,7 @@ import {
 } from '../game/liveops';
 import { isLegacySeasonPassActive, isSeasonPassActive, monthlyBundleForSave, SEASON_PASS_BENEFITS } from '../game/seasonPass';
 import { VipCollectionsScreen } from './VipCollectionsScreen';
+import { useManagedTimers } from '../hooks/useManagedTimers';
 import { ScreenProps } from '../navigation';
 import { purchases } from '../services';
 import { useCareer } from '../state/careerStore';
@@ -124,6 +125,7 @@ function LegacySeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
   const [rewardModal, setRewardModal] = useState<RewardModalData | null>(null);
   const [showFullTrack, setShowFullTrack] = useState(false);
   const [showPassInfo, setShowPassInfo] = useState(false);
+  const timers = useManagedTimers();
 
   useFocusEffect(
     useCallback(() => {
@@ -201,7 +203,7 @@ function LegacySeasonPassScreen({ navigation }: ScreenProps<'SeasonPass'>) {
         icon: 'trophy',
         visualRewards: { itemIds: r.itemIds, saveId: save.id },
       });
-      setTimeout(() => setClaimFlash(null), 3000);
+      timers.schedule('claim-flash', () => setClaimFlash(null), 3000);
     }
     setClaimBusy(false);
   };

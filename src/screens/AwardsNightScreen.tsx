@@ -4,7 +4,7 @@
  * making season completion a genuine "moment" rather than a data screen.
  */
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -26,6 +26,7 @@ import { PlayerAvatar } from '../components/PlayerAvatar';
 import { SaveGame } from '../domain/types';
 import { standings } from '../game/season';
 import { ScreenProps } from '../navigation';
+import { useManagedTimers } from '../hooks/useManagedTimers';
 import { useCareer } from '../state/careerStore';
 import {
   fonts,
@@ -53,6 +54,7 @@ function AwardReveal({ award, index, save }: { award: Award; index: number; save
   const scale = useSharedValue(0.3);
   const opacity = useSharedValue(0);
   const glow = useSharedValue(0.2);
+  const timers = useManagedTimers();
 
   useEffect(() => {
     const delay = index * 200;
@@ -69,15 +71,15 @@ function AwardReveal({ award, index, save }: { award: Award; index: number; save
 
     // Fire haptic on reveal
     if (delay === 0) {
-      setTimeout(() => {
+      timers.schedule(`award-card-haptic:${index}`, () => {
         playHaptic('impact-medium');
       }, 100);
     } else {
-      setTimeout(() => {
+      timers.schedule(`award-card-haptic:${index}`, () => {
         playHaptic('impact-light');
       }, delay + 100);
     }
-  }, [glow, index, opacity, scale]);
+  }, [glow, index, opacity, scale, timers]);
 
   const cardStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -129,7 +131,7 @@ export function AwardsNightScreen({ navigation }: ScreenProps<'AwardsNight'>) {
   const styles = useThemedStyles(makeStyles);
   const [revealed, setRevealed] = useState(0);
   const [showContinue, setShowContinue] = useState(false);
-  const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timers = useManagedTimers();
   const computedAwardList = useMemo(
     () => (save ? buildAwardList(save, colors) : []),
     [save, colors],
@@ -141,28 +143,25 @@ export function AwardsNightScreen({ navigation }: ScreenProps<'AwardsNight'>) {
 
     const revealNext = (idx: number) => {
       if (idx >= computedAwardList.length) {
-        setTimeout(() => setShowContinue(true), 1200);
+        timers.schedule('awards-continue', () => setShowContinue(true), 1200);
         return;
       }
       setRevealed(idx + 1);
       const isChampion = idx === 0;
       if (isChampion) {
-        setTimeout(() => {
+        timers.schedule('awards-champion-haptic', () => {
           playHaptic('impact-heavy');
-          setTimeout(() => playHaptic('impact-medium'), 180);
-          setTimeout(() => playHaptic('impact-light'), 350);
+          timers.schedule('awards-medium-haptic', () => playHaptic('impact-medium'), 180);
+          timers.schedule('awards-light-haptic', () => playHaptic('impact-light'), 350);
         }, 300);
       } else {
-        setTimeout(() => playHaptic('impact-medium'), 250);
+        timers.schedule('awards-step-haptic', () => playHaptic('impact-medium'), 250);
       }
-      revealTimer.current = setTimeout(() => revealNext(idx + 1), 1100);
+      timers.schedule('awards-reveal', () => revealNext(idx + 1), 1100);
     };
 
-    revealTimer.current = setTimeout(() => revealNext(0), 800);
-    return () => {
-      if (revealTimer.current) clearTimeout(revealTimer.current);
-    };
-  }, [computedAwardList.length, save]);
+    timers.schedule('awards-reveal', () => revealNext(0), 800);
+  }, [computedAwardList.length, save, timers]);
 
   if (!save) {
     return (
