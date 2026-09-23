@@ -4,6 +4,8 @@ export { Button } from './Button';
 export { Card } from './Card';
 export { ProgressBar } from './ProgressBar';
 export { SelectableCard } from './SelectableCard';
+export { SegmentedControl } from './SegmentedControl';
+export type { SegmentOption } from './SegmentedControl';
 export { ScreenHeader } from './ScreenHeader';
 export { Stepper } from './Stepper';
 export { Emblem } from './Emblem';

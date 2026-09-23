@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import {
   Button,
@@ -8,6 +8,7 @@ import {
   ScreenHeader,
   SelectableCard,
   AppText as Text,
+  SegmentedControl,
 } from '../components';
 import { getCountry } from '../data/countries';
 import { Difficulty } from '../domain/types';
@@ -19,7 +20,12 @@ import { useCareer } from '../state/careerStore';
 import { firstFreeSlot, listSlots, setLastPlayed, writeSave } from '../storage/saveGames';
 import { fontSize, fontWeight, radius, spacing, ThemeColors, useThemedStyles } from '../theme';
 
-const DIFFICULTIES: Difficulty[] = ['EASY', 'NORMAL', 'HARD', 'PRO'];
+const DIFFICULTIES: { value: Difficulty; label: string }[] = [
+  { value: 'EASY', label: 'Easy' },
+  { value: 'NORMAL', label: 'Normal' },
+  { value: 'HARD', label: 'Hard' },
+  { value: 'PRO', label: 'Pro' },
+];
 
 export function TeamSelectScreen({ navigation, route }: ScreenProps<'TeamSelect'>) {
   const setActive = useCareer((state) => state.setActive);
@@ -85,23 +91,12 @@ export function TeamSelectScreen({ navigation, route }: ScreenProps<'TeamSelect'
       <ScreenHeader title="Choose your club" onBack={() => navigation.goBack()} />
 
       <Text style={styles.label}>Difficulty</Text>
-      <View style={styles.chips}>
-        {DIFFICULTIES.map((item) => {
-          const selected = difficulty === item;
-          return (
-            <Pressable
-              key={item}
-              onPress={() => setDifficulty(item)}
-              style={[styles.chip, selected && styles.chipActive]}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              accessibilityLabel={`Difficulty ${item}`}
-            >
-              <Text style={[styles.chipText, selected && styles.chipTextActive]}>{item}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <SegmentedControl
+        value={difficulty}
+        options={DIFFICULTIES}
+        onChange={setDifficulty}
+        accessibilityLabel="Manager career difficulty"
+      />
 
       <View style={styles.progressNote}>
         <Text style={styles.progressNoteTitle}>Tier 3 · T20</Text>
@@ -149,22 +144,6 @@ const makeStyles = (colors: ThemeColors) =>
       marginBottom: spacing.sm,
     },
     sectionGap: { marginTop: spacing.lg },
-    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    chip: {
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.pill,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-    },
-    chipActive: { backgroundColor: colors.primaryDark, borderColor: colors.primary },
-    chipText: {
-      color: colors.textMuted,
-      fontSize: fontSize.sm,
-      fontWeight: fontWeight.semibold,
-    },
-    chipTextActive: { color: colors.white },
     progressNote: {
       marginTop: spacing.lg,
       backgroundColor: colors.surfaceAlt,

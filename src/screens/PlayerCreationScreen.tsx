@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
-  Pressable,
   StyleSheet,
   Switch,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
@@ -17,6 +15,7 @@ import {
   Screen,
   ScreenHeader,
   SelectableCard,
+  SegmentedControl,
   Stepper,
   AppText as Text,
 } from '../components';
@@ -645,41 +644,10 @@ function ChoiceRow<T extends string>({
   onChange: (v: T) => void;
   options: { value: T; label: string }[];
 }) {
-  const styles = useThemedStyles(makeStyles);
-  const { width } = useWindowDimensions();
-  const isFourOptionRow = options.length === 4;
-  const isWideFourOptionRow = isFourOptionRow && width >= 600;
   return (
     <View style={{ marginTop: spacing.lg }}>
       <Label text={label} />
-      <View style={[styles.chips, isWideFourOptionRow && styles.chipsSingleRow]}>
-        {options.map((o) => {
-          const sel = value === o.value;
-          return (
-            <Pressable
-              key={o.value}
-              onPress={() => onChange(o.value)}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: sel }}
-              style={[
-                styles.chip,
-                isFourOptionRow &&
-                  (isWideFourOptionRow ? styles.chipQuarter : styles.chipHalf),
-                sel && styles.chipActive,
-              ]}
-            >
-              <Text
-                style={[styles.chipText, sel && styles.chipTextActive]}
-                numberOfLines={1}
-                adjustsFontSizeToFit={isFourOptionRow}
-                minimumFontScale={0.82}
-              >
-                {o.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <SegmentedControl value={value} options={options} onChange={onChange} accessibilityLabel={label} />
     </View>
   );
 }
@@ -762,31 +730,6 @@ const makeStyles = (colors: ThemeColors) =>
       fontSize: fontSize.lg,
       fontWeight: fontWeight.semibold,
     },
-    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    chipsSingleRow: { flexWrap: 'nowrap' },
-    chip: {
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.pill,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-    },
-    chipHalf: {
-      alignItems: 'center',
-      flexBasis: '47%',
-      flexGrow: 1,
-      paddingHorizontal: spacing.sm,
-    },
-    chipQuarter: {
-      alignItems: 'center',
-      flex: 1,
-      minWidth: 0,
-      paddingHorizontal: spacing.xs,
-    },
-    chipActive: { backgroundColor: colors.primaryDark, borderColor: colors.primary },
-    chipText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
-    chipTextActive: { color: colors.white },
     summary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
     summaryItem: { alignItems: 'center', flex: 1 },
     summaryValue: { color: colors.text, fontSize: fontSize.xxxl, fontWeight: fontWeight.black },

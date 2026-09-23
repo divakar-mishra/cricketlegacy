@@ -235,8 +235,11 @@ const loaded: Record<AdKind, boolean> = {
 let lastInterstitialAt = 0;
 const INTERSTITIAL_HISTORY_KEY = 'ads:interstitial-history:v1';
 export const INTERSTITIAL_WINDOW_MS = 60 * 60_000;
-export const INTERSTITIAL_MAX_PER_WINDOW = 2;
-export const DEFAULT_INTERSTITIAL_GAP_MS = 30 * 60_000;
+/** Approved closed-test policy: at most four safe-point ads per rolling hour. */
+export const INTERSTITIAL_MAX_PER_WINDOW = 4;
+export const DEFAULT_INTERSTITIAL_GAP_MS = 15 * 60_000;
+/** A match, an innings and an unsettled result must never be ad entry points. */
+export type InterstitialSafePoint = 'career-hub-return';
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -303,9 +306,11 @@ export async function showInterstitial(adsEnabled = true): Promise<boolean> {
  */
 export async function maybeShowInterstitial(
   adsEnabled: boolean,
+  safePoint: InterstitialSafePoint,
   minGapMs: number = DEFAULT_INTERSTITIAL_GAP_MS,
 ): Promise<boolean> {
-  if (!adsEnabled) return false;
+  // Require an explicit, reviewed safe navigation point at every call site.
+  if (!adsEnabled || safePoint !== 'career-hub-return') return false;
   const now = Date.now();
   const stored = (await getJSON<number[]>(INTERSTITIAL_HISTORY_KEY)) ?? [];
   const history = stored.filter(

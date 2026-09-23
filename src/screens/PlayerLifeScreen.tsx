@@ -511,15 +511,20 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           <Text style={styles.phoneBrand}>LEGACY PHONE</Text>
           <Icon name="wifi-outline" size={16} color={colors.textMuted} />
         </View>
-        <View style={styles.phoneApps}>
+        <View style={styles.phoneApps} accessibilityRole="tablist" accessibilityLabel="Legacy phone apps">
           {PHONE_APPS.map((app) => {
             const active = app.id === phoneApp;
             return (
               <Pressable
                 key={app.id}
                 accessibilityRole="tab"
+                accessibilityLabel={app.label}
                 accessibilityState={{ selected: active }}
-                style={[styles.phoneApp, active && styles.phoneAppActive]}
+                style={({ pressed }) => [
+                  styles.phoneApp,
+                  active && styles.phoneAppActive,
+                  pressed && styles.tabPressed,
+                ]}
                 onPress={() => {
                   if (app.id === 'messages') moment('phone');
                   setPhoneApp(app.id);
@@ -806,9 +811,14 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           return (
             <Pressable
               key={item.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              style={[styles.tab, active && styles.tabActive]}
+                accessibilityRole="tab"
+                accessibilityLabel={item.label}
+                accessibilityState={{ selected: active }}
+              style={({ pressed }) => [
+                styles.tab,
+                active && styles.tabActive,
+                pressed && styles.tabPressed,
+              ]}
               onPress={() => setTab(item.id)}
             >
               <Icon name={item.icon} size={18} color={active ? colors.text : colors.textMuted} />
@@ -973,6 +983,7 @@ const makeStyles = (colors: ThemeColors) =>
       gap: spacing.xs,
       marginTop: spacing.md,
     },
+    tabPressed: { opacity: 0.78 },
     tab: {
       flexGrow: 1,
       flexBasis: '30%',

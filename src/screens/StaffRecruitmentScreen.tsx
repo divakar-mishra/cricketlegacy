@@ -84,9 +84,14 @@ export function StaffRecruitmentScreen({ navigation }: ScreenProps<'StaffRecruit
           <Pressable
             key={entry.role}
             accessibilityRole="tab"
+            accessibilityLabel={entry.label}
             accessibilityState={{ selected: role === entry.role }}
             onPress={() => setRole(entry.role)}
-            style={[styles.roleTab, role === entry.role && styles.roleTabActive]}
+            style={({ pressed }) => [
+              styles.roleTab,
+              role === entry.role && styles.roleTabActive,
+              pressed && styles.roleTabPressed,
+            ]}
           >
             <Text style={[styles.roleTabText, role === entry.role && styles.roleTabTextActive]}>
               {entry.label}
@@ -164,12 +169,15 @@ const makeStyles = (colors: ThemeColors) =>
     note: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 18, marginTop: spacing.sm },
     roleTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.lg },
     roleTab: {
+      minHeight: 44,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
       borderBottomWidth: 2,
       borderBottomColor: colors.border,
+      justifyContent: 'center',
     },
     roleTabActive: { borderBottomColor: colors.accent },
+    roleTabPressed: { opacity: 0.78 },
     roleTabText: {
       color: colors.textMuted,
       fontSize: fontSize.xs,

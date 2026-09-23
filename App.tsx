@@ -35,7 +35,9 @@ import {
   NarrativeScreen,
   NewGameScreen,
   NotificationInboxScreen,
+  FeedbackScreen,
   PlayerCreationScreen,
+  PrivacyPolicyScreen,
   PlayerLifeScreen,
   PlayerProfileScreen,
   PremiumClubhouseScreen,
@@ -224,6 +226,8 @@ export default function App() {
                       />
                       <Stack.Screen name="SavedGames" component={SavedGamesScreen} />
                       <Stack.Screen name="Settings" component={SettingsScreen} />
+                      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+                      <Stack.Screen name="Feedback" component={FeedbackScreen} />
                       <Stack.Screen name="CricketAcademy" component={CricketAcademyScreen} />
                       <Stack.Screen name="Login" component={LoginScreen} />
                       <Stack.Screen name="Purchase" component={PurchaseScreen} />

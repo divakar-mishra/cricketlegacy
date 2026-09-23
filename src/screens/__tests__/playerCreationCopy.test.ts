@@ -38,12 +38,10 @@ describe('player creation attribute dashboard', () => {
     expect(source).toContain('scrollResetKey={step}');
   });
 
-  it('keeps four-option selectors aligned across phone and tablet widths', () => {
-    expect(source).toContain('const isFourOptionRow = options.length === 4');
-    expect(source).toContain('const isWideFourOptionRow = isFourOptionRow && width >= 600');
-    expect(source).toContain('styles.chipHalf');
-    expect(source).toContain('styles.chipQuarter');
-    expect(source).toContain('numberOfLines={1}');
+  it('keeps every bowling-style option in the shared equal-width selector', () => {
+    expect(source).toContain('SegmentedControl,');
+    expect(source).toContain('<SegmentedControl value={value} options={options} onChange={onChange} accessibilityLabel={label} />');
+    expect(source).toContain("{ value: 'LEG_SPIN', label: 'Leg-spin' }");
   });
 
   it('explains ratings and the reserved club without repeated prose', () => {

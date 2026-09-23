@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
-import { Button, Card, Screen, ScreenHeader, AppText as Text } from '../components';
+import { Button, Card, Screen, ScreenHeader, SegmentedControl, AppText as Text } from '../components';
 import { GameMode, SaveGame } from '../domain/types';
 import { saveSubtitle, saveTitle } from '../game/saveMeta';
 import { isSeasonPassActive } from '../game/seasonPass';
@@ -10,7 +10,7 @@ import { ScreenProps } from '../navigation';
 import { premiumSponsorSave } from '../services';
 import { useCareer } from '../state/careerStore';
 import { BASE_MAX_SLOTS, deleteSave, listSlots, SlotView } from '../storage/saveGames';
-import { fontSize, fontWeight, radius, spacing, ThemeColors, useThemedStyles } from '../theme';
+import { fontSize, fontWeight, spacing, ThemeColors, useThemedStyles } from '../theme';
 
 export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
   const [mode, setMode] = useState<GameMode>('career');
@@ -86,10 +86,16 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
         onBack={() => navigation.goBack()}
       />
 
-      <View style={styles.tabs}>
-        <Tab label="Player" active={mode === 'career'} onPress={() => setMode('career')} />
-        <Tab label="Manager" active={mode === 'manager'} onPress={() => setMode('manager')} />
-      </View>
+      <SegmentedControl
+        value={mode}
+        options={[
+          { value: 'career', label: 'Player' },
+          { value: 'manager', label: 'Manager' },
+        ]}
+        onChange={setMode}
+        accessibilityLabel="Career mode"
+        style={styles.tabs}
+      />
 
       {slots.map(({ slot, save, unavailable }) => (
         <Card key={slot} style={styles.slot}>
@@ -157,36 +163,9 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
   );
 }
 
-function Tab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="tab"
-      accessibilityLabel={label}
-      accessibilityState={{ selected: active }}
-      style={[styles.tab, active && styles.tabActive]}
-    >
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    tabs: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-    tab: {
-      flex: 1,
-      paddingVertical: spacing.md,
-      borderRadius: radius.md,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      alignItems: 'center',
-    },
-    tabActive: { backgroundColor: colors.surfaceAlt, borderColor: colors.primary },
-    tabText: { color: colors.textMuted, fontWeight: fontWeight.bold, fontSize: fontSize.md },
-    tabTextActive: { color: colors.white },
+    tabs: { marginBottom: spacing.lg },
     slot: { marginBottom: spacing.md },
     slotHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     slotNo: {

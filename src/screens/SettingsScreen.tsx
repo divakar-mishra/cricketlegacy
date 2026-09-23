@@ -69,7 +69,7 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
 
   const nonReleaseBuild = typeof __DEV__ !== 'undefined' && __DEV__;
   const publicResourceRows = (Object.keys(PUBLIC_RESOURCE_LABELS) as PublicResourceKey[]).filter(
-    (key) => PUBLIC_RESOURCES[key] || nonReleaseBuild,
+    (key) => key === 'privacyPolicy' || PUBLIC_RESOURCES[key] || nonReleaseBuild,
   );
 
   return (
@@ -273,10 +273,16 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
             {publicResourceRows.map((key, index) => (
               <View key={key}>
                 {index > 0 ? <Divider /> : null}
-                <PublicResourceRow resourceKey={key} />
+                <PublicResourceRow resourceKey={key} navigation={navigation} />
               </View>
             ))}
           </Card>
+          <Button
+            label="Send Feedback"
+            variant="secondary"
+            style={{ marginTop: spacing.sm }}
+            onPress={() => navigation.navigate('Feedback')}
+          />
         </>
       ) : null}
 
@@ -321,13 +327,23 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
   );
 }
 
-function PublicResourceRow({ resourceKey }: { resourceKey: PublicResourceKey }) {
+function PublicResourceRow({
+  resourceKey,
+  navigation,
+}: {
+  resourceKey: PublicResourceKey;
+  navigation: ScreenProps<'Settings'>['navigation'];
+}) {
   const styles = useThemedStyles(makeStyles);
   const url = PUBLIC_RESOURCES[resourceKey];
   const invalid = PUBLIC_RESOURCE_READINESS.invalid.includes(resourceKey);
   const label = PUBLIC_RESOURCE_LABELS[resourceKey];
 
   const onOpen = async () => {
+    if (resourceKey === 'privacyPolicy') {
+      navigation.navigate('PrivacyPolicy');
+      return;
+    }
     if (!url) return;
     try {
       await Linking.openURL(url);
@@ -340,18 +356,28 @@ function PublicResourceRow({ resourceKey }: { resourceKey: PublicResourceKey }) 
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: !url }}
-      disabled={!url}
+      accessibilityState={{ disabled: resourceKey !== 'privacyPolicy' && !url }}
+      disabled={resourceKey !== 'privacyPolicy' && !url}
       onPress={() => void onOpen()}
       style={({ pressed }) => [styles.publicResourceRow, pressed && styles.rowPressed]}
     >
-      <Text style={[styles.publicResourceLabel, !url && styles.unavailableLabel]}>{label}</Text>
-      {!url ? (
+      <Text
+        style={[
+          styles.publicResourceLabel,
+          resourceKey !== 'privacyPolicy' && !url && styles.unavailableLabel,
+        ]}
+      >
+        {label}
+      </Text>
+      {!url && resourceKey !== 'privacyPolicy' ? (
         <Text style={styles.resourceStatus}>
           {invalid ? 'Invalid release URL' : 'Not configured'}
         </Text>
       ) : null}
-      <Icon name={url ? 'open-outline' : 'alert-circle-outline'} size={18} />
+      <Icon
+        name={resourceKey === 'privacyPolicy' ? 'chevron-forward' : url ? 'open-outline' : 'alert-circle-outline'}
+        size={18}
+      />
     </Pressable>
   );
 }

@@ -8,6 +8,8 @@ export type RootStackParamList = {
   TeamSelect: { slot?: number } | undefined;
   SavedGames: undefined;
   Settings: undefined;
+  PrivacyPolicy: undefined;
+  Feedback: undefined;
   CricketAcademy: undefined;
   Login: undefined;
   Purchase: { productId?: string } | undefined;

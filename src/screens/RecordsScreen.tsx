@@ -1,8 +1,16 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Button, Card, LeagueTable, ProgressBar, Screen, ScreenHeader } from '../components';
+import {
+  Button,
+  Card,
+  LeagueTable,
+  ProgressBar,
+  Screen,
+  ScreenHeader,
+  SegmentedControl,
+} from '../components';
 import { AppText as Text } from '../components/AppText';
 import { CareerCompetitionStatScope } from '../domain/types';
 import {
@@ -53,6 +61,25 @@ import {
 type HofTab = 'players' | 'managers';
 type MainTab = 'records' | 'achievements' | 'hof';
 type StatView = 'all' | CareerCompetitionStatScope;
+type AchievementFilter = 'all' | 'earned' | 'locked';
+
+const MANAGER_STAT_OPTIONS: { value: ManagerLeaderboardKind; label: string }[] = [
+  { value: 'runs', label: 'Most Runs' },
+  { value: 'wickets', label: 'Most Wickets' },
+  { value: 'highScore', label: 'High Scores' },
+  { value: 'bestBowling', label: 'Best Bowling' },
+];
+
+const ACHIEVEMENT_FILTER_OPTIONS: { value: AchievementFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'earned', label: '✓ Earned' },
+  { value: 'locked', label: '🔒 Locked' },
+];
+
+const HALL_OF_FAME_OPTIONS: { value: HofTab; label: string }[] = [
+  { value: 'players', label: 'Player Careers' },
+  { value: 'managers', label: 'Manager Careers' },
+];
 
 const TIER_COLOR: Record<string, string> = {
   bronze: '#CD7F32',
@@ -70,7 +97,7 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
   const [statView, setStatView] = useState<StatView>('all');
   const [hofTab, setHofTab] = useState<HofTab>(save?.mode === 'manager' ? 'managers' : 'players');
   const [mainTab, setMainTab] = useState<MainTab>('records');
-  const [achFilter, setAchFilter] = useState<'all' | 'earned' | 'locked'>('all');
+  const [achFilter, setAchFilter] = useState<AchievementFilter>('all');
   const [managerStatKind, setManagerStatKind] = useState<ManagerLeaderboardKind>('runs');
 
   useEffect(() => {
@@ -117,39 +144,24 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
   const achList: AchievementDef[] =
     achFilter === 'earned' ? earned : achFilter === 'locked' ? pending : achievementCatalog;
 
-  const tabCfg: { key: MainTab; label: string }[] = [
-    { key: 'records', label: 'Records' },
-    { key: 'achievements', label: `Achievements (${earnedCount})` },
-    { key: 'hof', label: 'Hall of Fame' },
+  const tabCfg: { value: MainTab; label: string }[] = [
+    { value: 'records', label: 'Records' },
+    { value: 'achievements', label: `Achievements (${earnedCount})` },
+    { value: 'hof', label: 'Hall of Fame' },
   ];
 
   return (
     <Screen scroll>
       <ScreenHeader title="Records & Glory" onBack={() => navigation.goBack()} />
 
-      {/* Main tab bar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.mainTabRow}
-        contentContainerStyle={styles.mainTabContent}
-      >
-        {tabCfg.map((t) => {
-          const sel = mainTab === t.key;
-          return (
-            <Pressable
-              key={t.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: sel }}
-              accessibilityLabel={t.label}
-              onPress={() => setMainTab(t.key)}
-              style={[styles.mainTab, sel && styles.mainTabActive]}
-            >
-              <Text style={[styles.mainTabText, sel && styles.mainTabTextActive]}>{t.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <SegmentedControl
+        value={mainTab}
+        options={tabCfg}
+        onChange={setMainTab}
+        accessibilityLabel="Records sections"
+        role="tablist"
+        style={styles.mainTabs}
+      />
 
       {/* ── RECORDS TAB ─────────────────────────────────────────────── */}
       {mainTab === 'records' && (
@@ -303,7 +315,7 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
             return (
               <Animated.View entering={FadeInDown.duration(260)}>
                 <Text style={styles.section}>Your Career</Text>
-                <View style={styles.statViewGrid}>
+                <View accessibilityRole="tablist" style={styles.statViewGrid}>
                   {statOptions.map((option) => {
                     const selected = statView === option.key;
                     return (
@@ -313,7 +325,11 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                         accessibilityState={{ selected }}
                         accessibilityLabel={option.label}
                         onPress={() => setStatView(option.key)}
-                        style={[styles.statViewButton, selected && styles.statViewButtonActive]}
+                        style={({ pressed }) => [
+                          styles.statViewButton,
+                          selected && styles.statViewButtonActive,
+                          pressed && styles.segmentPressed,
+                        ]}
                       >
                         <Text
                           style={[
@@ -321,6 +337,8 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                             selected && styles.statViewButtonTextActive,
                           ]}
                           numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.78}
                         >
                           {option.label}
                         </Text>
@@ -374,38 +392,14 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
             <Animated.View entering={FadeInDown.duration(270).delay(20)}>
               <Text style={styles.section}>{managerRecords.competitionLabel} Season Leaders</Text>
               <Card style={styles.managerRecordsPanel}>
-                <View style={styles.managerStatTabs}>
-                  {(
-                    [
-                      ['runs', 'Most Runs'],
-                      ['wickets', 'Most Wickets'],
-                      ['highScore', 'High Scores'],
-                      ['bestBowling', 'Best Bowling'],
-                    ] as [ManagerLeaderboardKind, string][]
-                  ).map(([kind, label]) => {
-                    const selected = managerStatKind === kind;
-                    return (
-                      <Pressable
-                        key={kind}
-                        accessibilityRole="tab"
-                        accessibilityState={{ selected }}
-                        accessibilityLabel={label}
-                        onPress={() => setManagerStatKind(kind)}
-                        style={[styles.managerStatTab, selected && styles.managerStatTabSelected]}
-                      >
-                        <Text
-                          style={[
-                            styles.managerStatTabText,
-                            selected && styles.managerStatTabTextSelected,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <SegmentedControl
+                  value={managerStatKind}
+                  options={MANAGER_STAT_OPTIONS}
+                  onChange={setManagerStatKind}
+                  accessibilityLabel="Season leaderboard statistic"
+                  role="tablist"
+                  style={styles.managerStatTabs}
+                />
                 {managerRankedRows.length ? (
                   <View style={styles.managerLeaderboard}>
                     {managerRankedRows.map((row, index) => (
@@ -530,24 +524,14 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
             </Card>
           </Animated.View>
 
-          <View style={styles.chips}>
-            {(['all', 'earned', 'locked'] as const).map((f) => {
-              const sel = achFilter === f;
-              const label = f === 'all' ? 'All' : f === 'earned' ? '✓ Earned' : '🔒 Locked';
-              return (
-                <Pressable
-                  key={f}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: sel }}
-                  accessibilityLabel={label}
-                  onPress={() => setAchFilter(f)}
-                  style={[styles.chip, sel && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, sel && styles.chipTextActive]}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <SegmentedControl
+            value={achFilter}
+            options={ACHIEVEMENT_FILTER_OPTIONS}
+            onChange={setAchFilter}
+            accessibilityLabel="Achievement filter"
+            role="tablist"
+            style={styles.filterTabs}
+          />
 
           {achList.map((a, idx) => {
             const isEarned = earned.some((e) => e.id === a.id);
@@ -670,25 +654,14 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
               </View>
             </View>
 
-            <View style={styles.chips}>
-              {(['players', 'managers'] as HofTab[]).map((t) => {
-                const sel = hofTab === t;
-                return (
-                <Pressable
-                  key={t}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: sel }}
-                  accessibilityLabel={t === 'players' ? 'Players' : 'Managers'}
-                    onPress={() => setHofTab(t)}
-                    style={[styles.chip, sel && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, sel && styles.chipTextActive]}>
-                      {t === 'players' ? 'Player Careers' : 'Manager Careers'}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <SegmentedControl
+              value={hofTab}
+              options={HALL_OF_FAME_OPTIONS}
+              onChange={setHofTab}
+              accessibilityLabel="Hall of Fame career type"
+              role="tablist"
+              style={styles.filterTabs}
+            />
           </Animated.View>
 
           {hofTab === 'managers' && activeManagerEntry ? (
@@ -1185,6 +1158,7 @@ const makeStyles = (colors: ThemeColors) =>
       fontWeight: fontWeight.semibold,
     },
     statViewButtonTextActive: { color: colors.primaryLight },
+    segmentPressed: { opacity: 0.82 },
     managerRecordsPanel: { paddingVertical: spacing.sm },
     managerCareerCard: { borderWidth: 1.5 },
     managerCareerHeader: {
@@ -1222,34 +1196,7 @@ const makeStyles = (colors: ThemeColors) =>
     managerIccYear: { width: 38, fontSize: fontSize.sm, fontWeight: fontWeight.black },
     managerIccName: { flex: 1, minWidth: 0, color: colors.text, fontSize: fontSize.sm },
     managerIccFormat: { color: colors.textMuted, fontSize: fontSize.xs },
-    managerStatTabs: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.xs,
-      marginBottom: spacing.sm,
-    },
-    managerStatTab: {
-      flexGrow: 1,
-      flexBasis: 120,
-      minHeight: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: spacing.sm,
-      borderRadius: radius.sm,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surfaceMuted,
-    },
-    managerStatTabSelected: {
-      borderColor: colors.primary,
-      backgroundColor: colors.primaryDark,
-    },
-    managerStatTabText: {
-      color: colors.textMuted,
-      fontSize: fontSize.xs,
-      fontWeight: fontWeight.bold,
-    },
-    managerStatTabTextSelected: { color: colors.white },
+    managerStatTabs: { marginBottom: spacing.sm },
     managerLeaderboard: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
@@ -1300,36 +1247,7 @@ const makeStyles = (colors: ThemeColors) =>
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
     },
-    mainTabRow: {
-      flexGrow: 0,
-      height: 48,
-      marginTop: spacing.md,
-      marginBottom: spacing.md,
-    },
-    mainTabContent: {
-      minHeight: 48,
-      alignItems: 'center',
-      gap: spacing.sm,
-      paddingHorizontal: 0,
-    },
-    mainTab: {
-      height: 44,
-      minWidth: 92,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.sm,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-    },
-    mainTabActive: { backgroundColor: colors.primaryDark, borderColor: colors.primary },
-    mainTabText: {
-      color: colors.textMuted,
-      fontSize: fontSize.sm,
-      fontWeight: fontWeight.semibold,
-    },
-    mainTabTextActive: { color: colors.white },
+    mainTabs: { marginTop: spacing.md, marginBottom: spacing.md },
     section: {
       color: colors.textMuted,
       fontSize: fontSize.sm,
@@ -1372,23 +1290,7 @@ const makeStyles = (colors: ThemeColors) =>
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
-    chips: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
-    chip: {
-      flex: 1,
-      minWidth: 0,
-      minHeight: 44,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 6,
-      borderRadius: radius.sm,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    chipActive: { backgroundColor: colors.primaryDark, borderColor: colors.primary },
-    chipText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.semibold },
-    chipTextActive: { color: colors.white },
+    filterTabs: { marginBottom: spacing.sm },
     lbRow: {
       flexDirection: 'row',
       alignItems: 'center',

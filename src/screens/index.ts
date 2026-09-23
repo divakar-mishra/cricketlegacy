@@ -4,6 +4,8 @@ export { NewGameScreen } from './NewGameScreen';
 export { PlayerCreationScreen } from './PlayerCreationScreen';
 export { SavedGamesScreen } from './SavedGamesScreen';
 export { SettingsScreen } from './SettingsScreen';
+export { PrivacyPolicyScreen } from './PrivacyPolicyScreen';
+export { FeedbackScreen } from './FeedbackScreen';
 export { CricketAcademyScreen } from './CricketAcademyScreen';
 export { LoginScreen } from './LoginScreen';
 export { PurchaseScreen } from './PurchaseScreen';

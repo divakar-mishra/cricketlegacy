@@ -12,7 +12,14 @@ import {
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import { showShortageOffer } from '../components/showShortageOffer';
-import { ffpBlockReason } from '../game/finance';
+import {
+  computeValue,
+  ffpBlockReason,
+  formatClubCurrency,
+  maxSquadSize,
+  MIN_SQUAD,
+  WAGE_RATE,
+} from '../game/finance';
 import {
   AppText as Text,
   Button,
@@ -22,15 +29,9 @@ import {
   PlayerStatusBadges,
   Screen,
   ScreenHeader,
+  SegmentedControl,
 } from '../components';
 import { Player } from '../domain/types';
-import {
-  computeValue,
-  formatClubCurrency,
-  maxSquadSize,
-  MIN_SQUAD,
-  WAGE_RATE,
-} from '../game/finance';
 import { SCOUT_FEE, superstarPrefersClub } from '../game/manager';
 import { MANAGER_FAST_TRACK_SCOUT_COINS } from '../game/managerResources';
 import {
@@ -935,25 +936,18 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
         </Card>
       ) : null}
 
-      <View style={styles.tabs}>
-        {(['market', 'squad', 'loan'] as const).map((t) => (
-          <Pressable
-            key={t}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: tab === t }}
-            onPress={() => setTab(t)}
-            style={[styles.tab, tab === t && styles.tabActive]}
-          >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'market'
-                ? `🏪 Market (${freeAgents.length})`
-                : t === 'squad'
-                  ? `👕 Squad (${squad.length})`
-                  : '🤝 Loan'}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <SegmentedControl
+        value={tab}
+        options={[
+          { value: 'market', label: `Market (${freeAgents.length})` },
+          { value: 'squad', label: `Squad (${squad.length})` },
+          { value: 'loan', label: 'Loan' },
+        ]}
+        onChange={setTab}
+        accessibilityLabel="Transfer sections"
+        role="tablist"
+        style={styles.tabs}
+      />
 
       {tab === 'market' && isManager && (
         <View style={styles.marketHintRow}>
@@ -986,10 +980,15 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
         {(['ALL', 'BATTER', 'BOWLER', 'ALLROUNDER', 'WK_BATTER'] as FilterRole[]).map((r) => (
           <Pressable
             key={r}
-            accessibilityRole="button"
+            accessibilityRole="tab"
+            accessibilityLabel={`Filter by ${r === 'ALL' ? 'all roles' : r === 'WK_BATTER' ? 'wicketkeeper batter' : r === 'ALLROUNDER' ? 'all-rounder' : r === 'BATTER' ? 'batter' : 'bowler'}`}
             accessibilityState={{ selected: filterRole === r }}
             onPress={() => setFilterRole(r)}
-            style={[styles.filterChip, filterRole === r && styles.filterChipActive]}
+            style={({ pressed }) => [
+              styles.filterChip,
+              filterRole === r && styles.filterChipActive,
+              pressed && styles.filterPressed,
+            ]}
           >
             <Text style={[styles.filterChipText, filterRole === r && styles.filterChipTextActive]}>
               {r === 'ALL'
@@ -1008,10 +1007,15 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
         {(['OVR', 'AGE_ASC', 'AGE_DESC', 'VALUE'] as SortField[]).map((s) => (
           <Pressable
             key={s}
-            accessibilityRole="button"
+            accessibilityRole="tab"
+            accessibilityLabel={`Sort by ${s === 'OVR' ? 'overall rating, highest first' : s === 'AGE_ASC' ? 'age, youngest first' : s === 'AGE_DESC' ? 'age, oldest first' : 'value, highest first'}`}
             accessibilityState={{ selected: sortField === s }}
             onPress={() => setSortField(s)}
-            style={[styles.filterChip, sortField === s && styles.filterChipActive]}
+            style={({ pressed }) => [
+              styles.filterChip,
+              sortField === s && styles.filterChipActive,
+              pressed && styles.filterPressed,
+            ]}
           >
             <Text style={[styles.filterChipText, sortField === s && styles.filterChipTextActive]}>
               {s === 'OVR'
@@ -1117,25 +1121,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
 
     // Tabs
-    tabs: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-      marginTop: spacing.md,
-      marginBottom: spacing.sm,
-    },
-    tab: {
-      flex: 1,
-      minHeight: 44,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.md,
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      alignItems: 'center',
-    },
-    tabActive: { backgroundColor: colors.primaryDark, borderColor: colors.primary },
-    tabText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: fontWeight.semibold },
-    tabTextActive: { color: colors.white },
+    tabs: { marginTop: spacing.md, marginBottom: spacing.sm },
 
     // Search + filter
     searchInput: {
@@ -1160,6 +1146,7 @@ const makeStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
     },
     filterChipActive: { backgroundColor: colors.primaryDark, borderColor: colors.primary },
+    filterPressed: { opacity: 0.78 },
     filterChipText: {
       color: colors.textMuted,
       fontSize: fontSize.xs,

@@ -26,9 +26,9 @@ describe('rewarded ads', () => {
     expect(mockBranch?.[1]).toBe('false');
   });
 
-  it('caps interstitials at two per rolling gameplay hour', () => {
-    expect(INTERSTITIAL_MAX_PER_WINDOW).toBe(2);
+  it('caps interstitials at four safe navigation points per rolling gameplay hour', () => {
+    expect(INTERSTITIAL_MAX_PER_WINDOW).toBe(4);
     expect(INTERSTITIAL_WINDOW_MS).toBe(60 * 60_000);
-    expect(DEFAULT_INTERSTITIAL_GAP_MS).toBe(30 * 60_000);
+    expect(DEFAULT_INTERSTITIAL_GAP_MS).toBe(15 * 60_000);
   });
 });

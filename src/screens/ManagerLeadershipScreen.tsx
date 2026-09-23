@@ -1,6 +1,14 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { AppText as Text, Button, Card, Icon, Screen, ScreenHeader } from '../components';
+import { StyleSheet, View } from 'react-native';
+import {
+  AppText as Text,
+  Button,
+  Card,
+  Icon,
+  Screen,
+  ScreenHeader,
+  SegmentedControl,
+} from '../components';
 import { activeManagerClub } from '../game/managerClubState';
 import {
   ensureManagerLeadership,
@@ -141,22 +149,16 @@ export function ManagerLeadershipScreen({ navigation }: ScreenProps<'ManagerLead
         </Card>
       </View>
 
-      <View style={styles.roleTabs}>
-        {(['CAPTAIN', 'VICE_CAPTAIN'] as ManagerLeadershipRole[]).map((option) => {
-          const selected = role === option;
-          return (
-            <Pressable
-              key={option}
-              onPress={() => setRole(option)}
-              style={[styles.roleTab, selected && styles.roleTabSelected]}
-            >
-              <Text style={[styles.roleTabText, selected && styles.roleTabTextSelected]}>
-                {option === 'CAPTAIN' ? 'Choose captain' : 'Choose vice-captain'}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <SegmentedControl
+        value={role}
+        options={[
+          { value: 'CAPTAIN', label: 'Choose captain' },
+          { value: 'VICE_CAPTAIN', label: 'Choose vice-captain' },
+        ]}
+        onChange={setRole}
+        accessibilityLabel="Leadership appointment role"
+        style={styles.roleTabs}
+      />
 
       {message ? <Text style={styles.message}>{message}</Text> : null}
 
@@ -235,20 +237,7 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: spacing.sm,
     },
     appointmentMeta: { color: colors.primaryLight, fontSize: fontSize.xs, marginTop: 3 },
-    roleTabs: { flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.lg },
-    roleTab: {
-      flex: 1,
-      minHeight: 46,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-    },
-    roleTabSelected: { borderColor: colors.primary, backgroundColor: colors.primary + '18' },
-    roleTabText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
-    roleTabTextSelected: { color: colors.primaryLight },
+    roleTabs: { marginVertical: spacing.lg },
     message: {
       color: colors.success,
       fontSize: fontSize.sm,

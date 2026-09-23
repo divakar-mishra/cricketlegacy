@@ -300,7 +300,10 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         ? (currentSave.players[currentSave.userPlayerId]?.careerStats?.matches ?? 0)
         : 0;
       if (matchesPlayed >= 3) {
-        void ads.maybeShowInterstitial(!areAdsRemoved(currentSave?.entitlements));
+        void ads.maybeShowInterstitial(
+          !areAdsRemoved(currentSave?.entitlements),
+          'career-hub-return',
+        );
       }
 
       // The modest starter offer unlocks only after a completed match. Its
