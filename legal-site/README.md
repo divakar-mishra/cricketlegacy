@@ -16,6 +16,7 @@ It currently generates:
 - `/terms/`
 - `/support/`
 - `/delete-account/`
+- `/app-ads.txt` — Cricket Legacy's authorized AdMob seller record
 
 The four top-level legal/support routes apply specifically to Cricket Legacy
 and stay stable because the app and release readiness gate use them. Do not
@@ -89,3 +90,10 @@ the complete release check. The gate fetches each configured URL and verifies
 that it serves the expected Cricket Legacy HTML. The Cloudflare deployment,
 store-console URLs, privacy declarations and account-deletion backend remain
 manual release steps; this repository does not deploy them automatically.
+
+For AdMob verification, set the Play Store listing's developer website to the
+published site origin (`https://sunlight-publisher-site.pages.dev/`). The build
+copies `static/app-ads.txt` to the site root, where AdMob expects to retrieve it
+at `https://sunlight-publisher-site.pages.dev/app-ads.txt`. Confirm the file is
+publicly reachable after deployment, then use AdMob's app-ads.txt verification
+flow once the Play listing can be linked.
