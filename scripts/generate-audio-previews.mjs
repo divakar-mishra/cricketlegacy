@@ -1,6 +1,7 @@
 // Original, self-contained audition clips and selected in-app audio assets.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { Buffer } from 'node:buffer';
 
 const sampleRate = 22050;
 const target = join(process.cwd(), 'output', 'audio-previews');
