@@ -22,7 +22,7 @@ export type SfxKey =
   | 'defeat';
 
 const SOURCES: Record<SfxKey, number> = {
-  tap: require('../../assets/sfx/ui_glass_tap.mp3'),
+  tap: require('../../assets/sfx/ui_soft_wood_tap.wav'),
   four: require('../../assets/sfx/bat_impact_classic.mp3'),
   six: require('../../assets/sfx/bat_impact_classic.mp3'),
   wicket: require('../../assets/sfx/stump_clack.mp3'),
@@ -37,7 +37,7 @@ const SOURCES: Record<SfxKey, number> = {
 };
 
 const VOLUME: Partial<Record<SfxKey, number>> = {
-  tap: 0.42,
+  tap: 0.36,
   four: 0.78,
   six: 0.88,
   wicket: 0.86,
