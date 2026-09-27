@@ -27,7 +27,7 @@ export function canUseGame(value: AgeDeclaration): boolean {
   );
 }
 
-/** No ad SDK initialization for minors, irrespective of local digital-consent age. */
+/** Eligibility only; teen ad requests still require child-directed SDK treatment. */
 export function canUseAds(value: AgeDeclaration): boolean {
-  return canUseGame(value) && value.band === 'adult';
+  return canUseGame(value);
 }

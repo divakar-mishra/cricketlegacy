@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { fieldGeometry, fieldingPositions } from '../../components/fieldGeometry';
 import { fieldRestriction, isFieldSettingLegal, legalFieldSetting } from '../intent';
 
 describe('limited-overs field restrictions', () => {
@@ -29,12 +30,29 @@ describe('limited-overs field restrictions', () => {
       path.join(__dirname, '..', 'simulateInnings.ts'),
       'utf8',
     );
+    const matchScreen = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'screens', 'MatchScreen.tsx'),
+      'utf8',
+    );
 
     expect(liveSource).toContain(
       'legalFieldSetting(this.input.fieldSetting, this.format, this.overIndex)',
     );
     expect(simulatedSource).toContain('legalFieldSetting(input.fieldSetting, input.format, over)');
+    expect(matchScreen).toContain('legalFieldSetting(requestedFieldSetting, liveFormat, currentOver)');
     expect(legalFieldSetting('BALANCED', 'T20', 0)).toBe('ATTACKING');
     expect(legalFieldSetting('BALANCED', 'T20', 10)).toBe('BALANCED');
+  });
+
+  it('draws at most two outfielders beyond the ring during a T20 powerplay', () => {
+    const size = 280;
+    const { cx, cy, innerR } = fieldGeometry(size);
+    for (const requested of ['BALANCED', 'DEFENSIVE', 'SWEEPER'] as const) {
+      const legal = legalFieldSetting(requested, 'T20', 0)!;
+      const outside = fieldingPositions(size, legal).filter(
+        ({ x, y }) => Math.hypot(x - cx, y - cy) > innerR,
+      );
+      expect(outside).toHaveLength(2);
+    }
   });
 });

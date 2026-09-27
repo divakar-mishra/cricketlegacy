@@ -6,6 +6,7 @@ import { matchGroundAppearance } from '../components/venueVisuals';
 import {
   AppState,
   BackHandler,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -67,6 +68,7 @@ import {
   BOWLER_PLAN_OPTIONS,
   BowlerPlan,
   FIELD_OPTIONS,
+  legalFieldSetting,
   FieldSetting,
   fieldRestriction,
   Intent,
@@ -81,7 +83,6 @@ import { deliveryDelayMs, MATCH_SPEED_OPTIONS, MatchSpeed } from '../game/matchT
 import { shotAngle, shotReach } from '../engine/shots';
 import { matchObjective } from '../game/progression';
 import { tacticalImpactSummary, tacticChangeImpact, tacticSelectionSummary } from '../game/tactics';
-import { describeMatchup } from '../game/careerExperience';
 import {
   MANAGER_EMERGENCY_TEAM_TALK_COINS,
   MANAGER_MATCH_ANALYSIS_COINS,
@@ -92,7 +93,7 @@ import { applyManagerPreparationToLiveMatch } from '../game/season';
 import { activeSponsorBranding } from '../game/sponsorship';
 import { TossCall, TossChoice } from '../engine/toss';
 import { ScreenProps } from '../navigation';
-import { PlayResult, useCareer } from '../state/careerStore';
+import { persistenceErrorMessage, PlayResult, useCareer } from '../state/careerStore';
 import {
   fonts,
   fontSize,
@@ -674,12 +675,18 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   }, [navigation]);
   const guardedGoBack = useCallback(() => {
     if (settlementPending) {
-      Alert.alert(
-        'Result not saved yet',
-        phase === 'saving'
-          ? 'The match result is being saved. Please wait.'
-          : 'Retry the save before leaving so this fixture cannot reopen.',
-      );
+      if (phase === 'saving') {
+        Alert.alert('Saving result', 'Please wait for the match-result save to finish.');
+      } else {
+        Alert.alert(
+          'Result not saved on this device',
+          'You can return to the hub and retry saving there, but closing the app before a successful save may lose this result.',
+          [
+            { text: 'Stay and retry', style: 'cancel' },
+            { text: 'Return to hub', onPress: () => navigation.goBack() },
+          ],
+        );
+      }
       return;
     }
     if (!activeMatch) {
@@ -1181,11 +1188,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         await persistCritical(true);
         setPhase('done');
       } catch (error) {
-        setSettlementError(
-          error instanceof Error && error.message
-            ? error.message
-            : 'The device did not confirm the match-result save.',
-        );
+        setSettlementError(persistenceErrorMessage(error));
         setPhase('save-error');
       }
     },
@@ -1596,11 +1599,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       await persistCritical(true);
       setPhase('done');
     } catch (error) {
-      setSettlementError(
-        error instanceof Error && error.message
-          ? error.message
-          : 'The device did not confirm the match-result save.',
-      );
+      setSettlementError(persistenceErrorMessage(error));
       setPhase('save-error');
     }
   };
@@ -1615,7 +1614,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         <ScreenHeader title="Couldn’t save result" onBack={guardedGoBack} />
         <Card>
           <Text style={styles.msg}>
-            This result has not been saved yet. Please retry before leaving.
+            This result is still in memory. Retry here or return to the hub to retry there;
+            do not close the app before the save succeeds.
           </Text>
           {settlementError ? <Text style={styles.msg}>{settlementError}</Text> : null}
           <Button
@@ -1623,6 +1623,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             variant="gold"
             onPress={() => void retrySettlementSave()}
           />
+          <Button label="Return to hub to retry" variant="secondary" onPress={() => navigation.goBack()} />
         </Card>
       </Screen>
     );
@@ -1811,7 +1812,21 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               <Text style={styles.requirementText}>Confirm the match plan above to continue</Text>
               <Button label="Continue to Match" variant="secondary" disabled />
             </View>
-          ) : undefined
+          ) : (
+            <View style={styles.requirementFooter}>
+              <Text style={styles.requirementText}>Choose how to play</Text>
+              <Button
+                label="Watch ball-by-ball"
+                size="sm"
+                variant="gold"
+                onPress={() => drive('WATCH')}
+              />
+              <View style={styles.modeFooterRow}>
+                <Button label="Key moments" size="sm" variant="secondary" style={styles.modeFooterHalf} onPress={() => drive('KEY')} />
+                <Button label="Instant sim" size="sm" variant="ghost" style={styles.modeFooterHalf} onPress={() => drive('INSTANT')} />
+              </View>
+            </View>
+          )
         }
       >
         <ScreenHeader title="Matchday" onBack={guardedGoBack} />
@@ -2185,22 +2200,17 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         )}
 
         {tossRevealed && (mode !== 'manager' || managerPreparationConfirmed) ? (
-          <>
-            <Animated.View entering={FadeInDown.duration(300).delay(560)}>
-              <Text style={styles.pickLabel}>Match mode</Text>
-            </Animated.View>
-
-            <Animated.View entering={FadeInDown.duration(300).delay(600)}>
-              <ModeButton emoji="🎙️" title="Watch ball-by-ball" onPress={() => drive('WATCH')} />
-            </Animated.View>
-            <Animated.View entering={FadeInDown.duration(300).delay(640)}>
-              <ModeButton emoji="⏱️" title="Key moments" onPress={() => drive('KEY')} />
-            </Animated.View>
-            <Animated.View entering={FadeInDown.duration(300).delay(720)}>
-              <ModeButton emoji="⏭️" title="Instant sim" onPress={() => drive('INSTANT')} />
-            </Animated.View>
-          </>
+          <Card style={styles.watchPreviewCard}>
+            <Text style={styles.watchPreviewKicker}>THE MATCH IS READY</Text>
+            <Text style={styles.watchPreviewTitle}>Stay for the innings</Text>
+            <Text style={styles.watchPreviewBody}>
+              {mode === 'manager'
+                ? 'Follow every delivery and adjust your tactics as the match unfolds.'
+                : 'Watch every delivery and make batting or bowling choices when you are in the action.'}
+            </Text>
+          </Card>
         ) : null}
+
       </Screen>
     );
   }
@@ -2535,15 +2545,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const s = display.score;
   const c = display.crease;
   const liveConditions = lmRef.current?.conditions;
-  const matchup =
-    c && liveConditions
-      ? describeMatchup(
-          save.players[c.strikerId],
-          save.players[c.bowlerId],
-          liveConditions,
-          s?.requiredRunRate ?? undefined,
-        )
-      : null;
   const chasing = s?.target != null;
   const controlledPlayerAtCrease =
     !!userPlayerId &&
@@ -2558,13 +2559,15 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           : null;
   const battingTeam = save.teams[display.battingTeamId];
   const bowlingTeam = save.teams[display.bowlingTeamId];
-  const visibleFieldSetting: FieldSetting =
+  const requestedFieldSetting: FieldSetting =
     mode === 'manager' && display.bowlingTeamId === userTeamId
       ? (managerTactics.field ?? 'BALANCED')
       : 'BALANCED';
   const liveFormat = setup?.format ?? lmRef.current?.format ?? 'T20';
   const ballsPerOver = FORMATS[liveFormat].ballsPerOver;
   const currentOver = Math.floor((s?.legalBalls ?? 0) / ballsPerOver);
+  const visibleFieldSetting: FieldSetting =
+    legalFieldSetting(requestedFieldSetting, liveFormat, currentOver) ?? 'ATTACKING';
   const legalOverDots = display.overDots.filter((dot) => dot.legal).slice(0, ballsPerOver);
   const extraOverDots = display.overDots.filter((dot) => !dot.legal);
   const overSlots = Array.from(
@@ -2873,40 +2876,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             }
           />
 
-          {/* Over-end summary card */}
-          {!fastMatchUi && overSummary && (
-            <Animated.View
-              entering={SlideInUp.duration(250)}
-              exiting={FadeOut.duration(300)}
-              style={styles.overSummaryCard}
-            >
-              <Text style={styles.overSummaryTitle}>End of Over {overSummary.over}</Text>
-              <Text style={styles.overSummaryStats}>
-                {overSummary.runs} runs ·{' '}
-                {overSummary.wickets > 0 ? `${overSummary.wickets} wkt · ` : ''}CRR{' '}
-                {overSummary.economy.toFixed(2)}
-              </Text>
-            </Animated.View>
-          )}
-
-          {banner ? (
-            <View
-              style={[
-                styles.banner,
-                {
-                  borderColor:
-                    banner.tone === 'danger'
-                      ? colors.danger
-                      : banner.tone === 'gold'
-                        ? colors.accent
-                        : colors.info,
-                },
-              ]}
-            >
-              <Text style={styles.bannerText}>{banner.text}</Text>
-            </View>
-          ) : null}
-
           {s && s.ballsRemaining != null && s.ballsRemaining <= 6 && s.ballsRemaining > 0 && (
             <Animated.View entering={FadeIn.duration(300)} style={styles.finalOverBadge}>
               <Text style={styles.finalOverText}>⚡ FINAL OVER</Text>
@@ -2975,44 +2944,37 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             ) : null}
           </GlassSurface>
 
-          {matchup && c ? (
-            <View
-              style={styles.matchupBand}
-              accessible
-              accessibilityLabel={`${matchup.label}. ${matchup.detail}`}
-            >
-              <View style={styles.matchupNames}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.matchupRole}>BATTER</Text>
-                  <Text style={styles.matchupName} numberOfLines={1}>
-                    {nameOf(c.strikerId)}
-                  </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.matchupEdge,
-                    {
-                      color:
-                        matchup.edge === 'BATTER'
-                          ? colors.success
-                          : matchup.edge === 'BOWLER'
-                            ? colors.warning
-                            : colors.info,
-                    },
-                  ]}
-                >
-                  {matchup.label}
-                </Text>
-                <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={styles.matchupRole}>BOWLER</Text>
-                  <Text style={styles.matchupName} numberOfLines={1}>
-                    {nameOf(c.bowlerId)}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.matchupDetail}>{matchup.detail}</Text>
+          {/* Keep the 2D field above secondary analysis and commentary on phones. */}
+          <View
+            style={[styles.fieldWrap, styles.liveFieldPrimary]}
+            onLayout={({ nativeEvent }) =>
+              setFieldWidth(Math.max(1, Math.min(420, nativeEvent.layout.width - 16)))
+            }
+          >
+            <View style={styles.groundBroadcastHeader}>
+              <Text style={styles.groundBroadcastLabel} numberOfLines={1}>
+                {setup?.venue ?? 'MATCH GROUND'}
+              </Text>
+              <Text style={styles.groundBroadcastTag}>LIVE</Text>
             </View>
-          ) : null}
+            <FieldView
+              size={fastMatchUi ? Math.min(220, fieldWidth) : fieldWidth}
+              groundAppearance={matchGroundAppearance(setup?.stadiumId, save.managerClubs)}
+              groundPrimaryColor={setup ? save.teams[setup.homeTeamId]?.primaryColor : undefined}
+              lastShot={lastShot}
+              stadiumTheme={save?.seasonPassExperience?.selectedStadiumTheme}
+              animate={!fastMatchUi}
+              userBatterPosition={userBatterPosition}
+              userKitId={mode === 'career' ? save.cosmetics?.kit : undefined}
+              userIsBowler={mode === 'career' && !!userPlayerId && c?.bowlerId === userPlayerId}
+              battingPrimaryColor={battingTeam?.primaryColor}
+              battingSecondaryColor={battingTeam?.secondaryColor}
+              fieldingPrimaryColor={bowlingTeam?.primaryColor}
+              fieldingSecondaryColor={bowlingTeam?.secondaryColor}
+              fieldSetting={visibleFieldSetting}
+              conditions={liveConditions}
+            />
+          </View>
 
           {/* Manager: live tactical readout + AI response (pulses each over) */}
           {!fastMatchUi && mode === 'manager' && matchRole !== 'NONE' ? (
@@ -3111,38 +3073,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             ) : null}
 
             <View style={[styles.midRow, fastMatchUi && styles.midRowFast]}>
-              <View
-                style={styles.fieldWrap}
-                onLayout={({ nativeEvent }) =>
-                  setFieldWidth(Math.max(1, Math.min(420, nativeEvent.layout.width - 16)))
-                }
-              >
-                <View style={styles.groundBroadcastHeader}>
-                  <Text style={styles.groundBroadcastLabel} numberOfLines={1}>
-                    {setup?.venue ?? 'MATCH GROUND'}
-                  </Text>
-                  <Text style={styles.groundBroadcastTag}>LIVE</Text>
-                </View>
-                <FieldView
-                  size={fastMatchUi ? Math.min(220, fieldWidth) : fieldWidth}
-                  groundAppearance={matchGroundAppearance(setup?.stadiumId, save.managerClubs)}
-                  groundPrimaryColor={
-                    setup ? save.teams[setup.homeTeamId]?.primaryColor : undefined
-                  }
-                  lastShot={lastShot}
-                  stadiumTheme={save?.seasonPassExperience?.selectedStadiumTheme}
-                  animate={!fastMatchUi}
-                  userBatterPosition={userBatterPosition}
-                  userKitId={mode === 'career' ? save.cosmetics?.kit : undefined}
-                  userIsBowler={mode === 'career' && !!userPlayerId && c?.bowlerId === userPlayerId}
-                  battingPrimaryColor={battingTeam?.primaryColor}
-                  battingSecondaryColor={battingTeam?.secondaryColor}
-                  fieldingPrimaryColor={bowlingTeam?.primaryColor}
-                  fieldingSecondaryColor={bowlingTeam?.secondaryColor}
-                  fieldSetting={visibleFieldSetting}
-                  conditions={liveConditions}
-                />
-              </View>
               <View style={styles.overCol}>
                 <View style={styles.overHeader}>
                   <View>
@@ -3200,37 +3130,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             </View>
           </>
 
-          {/* DRS Review decision prompt — the match loop is paused here */}
-          {awaitingReview && !showDRSResult ? (
-            <Animated.View
-              entering={SlideInDown.duration(200)}
-              style={[styles.drsPrompt, { borderColor: colors.danger }]}
-            >
-              <Text style={styles.drsPromptTitle}>🔴 You&apos;ve been given OUT</Text>
-              <Text style={styles.drsPromptSub}>
-                {drs.reviewsLeft > 0
-                  ? `Review the decision? (${drs.reviewsLeft} review${drs.reviewsLeft === 1 ? '' : 's'} left)`
-                  : 'No reviews remaining.'}
-              </Text>
-              <View style={styles.drsPromptBtns}>
-                {drs.reviewsLeft > 0 ? (
-                  <Pressable
-                    style={[styles.drsPromptBtn, { backgroundColor: colors.info }]}
-                    onPress={onDRSReview}
-                  >
-                    <Text style={styles.drsPromptBtnText}>🔍 Review</Text>
-                  </Pressable>
-                ) : null}
-                <Pressable
-                  style={[styles.drsPromptBtn, { backgroundColor: colors.surfaceAlt }]}
-                  onPress={onAcceptDecision}
-                >
-                  <Text style={[styles.drsPromptBtnText, { color: colors.text }]}>Accept</Text>
-                </Pressable>
-              </View>
-            </Animated.View>
-          ) : null}
-
           {/* DRS Review Result Overlay */}
           {showDRSResult && drs.lastReviewResult ? (
             <Animated.View
@@ -3261,6 +3160,41 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             </Animated.View>
           ) : null}
         </Screen>
+        {!fastMatchUi && overSummary ? (
+          <Animated.View pointerEvents="none" entering={SlideInDown.duration(220)} exiting={FadeOut.duration(250)} style={styles.liveFloatingNotice}>
+            <Text style={styles.overSummaryTitle}>End of Over {overSummary.over}</Text>
+            <Text style={styles.overSummaryStats}>
+              {overSummary.runs} runs · {overSummary.wickets > 0 ? `${overSummary.wickets} wkt · ` : ''}CRR {overSummary.economy.toFixed(2)}
+            </Text>
+          </Animated.View>
+        ) : null}
+        {banner ? (
+          <View pointerEvents="none" style={[styles.liveFloatingBanner, { borderColor: banner.tone === 'danger' ? colors.danger : banner.tone === 'gold' ? colors.accent : colors.info }]}>
+            <Text style={styles.bannerText}>{banner.text}</Text>
+          </View>
+        ) : null}
+        <Modal transparent animationType="fade" visible={awaitingReview && !showDRSResult} onRequestClose={() => {}}>
+          <View style={styles.drsModalBackdrop}>
+            <View style={[styles.drsPrompt, { borderColor: colors.danger }]}>
+              <Text style={styles.drsPromptTitle}>🔴 You&apos;ve been given OUT</Text>
+              <Text style={styles.drsPromptSub}>
+                {drs.reviewsLeft > 0
+                  ? `Review the decision? (${drs.reviewsLeft} review${drs.reviewsLeft === 1 ? '' : 's'} left)`
+                  : 'No reviews remaining.'}
+              </Text>
+              <View style={styles.drsPromptBtns}>
+                {drs.reviewsLeft > 0 ? (
+                  <Pressable accessibilityRole="button" style={[styles.drsPromptBtn, { backgroundColor: colors.info }]} onPress={onDRSReview}>
+                    <Text style={styles.drsPromptBtnText}>🔍 Review</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable accessibilityRole="button" style={[styles.drsPromptBtn, { backgroundColor: colors.surfaceAlt }]} onPress={onAcceptDecision}>
+                  <Text style={[styles.drsPromptBtnText, { color: colors.text }]}>Accept</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
         <CelebrationOverlay
           trigger={celebration.trigger}
           kind={celebration.kind}
@@ -3340,26 +3274,6 @@ function PreparationRating({ label, value }: { label: string; value: number }) {
   );
 }
 
-function ModeButton({
-  emoji,
-  title,
-  onPress,
-}: {
-  emoji: string;
-  title: string;
-  onPress: () => void;
-}) {
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <Card onPress={onPress} style={styles.modeCard}>
-      <Text style={styles.modeEmoji}>{emoji}</Text>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.modeTitle}>{title}</Text>
-      </View>
-    </Card>
-  );
-}
-
 function CreaseRow({
   avatar,
   name,
@@ -3396,11 +3310,34 @@ const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     msg: { color: colors.textMuted, fontSize: fontSize.md, marginBottom: spacing.lg },
     requirementFooter: { gap: spacing.sm },
+    modeFooterRow: { flexDirection: 'row', gap: spacing.sm },
+    modeFooterHalf: { flex: 1, minWidth: 0 },
     requirementText: {
       color: colors.warning,
       fontSize: fontSize.sm,
       fontWeight: fontWeight.bold,
       textAlign: 'center',
+    },
+    watchPreviewCard: {
+      marginTop: spacing.md,
+      marginBottom: spacing.md,
+      borderColor: colors.accent,
+    },
+    watchPreviewKicker: {
+      color: colors.accent,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.black,
+    },
+    watchPreviewTitle: {
+      color: colors.text,
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.heavy,
+      marginTop: spacing.xs,
+    },
+    watchPreviewBody: {
+      color: colors.textMuted,
+      fontSize: fontSize.sm,
+      marginTop: spacing.xs,
     },
 
     // pre-match cinematic
@@ -3841,9 +3778,9 @@ const makeStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       gap: spacing.md,
       marginTop: spacing.md,
-      minHeight: 280,
+      minHeight: 0,
     },
-    midRowFast: { minHeight: 220, marginTop: spacing.sm },
+    midRowFast: { marginTop: spacing.sm },
     stadiumScene: {
       marginTop: spacing.md,
       marginHorizontal: -spacing.md,
@@ -3872,6 +3809,7 @@ const makeStyles = (colors: ThemeColors) =>
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
     },
+    liveFieldPrimary: { marginTop: spacing.sm },
     groundBroadcastHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -4076,6 +4014,12 @@ const makeStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surface,
       padding: spacing.md,
       marginBottom: spacing.sm,
+    },
+    drsModalBackdrop: {
+      flex: 1,
+      justifyContent: 'center',
+      padding: spacing.lg,
+      backgroundColor: 'rgba(0,0,0,0.78)',
     },
     drsPromptTitle: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.black },
     drsPromptSub: {
@@ -4338,6 +4282,31 @@ const makeStyles = (colors: ThemeColors) =>
       padding: spacing.sm,
       alignItems: 'center',
       marginBottom: spacing.xs,
+    },
+    liveFloatingNotice: {
+      position: 'absolute',
+      top: 76,
+      left: spacing.md,
+      right: spacing.md,
+      zIndex: 20,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      padding: spacing.sm,
+      alignItems: 'center',
+    },
+    liveFloatingBanner: {
+      position: 'absolute',
+      top: 142,
+      left: spacing.md,
+      right: spacing.md,
+      zIndex: 20,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      padding: spacing.sm,
+      alignItems: 'center',
     },
     overSummaryTitle: {
       color: colors.primaryLight,

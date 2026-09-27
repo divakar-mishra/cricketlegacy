@@ -10,6 +10,7 @@ import { Rng } from '../engine/rng';
 import { clamp } from '../utils/math';
 import { MONTHLY_PASS_CONTENT } from '../data/seasonPassContent';
 import { ensureSeasonPassExperience, isSeasonPassActive, monthlyBundleForSave, passContentCycleId } from './seasonPass';
+import { MANAGER_PRESS_SCENARIOS } from './managerPressScenarios';
 
 export type MgrTrigger = 'PRE_SEASON' | 'POST_WIN' | 'POST_LOSS' | 'SEASON_END' | 'MEDIA';
 
@@ -114,6 +115,7 @@ const MONTHLY_PASS_MANAGER_EVENTS: MgrEvent[] = MONTHLY_PASS_CONTENT.flatMap((co
 
 export const MANAGER_EVENTS: MgrEvent[] = [
   ...MONTHLY_PASS_MANAGER_EVENTS,
+  ...MANAGER_PRESS_SCENARIOS,
   {
     id: 'm_unveiling',
     trigger: 'PRE_SEASON',
@@ -151,7 +153,7 @@ export const MANAGER_EVENTS: MgrEvent[] = [
     title: 'Under the Microscope',
     speaker: 'Press Room',
     weight: 2,
-    body: 'Another defeat. A reporter leans in: \u201CThree losses on the bounce. Are you the right man for {team}?\u201D',
+    body: 'After a difficult defeat, a reporter leans in: \u201CAre you still the right person to lead {team}?\u201D',
     choices: [
       {
         id: 'defiant',
@@ -593,6 +595,7 @@ export function queueManagerEvent(save: SaveGame, trigger: MgrTrigger, rng: Rng)
   }
   if (!save.managerStory!.pendingEventIds.includes(chosen.id))
     save.managerStory!.pendingEventIds.push(chosen.id);
+  if (chosen.speaker === 'Press Room') save.managerStory!.flags.matchesSincePress = 0;
   save.managerStory!.flags[`lastAskedMatch:${chosen.id}`] = save.managerMatchesAtCurrentClub ?? 0;
   save.managerStory!.flags[`lastAskedSeason:${chosen.id}`] = seasonYear;
   if (chosen.id.startsWith('pass_monthly_manager_') && chosen.id.endsWith('_opening')) {

@@ -126,6 +126,9 @@ const REPORT_PATH = path.resolve(
 const FULL_REPORT_PATH = path.resolve(
   process.env.CAREER_AUDIT_FULL_OUT ?? 'test-artifacts/full-career-audit.json',
 );
+const CAPTURE_SAVE_DIR = process.env.CAREER_CAPTURE_SAVE_DIR
+  ? path.resolve(process.env.CAREER_CAPTURE_SAVE_DIR)
+  : undefined;
 const MONETIZATION_REPORT_PATH = path.resolve(
   process.env.CAREER_AUDIT_MONETIZATION_OUT ??
     'test-artifacts/player-monetization-career-audit.json',
@@ -1300,6 +1303,16 @@ function runMode(
           0,
         ) / attendanceHistory.length
       : 0;
+
+  // Optional QA capture export. These are real saves produced by the same
+  // canonical match/season engine used by the audit, not hand-authored results.
+  // Keep the output outside source control (test-artifacts is gitignored).
+  if (CAPTURE_SAVE_DIR) {
+    fs.mkdirSync(CAPTURE_SAVE_DIR, { recursive: true });
+    const capturePath = path.join(CAPTURE_SAVE_DIR, `${mode}-${seed}.json`);
+    fs.writeFileSync(capturePath, `${JSON.stringify(finalSave, null, 2)}\n`, 'utf8');
+    console.log(`Capture save: ${capturePath}`);
+  }
 
   if (mode === 'manager' && (finalSave.careerLosses ?? 0) === 0 && totalResults > 0) {
     warnings.push(

@@ -2,6 +2,7 @@ import { ManagerCalendarPhase, PlayerCalendarEvent, SaveGame } from '../domain/t
 import { careerSelectionDecision } from './career';
 import { fixtureEnergyCost } from './economy';
 import { managerControlledTeamId, managerPhaseProgress } from './managerCalendar';
+import { nextPlayerAdvice } from './playerAdvisor';
 import { currentPlayerCalendarEvent } from './playerCalendar';
 import { nextUserFixtureId, seasonComplete } from './season';
 
@@ -12,6 +13,7 @@ export enum CareerStepType {
   MATCHDAY_BENCHED = 'MATCHDAY_BENCHED',
   MATCHDAY_RESTED = 'MATCHDAY_RESTED',
   STORY_EVENT_REQUIRED = 'STORY_EVENT_REQUIRED',
+  ADVISER_MOMENT = 'ADVISER_MOMENT',
   OFFSEASON_TRANSFER = 'OFFSEASON_TRANSFER',
   SEASON_WRAPUP = 'SEASON_WRAPUP',
   CAREER_PROMOTION_CEREMONY = 'CAREER_PROMOTION_CEREMONY',
@@ -29,6 +31,7 @@ export enum ManagerStepType {
 
 export type CareerStepAction =
   | 'OPEN_STORY'
+  | 'OPEN_ADVISER'
   | 'OPEN_TRAINING'
   | 'RESOLVE_CALENDAR'
   | 'PLAY_MATCH'
@@ -132,6 +135,17 @@ function resolvePlayerStep(save: SaveGame, context: CareerStepContext): Resolved
       action: 'OPEN_STORY',
       title: storyCount === 1 ? 'Career decision waiting' : `${storyCount} decisions waiting`,
       detail: 'Resolve this moment before the calendar advances.',
+    };
+  }
+
+  const adviserAdvice = nextPlayerAdvice(save, nextUserFixtureId(save));
+  if (adviserAdvice) {
+    return {
+      mode: 'career',
+      type: CareerStepType.ADVISER_MOMENT,
+      action: 'OPEN_ADVISER',
+      title: adviserAdvice.title,
+      detail: 'Hear your adviser or carry on. No purchase is required.',
     };
   }
 

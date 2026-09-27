@@ -38,7 +38,7 @@ const { PASS_BALANCE_VERSION, PASS_TIERS, WEEKLY_QUESTS, passLevel } =
   jest.requireActual<typeof import('../../game/liveops')>('../../game/liveops');
 const { ensureSeasonPassExperience, seasonPassPeriod } =
   jest.requireActual<typeof import('../../game/seasonPass')>('../../game/seasonPass');
-const { contractOffer } =
+const { contractOffer, roundContractCoins } =
   jest.requireActual<typeof import('../../game/career')>('../../game/career');
 const { ffpBlockReason } =
   jest.requireActual<typeof import('../../game/finance')>('../../game/finance');
@@ -1099,7 +1099,7 @@ describe('career reward integrity', () => {
     expect(renewed.ok).toBe(true);
     expect(after.inventory?.contract_boost_token).toBe(0);
     expect(after.players[after.userPlayerId!].contract?.wage).toBe(
-      Math.round(baseOffer.wage * 1.25),
+      roundContractCoins(baseOffer.wage * 1.25),
     );
   });
 
@@ -1113,9 +1113,9 @@ describe('career reward integrity', () => {
 
     const after = useCareer.getState().save!;
     expect(signed.ok).toBe(true);
-    expect(signed.offer?.wage).toBe(Math.round(offer.wage * 1.25));
-    expect(signed.offer?.signingBonus).toBe(Math.round(offer.signingBonus * 1.25));
-    expect(after.players[after.userPlayerId!].contract?.wage).toBe(Math.round(offer.wage * 1.25));
+    expect(signed.offer?.wage).toBe(roundContractCoins(offer.wage * 1.25));
+    expect(signed.offer?.signingBonus).toBe(roundContractCoins(offer.signingBonus * 1.25));
+    expect(after.players[after.userPlayerId!].contract?.wage).toBe(roundContractCoins(offer.wage * 1.25));
     expect(after.inventory?.contract_boost_token).toBe(0);
   });
 

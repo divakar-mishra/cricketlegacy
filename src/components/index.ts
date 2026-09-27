@@ -1,4 +1,5 @@
 export { Screen } from './Screen';
+export { BannerAdSlot } from './BannerAdSlot';
 export { AppText } from './AppText';
 export { Button } from './Button';
 export { Card } from './Card';

@@ -29,9 +29,9 @@ describe('CareerHub story preview copy', () => {
   it('surfaces milestone performances through the persistent newspaper scrapbook', () => {
     expect(source).toContain('mediaScrapbook');
     expect(source).toContain('pendingNewspaperId');
-    expect(source).toContain('styles.scrapbookHeadline}>{story.headline}');
+    expect(source).toContain('label={`Media Scrapbook · ${pressArchive.length}`}');
+    expect(source).toContain("navigation.navigate('PlayerLife', { initialTab: 'media' })");
     expect(source).toContain('<NewspaperModal');
-    expect(source).toContain('Media Scrapbook');
   });
 
   it('keeps the profile tab focused on profile-only actions', () => {

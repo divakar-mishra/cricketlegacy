@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   Button,
+  BannerAdSlot,
   Card,
   LeagueTable,
   ProgressBar,
@@ -1024,6 +1025,7 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
           )}
         </>
       )}
+      <BannerAdSlot entitlements={save.entitlements} />
     </Screen>
   );
 }

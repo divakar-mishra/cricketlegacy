@@ -5,7 +5,7 @@
  */
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert as NativeAlert, StyleSheet, View } from 'react-native';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -179,7 +179,7 @@ export function InjuryReportScreen({ navigation, route }: ScreenProps<'InjuryRep
         {/* Player name */}
         <Animated.View entering={FadeInDown.duration(350).delay(400)}>
           <Text style={styles.playerName}>{playerName}</Text>
-          <Text style={styles.playerSub}>has picked up an injury</Text>
+          <Text style={styles.playerSub}>is recovering from an injury</Text>
         </Animated.View>
 
         {/* Key stats */}
@@ -234,9 +234,18 @@ export function InjuryReportScreen({ navigation, route }: ScreenProps<'InjuryRep
               variant="secondary"
               style={{ marginTop: spacing.md }}
               onPress={() => {
-                // Not enough gems on hand → send them to the store to top up.
+                // Show an optional Store route alongside free recovery; never auto-buy.
                 if (gems < gemCost) {
-                  navigation.navigate('Purchase');
+                  // Injury Report owns the modal queue slot; a queued glass
+                  // alert could not become visible until this screen closed.
+                  NativeAlert.alert(
+                    'Not enough gems for fast-track',
+                    `This optional recovery needs ${gemCost} gems; you have ${gems}. You can rest for free, use a personal physio with Wallet Coins, or review gem packs. Nothing is purchased automatically.`,
+                    [
+                      { text: 'Keep recovering', style: 'cancel' },
+                      { text: 'View Store', onPress: () => navigation.navigate('Purchase') },
+                    ],
+                  );
                   return;
                 }
                 const res = recoverInjuryNow(playerId, gemCost);
@@ -244,8 +253,7 @@ export function InjuryReportScreen({ navigation, route }: ScreenProps<'InjuryRep
                   playHaptic('notify-success');
                   if (navigation.canGoBack()) navigation.goBack();
                 } else {
-                  // Fall back to the store (e.g. gems changed since render).
-                  navigation.navigate('Purchase');
+                  NativeAlert.alert('Recovery unavailable', res.reason ?? 'Please review your recovery options.');
                 }
               }}
             />

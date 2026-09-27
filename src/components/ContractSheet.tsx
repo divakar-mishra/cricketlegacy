@@ -1,7 +1,7 @@
 import { Image, StyleSheet, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { AppText as Text } from './AppText';
-import type { ContractOffer } from '../game/career';
+import { roundContractCoins, type ContractOffer } from '../game/career';
 import { fonts } from '../theme/fonts';
 
 /** Presentation only: signing and all financial effects remain in the store. */
@@ -39,9 +39,9 @@ export function ContractSheet({
             : 'The club offers the following terms for your cricket career.'}
         </Text>
         {[
-          ['Season salary', `${Math.round(offer.wage).toLocaleString()} coins / season`],
+          ['Season salary', `${roundContractCoins(offer.wage).toLocaleString()} coins / season`],
           ['Contract length', `${offer.years} year${offer.years === 1 ? '' : 's'}`],
-          ['Signing bonus', `${offer.signingBonus.toLocaleString()} coins`],
+          ['Signing bonus', `${roundContractCoins(offer.signingBonus).toLocaleString()} coins`],
         ].map(([label, value]) => (
           <View key={label} style={styles.term}>
             <Text style={styles.label}>{label}</Text>
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   office: { width: '100%', height: 100 },
   paper: {
     marginHorizontal: 10,
-    marginTop: -16,
+    marginTop: 0,
     padding: 20,
     backgroundColor: '#f6eedc',
     borderTopWidth: 4,

@@ -13,6 +13,8 @@
 const IS_DEV_BUILD = typeof __DEV__ !== 'undefined' && __DEV__;
 
 const ADMOB_ANDROID_REWARDED_UNIT = 'ca-app-pub-4249020515368291/1717736882';
+const ADMOB_ANDROID_INTERSTITIAL_UNIT = 'ca-app-pub-4249020515368291/6625581037';
+const ADMOB_ANDROID_BANNER_UNIT = 'ca-app-pub-4249020515368291/6681421355';
 
 export const MONETIZATION = {
   revenueCat: {
@@ -22,9 +24,10 @@ export const MONETIZATION = {
   admob: {
     /**
      * Debug builds use the SDK's TestIds fallback unless explicitly overridden.
-     * Release builds default to Cricket Legacy's Android rewarded ad unit.
+     * Release builds default to Cricket Legacy's Android ad units.
      */
     rewarded: process.env.EXPO_PUBLIC_ADMOB_REWARDED_UNIT ?? (IS_DEV_BUILD ? '' : ADMOB_ANDROID_REWARDED_UNIT),
-    interstitial: process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT ?? '',
+    interstitial: process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT ?? (IS_DEV_BUILD ? '' : ADMOB_ANDROID_INTERSTITIAL_UNIT),
+    banner: process.env.EXPO_PUBLIC_ADMOB_BANNER_UNIT ?? (IS_DEV_BUILD ? '' : ADMOB_ANDROID_BANNER_UNIT),
   },
 } as const;

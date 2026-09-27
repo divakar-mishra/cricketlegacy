@@ -29,6 +29,11 @@ import {
 } from './narrative';
 
 const DEFERRED_STORY_KEY = '__deferred_story_event_ids';
+export const PRESS_APPEARANCE_GAP = 5;
+
+function isPressBeat(event: StoryEvent): boolean {
+  return event.speaker === 'Press Room' || event.speaker === 'Journalist' || event.speaker === 'Clubhouse Studio';
+}
 
 function deferredStoryIds(save: SaveGame): string[] {
   const raw = save.story?.strings?.[DEFERRED_STORY_KEY];
@@ -101,9 +106,17 @@ export function queueStoryForTrigger(
   const ctx = baseContext(save, trigger);
   if (!ctx) return false;
   Object.assign(ctx, extra);
-  const ev = pickEvent(STORY_EVENTS, ctx, rng);
+  const appearances = ctx.user.careerStats?.matches ?? 0;
+  const lastPressAppearance = save.story?.flags.lastPressAppearance;
+  const pressReady = lastPressAppearance == null || appearances - lastPressAppearance >= PRESS_APPEARANCE_GAP;
+  const ev = pickEvent(
+    pressReady ? STORY_EVENTS : STORY_EVENTS.filter((event) => !isPressBeat(event)),
+    ctx,
+    rng,
+  );
   if (!ev) return false;
   if (!save.story!.pendingEventIds.includes(ev.id)) save.story!.pendingEventIds.push(ev.id);
+  if (isPressBeat(ev)) save.story!.flags.lastPressAppearance = appearances;
   if (ev.id.startsWith('pass_monthly_player_') && ev.id.endsWith('_opening')) {
     save.seasonPassExperience!.playerStoryCycleId = passContentCycleId(save);
   }

@@ -3,14 +3,14 @@ import path from 'path';
 
 const source = fs.readFileSync(path.join(__dirname, '../../../App.tsx'), 'utf8');
 
-test('startup navigation and onboarding do not require an age questionnaire', () => {
+test('startup navigation remains available with an age-only ad prompt', () => {
   expect(source).not.toContain('AgeEligibilityGate');
   expect(source).not.toContain('if (!ageDeclaration)');
   expect(source).toContain('<Onboarding />');
+  expect(source).toContain('<AdAgePrompt />');
   expect(source).toContain('<AppIntegrityGate>');
 });
 
-test('removing the questionnaire does not silently declare new users adult', () => {
-  expect(source).toContain('getJSON<unknown>(AGE_DECLARATION_KEY)');
-  expect(source).toContain('isAgeDeclaration(stored) && canUseAds(stored)');
+test('startup does not infer adulthood from Google sign-in or guest play', () => {
+  expect(source).not.toContain('ads.configureAds(MONETIZATION.admob, true)');
 });

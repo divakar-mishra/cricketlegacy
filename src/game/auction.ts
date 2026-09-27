@@ -6,6 +6,7 @@
 import { AuctionOffer, Player, SaveGame } from '../domain/types';
 import { Rng } from '../engine/rng';
 import { addCoins } from './economy';
+import { contractCoinsAtLeast, roundContractCoins } from './career';
 import { boardTargetFor, computeValue, MAX_SQUAD, WAGE_RATE } from './finance';
 import { buildPlayerSeasonCalendar } from './playerCalendar';
 import { matchImpactScore } from './progression';
@@ -75,12 +76,12 @@ export function generateAuctionOffers(save: SaveGame, rng: Rng): AuctionOffer[] 
     // Interest rises with the user's value and the club's ambition (reputation).
     const interest = value + team.reputation * 1.2 - 90 + (rng() * 2 - 1) * 18;
     if (interest < 0) continue;
-    const fee = Math.round(
+    const fee = roundContractCoins(
       computeValue(user) * (0.8 + team.reputation / 120) * (0.9 + rng() * 0.3),
     );
     // A genuine pay rise — richer/higher-rep clubs offer more. Always beats the
     // current wage so the auction is a real financial decision, not cosmetic.
-    const wagePromise = Math.round(
+    const wagePromise = roundContractCoins(
       Math.max(
         currentWage * (1.2 + team.reputation / 300),
         computeValue(user) * WAGE_RATE * (1.3 + team.reputation / 200),
@@ -89,7 +90,7 @@ export function generateAuctionOffers(save: SaveGame, rng: Rng): AuctionOffer[] 
     offers.push({
       teamId: team.id,
       fee,
-      signingBonus: Math.round(300 + value * 6 + team.reputation * 8),
+      signingBonus: roundContractCoins(300 + value * 6 + team.reputation * 8),
       wagePromise,
     });
   }
@@ -145,11 +146,11 @@ export function generateDomesticClubOffers(save: SaveGame, rng: Rng): AuctionOff
     .filter(Boolean)
     .map((team) => ({
       teamId: team.id,
-      fee: Math.round(
+      fee: roundContractCoins(
         computeValue(user) * (0.8 + team.reputation / 120) * (0.9 + rng() * 0.3),
       ),
-      signingBonus: Math.round(300 + value * 6 + team.reputation * 8),
-      wagePromise: Math.round(
+      signingBonus: roundContractCoins(300 + value * 6 + team.reputation * 8),
+      wagePromise: roundContractCoins(
         Math.max(
           currentWage * (1.2 + team.reputation / 300),
           computeValue(user) * WAGE_RATE * (1.3 + team.reputation / 200),
@@ -178,11 +179,11 @@ export function acceptAuctionOffer(save: SaveGame, teamId: string): AcceptResult
   const fromTeamId = save.franchiseTeamId ?? save.userTeamId;
   save.franchiseTeamId = teamId;
 
-  save.wallet = addCoins(save.wallet, offer.signingBonus);
+  save.wallet = addCoins(save.wallet, roundContractCoins(offer.signingBonus));
   // The promised salary becomes the user's REAL contract wage — a genuine raise,
   // on a fresh multi-year deal. Never a downgrade from their current terms.
   save.franchiseContract = {
-    wage: Math.max(offer.wagePromise, save.franchiseContract?.wage ?? 0),
+    wage: contractCoinsAtLeast(offer.wagePromise, save.franchiseContract?.wage ?? 0),
     yearsLeft: Math.max(3, save.franchiseContract?.yearsLeft ?? 0),
     releaseClause: save.franchiseContract?.releaseClause,
   };
@@ -249,11 +250,11 @@ export function acceptDomesticClubOffer(save: SaveGame, teamId: string): AcceptR
 
   const fromTeamId = moveDomesticRoster(save, user, teamId);
   user.contract = {
-    wage: Math.max(offer.wagePromise, user.contract?.wage ?? 0),
+    wage: contractCoinsAtLeast(offer.wagePromise, user.contract?.wage ?? 0),
     yearsLeft: Math.max(3, user.contract?.yearsLeft ?? 0),
     releaseClause: user.contract?.releaseClause,
   };
-  save.wallet = addCoins(save.wallet, offer.signingBonus);
+  save.wallet = addCoins(save.wallet, roundContractCoins(offer.signingBonus));
   save.brand = Math.min(100, (save.brand ?? 20) + 4);
   const year = save.currentSeasonId ? (save.seasons[save.currentSeasonId]?.year ?? 2026) : 2026;
   save.boardObjective = { year, targetPosition: boardTargetFor(newTeam.reputation) };

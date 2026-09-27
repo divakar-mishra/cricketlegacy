@@ -1528,7 +1528,7 @@ const makeStyles = (colors: ThemeColors) =>
       textTransform: 'uppercase',
     },
     legendBundleTitle: {
-      color: colors.text,
+      color: '#F7F4EA',
       fontSize: fontSize.xl,
       fontWeight: fontWeight.black,
       fontFamily: fonts.display,
@@ -1549,11 +1549,11 @@ const makeStyles = (colors: ThemeColors) =>
       letterSpacing: 0.5,
     },
     legendBundlePerks: { gap: 8, marginBottom: spacing.sm },
-    legendFrontDesc: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
+    legendFrontDesc: { color: '#C7D0CA', fontSize: fontSize.sm, lineHeight: 20 },
     legendBundlePerkRow: { flexDirection: 'row', alignItems: 'center' },
-    legendBundlePerkText: { color: colors.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
+    legendBundlePerkText: { color: '#C7D0CA', fontSize: fontSize.sm, lineHeight: 20 },
     legendBundleSaving: {
-      color: colors.textFaint,
+      color: '#C7D0CA',
       fontSize: fontSize.xs,
       textAlign: 'center',
       marginTop: spacing.xs,
@@ -1693,7 +1693,7 @@ const makeStyles = (colors: ThemeColors) =>
     itemTitle: { color: colors.text, fontSize: fontSize.md, fontWeight: fontWeight.bold, flex: 1 },
     itemDesc: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 2, lineHeight: 18 },
     itemValue: {
-      color: colors.accentLight,
+      color: colors.accent,
       fontSize: fontSize.xs,
       fontWeight: fontWeight.semibold,
       lineHeight: 17,

@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { playHaptic } from '../audio';
+import type { NewspaperStory } from '../domain/types';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import type { IconName } from '../components';
 import {
@@ -21,6 +22,7 @@ import {
   Icon,
   MechanicInfoButton,
   ModeGuideModal,
+  NewspaperModal,
   RewardModal,
   RewardModalData,
   Screen,
@@ -43,13 +45,13 @@ import {
 } from '../game/managerCalendar';
 import { MANAGER_LEVEL_LABEL } from '../game/managerCareer';
 import { nextUserFixturesByCompetition } from '../game/season';
-import { activeSponsorBranding } from '../game/sponsorship';
+import { activeSponsorBranding, sponsorshipOffers } from '../game/sponsorship';
 import { isDeadlineDay } from '../game/transferMarket';
 import { useIsCompact } from '../hooks/useResponsive';
 import { useManagedTimers } from '../hooks/useManagedTimers';
 import { useT } from '../i18n';
 import { ScreenProps } from '../navigation';
-import { useCareer } from '../state/careerStore';
+import { persistenceErrorMessage, useCareer } from '../state/careerStore';
 import { useSettings } from '../state/settingsStore';
 import {
   fonts,
@@ -129,13 +131,16 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   const declineManagerJobOffer = useCareer((s) => s.declineManagerJobOffer);
   const acknowledgeManagerAppointment = useCareer((s) => s.acknowledgeManagerAppointment);
   const persistCritical = useCareer((s) => s.persistCritical);
+  const persistenceError = useCareer((s) => s.persistenceError);
   const pendingAchievementIds = useCareer((s) => s.pendingAchievementIds);
+  const markNewspaperSeen = useCareer((s) => s.markNewspaperSeen);
   const clearPendingAchievements = useCareer((s) => s.clearPendingAchievements);
   const t = useT();
   const { gradients, colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const compact = useIsCompact();
   const [rewardModal, setRewardModal] = useState<RewardModalData | null>(null);
+  const [selectedNewspaper, setSelectedNewspaper] = useState<NewspaperStory | null>(null);
   const [calendarSimulation, setCalendarSimulation] = useState<{
     played: number;
     total: number;
@@ -229,6 +234,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   const managerSponsorBranding = isNationalManager
     ? { earned: undefined, premium: undefined }
     : activeSponsorBranding(save);
+  const managerSponsorOffers = isNationalManager ? [] : sponsorshipOffers(save);
   const leadershipNeedsReview =
     !isNationalManager && Boolean(save.flags?.[leadershipReviewFlag(save.userTeamId)]);
   const season = save.currentSeasonId ? save.seasons[save.currentSeasonId] : undefined;
@@ -553,6 +559,23 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
           subtitle={`Age ${save.managerAge ?? 35} · Season ${season?.year ?? ''}`}
           onBack={goMenu}
         />
+        {persistenceError ? (
+          <Card>
+            <Text style={{ color: colors.text, marginBottom: spacing.sm }}>
+              Career progress is not safely saved yet.
+            </Text>
+            <Text style={{ color: colors.textMuted, marginBottom: spacing.md }}>
+              {persistenceError}
+            </Text>
+            <Button
+              label="Retry save"
+              variant="gold"
+              onPress={() => void persistCritical(true).catch((error) =>
+                Alert.alert('Save still unavailable', persistenceErrorMessage(error)),
+              )}
+            />
+          </Card>
+        ) : null}
 
         <View style={styles.managerMasthead}>
           <View
@@ -585,6 +608,14 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
           compact
           style={styles.clubSponsorHeader}
         />
+        {managerSponsorOffers.length > 0 ? (
+          <Card
+            onPress={() => navigation.navigate('ClubOffice', { focusSponsor: true })}
+            accessibilityLabel="Review kit sponsor offers"
+          >
+            <Text style={styles.managerRole}>Kit sponsor offers ready · Review</Text>
+          </Card>
+        ) : null}
 
         <View
           style={[styles.fixtureTicket, !showFixtureTicket && styles.deskTicket]}
@@ -885,6 +916,26 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
           />
         ) : null}
 
+        {(save.experience?.mediaScrapbook?.length ?? 0) > 0 ? (
+          <>
+            <Text style={styles.section}>Press clippings</Text>
+            {[...(save.experience?.mediaScrapbook ?? [])]
+              .reverse()
+              .slice(0, 6)
+              .map((story) => (
+                <Card key={story.id} onPress={() => setSelectedNewspaper(story)}>
+                  <Text style={styles.competitionProgress}>
+                    {story.format} · SEASON {story.season}
+                  </Text>
+                  <Text style={styles.objectivesTitle}>{story.headline}</Text>
+                  <Text style={styles.objectivesMeta} numberOfLines={2}>
+                    {story.subheadline}
+                  </Text>
+                </Card>
+              ))}
+          </>
+        ) : null}
+
         <Button
           label="Save &amp; Exit"
           variant="ghost"
@@ -892,6 +943,13 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
           onPress={onSaveExit}
         />
       </Screen>
+      <NewspaperModal
+        story={selectedNewspaper}
+        onClose={(storyId) => {
+          markNewspaperSeen(storyId);
+          setSelectedNewspaper(null);
+        }}
+      />
       <Modal
         transparent
         visible={Boolean(calendarSimulation)}

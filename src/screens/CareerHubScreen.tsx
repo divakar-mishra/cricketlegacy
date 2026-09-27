@@ -83,6 +83,7 @@ import {
   shouldPromptRetirement,
 } from '../game/careerEvents';
 import { playerIdentityLine } from '../game/careerExperience';
+import { nextPlayerAdvice } from '../game/playerAdvisor';
 import { CareerStepType, resolveNextCareerStep } from '../game/careerStep';
 import { activeCompetitionTable } from '../game/competitionTable';
 import { areAdsRemoved, fixtureEnergyCost } from '../game/economy';
@@ -103,7 +104,7 @@ import { getU19WorldCupState, u19WorldCupSelectionStatus } from '../game/u19Worl
 import { careerPlayingTeamId } from '../game/youthFixtures';
 import { ScreenProps } from '../navigation';
 import { accountPurchases, ads, analytics } from '../services';
-import { useCareer } from '../state/careerStore';
+import { persistenceErrorMessage, useCareer } from '../state/careerStore';
 import { useSettings } from '../state/settingsStore';
 import {
   fonts,
@@ -157,8 +158,8 @@ const PLAYER_GUIDE_STEPS = [
   },
   {
     icon: 'fitness' as const,
-    title: 'Train with a purpose',
-    body: 'Develop your role.',
+    title: 'Find your support team',
+    body: 'Open Training, then Development Centre. That is where you compare personal coaches, the performance analyst, physio and role-fitting equipment. Hiring is optional.',
   },
   {
     icon: 'game-controller' as const,
@@ -171,9 +172,14 @@ const PLAYER_GUIDE_STEPS = [
     body: 'Selection and milestones.',
   },
   {
+    icon: 'chatbubble-ellipses-outline' as const,
+    title: 'Your free career adviser',
+    body: 'At relevant moments, your adviser becomes a story decision. Hear the suggestion or carry on; accepting opens the right screen but never spends for you.',
+  },
+  {
     icon: 'person' as const,
-    title: 'Review your career',
-    body: 'Stats, story and profile.',
+    title: 'Explore life off the field',
+    body: 'Open Profile → Player Life for contracts and Finances. Kit Partnership is under Kit & media. The Portfolio appears when senior cricket unlocks it.',
   },
 ] as const;
 
@@ -192,6 +198,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     declineDomesticClubOffers,
     contractStatus,
     persistCritical,
+    persistenceError,
     markFlagSeen,
     lastPromotion,
     clearPromotion,
@@ -220,6 +227,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       declineDomesticClubOffers: s.declineDomesticClubOffers,
       contractStatus: s.contractStatus,
       persistCritical: s.persistCritical,
+      persistenceError: s.persistenceError,
       markFlagSeen: s.markFlagSeen,
       lastPromotion: s.lastPromotion,
       clearPromotion: s.clearPromotion,
@@ -292,7 +300,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       setCanClaimDaily(useCareer.getState().save?.lastDailyClaim !== today);
       const currentSave = useCareer.getState().save;
       // Ad monetization: on returning to the hub, occasionally show an
-      // interstitial (persistently capped at two per rolling hour). Suppressed for
+      // interstitial (persistently capped at four per rolling hour). Suppressed for
       // players who removed ads — permanently (VIP) or via the timed Starter
       // Pack trial — and withheld until a few matches in so a brand-new player
       // is never greeted by an ad.
@@ -500,6 +508,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     pendingPromotion: Boolean(lastPromotion?.promoted),
   });
   const earnedSponsorOffers = sponsorshipOffers(save);
+  const advisorAdvice = nextPlayerAdvice(save, fixtureId);
   const portfolioUnlocked = stockMarketUnlocked(save.careerPathLevel, user.age);
   const portfolioHomeVisited = Boolean(save.flags?.playerHomePortfolioVisited);
   const academyReady = !save.personalAcademy && save.wallet.coins >= ACADEMY_COSTS[1];
@@ -557,8 +566,10 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   const primaryActionLabel =
     nextStep.action === 'OPEN_STORY'
       ? 'Open story'
-      : nextStep.action === 'PLAY_MATCH'
-        ? 'Play match'
+      : nextStep.action === 'OPEN_ADVISER'
+        ? 'Hear adviser'
+        : nextStep.action === 'PLAY_MATCH'
+          ? 'Play match'
         : nextStep.action === 'SIMULATE_MATCH'
           ? 'Advance while benched'
           : nextStep.action === 'REFILL_ENERGY'
@@ -606,6 +617,9 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         break;
       case 'OPEN_STORY':
         navigation.navigate('Narrative');
+        break;
+      case 'OPEN_ADVISER':
+        navigation.navigate('Narrative', { adviser: true });
         break;
       case 'RESOLVE_CALENDAR':
         resolveCalendar();
@@ -859,7 +873,11 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           <View style={[styles.ticketNotch, styles.ticketNotchRight]} />
           <View style={styles.ticketTopRule} />
           <Text style={styles.ticketKicker}>
-            {primaryIsStory ? 'CAREER DECISION' : fixture ? 'NEXT FIXTURE' : 'NEXT CHAPTER'}
+            {primaryIsStory
+              ? 'CAREER DECISION'
+              : nextStep.action === 'OPEN_ADVISER'
+                ? 'ADVISER MOMENT'
+                : fixture ? 'NEXT FIXTURE' : 'NEXT CHAPTER'}
           </Text>
           <Text style={styles.ticketTitle} numberOfLines={2}>
             {primaryIsStory && storyPreview?.title ? storyPreview.title : nextStep.title}
@@ -1026,6 +1044,20 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               style={styles.ticketPrimaryAction}
               onPress={runPrimaryAction}
             />
+          ) : null}
+          {advisorAdvice && nextStep.action !== 'OPEN_ADVISER' && !primaryIsStory ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Hear your career adviser: ${advisorAdvice.title}`}
+              style={styles.adviserStoryLink}
+              onPress={() => navigation.navigate('Narrative', { adviser: true })}
+            >
+              <Icon name="chatbubble-ellipses-outline" size={18} color={CRICKET_HOME.leather} />
+              <Text style={styles.adviserStoryText} numberOfLines={1}>
+                Adviser note · {advisorAdvice.title}
+              </Text>
+              <Icon name="chevron-forward" size={16} color={CRICKET_HOME.creamMuted} />
+            </Pressable>
           ) : null}
           <View style={styles.ticketBottomRule} />
         </View>
@@ -1531,7 +1563,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       {/* Rival comparison — persistent head-to-head badge */}
       {rivalCmp ? <RivalryBadge comparison={rivalCmp} userName={user?.name ?? 'You'} /> : null}
 
-      {/* Locked franchise auction (senior pros only) — standardized locked state */}
+      {/* Locked T20 club offers (senior pros only) — standardized locked state */}
       {(() => {
         const level = save.careerPathLevel ?? 'DOMESTIC';
         if (level !== 'DOMESTIC' && level !== 'INTERNATIONAL') return null;
@@ -1542,9 +1574,9 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         return (
           <View style={{ marginTop: spacing.md }}>
             <LockedFeatureCard
-              title="Franchise Auction"
+              title="T20 Club Offers"
               reason={gate.reason}
-              icon="hammer"
+              icon="document-text-outline"
               progress={Math.min(1, matches / 10)}
               progressLabel={`${matches} / 10 career matches`}
             />
@@ -2015,27 +2047,12 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         onPress={() => navigation.navigate('PlayerLife')}
       />
       {pressArchive.length > 0 ? (
-        <>
-          <Text style={styles.section}>Media Scrapbook</Text>
-          {[...pressArchive]
-            .reverse()
-            .slice(0, 6)
-            .map((story) => (
-              <Card
-                key={story.id}
-                style={styles.scrapbookItem}
-                onPress={() => setSelectedNewspaper(story)}
-              >
-                <Text style={styles.pressClipKicker}>
-                  {story.format} | SEASON {story.season}
-                </Text>
-                <Text style={styles.scrapbookHeadline}>{story.headline}</Text>
-                <Text style={styles.pressClipBody} numberOfLines={2}>
-                  {story.subheadline}
-                </Text>
-              </Card>
-            ))}
-        </>
+        <Button
+          label={`Media Scrapbook · ${pressArchive.length}`}
+          variant="secondary"
+          style={{ marginTop: spacing.sm }}
+          onPress={() => navigation.navigate('PlayerLife', { initialTab: 'media' })}
+        />
       ) : null}
       <Button
         label="🎨 Cosmetics"
@@ -2130,6 +2147,23 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           }
           onBack={goMenu}
         />
+        {persistenceError ? (
+          <Card>
+            <Text style={{ color: colors.text, marginBottom: spacing.sm }}>
+              Career progress is not safely saved yet.
+            </Text>
+            <Text style={{ color: colors.textMuted, marginBottom: spacing.md }}>
+              {persistenceError}
+            </Text>
+            <Button
+              label="Retry save"
+              variant="gold"
+              onPress={() => void persistCritical(true).catch((error) =>
+                Alert.alert('Save still unavailable', persistenceErrorMessage(error)),
+              )}
+            />
+          </Card>
+        ) : null}
         {page === 'home' ? (
           <View style={[styles.playerMasthead, compact && styles.playerMastheadCompact]}>
             <View style={styles.mastheadGoldRule} />
@@ -2979,6 +3013,20 @@ const makeStyles = (colors: ThemeColors) =>
     ticketSecondaryAction: {
       marginTop: spacing.sm,
     },
+    adviserStoryLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minHeight: 44,
+      marginTop: spacing.sm,
+      paddingHorizontal: spacing.sm,
+    },
+    adviserStoryText: {
+      flex: 1,
+      color: CRICKET_HOME.creamInk,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.bold,
+    },
     ticketBenchReason: {
       color: colors.textMuted,
       fontSize: fontSize.xs,
@@ -3125,19 +3173,6 @@ const makeStyles = (colors: ThemeColors) =>
       color: colors.textMuted,
       fontSize: fontSize.sm,
       lineHeight: 19,
-      marginTop: spacing.xs,
-    },
-    scrapbookItem: {
-      marginBottom: spacing.sm,
-      borderLeftWidth: 2,
-      borderLeftColor: colors.accent,
-    },
-    scrapbookHeadline: {
-      color: colors.text,
-      fontFamily: fonts.display,
-      fontSize: fontSize.md,
-      fontWeight: fontWeight.black,
-      lineHeight: 21,
       marginTop: spacing.xs,
     },
     // Player hero card

@@ -87,6 +87,7 @@ console features, provider dashboards and a production device/network test.
   may still process device/ad identifiers, IP address, interactions, consent
   state and diagnostics. Final consent flow, child treatment, production unit
   IDs and Data safety answers still need provider/device verification.
+
 - **Notifications:** Expo Notifications schedules local reminders after device
   permission. The checked-in service does not upload a push token or operate a
   remote push-notification backend.
@@ -104,6 +105,32 @@ console features, provider dashboards and a production device/network test.
 - The Android manifest blocks microphone and broad external-storage
   permissions. No precise-location, contacts or camera collection path was
   found in this repository audit.
+
+### Mixed-age ad serving (September 2026)
+
+Play Console currently declares target ages 13–15, 16–17 and 18+ and marks the
+game as containing ads. After onboarding, a neutral numeric age entry stores
+only an age band on the device. Teens also declare India/outside India residence
+and guardian permission. The exact age is not stored. Unknown age, under-13,
+teens in India, teens without guardian permission, and failed storage reads or
+writes get no AdMob SDK initialization, UMP request, or ad. Prior under-18
+answers must be asked again because that band cannot distinguish teens from
+younger children. Adults who answered the prior neutral numeric prompt migrate.
+
+For eligible teens outside India, the app sets child-directed treatment,
+under-age-of-consent treatment and a G-rated maximum before UMP or SDK
+initialization. Adults use adult request treatment. Both paths initialize only
+when UMP permits requests, and every live request asks for non-personalized
+inventory. This conservative teen treatment uses the flags supported by the
+project's Google Mobile Ads SDK 24.9.0; the newer TEEN age-restricted treatment
+API is not available in that version. Android rewarded, banner and interstitial
+unit IDs are configured as production-build defaults; debug builds do not default
+to those live IDs.
+Confirm Play Console audience and
+Families answers, AdMob Privacy & messaging, Data safety and on-device SDK
+behavior against the actual release bundle before production. In particular,
+verify teen rewarded/interstitial creative closeability and content against
+Google Play Families ad-format requirements before releasing this path.
 
 ## Release blockers
 

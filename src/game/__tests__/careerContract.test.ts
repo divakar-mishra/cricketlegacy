@@ -2,6 +2,7 @@ import {
   contractOffer,
   ensureUserContract,
   maybeNationalCaptaincy,
+  roundContractCoins,
   signUserContract,
   tickUserContract,
   userContractExpiring,
@@ -9,6 +10,15 @@ import {
 import { makeCareerSave } from './_depthHelpers';
 
 describe('career contracts', () => {
+  it('quotes and settles contracts in 500-coin steps', () => {
+    expect(roundContractCoins(2389)).toBe(2500);
+    const save = makeCareerSave();
+    const offer = contractOffer(save);
+    expect(offer.wage % 500).toBe(0);
+    expect(offer.signingBonus % 500).toBe(0);
+    expect(signUserContract(save, { wage: 15_795, years: 3, signingBonus: 2_056 })).toBe(2_000);
+    expect(save.players[save.userPlayerId!].contract?.wage).toBe(16_000);
+  });
   it('gives the user a starting contract (idempotent)', () => {
     const save = makeCareerSave();
     ensureUserContract(save);

@@ -46,65 +46,29 @@ export interface FieldShotPath {
   airborne: boolean;
 }
 
-const FIELD_LAYOUTS: Record<FieldLayout, ReadonlyArray<readonly [number, number]>> = {
-  // Radius 0.605 meets the 30-yard ring. Most fielders now sit clearly beyond
-  // it so the live view reads like a full cricket ground instead of a cluster
-  // around the pitch. Only catching/attacking plans retain deliberate close
-  // catchers behind and beside the striker.
+const FIELD_LAYOUTS: Record<FieldLayout, readonly (readonly [number, number])[]> = {
+  // The 30-yard circle is at ground-radius fraction 0.605. These nine sprites
+  // exclude the keeper and bowler, so each plan must show its actual outside
+  // count: 0 catching, 2 attacking, 3 balanced, 5 defensive/sweeper.
   CATCHING: [
-    [22, 0.78],
-    [72, 0.84],
-    [122, 0.72],
-    [154, 0.59],
-    [176, 0.57],
-    [202, 0.59],
-    [238, 0.72],
-    [288, 0.84],
-    [338, 0.78],
+    [22, 0.53], [72, 0.56], [122, 0.54], [154, 0.48], [176, 0.46],
+    [202, 0.48], [238, 0.54], [288, 0.56], [338, 0.53],
   ],
   ATTACKING: [
-    [26, 0.76],
-    [70, 0.84],
-    [112, 0.72],
-    [158, 0.6],
-    [200, 0.6],
-    [232, 0.7],
-    [250, 0.86],
-    [292, 0.74],
-    [334, 0.8],
+    [26, 0.55], [70, 0.84], [112, 0.54], [158, 0.5], [200, 0.5],
+    [232, 0.54], [250, 0.86], [292, 0.55], [334, 0.55],
   ],
   BALANCED: [
-    [24, 0.76],
-    [66, 0.88],
-    [108, 0.72],
-    [148, 0.82],
-    [184, 0.7],
-    [220, 0.82],
-    [258, 0.74],
-    [296, 0.88],
-    [336, 0.76],
+    [24, 0.55], [66, 0.88], [108, 0.54], [148, 0.55], [184, 0.5],
+    [220, 0.55], [258, 0.74], [296, 0.88], [336, 0.55],
   ],
   DEFENSIVE: [
-    [22, 0.9],
-    [66, 0.91],
-    [110, 0.87],
-    [150, 0.9],
-    [184, 0.8],
-    [218, 0.9],
-    [254, 0.87],
-    [298, 0.91],
-    [338, 0.9],
+    [22, 0.55], [66, 0.91], [110, 0.87], [150, 0.55], [184, 0.5],
+    [218, 0.55], [254, 0.87], [298, 0.91], [338, 0.9],
   ],
   SWEEPER: [
-    [18, 0.91],
-    [62, 0.91],
-    [106, 0.9],
-    [148, 0.91],
-    [188, 0.86],
-    [228, 0.91],
-    [270, 0.9],
-    [310, 0.91],
-    [344, 0.91],
+    [18, 0.55], [62, 0.91], [106, 0.9], [148, 0.55], [188, 0.5],
+    [228, 0.91], [270, 0.55], [310, 0.91], [344, 0.91],
   ],
 };
 

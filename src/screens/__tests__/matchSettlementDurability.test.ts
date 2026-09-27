@@ -7,6 +7,8 @@ const read = (relativePath: string) => fs.readFileSync(path.join(root, relativeP
 describe('Matchday result durability', () => {
   const matchScreen = read('src/screens/MatchScreen.tsx');
   const careerStore = read('src/state/careerStore.ts');
+  const playerHub = read('src/screens/CareerHubScreen.tsx');
+  const managerHub = read('src/screens/ManagerHubScreen.tsx');
 
   it('confirms the critical save before exposing the completed-result screen', () => {
     expect(matchScreen).toContain("setPhase('saving')");
@@ -20,6 +22,16 @@ describe('Matchday result durability', () => {
   it('enqueues autosaves immediately so an older write cannot enter after a newer result', () => {
     expect(careerStore).not.toContain('InteractionManager.runAfterInteractions');
     expect(careerStore).toContain('await writeSave(ref.mode, ref.slot, save)');
+  });
+
+  it('does not mistake optional save metadata failure for a lost match result', () => {
+    expect(careerStore).toContain('try { await setLastPlayed(ref.mode, ref.slot); }');
+    expect(careerStore).toContain('try { await syncVipArchive(save); }');
+    expect(matchScreen).toContain('label="Return to hub to retry" variant="secondary"');
+    for (const hub of [playerHub, managerHub]) {
+      expect(hub).toContain('persistenceError');
+      expect(hub).toContain('label="Retry save"');
+    }
   });
 
   it('guards normal, international and daily results with the exactly-once ledger', () => {

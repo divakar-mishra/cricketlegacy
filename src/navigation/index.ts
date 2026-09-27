@@ -16,16 +16,15 @@ export type RootStackParamList = {
   CareerHub: undefined;
   ManagerHub: undefined;
   Match: { intl?: boolean; daily?: boolean } | undefined;
-  Training: undefined;
+  Training: { initialDevelopment?: boolean } | undefined;
   ManagerLeadership: undefined;
   Squad: undefined;
   Transfers: undefined;
   PlayerProfile: { playerId: string };
-  PlayerLife:
-    { initialTab?: 'overview' | 'finance' | 'media' | 'legacy' } | undefined;
+  PlayerLife: { initialTab?: 'overview' | 'finance' | 'media' | 'legacy' } | undefined;
   Records: undefined;
-  Narrative: undefined;
-  ClubOffice: undefined;
+  Narrative: { adviser?: boolean } | undefined;
+  ClubOffice: { focusSponsor?: boolean } | undefined;
   MedicalCentre: undefined;
   ClubStadium: undefined;
   Academy: undefined;

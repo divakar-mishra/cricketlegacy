@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { AuctionOffer, Player, SaveGame, Team } from '../domain/types';
+import { contractCoinsAtLeast, roundContractCoins } from '../game/career';
 import { fontSize, fontWeight, radius, spacing, ThemeColors, useThemedStyles } from '../theme';
 import { AppText as Text } from './AppText';
 import { Button } from './Button';
@@ -27,10 +27,10 @@ const ROLE_LABEL: Record<Player['role'], string> = {
 };
 
 function coins(value: number): string {
-  return `${Math.round(value).toLocaleString()} coins`;
+  return `${roundContractCoins(value).toLocaleString()} coins`;
 }
 
-/** Cricket context for an offer; it does not alter selection or auction outcomes. */
+/** Cricket context for an offer; it does not alter club choice or contract terms. */
 export function franchiseSquadFit(save: SaveGame, team: Team, user: Player): SquadFit {
   const peers = team.playerIds
     .map((id) => save.players[id])
@@ -63,173 +63,93 @@ export function franchiseSquadFit(save: SaveGame, team: Team, user: Player): Squ
   };
 }
 
-function TeamPaddle({
-  team,
-  offer,
-  selected,
-  onPress,
-}: {
-  team: Team | undefined;
-  offer: AuctionOffer;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  const styles = useThemedStyles(makeStyles);
-  const primary = team?.primaryColor ?? '#9B6A2F';
-  const secondary = team?.secondaryColor ?? '#F4E5BE';
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${team?.name ?? 'Interested club'} final bid, ${coins(offer.fee)}`}
-      onPress={onPress}
-      style={[styles.paddle, selected && styles.paddleSelected]}
-    >
-      <View style={[styles.paddleStripe, { backgroundColor: primary }]} />
-      <View style={[styles.clubDisc, { backgroundColor: primary, borderColor: secondary }]}>
-        <Text style={[styles.clubDiscText, { color: secondary }]}>{team?.shortName ?? 'CLB'}</Text>
-      </View>
-      <View style={styles.paddleCopy}>
-        <Text style={styles.paddleClub} numberOfLines={1}>
-          {team?.name ?? 'Interested club'}
-        </Text>
-        <Text style={styles.paddleStatus}>PADDLE UP · FINAL BID</Text>
-      </View>
-      <Text style={styles.paddleBid}>{coins(offer.fee)}</Text>
-    </Pressable>
-  );
-}
-
 export function FranchiseOfferModal({ save, offers, onAccept, onStay }: Props) {
   const styles = useThemedStyles(makeStyles);
-  const [selectedTeamId, setSelectedTeamId] = useState(offers[0]?.teamId ?? '');
   const user = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
   const currentClubId = save.franchiseTeamId ?? save.userTeamId;
   const currentClub = currentClubId ? save.teams[currentClubId] : undefined;
   const currentSalary = Math.max(0, save.franchiseContract?.wage ?? 0);
   if (!offers.length || !user) return null;
 
-  const selectedOffer = offers.find((offer) => offer.teamId === selectedTeamId) ?? offers[0];
-  const selectedClub = save.teams[selectedOffer.teamId];
-  const fit = selectedClub ? franchiseSquadFit(save, selectedClub, user) : null;
-  const increase =
-    currentSalary > 0
-      ? Math.max(0, Math.round((selectedOffer.wagePromise / currentSalary - 1) * 100))
-      : null;
-
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onStay} statusBarTranslucent>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
-          <View style={styles.rostrum}>
-            <View style={styles.gavelMark}>
-              <Text style={styles.gavel}>◆</Text>
-            </View>
-            <View style={styles.rostrumCopy}>
-              <Text style={styles.kicker}>T20 FRANCHISE AUCTION · FINAL CALL</Text>
-              <Text style={styles.title}>The room is bidding for {user.name}</Text>
-              <Text style={styles.intro}>
-                Choose your next T20 franchise.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.lotStrip}>
-            <View style={styles.shirtMark}>
-              <Text style={styles.shirtNumber}>{user.overall}</Text>
-              <Text style={styles.shirtLabel}>OVR</Text>
-            </View>
-            <View style={styles.lotCopy}>
-              <Text style={styles.lotLabel}>PLAYER LOT</Text>
-              <Text style={styles.playerName}>{user.name}</Text>
-              <Text style={styles.playerLine}>
-                {ROLE_LABEL[user.role]} · Form {Math.round(user.meta.form ?? 60)}
-              </Text>
-            </View>
-            <View style={styles.currentClubBlock}>
-              <Text style={styles.currentClubLabel}>CURRENT T20 SIDE</Text>
-              <Text style={styles.currentClubName} numberOfLines={1}>
-                {currentClub?.shortName ?? 'Unsigned'}
-              </Text>
-            </View>
+          <View style={styles.header}>
+            <Text style={styles.kicker}>T20 CLUB OFFERS</Text>
+            <Text style={styles.title}>
+              {offers.length === 1
+                ? 'A club has approached you'
+                : `${offers.length} clubs have approached you`}
+            </Text>
+            <Text style={styles.intro}>
+              Compare the terms and choose where {user.name} will play T20 cricket.
+            </Text>
+            <Text style={styles.currentClub}>
+              Current T20 club: {currentClub?.name ?? 'Unsigned'}
+            </Text>
           </View>
 
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={styles.offerList}
             bounces={false}
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.bidHeader}>
-              <Text style={styles.sectionLabel}>BIDDING PADDLES</Text>
-              <Text style={styles.bidCount}>
-                {offers.length} final bid{offers.length === 1 ? '' : 's'}
-              </Text>
-            </View>
-            <View style={styles.paddleList}>
-              {offers.map((offer) => (
-                <TeamPaddle
-                  key={offer.teamId}
-                  team={save.teams[offer.teamId]}
-                  offer={offer}
-                  selected={selectedOffer.teamId === offer.teamId}
-                  onPress={() => setSelectedTeamId(offer.teamId)}
-                />
-              ))}
-            </View>
-
-            <View style={styles.managerNote}>
-              <View
-                style={[
-                  styles.managerTape,
-                  { backgroundColor: selectedClub?.secondaryColor ?? '#D8B45D' },
-                ]}
-              />
-              <Text style={styles.noteKicker}>
-                CRICKET FIT · {selectedClub?.shortName ?? 'CLUB'}
-              </Text>
-              <Text style={styles.noteHeadline}>{fit?.headline ?? 'Squad role under review'}</Text>
-              <Text style={styles.noteDetail}>
-                {fit?.detail ?? 'The club will confirm your role after the auction.'}
-              </Text>
-            </View>
-
-            <View style={styles.contractSheet}>
-              <View style={styles.contractNotchLeft} />
-              <View style={styles.contractNotchRight} />
-              <Text style={styles.contractTitle}>AGENT&apos;S CONTRACT SHEET</Text>
-              <View style={styles.contractRule} />
-              <View style={styles.contractRow}>
-                <View style={styles.contractItem}>
-                  <Text style={styles.contractLabel}>HAMMER BID</Text>
-                  <Text style={styles.contractValue}>{coins(selectedOffer.fee)}</Text>
+            {offers.map((offer) => {
+              const club = save.teams[offer.teamId];
+              const fit = club ? franchiseSquadFit(save, club, user) : null;
+              // An older save may hold raw numbers. Display exactly the rounded
+              // salary and bonus that acceptance will write/pay for this offer.
+              const salary = contractCoinsAtLeast(offer.wagePromise, currentSalary);
+              const signingBonus = roundContractCoins(offer.signingBonus);
+              return (
+                <View key={offer.teamId} style={styles.offerCard}>
+                  <View style={styles.clubRow}>
+                    <View
+                      style={[
+                        styles.clubDisc,
+                        {
+                          backgroundColor: club?.primaryColor ?? '#9B6A2F',
+                          borderColor: club?.secondaryColor ?? '#F4E5BE',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.clubInitials, { color: club?.secondaryColor ?? '#F4E5BE' }]}
+                      >
+                        {club?.shortName ?? 'CLB'}
+                      </Text>
+                    </View>
+                    <Text style={styles.clubName} numberOfLines={2}>
+                      {club?.name ?? 'Interested club'}
+                    </Text>
+                  </View>
+                  <View style={styles.terms}>
+                    <View style={styles.term}>
+                      <Text style={styles.termLabel}>SEASON SALARY</Text>
+                      <Text style={styles.termValue}>{coins(salary)}</Text>
+                    </View>
+                    <View style={styles.term}>
+                      <Text style={styles.termLabel}>SIGNING BONUS</Text>
+                      <Text style={styles.termValue}>{coins(signingBonus)}</Text>
+                    </View>
+                  </View>
+                  {fit ? <Text style={styles.fit}>Squad role: {fit.headline}</Text> : null}
+                  <Button
+                    label={`Sign with ${club?.shortName ?? 'club'}`}
+                    variant="gold"
+                    onPress={() => onAccept(offer.teamId)}
+                  />
                 </View>
-                <View style={styles.contractItem}>
-                  <Text style={styles.contractLabel}>SEASON SALARY</Text>
-                  <Text style={styles.contractValue}>{coins(selectedOffer.wagePromise)}</Text>
-                  {increase !== null ? (
-                    <Text style={styles.raise}>+{increase}% on current terms</Text>
-                  ) : null}
-                </View>
-                <View style={styles.contractItem}>
-                  <Text style={styles.contractLabel}>SIGNING BONUS</Text>
-                  <Text style={styles.contractValue}>{coins(selectedOffer.signingBonus)}</Text>
-                </View>
-              </View>
-              <Text style={styles.contractFootnote}>
-                T20 franchise contract
-              </Text>
-            </View>
+              );
+            })}
+            <Text style={styles.footnote}>Your First-Class and List A club will not change.</Text>
           </ScrollView>
 
-          <View style={styles.actions}>
-            <Button
-              label={`Sign for ${selectedClub?.shortName ?? 'club'}`}
-              variant="gold"
-              onPress={() => onAccept(selectedOffer.teamId)}
-            />
+          <View style={styles.footer}>
             <Pressable accessibilityRole="button" onPress={onStay} style={styles.stayButton}>
               <Text style={styles.stayText}>
-                Pass auction · stay at {currentClub?.shortName ?? 'current club'}
+                Stay with {currentClub?.shortName ?? 'current T20 club'}
               </Text>
             </Pressable>
           </View>
@@ -248,111 +168,43 @@ const makeStyles = (colors: ThemeColors) =>
       backgroundColor: 'rgba(2, 6, 14, 0.92)',
     },
     sheet: {
-      maxHeight: '94%',
+      maxHeight: '90%',
       overflow: 'hidden',
       borderRadius: radius.lg,
       borderWidth: 1,
       borderColor: colors.borderStrong,
       backgroundColor: colors.bg,
     },
-    rostrum: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
+    header: {
       padding: spacing.lg,
-      borderBottomWidth: 3,
+      borderBottomWidth: 2,
       borderBottomColor: colors.accent,
       backgroundColor: colors.surface,
     },
-    gavelMark: {
-      width: 46,
-      height: 46,
-      borderRadius: 23,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 2,
-      borderColor: colors.accent,
-      backgroundColor: colors.surfaceMuted,
-    },
-    gavel: { color: colors.accent, fontSize: 22, fontWeight: fontWeight.black },
-    rostrumCopy: { flex: 1, minWidth: 0 },
     kicker: {
       color: colors.accent,
-      fontSize: 10,
+      fontSize: fontSize.xs,
       fontWeight: fontWeight.black,
-      letterSpacing: 1.1,
+      letterSpacing: 1,
     },
     title: {
-      marginTop: 3,
+      marginTop: spacing.xs,
       color: colors.text,
       fontSize: fontSize.xl,
       fontWeight: fontWeight.black,
     },
-    intro: { marginTop: 4, color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 17 },
-    lotStrip: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    intro: { marginTop: spacing.xs, color: colors.textMuted, fontSize: fontSize.sm },
+    currentClub: { marginTop: spacing.sm, color: colors.textMuted, fontSize: fontSize.xs },
+    offerList: { padding: spacing.md, gap: spacing.md },
+    offerCard: {
       gap: spacing.md,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-      backgroundColor: colors.surfaceMuted,
-    },
-    shirtMark: {
-      width: 54,
-      height: 62,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderTopLeftRadius: 14,
-      borderTopRightRadius: 14,
-      borderBottomLeftRadius: 6,
-      borderBottomRightRadius: 6,
-      borderWidth: 1.5,
-      borderColor: colors.accent,
-      backgroundColor: colors.primaryDark,
-    },
-    shirtNumber: { color: colors.white, fontSize: fontSize.xl, fontWeight: fontWeight.black },
-    shirtLabel: { color: colors.accentLight, fontSize: 9, fontWeight: fontWeight.bold },
-    lotCopy: { flex: 1, minWidth: 0 },
-    lotLabel: {
-      color: colors.textFaint,
-      fontSize: 9,
-      fontWeight: fontWeight.black,
-      letterSpacing: 1,
-    },
-    playerName: { color: colors.text, fontSize: fontSize.lg, fontWeight: fontWeight.black },
-    playerLine: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: 2 },
-    currentClubBlock: { maxWidth: 86, alignItems: 'flex-end' },
-    currentClubLabel: {
-      color: colors.textFaint,
-      fontSize: 8,
-      fontWeight: fontWeight.bold,
-      textAlign: 'right',
-    },
-    currentClubName: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.black },
-    scrollContent: { padding: spacing.lg, gap: spacing.md },
-    bidHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    sectionLabel: {
-      color: colors.textMuted,
-      fontSize: 10,
-      fontWeight: fontWeight.black,
-      letterSpacing: 1,
-    },
-    bidCount: { color: colors.textFaint, fontSize: fontSize.xs },
-    paddleList: { gap: spacing.sm },
-    paddle: {
-      minHeight: 70,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      overflow: 'hidden',
-      paddingRight: spacing.md,
+      padding: spacing.md,
       borderRadius: radius.md,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.borderStrong,
       backgroundColor: colors.surface,
     },
-    paddleSelected: { borderWidth: 2, borderColor: colors.accent },
-    paddleStripe: { alignSelf: 'stretch', width: 7 },
+    clubRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     clubDisc: {
       width: 42,
       height: 42,
@@ -361,99 +213,21 @@ const makeStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
       borderWidth: 2,
     },
-    clubDiscText: { fontSize: 10, fontWeight: fontWeight.black },
-    paddleCopy: { flex: 1, minWidth: 0 },
-    paddleClub: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
-    paddleStatus: {
+    clubInitials: { fontSize: fontSize.xs, fontWeight: fontWeight.black },
+    clubName: { flex: 1, color: colors.text, fontSize: fontSize.lg, fontWeight: fontWeight.heavy },
+    terms: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    term: { flexGrow: 1, minWidth: 116 },
+    termLabel: {
       color: colors.textFaint,
-      fontSize: 8,
-      fontWeight: fontWeight.bold,
-      letterSpacing: 0.6,
-      marginTop: 2,
-    },
-    paddleBid: { color: colors.accent, fontSize: fontSize.xs, fontWeight: fontWeight.black },
-    managerNote: {
-      overflow: 'hidden',
-      padding: spacing.md,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: colors.borderStrong,
-      backgroundColor: colors.surfaceMuted,
-    },
-    managerTape: {
-      position: 'absolute',
-      top: -4,
-      left: '40%',
-      width: 70,
-      height: 13,
-      opacity: 0.72,
-      transform: [{ rotate: '-2deg' }],
-    },
-    noteKicker: {
-      color: colors.primaryLight,
-      fontSize: 9,
-      fontWeight: fontWeight.black,
-      letterSpacing: 0.8,
-    },
-    noteHeadline: {
-      color: colors.text,
-      fontSize: fontSize.md,
-      fontWeight: fontWeight.black,
-      marginTop: 5,
-    },
-    noteDetail: { color: colors.textMuted, fontSize: fontSize.xs, lineHeight: 17, marginTop: 3 },
-    contractSheet: {
-      overflow: 'hidden',
-      padding: spacing.md,
-      borderRadius: radius.sm,
-      backgroundColor: '#F4ECD8',
-    },
-    contractNotchLeft: {
-      position: 'absolute',
-      left: -8,
-      top: '46%',
-      width: 16,
-      height: 16,
-      borderRadius: 8,
-      backgroundColor: colors.bg,
-    },
-    contractNotchRight: {
-      position: 'absolute',
-      right: -8,
-      top: '46%',
-      width: 16,
-      height: 16,
-      borderRadius: 8,
-      backgroundColor: colors.bg,
-    },
-    contractTitle: {
-      color: '#26344A',
       fontSize: 10,
-      fontWeight: fontWeight.black,
-      letterSpacing: 1,
-    },
-    contractRule: { height: 1, backgroundColor: '#B9A77B', marginVertical: spacing.sm },
-    contractRow: { flexDirection: 'row', gap: spacing.sm },
-    contractItem: { flex: 1 },
-    contractLabel: {
-      color: '#746849',
-      fontSize: 8,
       fontWeight: fontWeight.bold,
       letterSpacing: 0.5,
     },
-    contractValue: {
-      color: '#12213A',
-      fontSize: fontSize.xs,
-      fontWeight: fontWeight.black,
-      marginTop: 3,
-    },
-    raise: { color: '#176536', fontSize: 9, fontWeight: fontWeight.bold, marginTop: 2 },
-    contractFootnote: { color: '#746849', fontSize: 9, lineHeight: 13, marginTop: spacing.md },
-    actions: {
-      gap: spacing.sm,
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.lg,
+    termValue: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
+    fit: { color: colors.textMuted, fontSize: fontSize.xs },
+    footnote: { color: colors.textMuted, fontSize: fontSize.xs },
+    footer: {
+      padding: spacing.md,
       borderTopWidth: 1,
       borderTopColor: colors.borderStrong,
       backgroundColor: colors.surface,
@@ -466,5 +240,5 @@ const makeStyles = (colors: ThemeColors) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
-    stayText: { color: colors.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.bold },
+    stayText: { color: colors.textMuted, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
   });

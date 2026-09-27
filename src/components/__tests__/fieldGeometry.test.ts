@@ -78,11 +78,11 @@ describe('live field geometry', () => {
   });
 
   it.each<[FieldLayout, number]>([
-    ['CATCHING', 6],
-    ['ATTACKING', 7],
-    ['BALANCED', 9],
-    ['DEFENSIVE', 9],
-    ['SWEEPER', 9],
+    ['CATCHING', 0],
+    ['ATTACKING', 2],
+    ['BALANCED', 3],
+    ['DEFENSIVE', 5],
+    ['SWEEPER', 5],
   ])('maps the %s plan to %i fielders outside the circle', (layout, expectedOutside) => {
     const field = fieldGeometry(size);
     const outside = fieldingPositions(size, layout).filter(

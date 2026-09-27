@@ -26,7 +26,7 @@ export function franchiseAuctionGate(save: SaveGame): FeatureGate {
   if (save.mode !== 'career' || !player) {
     return {
       unlocked: false,
-      reason: 'Franchise auctions are available in player career mode.',
+      reason: 'T20 club offers are available in player career mode.',
     };
   }
   if (auctionEligible(save, player)) return { unlocked: true };
@@ -35,13 +35,13 @@ export function franchiseAuctionGate(save: SaveGame): FeatureGate {
   if (level === 'SCHOOL' || level === 'U19') {
     return {
       unlocked: false,
-      reason: 'Reach domestic cricket before franchise auctions open.',
+      reason: 'Reach domestic cricket before T20 clubs can approach you.',
     };
   }
   if ((save.careerSeasons ?? 0) < 2) {
     return {
       unlocked: false,
-      reason: 'Complete 2 domestic seasons before auction interest builds.',
+      reason: 'Complete 2 domestic seasons before T20 clubs can approach you.',
     };
   }
   if ((player.careerStats?.matches ?? 0) < 10) {
@@ -52,6 +52,6 @@ export function franchiseAuctionGate(save: SaveGame): FeatureGate {
   }
   return {
     unlocked: false,
-    reason: 'Raise your form, brand, and overall to attract franchise bids.',
+    reason: 'Raise your form, brand, and overall to attract T20 club offers.',
   };
 }

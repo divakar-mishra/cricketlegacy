@@ -751,18 +751,28 @@ export interface ContractOffer {
   signingBonus: number; // paid to the player in coins on signing
 }
 
+/** Contract money is offered in readable 500-coin steps. */
+export function roundContractCoins(amount: number): number {
+  return amount > 0 ? Math.max(500, Math.round(amount / 500) * 500) : 0;
+}
+
+/** Keep an existing legacy salary from dropping while moving to 500-coin steps. */
+export function contractCoinsAtLeast(amount: number, minimum: number): number {
+  return Math.max(roundContractCoins(amount), Math.ceil(Math.max(0, minimum) / 500) * 500);
+}
+
 /** A renewal offer scaled by the player's overall, tier and caps. */
 export function contractOffer(save: SaveGame): ContractOffer {
   const user = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
   if (!user) return { wage: 0, years: 1, signingBonus: 0 };
   const tierMult = save.capped ? 1.6 : user.overall >= 68 ? 1.25 : 1;
   const relationshipMult = relationshipContractMultiplier(save);
-  const wage = Math.round(computeValue(user) * WAGE_RATE * tierMult * relationshipMult);
-  const signingBonus = Math.round(
+  const wage = roundContractCoins(computeValue(user) * WAGE_RATE * tierMult * relationshipMult);
+  const signingBonus = roundContractCoins(
     ((user.overall - 40) * 22 * tierMult + (save.userCaps ?? 0) * 8) * relationshipMult,
   );
   const years = user.overall >= 72 ? 3 : 2;
-  return { wage, years, signingBonus: Math.max(50, signingBonus) };
+  return { wage, years, signingBonus };
 }
 
 /** Accept a renewal: sets the contract and returns the coin signing bonus. */
@@ -770,9 +780,9 @@ export function signUserContract(save: SaveGame, offer: ContractOffer): number {
   if (!save.userPlayerId) return 0;
   const user = save.players[save.userPlayerId];
   if (!user) return 0;
-  const contract: Contract = { wage: offer.wage, yearsLeft: offer.years };
+  const contract: Contract = { wage: roundContractCoins(offer.wage), yearsLeft: offer.years };
   user.contract = contract;
-  return Math.max(0, offer.signingBonus);
+  return roundContractCoins(offer.signingBonus);
 }
 
 /** Tick the user's deal down a year at a season rollover. */
@@ -834,7 +844,7 @@ export function negotiateContract(
   const team = save.teams[save.userTeamId];
   const base = contractOffer(save);
 
-  const demandedWage = Math.round(base.wage * clamp(demand.wageMultiplier, 1, 1.6));
+  const demandedWage = roundContractCoins(base.wage * clamp(demand.wageMultiplier, 1, 1.6));
   const demandedYears = demand.yearsOverride ?? base.years;
   const demandedBonus = base.signingBonus + (demand.extraBonus ?? 0);
 
@@ -854,7 +864,7 @@ export function negotiateContract(
     const finalOffer: ContractOffer = {
       wage: demandedWage,
       years: demandedYears,
-      signingBonus: Math.max(base.signingBonus, demandedBonus),
+      signingBonus: roundContractCoins(Math.max(base.signingBonus, demandedBonus)),
     };
     return {
       clubAccepted: true,
@@ -867,11 +877,11 @@ export function negotiateContract(
   }
 
   // Club sends a counter at roughly halfway between original and demand.
-  const counterWage = Math.round(base.wage + (demandedWage - base.wage) * 0.45);
+  const counterWage = roundContractCoins(base.wage + (demandedWage - base.wage) * 0.45);
   const counter: ContractOffer = {
     wage: counterWage,
     years: demandedYears,
-    signingBonus: Math.round(base.signingBonus * 1.12),
+    signingBonus: roundContractCoins(base.signingBonus * 1.12),
   };
   return {
     clubAccepted: false,
@@ -897,9 +907,9 @@ export function holdOut(save: SaveGame): ContractOffer {
   }
   const base = contractOffer(save);
   return {
-    wage: Math.round(base.wage * 1.1),
+    wage: roundContractCoins(base.wage * 1.1),
     years: base.years,
-    signingBonus: Math.round(base.signingBonus * 1.25),
+    signingBonus: roundContractCoins(base.signingBonus * 1.25),
   };
 }
 

@@ -12,6 +12,7 @@ import { isSeasonPassActive } from '../game/seasonPass';
 import { EXTRA_EVENTS } from './storyEventsExtra';
 import { ARCHETYPE_EVENTS } from './archetypeEvents';
 import { MONTHLY_PASS_PLAYER_EVENTS } from './monthlyPassPlayerStories';
+import { PLAYER_PRESS_SCENARIOS } from './playerPressScenarios';
 
 const CORE_EVENTS: StoryEvent[] = [
   {
@@ -432,6 +433,7 @@ export const STORY_EVENTS: StoryEvent[] = [
   ...CORE_EVENTS,
   ...ARCHETYPE_EVENTS,
   ...EXTRA_EVENTS,
+  ...PLAYER_PRESS_SCENARIOS,
   ...PASS_EVENTS,
   ...MONTHLY_PASS_PLAYER_EVENTS,
 ];

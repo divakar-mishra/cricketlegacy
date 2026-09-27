@@ -33,7 +33,9 @@ export interface NewspaperScorePanel {
 /** Keep the masthead and edition separate without changing persisted story copy. */
 export function newspaperEditionDetail(story: NewspaperStory): string {
   return (
-    story.edition.replace(/^THE CRICKET CHRONICLE\s*\|\s*/i, '').trim() || `SEASON ${story.season}`
+    String(story.edition ?? '')
+      .replace(/^THE CRICKET CHRONICLE\s*\|\s*/i, '')
+      .trim() || `SEASON ${story.season}`
   );
 }
 
@@ -136,10 +138,10 @@ export function newspaperFacts(story: NewspaperStory): NewspaperFact[] {
 export function newspaperFooter(story: NewspaperStory): string {
   if (story.kind === 'TROPHY') return `CHAMPIONS | SEASON ${story.season}`;
   if (story.kind === 'ELIMINATION') {
-    return `${(story.competitionName ?? story.opponentName).toUpperCase()} | SEASON ${story.season}`;
+    return `${String(story.competitionName ?? story.opponentName ?? 'TOURNAMENT').toUpperCase()} | SEASON ${story.season}`;
   }
   if (story.kind === 'PROMOTION') {
-    return `NEW LEVEL | ${story.opponentName.toUpperCase()} | SEASON ${story.season}`;
+    return `NEW LEVEL | ${String(story.opponentName ?? 'CAREER').toUpperCase()} | SEASON ${story.season}`;
   }
   if (story.kind === 'MILESTONE') {
     return `CAREER RECORD | ${story.competitionName?.toUpperCase() ?? story.format} | SEASON ${story.season}`;
@@ -147,5 +149,5 @@ export function newspaperFooter(story: NewspaperStory): string {
   if (story.result === 'NEUTRAL') {
     return `${story.opponentName.toUpperCase()} | SEASON ${story.season}`;
   }
-  return `${story.opponentName.toUpperCase()} | ${story.result} | SEASON ${story.season}`;
+  return `${String(story.opponentName ?? 'OPPOSITION').toUpperCase()} | ${story.result ?? 'RESULT'} | SEASON ${story.season}`;
 }

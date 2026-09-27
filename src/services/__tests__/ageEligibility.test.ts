@@ -12,7 +12,7 @@ describe('approved country/age policy', () => {
   ])('%s %s guardian=%s eligible=%s', (residence, band, guardianPermission, expected) => {
     const declaration = { version: 1, residence, band, guardianPermission } as AgeDeclaration;
     expect(canUseGame(declaration)).toBe(expected);
-    expect(canUseAds(declaration)).toBe(band === 'adult');
+    expect(canUseAds(declaration)).toBe(expected);
   });
   it.each([
     null,

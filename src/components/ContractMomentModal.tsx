@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { AppText as Text } from './AppText';
-import { ContractSheet } from './ContractSheet';
+import { roundContractCoins } from '../game/career';
 import { useCareer } from '../state/careerStore';
 import { useContractPresentation } from '../state/contractPresentationStore';
+import { fontSize, fontWeight, radius, spacing, ThemeColors, useThemedStyles } from '../theme';
 
 export function ContractMomentModal({
   children,
@@ -14,10 +15,11 @@ export function ContractMomentModal({
   onContinue: () => void;
 }) {
   const { height } = useWindowDimensions();
+  const styles = useThemedStyles(makeStyles);
   return (
-    <Modal transparent visible animationType="fade" onRequestClose={onContinue}>
+    <Modal transparent visible animationType="fade" onRequestClose={onContinue} statusBarTranslucent>
       <View style={styles.backdrop}>
-        <View style={[styles.frame, { maxHeight: height * 0.88 }]}>
+        <View style={[styles.frame, { maxHeight: height * 0.82 }]}>
           <ScrollView bounces={false} contentContainerStyle={styles.content}>
             {children}
           </ScrollView>
@@ -31,6 +33,7 @@ export function ContractMomentModal({
 }
 
 export function PlayerContractMoment() {
+  const styles = useThemedStyles(makeStyles);
   const signed = useContractPresentation((s) => s.signed);
   const dismiss = useContractPresentation((s) => s.dismiss);
   const saveId = useCareer((s) => s.save?.id);
@@ -40,28 +43,70 @@ export function PlayerContractMoment() {
   if (!signed || signed.saveId !== saveId) return null;
   return (
     <ContractMomentModal onContinue={dismiss}>
-      <ContractSheet club={signed.club} player={signed.player} offer={signed.offer} signed />
+      <Text style={styles.kicker}>CONTRACT SIGNED</Text>
+      <Text style={styles.title}>{signed.club}</Text>
+      <Text style={styles.player}>New agreement for {signed.player}</Text>
+      <View style={styles.terms}>
+        <View style={styles.term}>
+          <Text style={styles.termLabel}>Season salary</Text>
+          <Text style={styles.termValue}>
+            {roundContractCoins(signed.offer.wage).toLocaleString()} coins
+          </Text>
+        </View>
+        <View style={styles.term}>
+          <Text style={styles.termLabel}>Signing bonus</Text>
+          <Text style={styles.termValue}>
+            {roundContractCoins(signed.offer.signingBonus).toLocaleString()} coins
+          </Text>
+        </View>
+        <Text style={styles.length}>
+          {signed.offer.years} year{signed.offer.years === 1 ? '' : 's'}
+        </Text>
+      </View>
     </ContractMomentModal>
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 12 },
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
   frame: {
     width: '100%',
     maxWidth: 560,
     alignSelf: 'center',
-    backgroundColor: '#24211c',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderColor: colors.accent,
+    borderWidth: 1,
+    borderRadius: radius.lg,
     overflow: 'hidden',
   },
-  content: { paddingBottom: 12 },
-  button: {
-    backgroundColor: '#d8ae46',
-    padding: 16,
-    alignItems: 'center',
-    margin: 12,
-    borderRadius: 8,
+  content: { padding: spacing.lg, gap: spacing.sm },
+  kicker: { color: colors.accent, fontSize: fontSize.xs, fontWeight: fontWeight.black },
+  title: { color: colors.text, fontSize: fontSize.xl, fontWeight: fontWeight.black },
+  player: { color: colors.textMuted, fontSize: fontSize.sm },
+  terms: { marginTop: spacing.sm, gap: spacing.md },
+  term: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
   },
-  buttonText: { color: '#201b13', fontSize: 17, fontWeight: '800' },
+  termLabel: { color: colors.textMuted, fontSize: fontSize.sm },
+  termValue: { color: colors.text, fontSize: fontSize.sm, fontWeight: fontWeight.heavy },
+  length: { color: colors.textMuted, fontSize: fontSize.xs },
+  button: {
+    backgroundColor: colors.accent,
+    padding: spacing.md,
+    alignItems: 'center',
+    margin: spacing.md,
+    borderRadius: radius.md,
+  },
+  buttonText: { color: colors.bg, fontSize: fontSize.md, fontWeight: fontWeight.black },
 });

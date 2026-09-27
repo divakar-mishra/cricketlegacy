@@ -17,6 +17,8 @@ type Props = {
   footer?: React.ReactNode;
   /** Scrolls a scrolling screen back to its top whenever this value changes. */
   scrollResetKey?: string | number;
+  /** Optional handle for scrolling directly to a section reached from a deep link. */
+  scrollRef?: React.RefObject<ScrollView | null>;
 };
 
 /**
@@ -33,17 +35,19 @@ export function Screen({
   contentStyle,
   footer,
   scrollResetKey,
+  scrollRef,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { gradients, colors } = useTheme();
   const { width } = useWindowDimensions();
   const bg = gradient ?? gradients.night;
-  const scrollRef = useRef<ScrollView>(null);
+  const internalScrollRef = useRef<ScrollView>(null);
+  const activeScrollRef = scrollRef ?? internalScrollRef;
 
   useEffect(() => {
     if (!scroll || scrollResetKey == null) return;
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [scroll, scrollResetKey]);
+    activeScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [activeScrollRef, scroll, scrollResetKey]);
 
   // Responsive horizontal padding: ~4% of width, bounded between md and xl.
   const hPad = padded ? Math.max(spacing.md, Math.min(spacing.xl, Math.round(width * 0.045))) : 0;
@@ -84,7 +88,7 @@ export function Screen({
 
   const inner = scroll ? (
     <ScrollView
-      ref={scrollRef}
+      ref={activeScrollRef}
       style={styles.fill}
       contentContainerStyle={[paddingStyle, { flexGrow: 1 }, contentWidthStyle, contentStyle]}
       keyboardShouldPersistTaps="handled"

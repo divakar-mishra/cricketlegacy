@@ -1,9 +1,10 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
-import { ImageBackground, StyleSheet, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ImageBackground, ScrollView, StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import {
   AppText as Text,
+  BannerAdSlot,
   Button,
   Card,
   Icon,
@@ -79,7 +80,8 @@ function currentFacilityEffect(kind: keyof Facilities): string {
   return 'Youth intake quality';
 }
 
-export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
+export function ClubOfficeScreen({ navigation, route }: ScreenProps<'ClubOffice'>) {
+  const sponsorScrollRef = useRef<ScrollView>(null);
   const save = useCareer((s) => s.save);
   const investStaff = useCareer((s) => s.investStaff);
   const upgradeFacilityLevel = useCareer((s) => s.upgradeFacilityLevel);
@@ -237,7 +239,7 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
   };
 
   return (
-    <Screen scroll gradient={gradients.pitch}>
+    <Screen scroll scrollRef={sponsorScrollRef} gradient={gradients.pitch}>
       <ScreenHeader title="Club Office" subtitle={team.name} onBack={() => navigation.goBack()} />
 
       {stadiumClub && groundSummary ? (
@@ -359,7 +361,13 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
         </ImageBackground>
       )}
 
-      <Text style={styles.section}>Kit Partnership</Text>
+      <View onLayout={(event) => {
+        if (route.params?.focusSponsor) {
+          sponsorScrollRef.current?.scrollTo({ y: event.nativeEvent.layout.y, animated: false });
+        }
+      }}>
+        <Text style={styles.section}>Kit Partnership</Text>
+      </View>
       <Card style={styles.sponsorCard}>
         {activeEarnedSponsor ? (
           <View style={styles.sponsorActive}>
@@ -659,6 +667,7 @@ export function ClubOfficeScreen({ navigation }: ScreenProps<'ClubOffice'>) {
           </Card>
         </>
       ) : null}
+      <BannerAdSlot entitlements={save.entitlements} />
     </Screen>
   );
 }

@@ -1,5 +1,6 @@
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { AuctionOffer, SaveGame } from '../domain/types';
+import { contractCoinsAtLeast, roundContractCoins } from '../game/career';
 import {
   fontSize,
   fontWeight,
@@ -18,7 +19,7 @@ interface Props {
   onStay: () => void;
 }
 
-const coins = (value: number): string => `${Math.round(value).toLocaleString()} coins`;
+const coins = (value: number): string => `${roundContractCoins(value).toLocaleString()} coins`;
 
 export function DomesticClubOfferModal({ save, offers, onAccept, onStay }: Props) {
   const styles = useThemedStyles(makeStyles);
@@ -40,9 +41,10 @@ export function DomesticClubOfferModal({ save, offers, onAccept, onStay }: Props
           <ScrollView contentContainerStyle={styles.list} bounces={false}>
             {offers.map((offer) => {
               const club = save.teams[offer.teamId];
+              const salary = contractCoinsAtLeast(offer.wagePromise, currentSalary);
               const increase =
                 currentSalary > 0
-                  ? Math.max(0, Math.round((offer.wagePromise / currentSalary - 1) * 100))
+                  ? Math.max(0, Math.round((salary / currentSalary - 1) * 100))
                   : null;
               return (
                 <View key={offer.teamId} style={styles.card}>
@@ -50,7 +52,7 @@ export function DomesticClubOfferModal({ save, offers, onAccept, onStay }: Props
                   <View style={styles.terms}>
                     <View style={styles.term}>
                       <Text style={styles.label}>SEASON SALARY</Text>
-                      <Text style={styles.value}>{coins(offer.wagePromise)}</Text>
+                      <Text style={styles.value}>{coins(salary)}</Text>
                       {increase !== null ? <Text style={styles.raise}>+{increase}%</Text> : null}
                     </View>
                     <View style={styles.term}>

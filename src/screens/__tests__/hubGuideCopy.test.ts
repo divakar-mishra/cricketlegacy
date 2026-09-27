@@ -20,10 +20,11 @@ describe('mode hub guides', () => {
   it('shows a dismissible player career guide in the career hub', () => {
     expect(guideModal).toContain('{modeLabel.toUpperCase()} GUIDE');
     expect(careerHubScreen).toContain('career_hub_guide');
-    expect(careerHubScreen).toContain('Train with a purpose');
+    expect(careerHubScreen).toContain('Find your support team');
+    expect(careerHubScreen).toContain('Your free career adviser');
     expect(careerHubScreen).toContain('Earn selection and progress');
     expect(careerHubScreen).toContain("body: 'Your next step.'");
-    expect(careerHubScreen).toContain("body: 'Develop your role.'");
+    expect(careerHubScreen).toContain('Open Training, then Development Centre.');
     expect(careerHubScreen).toContain('modeLabel="Player Career"');
     expect(guideModal).not.toContain('YOUR NEXT ACTION');
   });

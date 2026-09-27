@@ -11,7 +11,9 @@ import {
   ScreenHeader,
 } from '../components';
 import { nextPendingEvent } from '../game/careerEvents';
+import { advisorVisitKey, nextPlayerAdvice } from '../game/playerAdvisor';
 import { AppliedEffect } from '../game/narrative';
+import { nextUserFixtureId } from '../game/season';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
 import {
@@ -29,14 +31,45 @@ interface ResultView {
   applied: AppliedEffect[];
 }
 
-export function NarrativeScreen({ navigation }: ScreenProps<'Narrative'>) {
+export function NarrativeScreen({ navigation, route }: ScreenProps<'Narrative'>) {
   const save = useCareer((s) => s.save);
   const resolveStory = useCareer((s) => s.resolveStory);
+  const markFlagSeen = useCareer((s) => s.markFlagSeen);
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [result, setResult] = React.useState<ResultView | null>(null);
 
   const rendered = save ? nextPendingEvent(save) : null;
+  const adviserAdvice = save && route.params?.adviser
+    ? nextPlayerAdvice(save, nextUserFixtureId(save))
+    : undefined;
+
+  const onAdviserChoice = (action: 'decline' | 'accept' | 'recovery') => {
+    if (!save || !adviserAdvice) return;
+    markFlagSeen(adviserAdvice.key);
+    markFlagSeen(advisorVisitKey(save));
+    if (action === 'decline') {
+      navigation.goBack();
+      return;
+    }
+    if (action === 'recovery' || adviserAdvice.kind === 'INJURY' && adviserAdvice.action === 'View recovery') {
+      const player = save.userPlayerId ? save.players[save.userPlayerId] : undefined;
+      if (!player?.injury) return navigation.goBack();
+      navigation.replace('InjuryReport', {
+        playerId: player.id,
+        playerName: player.name,
+        weeksOut: player.injury.matchesOut,
+        matchesMissed: player.injury.matchesOut,
+      });
+    } else if (adviserAdvice.kind === 'INVEST') {
+      markFlagSeen('playerHomePortfolioVisited');
+      navigation.replace('InvestmentScreen');
+    } else if (adviserAdvice.kind === 'VENTURE') {
+      navigation.replace('PlayerLife', { initialTab: 'finance' });
+    } else {
+      navigation.replace('Training', { initialDevelopment: true });
+    }
+  };
 
   const onChoose = (choiceId: string) => {
     if (!rendered) return;
@@ -51,6 +84,43 @@ export function NarrativeScreen({ navigation }: ScreenProps<'Narrative'>) {
       <Screen gradient={gradients.pitch}>
         <ScreenHeader title="Career" onBack={() => navigation.goBack()} />
         <Text style={styles.empty}>No active career.</Text>
+      </Screen>
+    );
+  }
+
+  if (adviserAdvice) {
+    return (
+      <Screen scroll gradient={gradients.pitch}>
+        <ScreenHeader title="Your Story" onBack={() => navigation.goBack()} />
+        <Text style={styles.speaker}>Your free career adviser</Text>
+        <Text style={styles.title}>{adviserAdvice.title}</Text>
+        <GlassSurface style={styles.bodyCard} intensity={0.95} blur={false}>
+          <Text style={styles.body}>{adviserAdvice.message}</Text>
+        </GlassSurface>
+        <Text style={styles.prompt}>What do you do?</Text>
+        <FluidChoice
+          label={adviserAdvice.action}
+          desc="Open the relevant screen; no purchase is made"
+          index={0}
+          style={styles.choice}
+          onPress={() => onAdviserChoice('accept')}
+        />
+        {adviserAdvice.kind === 'INJURY' && adviserAdvice.action === 'View physio' ? (
+          <FluidChoice
+            label="Review recovery options"
+            desc="Rest for free or see the optional gem fast-track"
+            index={1}
+            style={styles.choice}
+            onPress={() => onAdviserChoice('recovery')}
+          />
+        ) : null}
+        <FluidChoice
+          label="Carry on for now"
+          desc="Decline the advice and return to your career"
+          index={2}
+          style={styles.choice}
+          onPress={() => onAdviserChoice('decline')}
+        />
       </Screen>
     );
   }

@@ -82,6 +82,10 @@ describe('shared match presentation', () => {
     expect(source).toContain('topBatters(inn)');
     expect(source).toContain('topBowlers(inn)');
     expect(source).toContain('manhattanData(match.innings[0])');
+    expect(source).not.toContain('style={styles.matchupBand}');
+    expect(source).toContain('style={styles.liveFloatingNotice}');
+    expect(source).toContain('visible={awaitingReview && !showDRSResult}');
+    expect(source.indexOf('<FieldView')).toBeLessThan(source.indexOf('accessibilityLabel="Recent commentary"'));
   });
 
   it('offers complete batting and bowling scorecards for every innings', () => {
@@ -176,7 +180,9 @@ describe('shared match presentation', () => {
 
   it('requires manager preparation with concise analysis copy before play modes unlock', () => {
     expect(source).toContain('const [managerPreparationConfirmed, setManagerPreparationConfirmed]');
-    expect(source).toContain("mode !== 'manager' || managerPreparationConfirmed");
+    expect(source).toContain("mode === 'manager' && !managerPreparationConfirmed");
+    expect(source).toContain('label="Watch ball-by-ball"');
+    expect(source).toContain('label="Instant sim" size="sm" variant="ghost"');
     expect(source).not.toContain('Ratings /100 · green manageable · amber strong · red elite');
     expect(source).toContain('<PreparationRating label="Batting"');
     expect(source).toContain(

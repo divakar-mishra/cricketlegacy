@@ -27,8 +27,8 @@ import { BattingStyle, BowlingStyle, CareerArchetype, Difficulty, Role } from '.
 import { buildUserPlayer, createCareerSave } from '../game/createGame';
 import { playerDomesticBlueprints } from '../game/domesticBranding';
 import {
-  allocatedCreationPoints,
-  creationAttributeDelta,
+  activeCreationAttributeDelta,
+  allocatedActiveCreationPoints,
   CreationAttrs,
 } from '../game/creationAllocation';
 import { ScreenProps } from '../navigation';
@@ -133,7 +133,9 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
 
   const roleBowls = role === 'BOWLER' || role === 'ALLROUNDER';
   const bowlingStyle = roleBowls ? resolveBowlingStyle(bowlingHand, bowlingDiscipline) : undefined;
-  const creationBudget = role === 'BATTER' || role === 'BOWLER' ? 150 : 230;
+  const careerStartOpt =
+    CAREER_START_OPTIONS.find((o) => o.value === careerStart) ?? CAREER_START_OPTIONS[0];
+  const creationBudget = Math.round((role === 'BATTER' || role === 'BOWLER' ? 150 : 230) * careerStartOpt.attrScale);
 
   /**
    * Show only the attribute groups that are relevant to the chosen role.
@@ -192,12 +194,9 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
   };
 
   const allocated = useMemo(() => {
-    return allocatedCreationPoints(attrs);
-  }, [attrs]);
+    return allocatedActiveCreationPoints(attrs, careerStartOpt.attrScale);
+  }, [attrs, careerStartOpt.attrScale]);
   const remaining = creationBudget - allocated;
-
-  const careerStartOpt =
-    CAREER_START_OPTIONS.find((o) => o.value === careerStart) ?? CAREER_START_OPTIONS[0];
 
   const preview = useMemo(
     () =>
@@ -227,8 +226,8 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
   const bump = (group: keyof AllAttrs, key: string, delta: number) => {
     setAttrs((prev) => {
       const current = (prev[group] as Record<string, number>)[key];
-      const prevRemaining = creationBudget - allocatedCreationPoints(prev);
-      const change = creationAttributeDelta(current, delta, prevRemaining);
+      const prevRemaining = creationBudget - allocatedActiveCreationPoints(prev, careerStartOpt.attrScale);
+      const change = activeCreationAttributeDelta(current, delta, prevRemaining, careerStartOpt.attrScale);
       if (change === 0) return prev;
       return { ...prev, [group]: { ...prev[group], [key]: current + change } };
     });
@@ -523,6 +522,9 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
               ))}
             </View>
           </Card>
+          <Text style={styles.roleHint}>
+            Each tap changes the displayed Grade A rating by up to 3 and uses the same number of points.
+          </Text>
 
           {attrSections.map((section) => (
             <View key={section.id} style={{ marginTop: spacing.lg }}>
@@ -537,7 +539,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
                     value={value}
                     displayValue={activeValue}
                     progressValue={activeValue}
-                    max={CREATION.maxPerAttr}
+                    max={Math.round(CREATION.maxPerAttr * careerStartOpt.attrScale)}
                     canDec={value > CREATION.base}
                     canInc={remaining > 0 && value < CREATION.maxPerAttr}
                     onDec={() => bump(group, key, -1)}

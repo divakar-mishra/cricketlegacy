@@ -155,6 +155,14 @@ export const PLAYER_EQUIPMENT: readonly PlayerEquipment[] = [
   },
 ] as const;
 
+export function equipmentFitsPlayerRole(equipment: PlayerEquipment, role: Player['role']): boolean {
+  if (role === 'BOWLER') return equipment.boosts.every((boost) => boost.group !== 'batting');
+  if (role === 'BATTER' || role === 'WK_BATTER') {
+    return equipment.boosts.every((boost) => boost.group !== 'bowling');
+  }
+  return true;
+}
+
 const PHYSIO_COST = 9_000;
 const ANALYST_COST = 12_000;
 const MAX_PHYSIO_VISITS = 3;
@@ -304,6 +312,9 @@ export function buyPlayerEquipment(save: SaveGame, equipmentId: string): PlayerL
   const equipment = PLAYER_EQUIPMENT.find((item) => item.id === equipmentId);
   const player = userPlayer(save);
   if (!equipment || !player) return { ok: false, reason: 'That equipment is not available.' };
+  if (!equipmentFitsPlayerRole(equipment, player.role)) {
+    return { ok: false, reason: 'This equipment does not support your playing role.' };
+  }
   if (life.equipmentIds.includes(equipment.id)) {
     return { ok: false, reason: 'This equipment is already owned and applied.' };
   }

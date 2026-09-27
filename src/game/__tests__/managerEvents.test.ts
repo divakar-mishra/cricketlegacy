@@ -15,6 +15,7 @@ describe('manager press-conferences', () => {
     expect(queueManagerEvent(save, 'PRE_SEASON', () => 0.1)).toBe(true);
     const ev = nextManagerEvent(save);
     expect(ev).not.toBeNull();
+    expect(save.managerStory?.flags.matchesSincePress).toBe(0);
     const res = resolveManagerChoice(save, ev!.id, ev!.choices[0].id);
     expect(res.ok).toBe(true);
     expect(managerEventCount(save)).toBe(0);

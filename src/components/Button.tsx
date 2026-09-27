@@ -17,6 +17,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { moment } from '../audio';
 import { fonts, fontSize, fontWeight, radius, shadow, spacing, useTheme } from '../theme';
+import { buttonForeground } from './buttonPalette';
 
 export type ButtonVariant = 'primary' | 'gold' | 'secondary' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -45,7 +46,7 @@ export const Button = React.memo(function Button({
   fullWidth = true,
   style,
 }: Props) {
-  const { colors, gradients } = useTheme();
+  const { colors, gradients, isDark } = useTheme();
   const reducedMotion = useReducedMotion();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
@@ -89,18 +90,18 @@ export const Button = React.memo(function Button({
   const gradient = gradientVariants[variant];
   const isSolid = variant === 'secondary';
   const isGhost = variant === 'ghost';
-  const textColor = variant === 'gold' ? colors.bg : colors.white;
+  const textColor = buttonForeground(variant, colors, isDark);
 
   const inner = (
     <>
       {loading ? (
-        <ActivityIndicator color={isGhost ? colors.primaryLight : textColor} />
+        <ActivityIndicator color={textColor} />
       ) : (
         <View style={styles.labelWrap}>
           <Text
             style={[
               styles.label,
-              { color: isGhost ? colors.primaryLight : textColor },
+              { color: textColor },
               size === 'sm' && { fontSize: fontSize.sm },
               size === 'lg' && { fontSize: fontSize.lg },
             ]}
@@ -112,7 +113,7 @@ export const Button = React.memo(function Button({
           </Text>
           {subtitle ? (
             <Text
-              style={[styles.subtitle, { color: isGhost ? colors.textMuted : textColor }]}
+              style={[styles.subtitle, { color: isGhost || isSolid ? colors.textMuted : textColor }]}
               numberOfLines={1}
             >
               {subtitle}

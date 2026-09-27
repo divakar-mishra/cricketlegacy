@@ -1,5 +1,5 @@
 /**
- * Rewarded/interstitial boundary with a lazily loaded AdMob native module.
+ * Rewarded/interstitial/banner boundary with a lazily loaded AdMob native module.
  *
  * ---------------------------------------------------------------------------
  * The live provider is implemented below and kept behind this interface.
@@ -35,10 +35,22 @@ export const MOCK_MODE = typeof __DEV__ !== 'undefined' && __DEV__ && ALLOW_LOCA
 type AdMobModule = any; // no static types — the dep may be absent
 let _admob: AdMobModule | null | undefined;
 let _adsConfigured = false;
-let _adultEligible = false;
+export type AdAudience = 'none' | 'teen' | 'adult';
+let _audience: AdAudience = 'none';
 let _configuration: Promise<void> | undefined;
 let _privacyBusy = false;
-let _unitIds: { rewarded?: string; interstitial?: string } = {};
+let _unitIds: { rewarded?: string; interstitial?: string; banner?: string } = {};
+const _adsStateListeners = new Set<() => void>();
+
+function notifyAdsStateChanged(): void {
+  _adsStateListeners.forEach((listener) => listener());
+}
+
+/** Subscribe to initialization/consent changes (used by inline banner slots). */
+export function subscribeAdsState(listener: () => void): () => void {
+  _adsStateListeners.add(listener);
+  return () => _adsStateListeners.delete(listener);
+}
 
 function loadAdMob(): AdMobModule | null {
   if (_admob !== undefined) return _admob;
@@ -57,12 +69,13 @@ function loadAdMob(): AdMobModule | null {
  * test IDs if omitted so nothing is left un-fillable during bring-up).
  */
 export async function configureAds(
-  unitIds: { rewarded?: string; interstitial?: string } = {},
-  adultEligible = false,
+  unitIds: { rewarded?: string; interstitial?: string; banner?: string } = {},
+  audience: AdAudience = 'none',
 ): Promise<void> {
-  _adultEligible = adultEligible;
-  if (!adultEligible) {
+  _audience = audience;
+  if (audience === 'none') {
     _adsConfigured = false;
+    notifyAdsStateChanged();
     return;
   }
   if (MOCK_MODE || _adsConfigured) return;
@@ -72,15 +85,27 @@ export async function configureAds(
   _unitIds = unitIds;
   _configuration = (async () => {
     try {
-      // Fail closed if UMP is absent, errors or does not allow ad requests.
-      const consent = await M.AdsConsent?.gatherConsent({ tagForUnderAgeOfConsent: false });
-      if (!_adultEligible || consent?.canRequestAds !== true) return;
+      // Configure treatment before consent or initialization. For eligible
+      // teens use the most restrictive flags available in GMA 24.x.
       const init = (M.default ?? M.mobileAds)?.();
-      if (!init?.initialize) return;
+      if (!init?.setRequestConfiguration || !init?.initialize) return;
+      await init.setRequestConfiguration({
+        tagForChildDirectedTreatment: audience === 'teen',
+        tagForUnderAgeOfConsent: audience === 'teen',
+        ...(audience === 'teen' ? { maxAdContentRating: M.MaxAdContentRating?.G ?? 'G' } : {}),
+      });
+      // Fail closed if UMP is absent, errors or does not allow ad requests.
+      const consent = await M.AdsConsent?.gatherConsent({ tagForUnderAgeOfConsent: audience === 'teen' });
+      if (_audience !== audience || consent?.canRequestAds !== true) {
+        notifyAdsStateChanged();
+        return;
+      }
       await init.initialize();
-      _adsConfigured = _adultEligible;
+      _adsConfigured = _audience === audience;
+      notifyAdsStateChanged();
     } catch {
       _adsConfigured = false;
+      notifyAdsStateChanged();
     }
   })();
   try {
@@ -91,7 +116,8 @@ export async function configureAds(
 }
 
 export async function showAdPrivacyChoices(): Promise<'shown' | 'not_required' | 'unavailable'> {
-  if (!_adultEligible || _privacyBusy) return 'unavailable';
+  if (_audience === 'none' || _privacyBusy) return 'unavailable';
+  const audience = _audience;
   const M = loadAdMob();
   if (!M?.AdsConsent) return 'unavailable';
   _privacyBusy = true;
@@ -99,27 +125,31 @@ export async function showAdPrivacyChoices(): Promise<'shown' | 'not_required' |
   try {
     if (_configuration) await _configuration;
     _adsConfigured = false;
-    const info = await M.AdsConsent.requestInfoUpdate({ tagForUnderAgeOfConsent: false });
+    notifyAdsStateChanged();
+    const info = await M.AdsConsent.requestInfoUpdate({ tagForUnderAgeOfConsent: audience === 'teen' });
     const required = info?.privacyOptionsRequirementStatus === 'REQUIRED';
     const result = required ? await M.AdsConsent.showPrivacyOptionsForm() : info;
-    if (result?.canRequestAds === true && _adultEligible) {
+    if (result?.canRequestAds === true && _audience === audience) {
       const init = (M.default ?? M.mobileAds)?.();
       if (init?.initialize) {
         await init.initialize();
-        _adsConfigured = _adultEligible;
+        _adsConfigured = _audience === audience;
       }
     }
+    notifyAdsStateChanged();
     return required ? 'shown' : 'not_required';
   } catch {
     _adsConfigured = false;
+    notifyAdsStateChanged();
     return 'unavailable';
   } finally {
     _privacyBusy = false;
+    notifyAdsStateChanged();
   }
 }
 
 async function mayRequestAds(): Promise<boolean> {
-  if (!_adultEligible || !_adsConfigured || _privacyBusy) return false;
+  if (_audience === 'none' || !_adsConfigured || _privacyBusy) return false;
   try {
     return (await loadAdMob()?.AdsConsent?.getConsentInfo())?.canRequestAds === true;
   } catch {
@@ -129,7 +159,14 @@ async function mayRequestAds(): Promise<boolean> {
 
 /** Whether a live ad backend is ready (SDK loaded + initialised). */
 export function isAdsReady(): boolean {
-  return _adultEligible && !_privacyBusy && _adsConfigured && loadAdMob() != null;
+  return _audience !== 'none' && !_privacyBusy && _adsConfigured && loadAdMob() != null;
+}
+
+/** Return a configured production banner unit, or Google's test unit in dev. */
+export function getBannerAdUnitId(): string | undefined {
+  if (!isAdsReady()) return undefined;
+  const M = loadAdMob();
+  return _unitIds.banner ?? (__DEV__ ? M?.TestIds?.BANNER : undefined);
 }
 
 /** Real rewarded ad — resolves completed=true only on EARNED_REWARD. */
@@ -138,8 +175,10 @@ function showRealRewarded(unitId: string, M: AdMobModule): Promise<{ completed: 
   return new Promise((resolve) => {
     let earned = false;
     let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     const subs: (() => void)[] = [];
-    const cleanup = () =>
+    const cleanup = () => {
+      if (timeout) clearTimeout(timeout);
       subs.forEach((u) => {
         try {
           u();
@@ -147,6 +186,7 @@ function showRealRewarded(unitId: string, M: AdMobModule): Promise<{ completed: 
           /* noop */
         }
       });
+    };
     const finish = () => {
       if (settled) return;
       settled = true;
@@ -172,7 +212,8 @@ function showRealRewarded(unitId: string, M: AdMobModule): Promise<{ completed: 
       subs.push(ad.addAdEventListener(AdEventType.CLOSED, finish));
       subs.push(ad.addAdEventListener(AdEventType.ERROR, finish));
       ad.load();
-      setTimeout(finish, 30_000); // safety: never hang the caller
+      // Loading plus an optional 60-second rewarded creative may exceed 30s.
+      timeout = setTimeout(finish, 180_000); // safety: never hang the caller
     } catch {
       finish();
     }

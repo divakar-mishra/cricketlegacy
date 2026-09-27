@@ -22,6 +22,6 @@ describe('shared screen footer layout', () => {
 
   it('supports explicit scroll restoration for multi-step screens', () => {
     expect(screen).toContain('scrollResetKey?: string | number');
-    expect(screen).toContain('scrollRef.current?.scrollTo({ y: 0, animated: false })');
+    expect(screen).toContain('activeScrollRef.current?.scrollTo({ y: 0, animated: false })');
   });
 });

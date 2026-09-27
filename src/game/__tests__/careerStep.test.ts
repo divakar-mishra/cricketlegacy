@@ -2,6 +2,7 @@ import { checkPathPromotion } from '../career';
 import fs from 'node:fs';
 import path from 'node:path';
 import { CareerStepType, resolveNextCareerStep } from '../careerStep';
+import { advisorVisitKey, nextPlayerAdvice } from '../playerAdvisor';
 import { synchronizeCareerPromotion } from '../careerTransition';
 import { buildPlayerSeasonCalendar } from '../playerCalendar';
 import { generateYouthFixtures, YOUTH_COMP_U19 } from '../youthFixtures';
@@ -36,6 +37,7 @@ describe('career next-step resolver', () => {
   test('never makes paid training a progression gate between fixtures', () => {
     const save = makeCareerSave();
     save.careerPathLevel = 'DOMESTIC';
+    save.wallet.coins = 0;
     if (save.story) save.story.pendingEventIds = [];
     const calendar = buildPlayerSeasonCalendar(save)!;
     for (const event of calendar.events) event.completed = true;
@@ -53,6 +55,21 @@ describe('career next-step resolver', () => {
       title: 'Continue season',
       detail: 'Training is optional.',
     });
+  });
+
+  test('offers a contextual adviser decision that can be declined before the next action', () => {
+    const save = makeCareerSave();
+    save.careerPathLevel = 'DOMESTIC';
+    save.wallet.coins = 20_000;
+    if (save.story) save.story.pendingEventIds = [];
+    const advice = nextPlayerAdvice(save);
+    expect(advice).toBeDefined();
+    expect(resolveNextCareerStep(save)).toMatchObject({
+      type: CareerStepType.ADVISER_MOMENT,
+      action: 'OPEN_ADVISER',
+    });
+    save.flags = { ...(save.flags ?? {}), [advice!.key]: true, [advisorVisitKey(save)]: true };
+    expect(resolveNextCareerStep(save).type).not.toBe(CareerStepType.ADVISER_MOMENT);
   });
 
   test.each([

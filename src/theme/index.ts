@@ -80,11 +80,11 @@ export const darkColors: ThemeColors = {
 
 /** Light palette — same keys, tuned for legibility on light surfaces. */
 export const lightColors: ThemeColors = {
-  bg: '#F3F7F4',
+  bg: '#F1F5EF',
   bgElevated: '#FFFFFF',
   surface: '#FFFFFF',
-  surfaceAlt: '#E7F0EA',
-  surfaceMuted: '#EDF3EF',
+  surfaceAlt: '#E3ECE3',
+  surfaceMuted: '#EDF3EB',
 
   primary: '#009B5E',
   primaryDark: '#007547',
@@ -96,7 +96,7 @@ export const lightColors: ThemeColors = {
 
   text: '#0E1B13',
   textMuted: '#4C5F54',
-  textFaint: '#7C8B82',
+  textFaint: '#5D7164',
 
   danger: '#C4362B',
   dangerDark: '#9E2A22',
@@ -136,11 +136,11 @@ export const gradientsDark: ThemeGradients = {
 };
 
 export const gradientsLight: ThemeGradients = {
-  night: ['#EEF4F0', '#F3F7F4'],
-  pitch: ['#E7F1EA', '#F3F7F4'],
-  brand: ['#2FA55B', '#1F8A46'],
+  night: ['#E9F1E9', '#F1F5EF'],
+  pitch: ['#E4EEE5', '#F1F5EF'],
+  brand: ['#137A3F', '#0B6835'],
   gold: ['#D69A28', '#B67B0B'],
-  danger: ['#E5646A', '#C4362B'],
+  danger: ['#B92C3A', '#952434'],
   surface: ['#FFFFFF', '#EDF3EF'],
 };
 

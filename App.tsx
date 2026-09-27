@@ -9,8 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { syncMusicWithSettings } from './src/audio';
 import { ErrorBoundary, GlassAlertHost, GlassBlurProvider, Onboarding } from './src/components';
 import { AppIntegrityGate } from './src/components/AppIntegrityGate';
-import { AGE_DECLARATION_KEY, canUseAds, isAgeDeclaration } from './src/services/ageEligibility';
-import { getJSON } from './src/storage/storage';
+import { AdAgePrompt } from './src/components/AdAgePrompt';
 import { MONETIZATION } from './src/config/monetization';
 import { ModalQueueProvider } from './src/context/ModalQueueContext';
 import { RootStackParamList } from './src/navigation';
@@ -64,7 +63,7 @@ import { MilestoneCinematicScreen } from './src/screens/MilestoneCinematicScreen
 import { PlayerCosmeticsScreen } from './src/screens/PlayerCosmeticsScreen';
 import { TransferDeadlineDayScreen } from './src/screens/TransferDeadlineDayScreen';
 import { YouthGraduateCeremonyScreen } from './src/screens/YouthGraduateCeremonyScreen';
-import { ads, analytics, auth, crash, notifications, purchases } from './src/services';
+import { analytics, auth, crash, notifications, purchases } from './src/services';
 import { startTelemetry } from './src/services/telemetry';
 import { useCareer } from './src/state/careerStore';
 import { useAppFonts, useTheme } from './src/theme';
@@ -111,11 +110,6 @@ export default function App() {
       .catch(() => undefined);
     // Local sign-in hydration must not wait for the store's network handshake.
     void auth.rehydrateAuth().catch(() => undefined);
-    // No startup age questionnaire. Preserve prior ad eligibility without
-    // inventing an adult declaration for new installs; UMP remains mandatory.
-    void getJSON<unknown>(AGE_DECLARATION_KEY)
-      .then((stored) => ads.configureAds(MONETIZATION.admob, isAgeDeclaration(stored) && canUseAds(stored)))
-      .catch(() => undefined);
     return stopTelemetry;
   }, []);
 
@@ -324,6 +318,7 @@ export default function App() {
                   </NavigationContainer>
                 </AppIntegrityGate>
               <Onboarding />
+              <AdAgePrompt />
               <GlassAlertHost />
               <PlayerContractMoment />
             </GlassBlurProvider>

@@ -1,5 +1,5 @@
 import { CREATION } from '../../data/attributes';
-import { allocatedCreationPoints, creationAttributeDelta, CreationAttrs } from '../creationAllocation';
+import { activeCreationAttributeDelta, allocatedActiveCreationPoints, allocatedCreationPoints, creationAttributeDelta, CreationAttrs } from '../creationAllocation';
 
 function attrs(value = CREATION.base): CreationAttrs {
   return {
@@ -29,5 +29,19 @@ describe('creation attribute allocation', () => {
     current.fielding.keeping += 3;
 
     expect(allocatedCreationPoints(current)).toBe(8);
+  });
+
+  it('charges the displayed Grade A gain, including partial final steps', () => {
+    const scale = 0.52;
+    const current = attrs();
+    const first = activeCreationAttributeDelta(current.batting.technique, 1, 78, scale);
+    current.batting.technique += first;
+    expect(Math.round(current.batting.technique * scale) - Math.round(CREATION.base * scale)).toBe(3);
+    expect(allocatedActiveCreationPoints(current, scale)).toBe(3);
+    const last = activeCreationAttributeDelta(current.batting.technique, 1, 1, scale);
+    current.batting.technique += last;
+    expect(allocatedActiveCreationPoints(current, scale)).toBe(4);
+    current.batting.technique += activeCreationAttributeDelta(current.batting.technique, -1, 0, scale);
+    expect(allocatedActiveCreationPoints(current, scale)).toBe(1);
   });
 });

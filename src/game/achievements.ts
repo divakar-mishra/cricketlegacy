@@ -429,9 +429,9 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   },
   {
     id: 'life_auction',
-    title: 'Going Once…',
-    description: 'Accept a franchise auction offer.',
-    icon: '🔨',
+    title: 'New T20 Chapter',
+    description: 'Accept an offer from another T20 club.',
+    icon: '📝',
     tier: 'silver',
     category: 'life',
   },

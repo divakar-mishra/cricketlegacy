@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { PersonalCoachDiscipline } from '../domain/types';
 import {
   ensurePlayerLifeState,
+  equipmentFitsPlayerRole,
   PERSONAL_COACHES,
   PLAYER_EQUIPMENT,
   PLAYER_LIFE_COSTS,
@@ -58,6 +59,14 @@ export function PlayerDevelopmentPanel() {
     fixtureId && life.lastAnalysisReport?.fixtureId === fixtureId
       ? life.lastAnalysisReport
       : undefined;
+  const visibleCoaches = PERSONAL_COACHES.filter((coach) =>
+    coach.discipline === 'MENTAL' ||
+    (coach.discipline === 'BATTING' && player.role !== 'BOWLER') ||
+    (coach.discipline === 'BOWLING' && (player.role === 'BOWLER' || player.role === 'ALLROUNDER')),
+  );
+  const visibleEquipment = PLAYER_EQUIPMENT.filter((equipment) =>
+    equipmentFitsPlayerRole(equipment, player.role),
+  );
   const resultAlert = (title: string, result: { ok: boolean; detail?: string; reason?: string }) =>
     Alert.alert(
       result.ok ? title : 'Not available',
@@ -71,6 +80,7 @@ export function PlayerDevelopmentPanel() {
         <ServiceTile
           icon="medkit-outline"
           title="Personal Physio"
+          info="Restores 25 condition, improves morale by 4, and shortens an active injury by one match. Up to three visits each season."
           detail={`${life.physioVisitsThisSeason}/${PLAYER_LIFE_COSTS.maxPhysioVisits} used`}
           price={PLAYER_LIFE_COSTS.physio}
           disabled={
@@ -82,6 +92,7 @@ export function PlayerDevelopmentPanel() {
         <ServiceTile
           icon="analytics-outline"
           title="Performance Analyst"
+          info="One opponent report for the next fixture: primary threat, weakness, match plan and training focus. Buying it also adds 3 confidence and 2 coach trust."
           detail={
             fixture
               ? activeAnalysis
@@ -111,7 +122,7 @@ export function PlayerDevelopmentPanel() {
 
       <SectionTitle title="Personal coaches" />
       <Card style={styles.listPanel}>
-        {PERSONAL_COACHES.map((coach, index) => {
+        {visibleCoaches.map((coach, index) => {
           const active = (life.personalCoaches[coach.discipline]?.seasonsRemaining ?? 0) > 0;
           return (
             <ActionRow
@@ -124,10 +135,11 @@ export function PlayerDevelopmentPanel() {
                     : 'sparkles-outline'
               }
               title={coach.name}
+              info={`${coach.specialty} Eligible paid sessions gain 50% more from the coach. Contract lasts one season.`}
               detail={`${label(coach.discipline)} · One season`}
               action={active ? 'Active' : coach.cost.toLocaleString()}
               disabled={active || save.wallet.coins < coach.cost}
-              last={index === PERSONAL_COACHES.length - 1}
+              last={index === visibleCoaches.length - 1}
               onPress={() =>
                 resultAlert(
                   'Coach hired',
@@ -141,7 +153,7 @@ export function PlayerDevelopmentPanel() {
 
       <SectionTitle title="Equipment" />
       <Card style={styles.listPanel}>
-        {PLAYER_EQUIPMENT.map((equipment, index) => {
+        {visibleEquipment.map((equipment, index) => {
           const owned = life.equipmentIds.includes(equipment.id);
           return (
             <ActionRow
@@ -156,6 +168,7 @@ export function PlayerDevelopmentPanel() {
                       : 'shield-checkmark-outline'
               }
               title={equipment.name}
+              info={equipment.description}
               detail={
                 equipment.id === 'balanced-bat'
                   ? 'Batting control'
@@ -167,7 +180,7 @@ export function PlayerDevelopmentPanel() {
               }
               action={owned ? 'Owned' : equipment.cost.toLocaleString()}
               disabled={owned || save.wallet.coins < equipment.cost}
-              last={index === PLAYER_EQUIPMENT.length - 1}
+              last={index === visibleEquipment.length - 1}
               onPress={() => resultAlert('Equipment ready', buyPlayerEquipment(equipment.id))}
             />
           );
@@ -185,6 +198,7 @@ function SectionTitle({ title }: { title: string }) {
 function ActionRow({
   icon,
   title,
+  info,
   detail,
   action,
   disabled,
@@ -193,6 +207,7 @@ function ActionRow({
 }: {
   icon: IconName;
   title: string;
+  info: string;
   detail: string;
   action: string;
   disabled?: boolean;
@@ -207,7 +222,10 @@ function ActionRow({
         <Icon name={icon} size={20} color={colors.primaryLight} />
       </View>
       <View style={styles.flexText}>
-        <Text style={styles.rowTitle}>{title}</Text>
+        <View style={styles.titleWithInfo}>
+          <Text style={styles.rowTitle}>{title}</Text>
+          <InfoButton title={title} info={info} />
+        </View>
         <Text style={styles.rowMeta}>{detail}</Text>
       </View>
       <Pressable
@@ -238,6 +256,7 @@ function ReportLine({ label: reportLabel, value }: { label: string; value: strin
 function ServiceTile({
   icon,
   title,
+  info,
   detail,
   price,
   disabled,
@@ -245,6 +264,7 @@ function ServiceTile({
 }: {
   icon: IconName;
   title: string;
+  info: string;
   detail: string;
   price: number;
   disabled?: boolean;
@@ -255,7 +275,10 @@ function ServiceTile({
   return (
     <View style={[styles.serviceTile, disabled && styles.disabledTile]}>
       <Icon name={icon} size={24} color={colors.primaryLight} />
-      <Text style={styles.serviceTitle}>{title}</Text>
+      <View style={styles.titleWithInfo}>
+        <Text style={styles.serviceTitle}>{title}</Text>
+        <InfoButton title={title} info={info} />
+      </View>
       <Text style={styles.serviceDetail}>{detail}</Text>
       <Button
         label={disabled ? 'Unavailable' : `${price.toLocaleString()} coins`}
@@ -266,6 +289,22 @@ function ServiceTile({
         onPress={onPress}
       />
     </View>
+  );
+}
+
+function InfoButton({ title, info }: { title: string; info: string }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`About ${title}`}
+      hitSlop={10}
+      style={styles.infoButton}
+      onPress={() => Alert.alert(title, info)}
+    >
+      <Icon name="information-circle-outline" size={20} color={colors.textMuted} />
+    </Pressable>
   );
 }
 
@@ -297,6 +336,8 @@ const makeStyles = (colors: ThemeColors) =>
       fontWeight: fontWeight.bold,
       marginTop: spacing.sm,
     },
+    titleWithInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
+    infoButton: { minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' },
     serviceDetail: {
       color: colors.textMuted,
       fontSize: fontSize.xs,
@@ -360,7 +401,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
     rowActionDisabled: { borderColor: colors.border, backgroundColor: colors.surfaceAlt },
     rowActionText: {
-      color: colors.primaryLight,
+      color: colors.white,
       fontSize: fontSize.xs,
       fontWeight: fontWeight.bold,
     },

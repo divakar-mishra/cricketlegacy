@@ -216,7 +216,7 @@ export function NewspaperModal({ story, onClose }: Props) {
                     <View style={styles.scoreTeams}>
                       <View style={styles.scoreCell}>
                         <Text numberOfLines={2} style={styles.scoreTeamName}>
-                          {scorePanel.teamName.toUpperCase()}
+                          {String(scorePanel.teamName ?? '').toUpperCase()}
                         </Text>
                         <Text adjustsFontSizeToFit numberOfLines={1} style={styles.scoreValue}>
                           {scorePanel.teamScore}
@@ -224,7 +224,7 @@ export function NewspaperModal({ story, onClose }: Props) {
                       </View>
                       <View style={[styles.scoreCell, styles.scoreCellDivider]}>
                         <Text numberOfLines={2} style={styles.scoreTeamName}>
-                          {scorePanel.opponentName.toUpperCase()}
+                          {String(scorePanel.opponentName ?? '').toUpperCase()}
                         </Text>
                         <Text adjustsFontSizeToFit numberOfLines={1} style={styles.scoreValue}>
                           {scorePanel.opponentScore}

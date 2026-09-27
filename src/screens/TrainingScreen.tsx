@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { playHaptic } from '../audio';
@@ -32,6 +32,7 @@ import {
   trainingSessionLimit,
 } from '../game/progression';
 import { nextUserFixtureId } from '../game/season';
+import { equipmentFitsPlayerRole, PLAYER_EQUIPMENT } from '../game/playerLife';
 import { useManagedTimers } from '../hooks/useManagedTimers';
 import { trainingAttributeCeiling } from '../game/youthBalance';
 import { ScreenProps } from '../navigation';
@@ -58,7 +59,7 @@ interface GainPopup {
   oldDevelopment: number;
 }
 
-export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
+export function TrainingScreen({ navigation, route }: ScreenProps<'Training'>) {
   const save = useCareer((s) => s.save);
   const train = useCareer((s) => s.train);
   const advanceSeason = useCareer((s) => s.advanceSeason);
@@ -67,7 +68,10 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
   const [flash, setFlash] = useState<string | null>(null);
   const [popup, setPopup] = useState<GainPopup | null>(null);
   const [busyGroup, setBusyGroup] = useState<TrainGroup | null>(null);
-  const [showDevelopment, setShowDevelopment] = useState(false);
+  const [showDevelopment, setShowDevelopment] = useState(Boolean(route.params?.initialDevelopment));
+  useEffect(() => {
+    if (route.params?.initialDevelopment) setShowDevelopment(true);
+  }, [route.params?.initialDevelopment]);
   const popupCounter = useRef(0);
   const timers = useManagedTimers();
 
@@ -120,7 +124,8 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
   const activeCoachCount = Object.values(save.playerLife?.personalCoaches ?? {}).filter(
     (coach) => (coach?.seasonsRemaining ?? 0) > 0,
   ).length;
-  const ownedEquipmentCount = save.playerLife?.equipmentIds?.length ?? 0;
+  const availableEquipment = PLAYER_EQUIPMENT.filter((item) => equipmentFitsPlayerRole(item, player.role));
+  const ownedEquipmentCount = availableEquipment.filter((item) => save.playerLife?.equipmentIds?.includes(item.id)).length;
   const nextFixtureId = nextUserFixtureId(save);
   const activeAnalysis =
     nextFixtureId && save.playerLife?.lastAnalysisReport?.fixtureId === nextFixtureId
@@ -197,7 +202,7 @@ export function TrainingScreen({ navigation }: ScreenProps<'Training'>) {
           <Text style={styles.supportTitle}>Development Centre</Text>
           <Text style={styles.supportStatus}>
             {activeCoachCount} coach{activeCoachCount === 1 ? '' : 'es'} · Equipment{' '}
-            {ownedEquipmentCount}/4
+            {ownedEquipmentCount}/{availableEquipment.length}
           </Text>
         </View>
         <View style={styles.supportAction}>

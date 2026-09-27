@@ -91,12 +91,12 @@ export const GlassSurface = React.memo(function GlassSurface({
   const themedStyles = useThemedStyles(makeStyles);
   const blurTarget = useContext(GlassBlurTargetContext);
   const borderRadius = rounded ?? radii.lg;
-  const useBlur = blur && (Platform.OS !== 'android' || blurTarget != null);
-  const baseAlpha = (useBlur ? 0.22 : 0.55) + intensity * 0.3;
-  const sheenTop = 0.14 + intensity * 0.12;
+  const useBlur = isDark && blur && (Platform.OS !== 'android' || blurTarget != null);
+  const baseAlpha = isDark ? (useBlur ? 0.22 : 0.55) + intensity * 0.3 : 0.95;
+  const sheenTop = isDark ? 0.14 + intensity * 0.12 : 0.03;
 
   return (
-    <View style={[themedStyles.wrap, { borderRadius }, highlighted && themedStyles.wrapHi, style]}>
+    <View style={[themedStyles.wrap, { borderRadius, borderColor: isDark ? 'rgba(255,255,255,0.18)' : colors.borderStrong }, highlighted && themedStyles.wrapHi, style]}>
       {useBlur ? (
         <BlurView
           intensity={Math.round(24 + intensity * 36)}

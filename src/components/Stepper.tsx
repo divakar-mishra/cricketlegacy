@@ -101,7 +101,7 @@ function StepButton({
         pressed && { opacity: 0.7 },
       ]}
     >
-      <Text style={styles.btnText}>{symbol}</Text>
+      <Text style={[styles.btnText, { color: highlight && enabled ? colors.white : colors.text }]}>{symbol}</Text>
     </Pressable>
   );
 }
@@ -131,7 +131,6 @@ const makeStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
     },
     btnText: {
-      color: colors.white,
       fontSize: fontSize.lg,
       fontWeight: fontWeight.bold,
       lineHeight: 22,

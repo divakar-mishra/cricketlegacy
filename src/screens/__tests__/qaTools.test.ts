@@ -16,12 +16,12 @@ describe('internal QA tools', () => {
     expect(settings).toContain('{QA_TOOLS_ENABLED ? (');
     expect(settings).toContain('Unlimited energy');
     expect(settings).toContain('+10M coins');
-    expect(settings).toContain('Preview auction');
+    expect(settings).toContain('Preview club offers');
     expect(settings).toContain('qaAuctionPreviewOpen ? qaAuctionOffers : []');
     expect(eas).toContain('"EXPO_PUBLIC_QA_TOOLS": "true"');
   });
 
-  it('previews the production auction UI without accepting a contract', () => {
+  it('previews the production T20 offer UI without accepting a contract', () => {
     expect(settings).toContain('<FranchiseOfferModal');
     expect(settings).toContain('Real UI · preview only · no contract changes');
     expect(settings).toContain('!team.isNationalTeam');

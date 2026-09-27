@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Switch, View } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { setMusicEnabled } from '../audio';
 import { showAdPrivacyChoices } from '../services/ads';
 import { FranchiseOfferModal } from '../components/FranchiseOfferModal';
@@ -41,7 +43,9 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
   const qaGrantWhaleCoins = useCareer((state) => state.qaGrantWhaleCoins);
   const qaGrantClubBudget = useCareer((state) => state.qaGrantClubBudget);
   const qaRefillEnergy = useCareer((state) => state.qaRefillEnergy);
+  const qaImportCaptureSave = useCareer((state) => state.qaImportCaptureSave);
   const [qaAuctionPreviewOpen, setQaAuctionPreviewOpen] = useState(false);
+  const [qaCaptureImportBusy, setQaCaptureImportBusy] = useState(false);
 
   const qaAuctionOffers =
     activeSave?.mode === 'career' && activeSave.userPlayerId
@@ -105,6 +109,52 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
         <>
           <Text style={styles.section}>QA Tools</Text>
           <Card style={styles.group}>
+            <Button
+              label={
+                qaCaptureImportBusy ? 'Loading capture save…' : 'Load isolated QA capture save'
+              }
+              variant="secondary"
+              disabled={qaCaptureImportBusy}
+              onPress={async () => {
+                setQaCaptureImportBusy(true);
+                try {
+                  const picked = await DocumentPicker.getDocumentAsync({
+                    type: 'application/json',
+                    copyToCacheDirectory: true,
+                    multiple: false,
+                  });
+                  if (picked.canceled || !picked.assets[0]) return;
+                  const raw = await FileSystem.readAsStringAsync(picked.assets[0].uri, {
+                    encoding: FileSystem.EncodingType.UTF8,
+                  });
+                  const result = await qaImportCaptureSave(raw);
+                  if (!result.ok || !result.mode) {
+                    Alert.alert('Capture save not loaded', result.reason ?? 'Please try again.');
+                    return;
+                  }
+                  Alert.alert(
+                    'Capture save loaded',
+                    result.persisted === false
+                      ? 'Opened as a temporary, in-memory QA preview because emulator storage refused another save. It will not survive closing the app; existing saves were left untouched.'
+                      : `Loaded into a new empty ${result.mode === 'career' ? 'Player' : 'Manager'} slot. Existing saves were left untouched.`,
+                    [
+                      {
+                        text: 'Open career',
+                        onPress: () =>
+                          navigation.navigate(
+                            result.mode === 'career' ? 'CareerHub' : 'ManagerHub',
+                          ),
+                      },
+                    ],
+                  );
+                } catch {
+                  Alert.alert('Capture save not loaded', 'The selected save could not be read.');
+                } finally {
+                  setQaCaptureImportBusy(false);
+                }
+              }}
+            />
+            <Divider />
             <ToggleRow
               label="Unlimited energy"
               value={s.qaUnlimitedEnergy}
@@ -176,11 +226,11 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
             <Divider />
             <View style={styles.qaCoinsRow}>
               <View style={styles.qaCoinsCopy}>
-                <Text style={styles.rowLabel}>Auction Presentation</Text>
+                <Text style={styles.rowLabel}>T20 Club Offers</Text>
                 <Text style={styles.qaBalance}>Real UI · preview only · no contract changes</Text>
               </View>
               <Button
-                label="Preview auction"
+                label="Preview club offers"
                 size="sm"
                 fullWidth={false}
                 disabled={activeSave?.mode !== 'career' || qaAuctionOffers.length === 0}
@@ -375,7 +425,13 @@ function PublicResourceRow({
         </Text>
       ) : null}
       <Icon
-        name={resourceKey === 'privacyPolicy' ? 'chevron-forward' : url ? 'open-outline' : 'alert-circle-outline'}
+        name={
+          resourceKey === 'privacyPolicy'
+            ? 'chevron-forward'
+            : url
+              ? 'open-outline'
+              : 'alert-circle-outline'
+        }
         size={18}
       />
     </Pressable>

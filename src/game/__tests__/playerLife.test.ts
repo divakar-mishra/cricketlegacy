@@ -4,10 +4,12 @@ import {
   buyPlayerAsset,
   buyPlayerEquipment,
   ensurePlayerLifeState,
+  equipmentFitsPlayerRole,
   hirePersonalCoach,
   personalCoachTrainingMultiplier,
   PLAYER_LIFE_COSTS,
   processPlayerLifeSeason,
+  PLAYER_EQUIPMENT,
   publishPlayerSocialPost,
   recordPlayerLifeMatch,
   transferPlayerBank,
@@ -57,6 +59,17 @@ describe('Player Life economy and development', () => {
     expect(player.batting.technique).toBe(before + 1);
     expect(buyPlayerEquipment(save, 'balanced-bat').ok).toBe(false);
     expect(player.batting.technique).toBe(before + 1);
+  });
+
+  it('keeps batting gear out of a specialist bowler career', () => {
+    const save = seniorCareer();
+    const player = save.players[save.userPlayerId!];
+    player.role = 'BOWLER';
+    const before = save.wallet.coins;
+    expect(PLAYER_EQUIPMENT.filter((item) => equipmentFitsPlayerRole(item, player.role)).map((item) => item.id)).toEqual(['keeper-gloves']);
+    expect(buyPlayerEquipment(save, 'balanced-bat').ok).toBe(false);
+    expect(save.wallet.coins).toBe(before);
+    expect(buyPlayerEquipment(save, 'keeper-gloves').ok).toBe(true);
   });
 
   it('gives active specialist coaches a bounded training multiplier', () => {

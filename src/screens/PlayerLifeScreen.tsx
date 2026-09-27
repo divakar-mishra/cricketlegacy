@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
-import { moment } from '../audio';
 import {
   Button,
+  BannerAdSlot,
   Card,
   Icon,
   IconName,
+  NewspaperModal,
   ProgressBar,
   Screen,
   ScreenHeader,
@@ -17,7 +18,7 @@ import { AppText as Text } from '../components/AppText';
 import { PLAYER_LIFE_ART, PlayerLifeAssetCard } from '../components/PlayerLifeAssetCard';
 import { VenueIllustration } from '../components/VenueIllustration';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
-import type { PlayerLifeMatch, SaveGame } from '../domain/types';
+import type { NewspaperStory, PlayerLifeMatch, SaveGame } from '../domain/types';
 import { getAchievement } from '../game/achievements';
 import { careerSelectionDecision } from '../game/career';
 import { careerLegacyScore } from '../game/careerEvents';
@@ -28,7 +29,6 @@ import {
   PLAYER_PROPERTIES,
 } from '../game/playerLife';
 import { nextUserFixtureId } from '../game/season';
-import { stockPortfolioTotals } from '../game/stockMarket';
 import {
   premiumSponsorStoreUnlocked,
   premiumSponsorWeeklyRate,
@@ -48,20 +48,12 @@ import {
 } from '../theme';
 
 type LifeTab = 'overview' | 'finance' | 'media' | 'legacy';
-type PhoneApp = 'feed' | 'messages' | 'news' | 'wallet';
 
 const LIFE_TABS: readonly { id: LifeTab; label: string; icon: IconName }[] = [
-  { id: 'overview', label: 'Overview', icon: 'speedometer-outline' },
-  { id: 'finance', label: 'Finance', icon: 'wallet-outline' },
-  { id: 'media', label: 'Media', icon: 'phone-portrait-outline' },
+  { id: 'overview', label: 'Career', icon: 'speedometer-outline' },
+  { id: 'media', label: 'Kit & media', icon: 'shirt-outline' },
+  { id: 'finance', label: 'Finances', icon: 'wallet-outline' },
   { id: 'legacy', label: 'Legacy', icon: 'trophy-outline' },
-] as const;
-
-const PHONE_APPS: readonly { id: PhoneApp; label: string; icon: IconName }[] = [
-  { id: 'feed', label: 'Feed', icon: 'people-outline' },
-  { id: 'messages', label: 'Inbox', icon: 'mail-outline' },
-  { id: 'news', label: 'News', icon: 'newspaper-outline' },
-  { id: 'wallet', label: 'Money', icon: 'card-outline' },
 ] as const;
 
 function currentPlayer(save: SaveGame) {
@@ -90,6 +82,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
     acceptEarnedSponsorOffer,
     publishPlayerSocialPost,
     importCareerBackup,
+    markNewspaperSeen,
   } = useCareer(
     useShallow((state) => ({
       save: state.save,
@@ -98,16 +91,20 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
       acceptEarnedSponsorOffer: state.acceptEarnedSponsorOffer,
       publishPlayerSocialPost: state.publishPlayerSocialPost,
       importCareerBackup: state.importCareerBackup,
+      markNewspaperSeen: state.markNewspaperSeen,
     })),
   );
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [tab, setTab] = useState<LifeTab>(route.params?.initialTab ?? 'overview');
-  const [phoneApp, setPhoneApp] = useState<PhoneApp>('feed');
   const [bankAmount, setBankAmount] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [backupText, setBackupText] = useState('');
   const [importing, setImporting] = useState(false);
+  const [showOlderUpdates, setShowOlderUpdates] = useState(false);
+  const [showPressClippings, setShowPressClippings] = useState(false);
+  const [visibleOlderClippings, setVisibleOlderClippings] = useState(5);
+  const [selectedNewspaper, setSelectedNewspaper] = useState<NewspaperStory | null>(null);
 
   if (!save || save.mode !== 'career') {
     return (
@@ -214,8 +211,26 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
 
   const renderOverview = () => (
     <>
+      {earnedSponsorOffers.length || activeEarnedSponsor ? (
+        <Card
+          style={styles.kitSpotlight}
+          onPress={() => setTab('media')}
+          accessibilityLabel={earnedSponsorOffers.length ? 'Review kit partnership offers' : 'View active kit partnership'}
+        >
+          <View style={styles.kitSpotlightTop}>
+            <Icon name="shirt-outline" size={24} color={colors.accent} />
+            <Text style={styles.kitSpotlightTitle}>Kit Partnership</Text>
+            <Text style={styles.kitSpotlightAction}>VIEW →</Text>
+          </View>
+          <Text style={styles.bodyText}>
+            {earnedSponsorOffers.length
+              ? `${earnedSponsorOffers.length} kit offers ready. Choose who appears on your shirt.`
+              : `${activeEarnedSponsor?.brandName ?? activeEarnedSponsor?.label} · ${activeEarnedSponsor?.paidFixtures ?? 0}/${activeEarnedSponsor?.fixtureQuota ?? 0} eligible appearances paid.`}
+          </Text>
+        </Card>
+      ) : null}
       {renderSectionTitle(
-        'Selection Risk',
+        'Selection outlook',
         fixture ? `Next: ${fixture.format}` : 'No fixture queued',
       )}
       <Card style={styles.panel}>
@@ -224,43 +239,16 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
             <Text style={styles.panelTitle}>{selectionStatus}</Text>
           </View>
           <Text style={[styles.selectionScore, { color: selectionColor }]}>
-            {Math.round(selection.userScore)}
+            {Math.round(selection.userScore)}/100
           </Text>
         </View>
+        <Text style={styles.selectionCaption}>Coach assessment for the next team sheet</Text>
         <ProgressBar
           value={Math.max(0, Math.min(1, selection.userScore / 100))}
           color={selectionColor}
           style={styles.progress}
         />
       </Card>
-
-      {renderSectionTitle(
-        'Off-field Ventures',
-        financeUnlocked ? undefined : 'Portfolio unlocks at 18',
-      )}
-      <View style={styles.twoButtons}>
-        <Button
-          label="Stock Portfolio"
-          variant="secondary"
-          fullWidth={false}
-          style={styles.halfButton}
-          onPress={() => navigation.navigate('InvestmentScreen')}
-        />
-        <Button
-          label="My Cricket Academy"
-          variant="secondary"
-          fullWidth={false}
-          style={styles.halfButton}
-          onPress={() => navigation.navigate('AcademyManagement')}
-        />
-      </View>
-      <Button
-        label={financeUnlocked ? 'Finance' : 'Finance · Unlocks at 18'}
-        variant="ghost"
-        size="sm"
-        style={styles.sectionButton}
-        onPress={() => setTab('finance')}
-      />
 
       {renderSectionTitle('Last 10 Matches')}
       <Card style={styles.tablePanel}>
@@ -318,6 +306,24 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           last
         />
       </Card>
+
+      {renderSectionTitle('Beyond cricket', financeUnlocked ? undefined : 'Portfolio unlocks at 18 in senior cricket')}
+      <View style={styles.twoButtons}>
+        <Button
+          label="Cricket Academy"
+          variant="secondary"
+          fullWidth={false}
+          style={styles.halfButton}
+          onPress={() => navigation.navigate('AcademyManagement')}
+        />
+        <Button
+          label={financeUnlocked ? 'Stock Portfolio' : 'Portfolio · Locked'}
+          variant="secondary"
+          fullWidth={false}
+          style={styles.halfButton}
+          onPress={() => navigation.navigate('InvestmentScreen')}
+        />
+      </View>
     </>
   );
 
@@ -329,7 +335,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           <Card style={[styles.panel, styles.lockedPanel]}>
             <View style={styles.lockHeader}>
               <Icon name="lock-closed-outline" size={20} color={colors.warning} />
-              <Text style={styles.panelTitle}>Finance unlocks at 18</Text>
+              <Text style={styles.panelTitle}>Finance unlocks at 18 in senior cricket</Text>
             </View>
           </Card>
         ) : null}
@@ -416,163 +422,9 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
     );
   };
 
-  const renderPhoneContent = () => {
-    if (phoneApp === 'feed') {
-      return life.socialFeed.length ? (
-        life.socialFeed.slice(0, 6).map((post) => (
-          <View key={post.id} style={styles.phoneItem}>
-            <Text style={styles.phoneItemTitle}>{post.headline}</Text>
-            <Text style={styles.phoneItemBody}>{post.body}</Text>
-            <Text style={styles.phoneItemMeta}>
-              {post.reactions.toLocaleString()} reactions | {post.comments.length} comments | +
-              {post.followersDelta.toLocaleString()} followers
-            </Text>
-          </View>
-        ))
-      ) : (
-        <Text style={styles.phoneEmpty}>No posts yet.</Text>
-      );
-    }
-    if (phoneApp === 'messages') {
-      return (save.inbox ?? []).length ? (
-        (save.inbox ?? [])
-          .slice()
-          .reverse()
-          .slice(0, 6)
-          .map((message) => (
-            <View key={message.id} style={styles.phoneItem}>
-              <Text style={styles.phoneItemTitle}>{message.title}</Text>
-              <Text style={styles.phoneItemBody} numberOfLines={2}>
-                {message.body}
-              </Text>
-              <Text style={styles.phoneItemMeta}>{message.read ? 'Read' : 'Unread'}</Text>
-            </View>
-          ))
-      ) : (
-        <Text style={styles.phoneEmpty}>No messages.</Text>
-      );
-    }
-    if (phoneApp === 'news') {
-      const stories = save.experience?.mediaScrapbook ?? [];
-      return stories.length ? (
-        stories
-          .slice()
-          .reverse()
-          .slice(0, 6)
-          .map((story) => (
-            <View key={story.id} style={styles.phoneItem}>
-              <Text style={styles.phoneItemMeta}>
-                {story.format} | SEASON {story.season}
-              </Text>
-              <Text style={styles.phoneItemTitle}>{story.headline}</Text>
-              <Text style={styles.phoneItemBody}>{story.subheadline}</Text>
-            </View>
-          ))
-      ) : (
-        <Text style={styles.phoneEmpty}>No clippings yet.</Text>
-      );
-    }
-    return (
-      <>
-        <SummaryRow icon="wallet-outline" label="Wallet" value={`${save.wallet.coins} coins`} />
-        <SummaryRow icon="business-outline" label="Bank" value={`${life.bankCoins} coins`} />
-        <SummaryRow
-          icon="trending-up-outline"
-          label="Stocks"
-          value={`${stockPortfolioTotals(save.stockPortfolio).currentValue} coins`}
-        />
-        <SummaryRow
-          icon="home-outline"
-          label="Assets"
-          value={`${life.propertyIds.length} properties | ${life.businessIds.length} businesses`}
-          last
-        />
-      </>
-    );
-  };
-
   const renderMedia = () => (
     <>
-      <View style={styles.followersBand}>
-        <View>
-          <Text style={styles.metricLabel}>FOLLOWERS</Text>
-          <Text style={styles.followerValue}>{life.followers.toLocaleString()}</Text>
-        </View>
-        <View style={styles.followersRight}>
-          <Text style={styles.metricLabel}>POSTS THIS SEASON</Text>
-          <Text style={styles.followerMinor}>
-            {life.mediaPostsThisSeason}/{PLAYER_LIFE_COSTS.maxSocialPosts}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.phoneShell}>
-        <View style={styles.phoneStatus}>
-          <Text style={styles.phoneBrand}>LEGACY PHONE</Text>
-          <Icon name="wifi-outline" size={16} color={colors.textMuted} />
-        </View>
-        <View style={styles.phoneApps} accessibilityRole="tablist" accessibilityLabel="Legacy phone apps">
-          {PHONE_APPS.map((app) => {
-            const active = app.id === phoneApp;
-            return (
-              <Pressable
-                key={app.id}
-                accessibilityRole="tab"
-                accessibilityLabel={app.label}
-                accessibilityState={{ selected: active }}
-                style={({ pressed }) => [
-                  styles.phoneApp,
-                  active && styles.phoneAppActive,
-                  pressed && styles.tabPressed,
-                ]}
-                onPress={() => {
-                  if (app.id === 'messages') moment('phone');
-                  setPhoneApp(app.id);
-                }}
-              >
-                <Icon name={app.icon} size={20} color={active ? colors.text : colors.textMuted} />
-                <Text style={[styles.phoneAppLabel, active && styles.phoneAppLabelActive]}>
-                  {app.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <View style={styles.phoneContent}>{renderPhoneContent()}</View>
-      </View>
-
-      {renderSectionTitle('Player Press Room')}
-      <View style={styles.threeButtons}>
-        <Button
-          label="Humble"
-          size="sm"
-          variant="secondary"
-          fullWidth={false}
-          style={styles.thirdButton}
-          disabled={life.mediaPostsThisSeason >= PLAYER_LIFE_COSTS.maxSocialPosts}
-          onPress={() => resultAlert('Post published', publishPlayerSocialPost('HUMBLE'))}
-        />
-        <Button
-          label="Confident"
-          size="sm"
-          variant="secondary"
-          fullWidth={false}
-          style={styles.thirdButton}
-          disabled={life.mediaPostsThisSeason >= PLAYER_LIFE_COSTS.maxSocialPosts}
-          onPress={() => resultAlert('Post published', publishPlayerSocialPost('CONFIDENT'))}
-        />
-        <Button
-          label="Team first"
-          size="sm"
-          variant="secondary"
-          fullWidth={false}
-          style={styles.thirdButton}
-          disabled={life.mediaPostsThisSeason >= PLAYER_LIFE_COSTS.maxSocialPosts}
-          onPress={() => resultAlert('Post published', publishPlayerSocialPost('TEAM_FIRST'))}
-        />
-      </View>
-
-      {renderSectionTitle('Kit Partnership')}
+      {renderSectionTitle('Kit Partnership', earnedSponsorOffers.length ? `${earnedSponsorOffers.length} offers ready` : undefined)}
       <Card style={styles.panel}>
         {activeEarnedSponsor ? (
           <View>
@@ -665,12 +517,108 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           </View>
         ) : null}
       </Card>
-      <Button
-        label="Open Full Inbox"
-        variant="ghost"
-        style={styles.sectionButton}
-        onPress={() => navigation.navigate('NotificationInbox')}
-      />
+
+      {renderSectionTitle('Public profile', 'Optional off-field activity')}
+      <Card style={styles.panel}>
+        <Text style={styles.mediaGuidance}>
+          Share a short update to grow your following and player brand. Match results and selection
+          still come from cricket, not posts.
+        </Text>
+        <View style={styles.followersBand}>
+          <View>
+            <Text style={styles.metricLabel}>FOLLOWERS</Text>
+            <Text style={styles.followerValue}>{life.followers.toLocaleString()}</Text>
+          </View>
+          <View style={styles.followersRight}>
+            <Text style={styles.metricLabel}>UPDATES THIS SEASON</Text>
+            <Text style={styles.followerMinor}>
+              {life.mediaPostsThisSeason}/{PLAYER_LIFE_COSTS.maxSocialPosts}
+            </Text>
+          </View>
+        </View>
+        <Button
+          label="Share a media update"
+          size="sm"
+          variant="secondary"
+          style={styles.sectionButton}
+          disabled={life.mediaPostsThisSeason >= PLAYER_LIFE_COSTS.maxSocialPosts}
+          onPress={() => Alert.alert('Share a media update', 'Choose what you want to say.', [
+            { text: 'Thank supporters', onPress: () => resultAlert('Update shared', publishPlayerSocialPost('HUMBLE')) },
+            { text: 'Show confidence', onPress: () => resultAlert('Update shared', publishPlayerSocialPost('CONFIDENT')) },
+            { text: 'Credit the team', onPress: () => resultAlert('Update shared', publishPlayerSocialPost('TEAM_FIRST')) },
+            { text: 'Cancel', style: 'cancel' },
+          ])}
+        />
+        {life.socialFeed[0] ? (
+          <View style={styles.mediaItem}>
+            <Text style={styles.mediaItemCaption}>LATEST UPDATE</Text>
+            <Text style={styles.mediaItemTitle}>{life.socialFeed[0].headline}</Text>
+            <Text style={styles.mediaItemBody}>{life.socialFeed[0].body}</Text>
+          </View>
+        ) : null}
+        {life.socialFeed.length > 1 ? (
+          <Button
+            label={showOlderUpdates ? 'Hide older updates' : 'Show older updates'}
+            size="sm"
+            variant="ghost"
+            style={styles.sectionButton}
+            onPress={() => setShowOlderUpdates(!showOlderUpdates)}
+          />
+        ) : null}
+        {showOlderUpdates ? life.socialFeed.slice(1, 6).map((post) => (
+          <View key={post.id} style={styles.mediaItem}>
+            <Text style={styles.mediaItemTitle}>{post.headline}</Text>
+            <Text style={styles.mediaItemBody}>{post.body}</Text>
+          </View>
+        )) : null}
+      </Card>
+      {save.experience?.mediaScrapbook?.length ? (
+        <Card style={[styles.panel, styles.clippingCard]}>
+          <Text style={styles.mediaItemCaption}>LATEST PRESS CLIPPING</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Read latest press clipping"
+            onPress={() => setSelectedNewspaper(save.experience!.mediaScrapbook!.at(-1)!)}
+          >
+            <Text style={styles.mediaItemTitle}>
+              {save.experience.mediaScrapbook[save.experience.mediaScrapbook.length - 1].headline}
+            </Text>
+            <Text style={styles.mediaItemBody}>
+              {save.experience.mediaScrapbook[save.experience.mediaScrapbook.length - 1].subheadline}
+            </Text>
+          </Pressable>
+          {save.experience.mediaScrapbook.length > 1 ? (
+            <Button
+              label={showPressClippings ? 'Hide older clippings' : 'Show older clippings'}
+              size="sm"
+              variant="ghost"
+              style={styles.sectionButton}
+              onPress={() => setShowPressClippings(!showPressClippings)}
+            />
+          ) : null}
+          {showPressClippings ? save.experience.mediaScrapbook.slice(0, -1).slice(-visibleOlderClippings).reverse().map((story) => (
+            <Pressable
+              key={story.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Read clipping: ${story.headline}`}
+              onPress={() => setSelectedNewspaper(story)}
+              style={styles.mediaItem}
+            >
+              <Text style={styles.mediaItemTitle}>{story.headline}</Text>
+              <Text style={styles.mediaItemBody}>{story.subheadline}</Text>
+            </Pressable>
+          )) : null}
+          {showPressClippings && save.experience.mediaScrapbook.length - 1 > visibleOlderClippings ? (
+            <Button
+              label="Show 5 more clippings"
+              size="sm"
+              variant="ghost"
+              style={styles.sectionButton}
+              onPress={() => setVisibleOlderClippings((count) => count + 5)}
+            />
+          ) : null}
+        </Card>
+      ) : null}
     </>
   );
 
@@ -710,7 +658,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
                 </View>
               ))
             ) : (
-              <Text style={styles.phoneEmpty}>No trophies yet.</Text>
+              <Text style={styles.emptyPanelText}>No trophies yet.</Text>
             )}
           </View>
           {unlocked.length ? (
@@ -800,20 +748,15 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
   return (
     <Screen scroll>
       <ScreenHeader title="Player Life" onBack={() => navigation.goBack()} />
-      <View style={styles.metricBand}>
-        <HeaderMetric label="Followers" value={life.followers.toLocaleString()} />
-        <HeaderMetric label="Wallet" value={save.wallet.coins.toLocaleString()} />
-        <HeaderMetric label="Bank" value={life.bankCoins.toLocaleString()} />
-      </View>
       <View style={styles.tabs} accessibilityRole="tablist">
         {LIFE_TABS.map((item) => {
           const active = tab === item.id;
           return (
             <Pressable
               key={item.id}
-                accessibilityRole="tab"
-                accessibilityLabel={item.label}
-                accessibilityState={{ selected: active }}
+              accessibilityRole="tab"
+              accessibilityLabel={item.label}
+              accessibilityState={{ selected: active }}
               style={({ pressed }) => [
                 styles.tab,
                 active && styles.tabActive,
@@ -821,7 +764,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
               ]}
               onPress={() => setTab(item.id)}
             >
-              <Icon name={item.icon} size={18} color={active ? colors.text : colors.textMuted} />
+              <Icon name={item.icon} size={18} color={active ? colors.white : colors.textMuted} />
               <Text
                 style={[styles.tabLabel, active && styles.tabLabelActive]}
                 numberOfLines={1}
@@ -834,25 +777,18 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           );
         })}
       </View>
-      <View style={styles.page}>{page}</View>
+      <View style={styles.page}>
+        {page}
+      </View>
+      <BannerAdSlot entitlements={save.entitlements} />
+      <NewspaperModal
+        story={selectedNewspaper}
+        onClose={(storyId) => {
+          markNewspaperSeen(storyId);
+          setSelectedNewspaper(null);
+        }}
+      />
     </Screen>
-  );
-}
-
-function HeaderMetric({ label, value }: { label: string; value: string }) {
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <View style={styles.headerMetric}>
-      <Text style={styles.metricLabel}>{label.toUpperCase()}</Text>
-      <Text
-        style={styles.metricValue}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}
-      >
-        {value}
-      </Text>
-    </View>
   );
 }
 
@@ -946,35 +882,11 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: 2,
       letterSpacing: 0,
     },
-    metricBand: {
-      flexDirection: 'row',
-      backgroundColor: colors.surfaceMuted,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: radius.sm,
-      overflow: 'hidden',
-    },
-    headerMetric: {
-      flex: 1,
-      minWidth: 0,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.md,
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderRightColor: colors.border,
-    },
     metricLabel: {
       color: colors.textMuted,
       fontSize: 10,
       fontWeight: fontWeight.bold,
       fontFamily: fonts.bold,
-      letterSpacing: 0,
-    },
-    metricValue: {
-      color: colors.text,
-      fontSize: fontSize.lg,
-      fontWeight: fontWeight.heavy,
-      fontFamily: fonts.display,
-      marginTop: 2,
       letterSpacing: 0,
     },
     tabs: {
@@ -986,8 +898,8 @@ const makeStyles = (colors: ThemeColors) =>
     tabPressed: { opacity: 0.78 },
     tab: {
       flexGrow: 1,
-      flexBasis: '30%',
-      minWidth: 92,
+      flexBasis: '46%',
+      minWidth: 138,
       minHeight: 44,
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.sm,
@@ -1002,7 +914,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
     tabActive: {
       backgroundColor: colors.primaryDark,
-      borderColor: colors.primaryLight,
+      borderColor: colors.primaryDark,
     },
     tabLabel: {
       color: colors.textMuted,
@@ -1011,8 +923,22 @@ const makeStyles = (colors: ThemeColors) =>
       fontFamily: fonts.bold,
       letterSpacing: 0,
     },
-    tabLabelActive: { color: colors.text },
+    tabLabelActive: { color: colors.white },
     panel: { borderRadius: radius.sm },
+    kitSpotlight: {
+      marginTop: spacing.lg,
+      borderColor: colors.accent,
+      borderLeftWidth: 3,
+      backgroundColor: colors.surfaceAlt,
+    },
+    kitSpotlightTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    kitSpotlightTitle: {
+      flex: 1,
+      color: colors.text,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.heavy,
+    },
+    kitSpotlightAction: { color: colors.accentDark, fontSize: fontSize.xs, fontWeight: fontWeight.bold },
     listPanel: { paddingVertical: 0, borderRadius: radius.sm },
     tablePanel: { paddingVertical: spacing.xs, borderRadius: radius.sm },
     panelTitle: {
@@ -1031,11 +957,12 @@ const makeStyles = (colors: ThemeColors) =>
     },
     selectionTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
     selectionScore: {
-      fontSize: fontSize.xxl,
+      fontSize: fontSize.lg,
       fontWeight: fontWeight.black,
       fontFamily: fonts.display,
       letterSpacing: 0,
     },
+    selectionCaption: { color: colors.textMuted, fontSize: fontSize.xs, marginTop: spacing.xs },
     progress: { marginTop: spacing.md },
     inlineStats: {
       flexDirection: 'row',
@@ -1257,7 +1184,7 @@ const makeStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surfaceMuted,
     },
     rowActionText: {
-      color: colors.primaryLight,
+      color: colors.text,
       fontSize: fontSize.xs,
       fontWeight: fontWeight.bold,
       textAlign: 'center',
@@ -1310,13 +1237,6 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: spacing.sm,
     },
     halfButton: { flexGrow: 1, flexBasis: '46%', minWidth: 138 },
-    threeButtons: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.xs,
-      marginTop: spacing.md,
-    },
-    thirdButton: { flexGrow: 1, flexBasis: '30%', minWidth: 92 },
     exchangeTop: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -1339,91 +1259,38 @@ const makeStyles = (colors: ThemeColors) =>
     },
     followersRight: { alignItems: 'flex-end' },
     followerMinor: {
-      color: colors.primaryLight,
+      color: colors.text,
       fontSize: fontSize.lg,
       fontWeight: fontWeight.heavy,
       letterSpacing: 0,
     },
-    phoneShell: {
-      marginTop: spacing.lg,
-      borderWidth: 1,
-      borderColor: colors.borderStrong,
-      borderRadius: radius.sm,
-      backgroundColor: colors.surfaceMuted,
-      overflow: 'hidden',
+    mediaItem: {
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
     },
-    phoneStatus: {
-      minHeight: 36,
-      paddingHorizontal: spacing.md,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
-    },
-    phoneBrand: {
-      color: colors.textMuted,
-      fontSize: 10,
-      fontWeight: fontWeight.heavy,
-      letterSpacing: 0,
-    },
-    phoneApps: {
-      flexDirection: 'row',
-      padding: spacing.xs,
-      gap: spacing.xs,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
-    },
-    phoneApp: {
-      flex: 1,
-      minWidth: 0,
-      minHeight: 54,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.sm,
-      gap: 2,
-    },
-    phoneAppActive: { backgroundColor: colors.surfaceAlt },
-    phoneAppLabel: {
+    mediaItemCaption: {
       color: colors.textMuted,
       fontSize: 10,
       fontWeight: fontWeight.bold,
-      letterSpacing: 0,
+      letterSpacing: 0.6,
     },
-    phoneAppLabelActive: { color: colors.text },
-    phoneContent: { paddingHorizontal: spacing.md, minHeight: 190, maxHeight: 430 },
-    phoneItem: {
-      paddingVertical: spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
-    },
-    phoneItemTitle: {
+    mediaItemTitle: {
       color: colors.text,
       fontSize: fontSize.sm,
       fontWeight: fontWeight.bold,
-      letterSpacing: 0,
-    },
-    phoneItemBody: {
-      color: colors.textMuted,
-      fontSize: fontSize.xs,
-      lineHeight: 16,
-      marginTop: 2,
-      letterSpacing: 0,
-    },
-    phoneItemMeta: {
-      color: colors.textFaint,
-      fontSize: 10,
       marginTop: spacing.xs,
       letterSpacing: 0,
     },
-    phoneEmpty: {
+    mediaItemBody: {
       color: colors.textMuted,
-      fontSize: fontSize.sm,
-      textAlign: 'center',
-      paddingVertical: spacing.xl,
-      lineHeight: 19,
+      fontSize: fontSize.xs,
+      lineHeight: 16,
+      marginTop: spacing.xs,
       letterSpacing: 0,
     },
+    clippingCard: { marginTop: spacing.md, borderLeftWidth: 3, borderLeftColor: colors.accent },
     negotiationGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -1450,14 +1317,14 @@ const makeStyles = (colors: ThemeColors) =>
       letterSpacing: 0,
     },
     negotiationChance: {
-      color: colors.primaryLight,
+      color: colors.primaryDark,
       fontSize: fontSize.xs,
       fontWeight: fontWeight.bold,
       marginTop: 2,
       letterSpacing: 0,
     },
     negotiationPayout: {
-      color: colors.accent,
+      color: colors.accentDark,
       fontSize: fontSize.sm,
       fontWeight: fontWeight.heavy,
       marginTop: spacing.xs,

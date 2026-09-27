@@ -465,8 +465,10 @@ can still render independently in isolated tests when no queue provider exists.
 - Each step slides from right in 220ms; backdrop fades in 180ms/out 140ms.
 - The "Your next action" box uses `surfaceAlt` and a 3px primary-green left rule.
 - Interaction: Previous, Next/Start Playing, dots, 54dp swipe and close.
-- Player guide has five steps: next action, purposeful training, match role,
-  selection/progression and career review.
+- Player guide has six steps: next action, Training → Development Centre,
+  match role, selection/progression, contextual free career-adviser moments,
+  and Profile → Player Life → Kit & media / Finances. It names the destinations
+  rather than only listing systems.
 - Manager guide has six steps: Continue flow, domestic year, XI preparation,
   match plan, evidence-led recruitment and running the club.
 
@@ -1090,14 +1092,20 @@ breaking-news badge, stats, recovery timeline and a blue-purple fast-track card
 
 ### 14.8 Player Life
 
-- The five-tab control wraps within the viewport and keeps each target at least
-  44dp high. It never uses absolute positioning for content layout.
-- Overview uses a single unframed flow: selection score, reason breakdown,
-  Domestic/International totals and a ten-row recent-appearance list.
+- Career, Kit & media, Finances and Legacy use a predictable two-column tab grid
+  on compact phones. Every target is at least 44dp high, including in light mode.
+- Career leads with an actionable kit-offer spotlight when a deal is ready, then
+  a labelled selection assessment, recent appearances and current contracts.
+  Academy and Portfolio remain secondary off-field destinations.
 - Development and Finance use responsive rows with bounded minimum widths.
   They collapse to one column before labels or actions can overlap.
-- The phone is one bounded surface, not nested cards. Feed, Inbox, News and
-  Money use compact icon tabs and vertically scrolling content.
+- Kit & media places the earned Kit Partnership first. The hub's Review action
+  opens this tab directly; no delayed layout-event scrolling is needed. The
+  duplicate phone Inbox and Money views are removed because the app already
+  has a full inbox and a Finances tab.
+- Public media updates are explicitly optional: one button explains the
+  follower/brand effect before offering three tones. Only the latest update
+  and clipping show by default; older entries are available on demand.
 - Finance actions use theme success for positive balances/income, warning for
   gated features and primary green only for active selection/actions.
 - The Legacy Museum uses the gold accent at 9% background and 33% border
@@ -1106,6 +1114,15 @@ breaking-news badge, stats, recovery timeline and a blue-purple fast-track card
   and claim copy cannot render behind another popup.
 - Personal Physio costs 9,000 Wallet Coins, restores 25 condition and removes
   one match from an active injury, up to three times per season.
+- When an actual injury, form slump or affordable relevant opportunity exists,
+  the adviser takes a single story decision before the next senior-career
+  action. Youth matchday remains playable and shows only a compact adviser
+  link inside its existing ticket. There is no permanent Home adviser card.
+  The player can accept its destination or carry on; advice never buys a service or invests coins
+  automatically. Non-injury notes follow the established five-appearance
+  press cadence; injury advice is immediate. Generic introduction notes were
+  moved into the guide, while the Injury Report retains its optional gem
+  fast-track route.
 - Performance Analysis costs 12,000 Wallet Coins once per upcoming fixture.
   Its persistent report names the threat, explains a weakness and match plan,
   and links to/highlights the recommended Training focus. The real preparation
@@ -1167,7 +1184,7 @@ breaking-news badge, stats, recovery timeline and a blue-purple fast-track card
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Career Hub             | Four persistent tabs, career stadium spotlight with a visible Player Life action, wallet and exactly one resolver-owned primary action. One compact off-field row appears directly after the chapter only for a real sponsor offer, first Portfolio visit or affordable unfounded Academy; the older three-tile block is removed. Club/national captains receive a contextual XI/tactics action for the relevant fixture only. |
 | Training               | Compact role-group cards with stage-based 8/12/18 limits, price buttons and one-line focus state; repeated cap/mechanic explanation boxes are removed. Every paid session shows exact direct attribute increases plus continuous decimal OVR progress in a centered result modal.                                                                                                                                              |
-| Player Life            | Five responsive tabs: selection risk/recent ten, personal development services, finance/assets, bounded phone/media, one earned Kit Partnership slot and a visual Legacy Museum with career backup tools.                                                                                                                                                                                                                      |
+| Player Life            | Four responsive tabs: Career assessment and contracts, Kit & media with partnership offers first and optional public updates second, Finances/assets, and a visual Legacy Museum with career backup tools. The duplicate phone Inbox and Money views are removed.                                                                                                                                                                 |
 | Player Profile         | Identity/avatar, current/career stats, role-relevant attributes, contract/equipment and a dynamic kit-partner mark for the user when active; fielding remains engine-visible without a dedicated section.                                                                                                                                                                                                                      |
 | Contract Negotiation   | Staged offer, demands, club response and signed states with animated cards and held/disabled actions.                                                                                                                                                                                                                                                                                                                          |
 | Narrative              | Story event, choices, result effects and empty-story state; entered from bottom.                                                                                                                                                                                                                                                                                                                                               |

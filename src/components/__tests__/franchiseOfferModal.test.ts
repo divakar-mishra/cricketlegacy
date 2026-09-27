@@ -1,28 +1,27 @@
 import fs from 'fs';
 import path from 'path';
 
-describe('FranchiseOfferModal auction-room presentation', () => {
+describe('FranchiseOfferModal club-choice presentation', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'FranchiseOfferModal.tsx'), 'utf8');
 
-  it('leads with the player lot, bidding paddles and cricket fit', () => {
-    expect(source).toContain('T20 FRANCHISE AUCTION · FINAL CALL');
-    expect(source).toContain('PLAYER LOT');
-    expect(source).toContain('BIDDING PADDLES');
-    expect(source).toContain('CRICKET FIT');
+  it('shows the approaching T20 clubs and cricket fit without auction jargon', () => {
+    expect(source).toContain('T20 CLUB OFFERS');
+    expect(source).toContain('clubs have approached you');
     expect(source).toContain('franchiseSquadFit');
+    expect(source).not.toContain('HAMMER BID');
+    expect(source).not.toContain('BIDDING PADDLES');
   });
 
-  it('keeps money on a contract sheet and explains the separate affiliation', () => {
-    expect(source).toContain('AGENT&apos;S CONTRACT SHEET');
-    expect(source).toContain('HAMMER BID');
+  it('shows the money the player actually receives, including on legacy saves', () => {
     expect(source).toContain('SEASON SALARY');
-    expect(source).toContain(
-      'T20 franchise contract',
-    );
+    expect(source).toContain('SIGNING BONUS');
+    expect(source).toContain('contractCoinsAtLeast(offer.wagePromise, currentSalary)');
+    expect(source).toContain('roundContractCoins(offer.signingBonus)');
+    expect(source).toContain('Your First-Class and List A club will not change.');
   });
 
-  it('does not fall back to the old salary-card offer list', () => {
-    expect(source).not.toContain('styles.offerCard');
-    expect(source).not.toContain('Clubs want to sign');
+  it('gives each club a direct sign action and a stay option', () => {
+    expect(source).toContain('Sign with ${club?.shortName');
+    expect(source).toContain('Stay with {currentClub?.shortName');
   });
 });
