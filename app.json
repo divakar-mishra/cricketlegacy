@@ -12,7 +12,7 @@
         ]
       }
     },
-    "version": "1.0.8",
+    "version": "1.0.9",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "com.coverdrive.cricket",
-      "versionCode": 8,
+      "versionCode": 13,
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#0A1912",
