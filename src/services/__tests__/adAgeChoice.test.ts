@@ -1,4 +1,11 @@
-import { AD_AGE_CHOICE_KEY, adAudience, ageToAdBand, readAdAgeChoice, saveAdAgeChoice } from '../adAgeChoice';
+import {
+  AD_AGE_CHOICE_KEY,
+  adAudience,
+  ageToAdBand,
+  isAgeChoiceEligible,
+  readAdAgeChoice,
+  saveAdAgeChoice,
+} from '../adAgeChoice';
 import { getJSON, removeKey, setJSON } from '../../storage/storage';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -39,15 +46,41 @@ describe('on-device ad age choice', () => {
     await setJSON('privacy:ad-age-choice:v2', 'under18');
     expect(await readAdAgeChoice()).toBeNull();
     await setJSON('privacy:ad-age-choice:v2', 'adult');
-    expect(await readAdAgeChoice()).toEqual({ band: 'adult', residence: null, guardianPermission: false });
+    expect(await readAdAgeChoice()).toEqual({
+      band: 'adult',
+      residence: null,
+      guardianPermission: false,
+    });
   });
 
   it('only admits adult or permitted teen outside India', () => {
     expect(adAudience(null)).toBe('none');
-    expect(adAudience({ band: 'under13', residence: null, guardianPermission: false })).toBe('none');
+    expect(adAudience({ band: 'under13', residence: null, guardianPermission: false })).toBe(
+      'none',
+    );
     expect(adAudience({ band: 'teen', residence: 'india', guardianPermission: true })).toBe('none');
-    expect(adAudience({ band: 'teen', residence: 'elsewhere', guardianPermission: false })).toBe('none');
-    expect(adAudience({ band: 'teen', residence: 'elsewhere', guardianPermission: true })).toBe('teen');
+    expect(adAudience({ band: 'teen', residence: 'elsewhere', guardianPermission: false })).toBe(
+      'none',
+    );
+    expect(adAudience({ band: 'teen', residence: 'elsewhere', guardianPermission: true })).toBe(
+      'teen',
+    );
     expect(adAudience({ band: 'adult', residence: null, guardianPermission: false })).toBe('adult');
+    expect(isAgeChoiceEligible(null)).toBe(false);
+    expect(
+      isAgeChoiceEligible({ band: 'under13', residence: null, guardianPermission: false }),
+    ).toBe(false);
+    expect(
+      isAgeChoiceEligible({ band: 'teen', residence: 'india', guardianPermission: true }),
+    ).toBe(false);
+    expect(
+      isAgeChoiceEligible({ band: 'teen', residence: 'elsewhere', guardianPermission: false }),
+    ).toBe(false);
+    expect(
+      isAgeChoiceEligible({ band: 'teen', residence: 'elsewhere', guardianPermission: true }),
+    ).toBe(true);
+    expect(isAgeChoiceEligible({ band: 'adult', residence: null, guardianPermission: false })).toBe(
+      true,
+    );
   });
 });

@@ -47,7 +47,7 @@ export function AppIntegrityGate({ children }: { children: ReactNode }) {
         <>
           <Text style={{ color: colors.textMuted, fontSize: 16 }}>
             {rejected
-              ? 'Google Play could not recognise this installation as an official licensed copy. Open Cricket Legacy on Google Play. Your saves have not been deleted.'
+              ? 'Google Play could not recognise this installation as an official licensed copy. Open Cricket: Player and Manager on Google Play. Your saves have not been deleted.'
               : 'Verification is unavailable. Check your connection and Google Play services, then retry. After a successful check, offline play is available.'}
           </Text>
           <Pressable

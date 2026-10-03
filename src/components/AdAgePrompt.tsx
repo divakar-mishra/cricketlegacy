@@ -1,26 +1,44 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Modal, StyleSheet, TextInput, View } from 'react-native';
+import { AppState, Linking, Modal, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PUBLIC_RESOURCES } from '../config/legal';
 import { MONETIZATION } from '../config/monetization';
 import { MODAL_PRIORITY, useModalQueue } from '../context/ModalQueueContext';
 import * as ads from '../services/ads';
-import { adAudience, ageToAdBand, AdAgeChoice, readAdAgeChoice, saveAdAgeChoice } from '../services/adAgeChoice';
+import {
+  adAudience,
+  ageToAdBand,
+  AdAgeChoice,
+  isAgeChoiceEligible,
+  readAdAgeChoice,
+  saveAdAgeChoice,
+} from '../services/adAgeChoice';
 import { useSettings } from '../state/settingsStore';
 import { fontSize, radius, spacing, useTheme } from '../theme';
 import { AppText as Text } from './AppText';
 import { Button } from './Button';
 
 /** One on-device, age-only choice before any ad SDK initialization. */
-export function AdAgePrompt() {
+export function AdAgePrompt({
+  onEligibilityChange,
+}: {
+  onEligibilityChange: (eligible: boolean) => void;
+}) {
   const { colors } = useTheme();
   const onboarded = useSettings((state) => state.hasOnboarded);
   const settingsReady = useSettings((state) => state.hasHydrated);
-  const [state, setState] = useState<'loading' | 'prompt' | 'saving' | 'done'>('loading');
+  const [state, setState] = useState<'loading' | 'prompt' | 'saving' | 'blocked' | 'done'>(
+    'loading',
+  );
   const [choice, setChoice] = useState<AdAgeChoice | null>(null);
   const [ageText, setAgeText] = useState('');
   const [step, setStep] = useState<'age' | 'residence' | 'permission'>('age');
   const [error, setError] = useState('');
-  const visible = useModalQueue((state === 'prompt' || state === 'saving') && onboarded && settingsReady, MODAL_PRIORITY.prompt, 'ad-age');
+  const visible = useModalQueue(
+    (state === 'prompt' || state === 'saving' || state === 'blocked') && settingsReady,
+    MODAL_PRIORITY.critical,
+    'ad-age',
+  );
 
   useEffect(() => {
     let active = true;
@@ -29,38 +47,58 @@ export function AdAgePrompt() {
         if (!active) return;
         if (choice) {
           setChoice(choice);
-          setState('done');
+          const eligible = isAgeChoiceEligible(choice);
+          onEligibilityChange(eligible);
+          setState(eligible ? 'done' : 'blocked');
         } else {
+          onEligibilityChange(false);
           setState('prompt');
         }
       })
       .catch(() => {
-        if (active) setState('prompt');
+        if (active) {
+          onEligibilityChange(false);
+          setState('prompt');
+        }
       });
-    return () => { active = false; };
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [onEligibilityChange]);
 
   useEffect(() => {
-    if (state !== 'done' || !choice) return undefined;
-    // Let the age modal finish closing before UMP displays a consent form.
-    const timer = setTimeout(() => {
-      void ads.configureAds(MONETIZATION.admob, adAudience(choice));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [choice, state]);
+    if (state !== 'done' || !choice || !onboarded) return undefined;
+    // Let onboarding and the age modal finish closing before UMP appears.
+    const configureIfNeeded = () => {
+      if (!ads.isAdsReady()) void ads.configureAds(MONETIZATION.admob, adAudience(choice));
+    };
+    const timer = setTimeout(configureIfNeeded, 300);
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') configureIfNeeded();
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [choice, onboarded, state]);
 
-  const persist = useCallback(async (selected: AdAgeChoice) => {
-    setState('saving');
-    setError('');
-    try {
-      await saveAdAgeChoice(selected);
-      setChoice(selected);
-      setState('done');
-    } catch {
-      setError('Could not save your choice on this device. Please try again.');
-      setState('prompt');
-    }
-  }, []);
+  const persist = useCallback(
+    async (selected: AdAgeChoice) => {
+      setState('saving');
+      setError('');
+      try {
+        await saveAdAgeChoice(selected);
+        setChoice(selected);
+        const eligible = isAgeChoiceEligible(selected);
+        onEligibilityChange(eligible);
+        setState(eligible ? 'done' : 'blocked');
+      } catch {
+        setError('Could not save your choice on this device. Please try again.');
+        setState('prompt');
+      }
+    },
+    [onEligibilityChange],
+  );
 
   const choose = useCallback(() => {
     if (state !== 'prompt') return;
@@ -79,44 +117,136 @@ export function AdAgePrompt() {
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={() => undefined}>
       <SafeAreaView style={styles.backdrop} edges={['top', 'right', 'bottom', 'left']}>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.text }]}>
-            {step === 'age' ? 'Your age' : step === 'residence' ? 'Where do you live?' : 'Parent or guardian permission'}
-          </Text>
-          <Text style={[styles.body, { color: colors.textMuted }]}>
-            {step === 'age'
-              ? 'Enter your age to continue. We save only an age group on this device.'
-              : step === 'residence'
-                ? 'Choose your country of residence to apply the right age rules.'
-                : 'Do you have permission from a parent or guardian to play?'}
-          </Text>
-          {step === 'age' ? (
+        <View
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          {state === 'blocked' ? (
             <>
-              <TextInput
-                accessibilityLabel="Your age"
-                value={ageText}
-                onChangeText={(value) => { setAgeText(value.replace(/[^0-9]/g, '')); setError(''); }}
-                keyboardType="number-pad"
-                maxLength={3}
-                placeholder="Age"
-                placeholderTextColor={colors.textMuted}
-                editable={state !== 'saving'}
-                style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg }]}
+              <Text style={[styles.title, { color: colors.text }]}>
+                This game is not available for your age group
+              </Text>
+              <Text style={[styles.body, { color: colors.textMuted }]}>
+                Players in India must be 18 or older. Elsewhere, players must be at least 13 and
+                have parent or guardian permission where required. Your saved games have not been
+                deleted.
+              </Text>
+              <Button
+                label="Correct my answer"
+                variant="secondary"
+                onPress={() => {
+                  setAgeText('');
+                  setStep('age');
+                  setState('prompt');
+                }}
               />
-              <Button label="Continue" variant="secondary" disabled={state === 'saving'} onPress={choose} />
-            </>
-          ) : step === 'residence' ? (
-            <>
-              <Button label="India" variant="secondary" disabled={state === 'saving'} onPress={() => void persist({ band: 'teen', residence: 'india', guardianPermission: false })} />
-              <Button label="Outside India" variant="secondary" disabled={state === 'saving'} onPress={() => setStep('permission')} />
+              {PUBLIC_RESOURCES.privacyPolicy ? (
+                <Button
+                  label="Privacy Policy"
+                  variant="secondary"
+                  onPress={() => {
+                    void Linking.openURL(PUBLIC_RESOURCES.privacyPolicy!).catch(() => undefined);
+                  }}
+                />
+              ) : null}
             </>
           ) : (
             <>
-              <Button label="Yes, I have permission" variant="secondary" disabled={state === 'saving'} onPress={() => void persist({ band: 'teen', residence: 'elsewhere', guardianPermission: true })} />
-              <Button label="No" variant="secondary" disabled={state === 'saving'} onPress={() => void persist({ band: 'teen', residence: 'elsewhere', guardianPermission: false })} />
+              <Text style={[styles.title, { color: colors.text }]}>
+                {step === 'age'
+                  ? 'Your age'
+                  : step === 'residence'
+                    ? 'Where do you live?'
+                    : 'Parent or guardian permission'}
+              </Text>
+              <Text style={[styles.body, { color: colors.textMuted }]}>
+                {step === 'age'
+                  ? 'Enter your age to continue. We save only an age group on this device.'
+                  : step === 'residence'
+                    ? 'Choose your country of residence to apply the right age rules.'
+                    : 'Do you have permission from a parent or guardian to play?'}
+              </Text>
+              {step === 'age' ? (
+                <>
+                  <TextInput
+                    accessibilityLabel="Your age"
+                    value={ageText}
+                    onChangeText={(value) => {
+                      setAgeText(value.replace(/[^0-9]/g, ''));
+                      setError('');
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    placeholder="Age"
+                    placeholderTextColor={colors.textMuted}
+                    editable={state !== 'saving'}
+                    style={[
+                      styles.input,
+                      {
+                        color: colors.text,
+                        borderColor: colors.border,
+                        backgroundColor: colors.bg,
+                      },
+                    ]}
+                  />
+                  <Button
+                    label="Continue"
+                    variant="secondary"
+                    disabled={state === 'saving'}
+                    onPress={choose}
+                  />
+                </>
+              ) : step === 'residence' ? (
+                <>
+                  <Button
+                    label="India"
+                    variant="secondary"
+                    disabled={state === 'saving'}
+                    onPress={() =>
+                      void persist({ band: 'teen', residence: 'india', guardianPermission: false })
+                    }
+                  />
+                  <Button
+                    label="Outside India"
+                    variant="secondary"
+                    disabled={state === 'saving'}
+                    onPress={() => setStep('permission')}
+                  />
+                </>
+              ) : (
+                <>
+                  <Button
+                    label="Yes, I have permission"
+                    variant="secondary"
+                    disabled={state === 'saving'}
+                    onPress={() =>
+                      void persist({
+                        band: 'teen',
+                        residence: 'elsewhere',
+                        guardianPermission: true,
+                      })
+                    }
+                  />
+                  <Button
+                    label="No"
+                    variant="secondary"
+                    disabled={state === 'saving'}
+                    onPress={() =>
+                      void persist({
+                        band: 'teen',
+                        residence: 'elsewhere',
+                        guardianPermission: false,
+                      })
+                    }
+                  />
+                </>
+              )}
+              {error ? (
+                <Text accessibilityRole="alert" style={{ color: colors.danger }}>
+                  {error}
+                </Text>
+              ) : null}
             </>
           )}
-          {error ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{error}</Text> : null}
         </View>
       </SafeAreaView>
     </Modal>

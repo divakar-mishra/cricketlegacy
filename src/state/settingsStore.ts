@@ -3,7 +3,16 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type GraphicsQuality = 'low' | 'medium' | 'high';
-export type ThemeMode = 'dark' | 'light' | 'system';
+export type Appearance = 'classic' | 'warm';
+export const APPEARANCE_PROMPT_MS = 20 * 60 * 1000;
+export function migrateAppearanceSettings(value: unknown) {
+  const old = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const { themeMode: _legacy, ...rest } = old;
+  return { ...rest, appearance: old.appearance === 'warm' ? 'warm' as const : 'classic' as const,
+    appearancePromptDone: old.appearancePromptDone === true,
+    appearancePlayMs: typeof old.appearancePlayMs === 'number' && Number.isFinite(old.appearancePlayMs)
+      ? Math.max(0, Math.min(APPEARANCE_PROMPT_MS, old.appearancePlayMs)) : 0 };
+}
 export type Language = 'en' | 'hi';
 
 interface SettingsState {
@@ -16,7 +25,11 @@ interface SettingsState {
   haptics: boolean;
   notifications: boolean;
   graphics: GraphicsQuality;
-  themeMode: ThemeMode;
+  appearance: Appearance;
+  appearancePlayMs: number;
+  appearancePromptDone: boolean;
+  addAppearancePlayTime: (ms: number) => void;
+  dismissAppearancePrompt: () => void;
   language: Language;
   hasOnboarded: boolean;
   hasHydrated: boolean;
@@ -30,7 +43,7 @@ interface SettingsState {
   setHaptics: (v: boolean) => void;
   setNotifications: (v: boolean) => void;
   setGraphics: (v: GraphicsQuality) => void;
-  setThemeMode: (v: ThemeMode) => void;
+  setAppearance: (v: Appearance) => void;
   setLanguage: (v: Language) => void;
   setOnboarded: (v: boolean) => void;
   setHydrated: () => void;
@@ -49,7 +62,9 @@ const DEFAULTS = {
   haptics: true,
   notifications: true,
   graphics: 'high' as GraphicsQuality,
-  themeMode: 'dark' as ThemeMode,
+  appearance: 'classic' as Appearance,
+  appearancePlayMs: 0,
+  appearancePromptDone: false,
   language: 'en' as Language,
   hasOnboarded: false,
   playedMatchesAllModes: 0,
@@ -69,7 +84,10 @@ export const useSettings = create<SettingsState>()(
       setHaptics: (haptics) => set({ haptics }),
       setNotifications: (notifications) => set({ notifications }),
       setGraphics: (graphics) => set({ graphics }),
-      setThemeMode: (themeMode) => set({ themeMode }),
+      setAppearance: (appearance) => set({ appearance, appearancePromptDone: true }),
+      dismissAppearancePrompt: () => set({ appearancePromptDone: true }),
+      addAppearancePlayTime: (ms) => set(s => ({ appearancePlayMs: s.appearancePromptDone ? s.appearancePlayMs
+        : Math.min(APPEARANCE_PROMPT_MS, s.appearancePlayMs + (Number.isFinite(ms) ? Math.max(0, ms) : 0)) })),
       setLanguage: (language) => set({ language }),
       setOnboarded: (hasOnboarded) => set({ hasOnboarded }),
       setHydrated: () => set({ hasHydrated: true }),
@@ -86,6 +104,8 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: 'cricket:settings',
+      version: 1,
+      migrate: (state) => migrateAppearanceSettings(state),
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         usageAnalytics: s.usageAnalytics,
@@ -95,7 +115,9 @@ export const useSettings = create<SettingsState>()(
         haptics: s.haptics,
         notifications: s.notifications,
         graphics: s.graphics,
-        themeMode: s.themeMode,
+        appearance: s.appearance,
+        appearancePlayMs: s.appearancePlayMs,
+        appearancePromptDone: s.appearancePromptDone,
         language: s.language,
         hasOnboarded: s.hasOnboarded,
         playedMatchesAllModes: s.playedMatchesAllModes,

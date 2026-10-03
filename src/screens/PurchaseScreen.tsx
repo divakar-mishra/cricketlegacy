@@ -38,6 +38,7 @@ import { formatClubCurrency } from '../game/finance';
 import { facilityUpgradeCost } from '../game/manager';
 import { hasModeVip, vipProductId } from '../game/vip';
 import { premiumSponsorStoreUnlocked, premiumSponsorWeeklyRate } from '../game/sponsorship';
+import { useAdsReady } from '../hooks/useAdsReady';
 import { useIsCompact } from '../hooks/useResponsive';
 import { useCareer } from '../state/careerStore';
 import {
@@ -337,6 +338,8 @@ function ProductRow({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
+  const compact = useIsCompact(560);
+  const rewardedEnergyAvailable = useAdsReady();
   const save = useCareer((s) => s.save);
   const purchaseProduct = useCareer((s) => s.purchaseProduct);
   const restorePurchases = useCareer((s) => s.restorePurchases);
@@ -357,7 +360,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
   const rewardedEnergyPendingRef = useRef(false);
   const rewardedEnergyAttemptRef = useRef(0);
   const storeSetupPending = !purchases.MOCK_MODE && !purchases.isStoreReady();
-  const unavailableLabel = storeSetupPending ? 'Coming soon' : 'Unavailable';
+  const unavailableLabel = storeSetupPending ? 'Store unavailable' : 'Unavailable';
   const storeName = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
 
   // The one-time Starter Pack starts only after the first completed match.
@@ -432,7 +435,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
         res.ok
           ? purchases.isSaveSponsorProduct(p.id)
             ? `${p.title} is now bound to this save.`
-            : `${p.title} applied to your account.`
+            : `${p.title} applied to this career.`
           : (PURCHASE_ERROR_MESSAGE[res.error ?? ''] ?? res.error ?? 'Please try again.'),
       );
     } catch {
@@ -675,7 +678,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
         ];
       case 'remove_ads':
         return [
-          'Permanent ad removal',
+          'Removes banners and interstitials; optional rewarded ads remain available',
           'Training Focus capacity increased to 60',
           '20% more Wallet Coins from match rewards',
         ];
@@ -744,7 +747,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
     }
     if (!purchases.isProductAvailable(product)) {
       return storeSetupPending
-        ? `${storeName} checkout will activate after product setup is finished.`
+        ? `${storeName} is unavailable. Check your connection and try again.`
         : 'Price unavailable. Try again later.';
     }
     if (purchases.isSaveSponsorProduct(product.id) && !purchases.isSaveSponsorCheckoutReady()) {
@@ -793,7 +796,6 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
     save?.mode === 'manager' ? 'MANAGER LEGACY EDITION' : 'PLAYER LEGEND EDITION';
   const legendBundleTitle =
     save?.mode === 'manager' ? 'Build a Dynasty' : 'The Ultimate Player Edition';
-  const rewardedEnergyAvailable = ads.isAdsReady() || ads.isReady('rewarded');
 
   const onWatchEnergyAd = async () => {
     if (rewardedEnergyPendingRef.current) return;
@@ -805,7 +807,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
     const transactionId = `store-energy:${save?.id ?? 'unknown'}:${Date.now()}:${++rewardedEnergyAttemptRef.current}`;
     setBusy('rewarded_energy');
     try {
-      const res = await ads.showRewarded(!removeAds);
+      const res = await ads.showRewarded();
       if (!res.completed) {
         Alert.alert('Ad unavailable', 'Please try again in a moment.');
         return;
@@ -887,7 +889,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
         <View style={styles.storePendingCard}>
           <Ionicons name="storefront-outline" size={22} color={colors.info} />
           <View style={styles.storePendingCopy}>
-            <Text style={styles.storePendingTitle}>Checkout coming soon</Text>
+            <Text style={styles.storePendingTitle}>Store unavailable</Text>
           </View>
         </View>
       ) : null}
@@ -1075,7 +1077,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
                     label={
                       purchases.isProductAvailable(legendProduct)
                         ? `Buy · ${legendProduct.priceString} once`
-                        : 'Coming soon'
+                        : 'Unavailable'
                     }
                     variant="gold"
                     loading={busy === legendProduct.id}
@@ -1107,7 +1109,11 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
             <Animated.View entering={FadeInDown.duration(320).delay(80)}>
               <LinearGradient
                 colors={[colors.info + '22', colors.surface]}
-                style={[styles.passCard, { borderColor: colors.info }]}
+                style={[
+                  styles.passCard,
+                  { borderColor: colors.info },
+                  (compact || expandedFeatureCard === passProduct.id) && styles.passCardStacked,
+                ]}
               >
                 <View style={styles.passLeft}>
                   <View style={styles.specialTitleRow}>
@@ -1153,18 +1159,18 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
                       ? '✓ Active'
                       : purchases.isProductAvailable(passProduct)
                         ? passProduct.priceString
-                        : 'Coming soon'
+                        : 'Unavailable'
                   }
                   variant={hasModeVip(save) ? 'secondary' : 'primary'}
                   size="sm"
-                  fullWidth={false}
+                  fullWidth={compact || expandedFeatureCard === passProduct.id}
                   disabled={
                     !save || busy != null ||
                     hasModeVip(save) ||
                     !purchases.isProductAvailable(passProduct)
                   }
                   onPress={() => navigation.navigate('SeasonPass')}
-                  style={{ flexShrink: 0 }}
+                  style={compact || expandedFeatureCard === passProduct.id ? undefined : styles.passButton}
                 />
               </LinearGradient>
             </Animated.View>
@@ -1615,7 +1621,9 @@ const makeStyles = (colors: ThemeColors) =>
       padding: spacing.lg,
       marginTop: spacing.md,
     },
-    passLeft: { flex: 1 },
+    passCardStacked: { flexDirection: 'column', alignItems: 'stretch' },
+    passLeft: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
+    passButton: { maxWidth: '40%' },
     passHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
     passTitle: {
       color: colors.text,

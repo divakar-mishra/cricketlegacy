@@ -22,7 +22,7 @@ describe('newspaper sharing flow', () => {
     expect(logo).toBeGreaterThanOrEqual(0);
     expect(visibleLogo).toBeGreaterThan(captureStart);
     expect(gameName).toBeGreaterThan(captureStart);
-    expect(modal).toContain('accessibilityLabel="Cricket Legacy game logo"');
+    expect(modal).toContain('accessibilityLabel="Cricket: Player and Manager game logo"');
     expect(modal).toContain('compact && styles.headlineCompact');
     expect(modal).toContain('narrow && styles.subheadlineNarrow');
     expect(modal).toContain('style={styles.scroll}');

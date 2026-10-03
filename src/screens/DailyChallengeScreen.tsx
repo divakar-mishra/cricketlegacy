@@ -99,8 +99,8 @@ export function DailyChallengeScreen({ navigation }: ScreenProps<'DailyChallenge
   const onShare = useCallback(async () => {
     try {
       await Share.share({
-        message: `I just completed today's Cricket Legacy Daily Challenge — "${challenge.title}"! 🏏 Score ${challenge.targetRuns}+ in ${challenge.targetBalls} balls. Can you beat it? #CricketLegacy`,
-        title: 'Cricket Legacy Daily Challenge',
+        message: `I just completed today's Cricket: Player and Manager Daily Challenge — "${challenge.title}"! 🏏 Score ${challenge.targetRuns}+ in ${challenge.targetBalls} balls. Can you beat it? #CricketPlayerManager`,
+        title: 'Cricket: Player and Manager Daily Challenge',
       });
     } catch {
       /* optional */

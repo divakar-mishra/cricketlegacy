@@ -26,7 +26,7 @@ import {
 import { LANGUAGE_OPTIONS, useT } from '../i18n';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
-import { GraphicsQuality, ThemeMode, useSettings } from '../state/settingsStore';
+import { GraphicsQuality, Appearance, useSettings } from '../state/settingsStore';
 import { fontSize, fontWeight, spacing, ThemeColors, useTheme, useThemedStyles } from '../theme';
 
 const GRAPHICS_OPTIONS: { id: GraphicsQuality; label: string; description: string }[] = [
@@ -65,10 +65,9 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
           }))
       : [];
 
-  const themeOptions: { id: ThemeMode; label: string }[] = [
-    { id: 'dark', label: t('settings.themeDark') },
-    { id: 'light', label: t('settings.themeLight') },
-    { id: 'system', label: t('settings.themeSystem') },
+  const themeOptions: { id: Appearance; label: string }[] = [
+    { id: 'classic', label: 'Classic — original green & gold' },
+    { id: 'warm', label: 'Warm — charcoal, cream & bronze' },
   ];
 
   const nonReleaseBuild = typeof __DEV__ !== 'undefined' && __DEV__;
@@ -257,8 +256,8 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
           <SelectableCard
             key={opt.id}
             title={opt.label}
-            selected={s.themeMode === opt.id}
-            onPress={() => s.setThemeMode(opt.id)}
+            selected={s.appearance === opt.id}
+            onPress={() => s.setAppearance(opt.id)}
           />
         ))}
       </View>

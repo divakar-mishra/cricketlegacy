@@ -49,11 +49,15 @@ const invalid = [];
 const configuredResources = [];
 const configuredUrls = new Set();
 let legalSiteErrors = [];
+let expectedAppName = '';
+let expectedAppNameInHtml = '';
 
 try {
   const legalSiteConfig = JSON.parse(
     fs.readFileSync(new URL('../legal-site/legal.config.json', import.meta.url), 'utf8'),
   );
+  expectedAppName = typeof legalSiteConfig.appName === 'string' ? legalSiteConfig.appName : '';
+  expectedAppNameInHtml = expectedAppName.replaceAll('&', '&amp;');
   legalSiteErrors = validateLegalConfig(legalSiteConfig);
 } catch (error) {
   legalSiteErrors = [
@@ -112,10 +116,10 @@ if (missing.length || invalid.length || legalSiteErrors.length) {
         !contentType.includes('text/html') ||
         !body.includes(`data-legal-page="${resource.pageId}"`) ||
         !body.includes('Sunlight') ||
-        !body.includes('Cricket Legacy')
+        !body.includes(expectedAppNameInHtml)
       ) {
         unavailable.push(
-          `${resource.label} did not return the expected public Cricket Legacy HTML page`,
+          `${resource.label} did not return the expected public ${expectedAppName} HTML page`,
         );
       }
     } catch (error) {
@@ -142,7 +146,7 @@ if (missing.length || invalid.length || legalSiteErrors.length) {
         !body.includes('data-legal-page="publisher"') ||
         !body.includes('Divakar Mishra') ||
         !body.includes('Sunlight') ||
-        !body.includes('Cricket Legacy')
+        !body.includes(expectedAppNameInHtml)
       ) {
         unavailable.push('Publisher Information did not return the expected legal identity page');
       }

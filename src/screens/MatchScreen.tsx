@@ -5,6 +5,7 @@ import { personalCelebrationId } from '../components/celebrationPresentation';
 import { matchGroundAppearance } from '../components/venueVisuals';
 import {
   AppState,
+  Animated as NativeAnimated,
   BackHandler,
   Modal,
   Platform,
@@ -24,6 +25,7 @@ import Animated, {
   SlideInUp,
   useAnimatedStyle,
   useSharedValue,
+  useReducedMotion,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
@@ -51,7 +53,7 @@ import {
   WagonWheel,
 } from '../components';
 import { getAchievement } from '../game/achievements';
-import { moment, music } from '../audio';
+import { deliveryMoment, haptics, matchMusicScene, moment, music, preloadMatchSounds } from '../audio';
 import { ads } from '../services';
 import { FORMATS } from '../data/gameConfig';
 import {
@@ -80,6 +82,9 @@ import { LiveMatch, MatchBallStep } from '../engine/liveMatch';
 import { drsAvailableForMatch, isReviewableDismissal } from '../game/drs';
 import { careerSkipAction, continueSkipAfterInningsBreak } from '../game/matchSkip';
 import { deliveryDelayMs, MATCH_SPEED_OPTIONS, MatchSpeed } from '../game/matchTiming';
+import { playDelivery, shouldRenderDelivery } from '../game/deliveryPlayback';
+import { play as playSound } from '../audio/sfx';
+import { DELIVERY_RUN_UP_MS, DELIVERY_ROLE_MOTION_MS, deliveryBallFlightMs, deliveryVisualDurationMs } from '../components/fieldMotion';
 import { shotAngle, shotReach } from '../engine/shots';
 import { matchObjective } from '../game/progression';
 import { tacticalImpactSummary, tacticChangeImpact, tacticSelectionSummary } from '../game/tactics';
@@ -106,6 +111,7 @@ import {
 } from '../theme';
 import { HeroBackground, VictoryHero } from '../components/HeroBackground';
 import { useSettings } from '../state/settingsStore';
+import { useAdsReady } from '../hooks/useAdsReady';
 
 type Phase = 'loading' | 'prematch' | 'live' | 'saving' | 'save-error' | 'done' | 'empty';
 type Mode = 'WATCH' | 'KEY' | 'INSTANT';
@@ -467,6 +473,7 @@ function FullInningsScorecard({
 }
 
 export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
+  const rewardedAdsAvailable = useAdsReady();
   const intl = route.params?.intl ?? false;
   const daily = route.params?.daily ?? false;
   const save = useCareer((s) => s.save);
@@ -587,6 +594,14 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   const [result, setResult] = useState<PlayResult | null>(null);
   const [settlementError, setSettlementError] = useState<string | null>(null);
   const [lastShot, setLastShot] = useState<LastShot | null>(null);
+  const [deliveryResolved, setDeliveryResolved] = useState(true);
+  const fieldPlayback = useRef({
+    ball: new NativeAnimated.Value(0), roles: new NativeAnimated.Value(0),
+    reaction: new NativeAnimated.Value(0),
+  }).current;
+  const playbackRef = useRef<ReturnType<typeof playDelivery> | null>(null);
+  const playbackEpoch = useRef(0);
+  const reducedMotion = useReducedMotion();
   const [fieldWidth, setFieldWidth] = useState(280);
   const [celebration, setCelebration] = useState<{ trigger: number; kind: CelebrationKind; cosmeticId?: string }>({
     trigger: 0,
@@ -652,8 +667,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   );
 
   useEffect(() => {
-    if (phase === 'prematch' || phase === 'live') music.setMusicScene('MATCH_CALM');
-    else if (phase === 'done') music.setMusicScene(result?.userWon ? 'VICTORY' : 'DEFEAT');
+    music.setMusicScene(matchMusicScene(phase, result?.userWon));
+    if (phase === 'prematch') preloadMatchSounds();
   }, [phase, result?.userWon]);
 
   // Grade A/U19 careers control the pathway XI rather than save.userTeamId
@@ -741,6 +756,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     appPausedRef.current = AppState.currentState !== 'active';
     const sub = AppState.addEventListener('change', (nextState) => {
       appPausedRef.current = nextState !== 'active';
+      playbackEpoch.current += 1;
     });
     return () => sub.remove();
   }, []);
@@ -927,23 +943,13 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   }, []);
 
   const applyStep = useCallback(
-    (step: MatchBallStep) => {
+    (step: MatchBallStep, presented = false, renderStep?: boolean, silent = false) => {
       const ev = step.event;
       const tone = toneFor(ev);
       const stepId = (feedId.current += 1);
       fastRenderCountRef.current += 1;
-      const speed = speedMultRef.current;
-      const mustRender =
-        speed === 1 ||
-        step.overComplete ||
-        step.inningsBreak ||
-        step.matchComplete ||
-        step.event.isWicket ||
-        Boolean(step.milestone) ||
-        step.event.outcome === '4' ||
-        step.event.outcome === '6';
-      renderCurrentStepRef.current =
-        mustRender || fastRenderCountRef.current % Math.max(1, speed) === 0;
+      renderCurrentStepRef.current = renderStep ??
+        shouldRenderDelivery(step, speedMultRef.current, fastRenderCountRef.current);
 
       // Track partnership runs/balls — reset on wicket
       if (ev.isWicket) {
@@ -1027,7 +1033,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
 
       // Keep the 2D field alive at every speed. Fast modes update only on their
       // batched render step, so they remain readable without flooding the UI.
-      if (renderCurrentStepRef.current && ev.outcome !== 'WD' && ev.outcome !== 'NB') {
+      if (!presented && renderCurrentStepRef.current && ev.outcome !== 'WD' && ev.outcome !== 'NB') {
         setLastShot({
           key: stepId,
           angleDeg: shotAngle(ev),
@@ -1037,14 +1043,19 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           delivery: ev.delivery,
           shot: ev.shot,
           dismissalType: ev.dismissal?.type,
+          outcome: ev.outcome,
         });
       }
-      // Sound + haptic + celebration juice (milestone takes priority).
-      const showCinematic = speedMultRef.current === 1;
+      // Every presented contact gets its sound at any speed. Milestones add
+      // their cheer without suppressing the impact that brought them up.
+      const deliverySound = deliveryMoment(ev);
+      if (!silent && !presented && renderCurrentStepRef.current && !instant.current && deliverySound) moment(deliverySound);
+      // Cinematics stay limited to normal speed; they do not gate sound.
+      const showCinematic = speedMultRef.current === 1 && !silent;
       const personalEffect = personalCelebrationId({ mode, playerId: userPlayerId,
         equippedId: save?.cosmetics?.celebration, event: ev, milestonePlayerId: step.milestone?.playerId });
       if (step.milestone) {
-        moment(step.milestone.kind === 'HUNDRED' ? 'hundred' : 'fifty');
+        if (!silent) moment(step.milestone.kind === 'HUNDRED' ? 'hundred' : 'fifty');
         if (showCinematic) {
           fireCelebration(step.milestone.kind === 'HUNDRED' ? 'hundred' : 'fifty', personalEffect);
         }
@@ -1053,7 +1064,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           tone: 'gold',
         });
       } else if (ev.isWicket) {
-        moment('wicket');
         if (showCinematic) {
           fireCelebration('wicket', personalEffect);
           // Wicket cinematic: screen flash + camera shake
@@ -1072,7 +1082,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         }
       } else if (ev.outcome === '6') {
         if (showCinematic) {
-          moment('six');
           fireCelebration('six', personalEffect);
         }
         if (showCinematic && ev.strikerId === userPlayerId) {
@@ -1080,7 +1089,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         }
       } else if (ev.outcome === '4') {
         if (showCinematic) {
-          moment('four');
           fireCelebration('four', personalEffect);
         }
         if (showCinematic && ev.strikerId === userPlayerId) {
@@ -1099,7 +1107,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         setReviewableWicket(null);
         stancePauseRef.current = false;
         setShowStancePicker(false);
-        moment('crowd');
+        if (!silent) moment('crowd');
         if (showCinematic) fireCelebration('innings');
         const isTest = lmRef.current?.format === 'TEST';
         flashBanner({
@@ -1351,13 +1359,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           if (step.event.isWicket) evidence.wickets += 1;
         }
 
-        // Batch all per-ball state updates into ONE React render cycle.
-        // Without this, applyStep + updateCrease each cause a separate render.
-        unstable_batchedUpdates(() => {
-          applyStep(step);
-          if (renderCurrentStepRef.current) updateCrease(lm);
-        });
-
         // Last-over tension: auto-drop 4× to 2× once so the climax is readable.
         const ballsLeft = lm.scoreState.ballsRemaining;
         if (
@@ -1370,10 +1371,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           autoSlowedRef.current = true;
           changeSpeed(2);
         }
-        if (ballsLeft != null && ballsLeft <= 12 && ballsLeft > 0) {
-          music.setMusicScene('MATCH_TENSE');
-        }
-        if (step.inningsBreak) music.setMusicScene('MATCH_CALM');
 
         // A "key moment" worth lingering on: a boundary, wicket, milestone,
         // innings break, or a genuinely tense game state (death overs / tight
@@ -1386,29 +1383,99 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
           step.inningsBreak ||
           isKeyMoment(lm);
 
-        if (!instant.current) {
-          if (chosen === 'KEY' && !isKeyBall) {
-            // Highlights mode: fast-forward the quiet deliveries.
-            await sleep(
-              deliveryDelayMs({
-                speed: speedMultRef.current,
-                userBatting,
-                keyHighlightsMode: true,
-                keyBall: false,
-              }),
-            );
-          } else {
-            await sleep(
-              deliveryDelayMs({
-                speed: speedMultRef.current,
-                userBatting,
-                keyBall: isKeyBall,
-                inningsBreak: step.inningsBreak,
-                wicketOrMilestone: step.event.isWicket || Boolean(step.milestone),
-              }),
-            );
-          }
+        const quietHighlight = chosen === 'KEY' && !isKeyBall;
+        const renderStep = shouldRenderDelivery(step, speedMultRef.current, fastRenderCountRef.current + 1);
+        const ev = step.event;
+        const tone = toneFor(ev);
+        const shot: LastShot = {
+          key: feedId.current + 1, angleDeg: shotAngle(ev),
+          reach: shotReach(ev.runs, ev.outcome === '6'), tone, runs: ev.runs,
+          delivery: ev.delivery, shot: ev.shot, dismissalType: ev.dismissal?.type, outcome: ev.outcome,
+        };
+        const canAnimate = renderStep && !quietHighlight && speedMultRef.current === 1 &&
+          !reducedMotion && useSettings.getState().graphics !== 'low' &&
+          ev.outcome !== 'WD' && ev.outcome !== 'NB';
+        const delayInput = {
+          userBatting, keyHighlightsMode: quietHighlight, keyBall: isKeyBall,
+          inningsBreak: step.inningsBreak,
+          wicketOrMilestone: ev.isWicket || Boolean(step.milestone),
+        };
+        const durationMs = deliveryDelayMs({ ...delayInput, speed: 1 });
+        const resolveMs = Math.min(durationMs, deliveryVisualDurationMs(tone));
+        fieldPlayback.ball.setValue(0);
+        fieldPlayback.roles.setValue(0);
+        fieldPlayback.reaction.setValue(0);
+        if (renderStep) {
+          setDeliveryResolved(false);
+          // Static/fast presentations keep the previous frame until reveal.
+          if (canAnimate) setLastShot(shot);
         }
+        let feedbackCurrent = true;
+        const feedbackAllowed = () => feedbackCurrent && !cancelled.current && !instant.current &&
+          !appPausedRef.current && !manualPauseRef.current && !commentaryPauseRef.current &&
+          !tacticsPauseRef.current && !stancePauseRef.current && !guidePauseRef.current &&
+          !skipToBatRef.current && !skipRestOfInningsRef.current;
+        let lastVisualMs = -1;
+        const playback = playDelivery({
+          durationMs,
+          contactMs: Math.min(resolveMs, DELIVERY_RUN_UP_MS + deliveryBallFlightMs(tone) * 0.46),
+          resolveMs,
+          controls: () => ({
+            paused: appPausedRef.current || manualPauseRef.current || commentaryPauseRef.current ||
+              tacticsPauseRef.current || stancePauseRef.current || guidePauseRef.current,
+            skip: instant.current || skipToBatRef.current || skipRestOfInningsRef.current,
+            epoch: playbackEpoch.current,
+            rate: durationMs / deliveryDelayMs({ ...delayInput, speed: speedMultRef.current }),
+          }),
+          onFrame: (elapsed) => {
+            if (!canAnimate) return;
+            // A small post-result response uses the same pausable clock, not a timer.
+            fieldPlayback.reaction.setValue(Math.max(0, Math.min(1,
+              (elapsed - resolveMs) / Math.max(1, Math.min(600, durationMs - resolveMs)))));
+            const visualMs = Math.min(resolveMs, elapsed);
+            if (visualMs === lastVisualMs) return;
+            lastVisualMs = visualMs;
+            fieldPlayback.ball.setValue(Math.max(0, Math.min(1,
+              (elapsed - DELIVERY_RUN_UP_MS) / deliveryBallFlightMs(tone))));
+            fieldPlayback.roles.setValue(Math.min(1, elapsed / DELIVERY_ROLE_MOTION_MS));
+          },
+          onContact: () => {
+            if (!renderStep || quietHighlight) return;
+            const sound = deliveryMoment(ev);
+            // Boundary cheers and wickets belong to resolution, not bat contact.
+            if (sound === 'bat' || sound === 'four' || sound === 'six' ||
+              (ev.isWicket && ev.dismissal?.type === 'CAUGHT')) {
+              const contactEpoch = playbackEpoch.current;
+              playSound('bat', () => feedbackAllowed() && playbackEpoch.current === contactEpoch);
+            }
+          },
+          onResolve: (skipped) => {
+            unstable_batchedUpdates(() => {
+              applyStep(step, true, renderStep, skipped);
+              if (renderStep) {
+                setDeliveryResolved(true);
+                if (!canAnimate) setLastShot(shot);
+                updateCrease(lm);
+              }
+            });
+            if (skipped || !renderStep || quietHighlight) return;
+            if (ev.isWicket) {
+              const resolveEpoch = playbackEpoch.current;
+              playSound('wicket', () => feedbackAllowed() && playbackEpoch.current === resolveEpoch);
+              haptics.notify(haptics.NotifyType.Warning);
+            }
+            else if (ev.outcome === '4') haptics.impact(haptics.ImpactStyle.Light);
+            else if (ev.outcome === '6') {
+              haptics.impact(haptics.ImpactStyle.Heavy);
+              if (!step.milestone) moment('crowd');
+            }
+          },
+        });
+        playbackRef.current = playback;
+        const completed = await playback.done;
+        feedbackCurrent = false;
+        if (playbackRef.current === playback) playbackRef.current = null;
+        if (!completed || cancelled.current) return;
 
         // Over-end summary card
         if (step.overComplete && !instant.current && speedMultRef.current === 1) {
@@ -1519,6 +1586,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     setPhase('prematch');
     return () => {
       cancelled.current = true;
+      playbackRef.current?.cancel();
+      playbackRef.current = null;
       skipToBatRef.current = false;
       skipRestOfInningsRef.current = false;
       skipBusyRef.current = false;
@@ -2232,7 +2301,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             ? 'No Result'
             : 'Defeat';
     const headlineColor = userWon ? colors.success : neutralOutcome ? colors.accent : colors.danger;
-    const rewardedAdsAvailable = ads.isAdsReady() || ads.isReady('rewarded');
     return (
       <>
         <Screen
@@ -2962,6 +3030,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               groundAppearance={matchGroundAppearance(setup?.stadiumId, save.managerClubs)}
               groundPrimaryColor={setup ? save.teams[setup.homeTeamId]?.primaryColor : undefined}
               lastShot={lastShot}
+              playback={fieldPlayback}
+              deliveryResolved={deliveryResolved}
               stadiumTheme={save?.seasonPassExperience?.selectedStadiumTheme}
               animate={!fastMatchUi}
               userBatterPosition={userBatterPosition}
@@ -4147,11 +4217,12 @@ const makeStyles = (colors: ThemeColors) =>
     },
     footerBtn: { flexGrow: 1, flexShrink: 1, minWidth: 104, maxWidth: 190 },
     pauseControl: {
-      flexGrow: 1,
-      flexShrink: 1,
-      minWidth: 104,
-      maxWidth: 190,
-      minHeight: 52,
+      flexGrow: 0,
+      flexShrink: 0,
+      minWidth: 72,
+      minHeight: 48,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
       borderRadius: radius.md,
       borderWidth: 1,
       borderColor: colors.borderStrong,
@@ -4161,8 +4232,8 @@ const makeStyles = (colors: ThemeColors) =>
       overflow: 'hidden',
     },
     pauseControlText: {
-      color: colors.white,
-      fontSize: fontSize.md,
+      color: colors.text,
+      fontSize: fontSize.sm,
       fontWeight: fontWeight.bold,
       fontFamily: fonts.bold,
       letterSpacing: 0.3,

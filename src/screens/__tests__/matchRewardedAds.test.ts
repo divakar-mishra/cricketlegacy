@@ -5,7 +5,7 @@ describe('MatchScreen rewarded ad result UI', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'MatchScreen.tsx'), 'utf8');
 
   it('disables result-screen ad rewards when no provider is ready', () => {
-    expect(source).toContain('const rewardedAdsAvailable = ads.isAdsReady() || ads.isReady');
+    expect(source).toContain('const rewardedAdsAvailable = useAdsReady();');
     expect(source).toContain('Rewarded ads unavailable');
     expect(source).toContain('disabled');
   });

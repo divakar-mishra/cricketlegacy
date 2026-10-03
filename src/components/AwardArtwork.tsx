@@ -16,7 +16,7 @@ export function AwardArtwork({ kind, size = 144 }: { kind: AwardArtworkKind; siz
       <Path d="M57 7H75L56 55 41 44Z" fill="#BD4550" />
       <Circle cx="50" cy="61" r="29" fill="#131925" stroke={metal} strokeWidth="4" />
       <Circle cx="50" cy="61" r="24" fill={metal} />
-      <Circle cx="50" cy="61" r="20" fill="none" stroke="#45515C" strokeOpacity=".4" />
+      <Circle cx="50" cy="61" r="20" fill="none" stroke="#45515C" strokeOpacity="0.4" />
       <SvgText x="50" y="71" fill="#28303B" fontSize="30" fontWeight="bold" textAnchor="middle">{kind === 'silver' ? '2' : '3'}</SvgText>
     </Svg>;
   }

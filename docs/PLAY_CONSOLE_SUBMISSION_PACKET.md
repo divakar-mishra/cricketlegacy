@@ -41,6 +41,8 @@ These are local checks, not device SDK/production-backend or public deployment t
 
 ## 1. English store listing — copy-ready
 
+> Superseded by the current [Cricket: Player and Manager listing copy](../marketing/capture-2026-09/PLAY_STORE_LISTING.md). The older Cricket Legacy text below is retained as release history.
+
 App name: `Cricket Legacy`
 
 Short description (maximum 80 characters):

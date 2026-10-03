@@ -9,20 +9,20 @@ export const PRIVACY_POLICY_UPDATE_DATE = '13 September 2026';
 export const PRIVACY_CONTACT_EMAIL = 'devsunlightpvt@gmail.com';
 
 /**
- * Native, offline-readable copy of the published Cricket Legacy policy.
+ * Native, offline-readable copy of the published Cricket: Player and Manager policy.
  * Keep this synchronized with legal-site/build-core.cjs and legal.config.json.
  */
 export const PRIVACY_POLICY_SECTIONS: readonly PrivacyPolicySection[] = [
   {
     title: 'Scope of this policy',
     paragraphs: [
-      'This policy applies specifically to Cricket Legacy and its related support and web pages. It does not apply to other apps published by Sunlight; those apps have their own privacy policies.',
+      'This policy applies specifically to Cricket: Player and Manager and its related support and web pages. It does not apply to other apps published by Sunlight; those apps have their own privacy policies.',
     ],
   },
   {
     title: 'Who is responsible',
     paragraphs: [
-      'Sunlight provides Cricket Legacy and is responsible for the personal data described here. Sunlight is operated by Divakar Mishra, an individual developer in Maharashtra, India.',
+      'Sunlight provides Cricket: Player and Manager and is responsible for the personal data described here. Sunlight is operated by Divakar Mishra, an individual developer in Maharashtra, India.',
       `Privacy and support contact: ${PRIVACY_CONTACT_EMAIL}`,
     ],
   },
@@ -34,7 +34,7 @@ export const PRIVACY_POLICY_SECTIONS: readonly PrivacyPolicySection[] = [
       'Purchases: product, entitlement, transaction status and pseudonymous verification identifiers supplied by Google Play, Apple or RevenueCat. Sunlight does not receive your full payment-card number.',
       'Online play and security: leaderboard entries you submit, server timestamps, app/build version, fraud checks, IP address and service logs.',
       'Age preferences: your self-declared age band, India/outside-India choice and, where applicable, parent or guardian permission are stored on your device. The app does not ask for a date of birth or upload these answers.',
-      'Advertising: Google Mobile Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices. Ads are not initialized for unknown-age users, children under 13, teens in India, or teens without parent or guardian permission. Eligible teens outside India receive child-directed, G-rated, non-personalized ads. Adult ads are also requested non-personalized. Both eligible groups wait for the Google consent flow to permit requests.',
+      'Advertising: Google Mobile Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices. Ads are not initialized for unknown-age users, children under 13, teens in India, or teens without parent or guardian permission. Eligible teens outside India receive child-directed, G-rated, non-personalized ads. For adults, Google uses the consent choice to determine whether personalized, non-personalized, or eligible limited ads may be served. Both eligible groups wait for the Google consent flow to permit requests. Declining consent does not guarantee that a limited ad will be available.',
       'Support: your email address, message and attachments if you contact support.',
       'Optional diagnostics: if enabled in Settings, Firebase Analytics may process app-instance identifiers, app/device information, sessions and limited gameplay or purchase events. Crashlytics may process installation identifiers, device diagnostics, session information and crash traces. Both choices are off by default and can be withdrawn in Settings. We do not attach account names, emails or save contents to Firebase reports. Turning these options off stops future reporting but does not automatically erase reports already received by Google.',
       'Device features: notification permission and locally scheduled reminders. The current app does not upload a push-notification token.',
@@ -86,7 +86,7 @@ export const PRIVACY_POLICY_SECTIONS: readonly PrivacyPolicySection[] = [
   {
     title: 'Children and younger users',
     paragraphs: [
-      'Cricket Legacy is not directed to children. Users in India must be at least 18. Users elsewhere must be at least 13 and, where local law requires it, have permission from a parent or guardian.',
+      'Cricket: Player and Manager is not directed to children. Users in India must be at least 18. Users elsewhere must be at least 13 and, where local law requires it, have permission from a parent or guardian.',
       'We do not knowingly collect personal data from anyone below the applicable minimum age. A parent or guardian who believes a child supplied personal data may contact us so that we can investigate and delete it.',
     ],
   },

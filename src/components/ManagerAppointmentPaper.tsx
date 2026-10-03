@@ -18,7 +18,7 @@ export function ManagerAppointmentPaper({
     <ContractMomentModal onContinue={onContinue}>
       <View style={styles.paper}>
         <View style={styles.masthead}>
-          <Text style={styles.brand}>CRICKET LEGACY</Text>
+          <Text style={styles.brand}>CRICKET</Text>
           <Text style={styles.publication}>THE CRICKET CHRONICLE</Text>
         </View>
         <Text style={styles.edition}>APPOINTMENT SPECIAL{year ? ` · ${year}` : ''}</Text>

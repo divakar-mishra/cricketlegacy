@@ -31,6 +31,21 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => undefined),
 }));
 
+// The audit runs outside Android; keep VIP's device-only archive deterministic.
+const mockSecureArchive = new Map<string, string>();
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn(async (key: string) => mockSecureArchive.get(key) ?? null),
+  setItemAsync: jest.fn(async (key: string, value: string) => {
+    mockSecureArchive.set(key, value);
+  }),
+}));
+
+// This simulation audits career/economy outcomes, not the separately tested
+// device/account VIP archive. Avoid background archive refreshes outliving Jest.
+jest.mock('../src/services/vipArchive', () => ({
+  syncVipArchive: jest.fn(async () => undefined),
+}));
+
 jest.mock('../src/services/analytics', () => {
   const actual = jest.requireActual<typeof import('../src/services/analytics')>(
     '../src/services/analytics',

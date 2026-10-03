@@ -113,7 +113,7 @@ describe('premium sponsor backend contract', () => {
     expect(tombstoneTable).not.toContain('transaction_id');
   });
 
-  it('rejects anonymous accounts and requires exact RevenueCat account identity', () => {
+  it('keeps exact-save sponsor checkout account-bound while ordinary store checkout supports guests', () => {
     expect(shared).toContain("throw new HttpError(403, 'recoverable_sign_in_required')");
     expect(shared).toContain('admin.auth.getUser(token)');
     expect(createIntent).toContain('p_revenuecat_app_user_id: user.id');
@@ -126,15 +126,14 @@ describe('premium sponsor backend contract', () => {
     expect(supabaseClient).toContain('hasRecoverableUserIdentity(data.user)');
     expect(supabaseClient).toContain("identity.provider !== 'anonymous'");
     expect(purchases).toContain('currentRecoverableSupabaseUserId()');
-    expect(purchases).toContain('RC.configure({ apiKey, appUserID: appUserId })');
-    expect(purchases).toContain('await RC.logIn(appUserId)');
+    expect(purchases).toContain('RC.configure({ apiKey })');
+    expect(purchases).toContain('RC.logIn(appUserId)');
+    expect(purchases).toContain('await RC.logOut()');
     expect(purchases).toContain('await synchronizePurchaseIdentity()');
-    expect(purchases).toContain('recoverable_sign_in_required');
     const signOut = auth.slice(auth.indexOf('export async function signOut'));
     expect(signOut.indexOf('clearPurchaseIdentity()')).toBeLessThan(
       signOut.indexOf('getSupabaseClient()?.auth.signOut()'),
     );
-    expect(purchases).not.toContain('RC.logOut()');
     expect(app).toMatch(/void purchases\s*\.configurePurchases\(MONETIZATION\.revenueCat\)/);
   });
 

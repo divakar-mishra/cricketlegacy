@@ -2,12 +2,11 @@
  * Central design system for the game.
  * Cricket-inspired palette: deep pitch greens, charcoal night, gold trophy accents.
  *
- * Two palettes (dark + light) share identical keys. Components read the active
+ * Classic and Warm share identical keys. Components read the active
  * one reactively via `useTheme()` and build styles with `makeStyles(colors)`.
  * `colors`/`gradients` remain exported as the dark defaults for back-compat.
  */
 import { useMemo } from 'react';
-import { useColorScheme } from 'react-native';
 import { useSettings } from '../state/settingsStore';
 
 export interface ThemeColors {
@@ -40,37 +39,37 @@ export interface ThemeColors {
 
 export const darkColors: ThemeColors = {
   // Backgrounds — near-black, premium feel
-  bg: '#07080C',
-  bgElevated: '#0C0E15',
-  surface: '#10131E',
-  surfaceAlt: '#171C2A',
-  surfaceMuted: '#090B12',
+  bg: '#121110',
+  bgElevated: '#1C1A17',
+  surface: '#24211D',
+  surfaceAlt: '#2D2923',
+  surfaceMuted: '#181613',
 
-  // Brand — crisp emerald green, sharper than the old WhatsApp-green on AMOLED
-  primary: '#00C97A',
-  primaryDark: '#00A364',
-  primaryLight: '#33D993',
+  // Muted sage/grass accents; avoid luminous emerald on the night surfaces.
+  primary: '#78A58B',
+  primaryDark: '#416D56',
+  primaryLight: '#A2C3AE',
 
   // Accent (gold / trophy)
-  accent: '#E8B332',
-  accentDark: '#C4902A',
-  accentLight: '#F5CF65',
+  accent: '#C4AA78',
+  accentDark: '#8C744C',
+  accentLight: '#DDC9A2',
 
   // Text
-  text: '#ECEFF4',
-  textMuted: '#7A8899',
-  textFaint: '#40505E',
+  text: '#F1EBDF',
+  textMuted: '#B7AD9D',
+  textFaint: '#958B7E',
 
   // Status
   danger: '#E5484D',
   dangerDark: '#B93A3E',
   warning: '#F5A524',
-  success: '#30D070',
+  success: '#86B596',
   info: '#4C9AFF',
 
   // Lines & overlays — subtle on black
-  border: '#1A2035',
-  borderStrong: '#242E45',
+  border: '#39342C',
+  borderStrong: '#574C3D',
   overlay: 'rgba(0,0,0,0.70)',
 
   white: '#FFFFFF',
@@ -80,32 +79,32 @@ export const darkColors: ThemeColors = {
 
 /** Light palette — same keys, tuned for legibility on light surfaces. */
 export const lightColors: ThemeColors = {
-  bg: '#F1F5EF',
-  bgElevated: '#FFFFFF',
-  surface: '#FFFFFF',
-  surfaceAlt: '#E3ECE3',
-  surfaceMuted: '#EDF3EB',
+  bg: '#F4EFE5',
+  bgElevated: '#FFFBF3',
+  surface: '#FFFBF3',
+  surfaceAlt: '#EAE2D5',
+  surfaceMuted: '#F0E9DD',
 
-  primary: '#009B5E',
-  primaryDark: '#007547',
-  primaryLight: '#00B86E',
+  primary: '#416D56',
+  primaryDark: '#305640',
+  primaryLight: '#527C63',
 
   accent: '#B67B0B',
   accentDark: '#8A5D08',
   accentLight: '#D69A28',
 
-  text: '#0E1B13',
-  textMuted: '#4C5F54',
-  textFaint: '#5D7164',
+  text: '#28231C',
+  textMuted: '#62594D',
+  textFaint: '#706556',
 
   danger: '#C4362B',
   dangerDark: '#9E2A22',
   warning: '#B26A00',
-  success: '#1F8A4C',
+  success: '#416D56',
   info: '#2A6FD6',
 
-  border: '#D3DFD8',
-  borderStrong: '#B4C7BB',
+  border: '#DFD5C5',
+  borderStrong: '#C4B69F',
   overlay: 'rgba(0,0,0,0.35)',
 
   white: '#FFFFFF',
@@ -114,7 +113,16 @@ export const lightColors: ThemeColors = {
 };
 
 /** Dark default export kept for any non-themed reference. */
-export const colors = darkColors;
+
+export const classicColors: ThemeColors = {
+  ...darkColors,
+  bg: '#07080C', bgElevated: '#0C0E15', surface: '#10131E', surfaceAlt: '#171C2A', surfaceMuted: '#090B12',
+  primary: '#00C97A', primaryDark: '#00A364', primaryLight: '#33D993',
+  accent: '#E8B332', accentDark: '#C4902A', accentLight: '#F5CF65',
+  text: '#ECEFF4', textMuted: '#9AA6B5', textFaint: '#7A8899', success: '#30D070',
+  border: '#1A2035', borderStrong: '#242E45',
+};
+export const colors = classicColors;
 
 type Grad = readonly [string, string, ...string[]];
 export interface ThemeGradients {
@@ -127,24 +135,30 @@ export interface ThemeGradients {
 }
 
 export const gradientsDark: ThemeGradients = {
-  night: ['rgba(11,14,28,0.96)', 'rgba(6,7,16,0.84)'],
-  pitch: ['rgba(14,18,32,0.96)', 'rgba(7,8,12,0.84)'],
-  brand: ['rgba(30,144,72,0.98)', 'rgba(44,201,106,0.86)'],
-  gold: ['rgba(245,207,101,0.98)', 'rgba(196,144,42,0.88)'],
+  night: ['#1C1A17', '#121110'],
+  pitch: ['#24211D', '#181613'],
+  brand: ['#756044', '#645138'],
+  gold: ['#DDC9A2', '#C4AA78'],
   danger: ['#E5484D', '#B93A3E'],
-  surface: ['rgba(23,28,42,0.75)', 'rgba(16,19,30,0.94)'],
+  surface: ['#2D2923', '#24211D'],
 };
 
 export const gradientsLight: ThemeGradients = {
-  night: ['#E9F1E9', '#F1F5EF'],
-  pitch: ['#E4EEE5', '#F1F5EF'],
-  brand: ['#137A3F', '#0B6835'],
+  night: ['#FFFBF3', '#F4EFE5'],
+  pitch: ['#EAE2D5', '#F4EFE5'],
+  brand: ['#756044', '#645138'],
   gold: ['#D69A28', '#B67B0B'],
   danger: ['#B92C3A', '#952434'],
-  surface: ['#FFFFFF', '#EDF3EF'],
+  surface: ['#FFFBF3', '#F0E9DD'],
 };
 
-export const gradients = gradientsDark;
+export const classicGradients: ThemeGradients = {
+  ...gradientsDark,
+  night: ['#0B0E1C', '#060710'], pitch: ['#0E1220', '#07080C'],
+  brand: ['#416D56', '#345A46'], gold: ['#F5CF65', '#C4902A'],
+  surface: ['#171C2A', '#10131E'],
+};
+export const gradients = classicGradients;
 
 export interface Theme {
   colors: ThemeColors;
@@ -152,15 +166,13 @@ export interface Theme {
   isDark: boolean;
 }
 
-/** Reactive theme: reflects the themeMode setting (and OS scheme when 'system'). */
+/** Both appearances are dark; system/light mode is no longer selectable. */
 export function useTheme(): Theme {
-  const mode = useSettings((s) => s.themeMode);
-  const scheme = useColorScheme();
-  const isDark = mode === 'system' ? scheme !== 'light' : mode === 'dark';
+  const appearance = useSettings((s) => s.appearance);
   return {
-    colors: isDark ? darkColors : lightColors,
-    gradients: isDark ? gradientsDark : gradientsLight,
-    isDark,
+    colors: appearance === 'warm' ? darkColors : classicColors,
+    gradients: appearance === 'warm' ? gradientsDark : classicGradients,
+    isDark: true,
   };
 }
 

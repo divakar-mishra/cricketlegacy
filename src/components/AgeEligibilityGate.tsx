@@ -93,7 +93,7 @@ export function AgeEligibilityGate({
         contentContainerStyle={{ padding: 24, gap: 16, flexGrow: 1, justifyContent: 'center' }}
       >
         <Text style={{ color: colors.accent, fontSize: 28, fontWeight: '700' }}>
-          Cricket Legacy
+          Cricket: Player and Manager
         </Text>
         {status === 'loading' ? (
           <ActivityIndicator color={colors.accent} />

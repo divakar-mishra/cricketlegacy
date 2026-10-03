@@ -787,7 +787,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           style={{ marginTop: spacing.md }}
           onPress={() => {
             void Share.share({
-              title: `${user.name} - Cricket Legacy`,
+              title: `${user.name} - Cricket: Player and Manager`,
               message: [
                 `${user.name} | ${playerIdentityLine(save)}`,
                 `${stats.matches} matches | ${stats.runs} runs | ${stats.wickets} wickets`,

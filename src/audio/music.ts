@@ -7,7 +7,7 @@ import { useSettings } from '../state/settingsStore';
 
 const TRACK = require('../../assets/audio/menu_broadcast_soft.wav');
 
-export type MusicScene = 'MENU' | 'MATCH_CALM' | 'MATCH_TENSE' | 'VICTORY' | 'DEFEAT';
+export type MusicScene = 'MENU' | 'MATCH_CALM' | 'MATCH_LIVE' | 'VICTORY' | 'DEFEAT';
 
 let enabled = false;
 let playing = false;
@@ -17,7 +17,7 @@ let scene: MusicScene = 'MENU';
 const SCENE_VOLUME: Record<MusicScene, number> = {
   MENU: 0.2,
   MATCH_CALM: 0.12,
-  MATCH_TENSE: 0.15,
+  MATCH_LIVE: 0,
   VICTORY: 0.17,
   DEFEAT: 0.1,
 };
@@ -61,7 +61,6 @@ function stop(): void {
   }
   try {
     player.pause();
-    player.seekTo(0);
   } catch {
     // Music is optional; state still needs to reflect the user's intent.
   }
@@ -71,17 +70,20 @@ function stop(): void {
 /** Turn background music on/off (persisted intent lives in settings). */
 export function setMusicEnabled(next: boolean): void {
   enabled = next;
-  if (enabled) start();
+  if (enabled && scene !== 'MATCH_LIVE') start();
   else stop();
 }
 
 /**
- * Keep the soft melody steady across scenes. Only its volume changes so match
- * effects remain clear and the soundtrack never speeds up or doubles itself.
+ * Live play pauses the music without changing the user's saved preference.
+ * Menus and results resume the same track when music is enabled.
  */
 export function setMusicScene(next: MusicScene): void {
   scene = next;
-  if (enabled) applySceneMix();
+  if (enabled && scene !== 'MATCH_LIVE') {
+    start();
+    applySceneMix();
+  } else stop();
 }
 
 /** Align the controller with the current setting (call at app start / resume). */

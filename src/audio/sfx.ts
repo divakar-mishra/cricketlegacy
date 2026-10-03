@@ -9,6 +9,7 @@ import { useSettings } from '../state/settingsStore';
 
 export type SfxKey =
   | 'tap'
+  | 'bat'
   | 'four'
   | 'six'
   | 'wicket'
@@ -23,6 +24,7 @@ export type SfxKey =
 
 const SOURCES: Record<SfxKey, number> = {
   tap: require('../../assets/sfx/ui_soft_wood_tap.wav'),
+  bat: require('../../assets/sfx/bat_impact_classic.mp3'),
   four: require('../../assets/sfx/bat_impact_classic.mp3'),
   six: require('../../assets/sfx/bat_impact_classic.mp3'),
   wicket: require('../../assets/sfx/stump_clack.mp3'),
@@ -38,6 +40,7 @@ const SOURCES: Record<SfxKey, number> = {
 
 const VOLUME: Partial<Record<SfxKey, number>> = {
   tap: 0.36,
+  bat: 0.55,
   four: 0.78,
   six: 0.88,
   wicket: 0.86,
@@ -65,13 +68,16 @@ const PLAYBACK_RATE: Partial<Record<SfxKey, number>> = {
 
 type Player = ReturnType<typeof createAudioPlayer>;
 const players: Partial<Record<SfxKey, Player>> = {};
-let initialised = false;
+let modeReady: Promise<void> | null = null;
+const requests: Partial<Record<SfxKey, number>> = {};
 
-function ensureMode(): void {
-  if (initialised) return;
-  initialised = true;
+function ensureMode(): Promise<void> {
+  if (modeReady) return modeReady;
   // Play even when the device is on silent (games expect this).
-  setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+  modeReady = setAudioModeAsync({ playsInSilentMode: true }).catch(() => {
+    modeReady = null;
+  });
+  return modeReady;
 }
 
 function soundOn(): boolean {
@@ -99,15 +105,34 @@ function getPlayer(key: SfxKey): Player | null {
 }
 
 /** Fire-and-forget playback of a one-shot effect. */
-export function play(key: SfxKey): void {
-  if (!soundOn()) return;
-  ensureMode();
+export function play(key: SfxKey, isCurrent: () => boolean = () => true): void {
+  if (!soundOn() || !isCurrent()) return;
+  const request = (requests[key] ?? 0) + 1;
+  requests[key] = request;
   const p = getPlayer(key);
   if (!p) return;
+  void replay(key, p, request, isCurrent);
+}
+
+async function replay(key: SfxKey, p: Player, request: number, isCurrent: () => boolean): Promise<void> {
   try {
-    p.seekTo(0);
+    await ensureMode();
+    if (requests[key] !== request || !soundOn() || !isCurrent()) return;
+    // Expo seekTo is asynchronous. Starting before it finishes can play from
+    // the previous end position and drop repeated impacts on Android.
+    await p.seekTo(0);
+    if (requests[key] !== request || !soundOn() || !isCurrent()) return;
     p.play();
   } catch {
     // Audio feedback is non-critical.
+  }
+}
+
+/** Load match effects during preparation so the first impact is already ready. */
+export function preloadMatchSounds(): void {
+  if (!soundOn()) return;
+  void ensureMode();
+  for (const key of ['bat', 'four', 'six', 'wicket', 'crowd', 'fifty', 'hundred'] as const) {
+    getPlayer(key);
   }
 }

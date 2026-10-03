@@ -1,4 +1,4 @@
-/** Working title & app-wide constants. Rename freely later. */
-export const APP_NAME = 'CRICKET LEGACY';
+/** In-game title; the Android launcher label is intentionally shorter. */
+export const APP_NAME = 'CRICKET: PLAYER AND MANAGER';
 export const APP_TAGLINE = 'Build your cricket legend';
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.0.8';

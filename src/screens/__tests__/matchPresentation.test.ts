@@ -9,6 +9,19 @@ describe('shared match presentation', () => {
   );
   const spriteSource = fs.readFileSync(path.join(__dirname, '..', '..', 'components', 'CricketerArtwork.tsx'), 'utf8');
 
+  it('keeps matchday dimensions and connects field, contact and score reveal to one clock', () => {
+    expect(source).toContain('size={fastMatchUi ? Math.min(220, fieldWidth) : fieldWidth}');
+    expect(source).toContain('playback={fieldPlayback}');
+    expect(source).toContain('deliveryResolved={deliveryResolved}');
+    const playback = source.slice(source.indexOf('const playback = playDelivery({'), source.indexOf('// Over-end summary card'));
+    for (const ref of ['appPausedRef', 'manualPauseRef', 'commentaryPauseRef', 'tacticsPauseRef', 'stancePauseRef', 'guidePauseRef']) {
+      expect(playback).toContain(`${ref}.current`);
+    }
+    expect(playback.indexOf('onResolve:')).toBeLessThan(playback.indexOf('applyStep(step, true'));
+    expect(playback).toContain('const completed = await playback.done');
+    expect(source).toContain('playbackRef.current?.cancel()');
+  });
+
   it('shows only the ball during saving and retains error retry and durable completion', () => {
     const settlement = source.slice(source.indexOf('// ---------- RESULT SETTLEMENT'),
       source.indexOf('// ---------- EMPTY'));
@@ -58,6 +71,16 @@ describe('shared match presentation', () => {
     expect(source).toContain('speedMultRef.current === 1 || step.overComplete');
     expect(source).toContain('renderCurrentStepRef.current &&');
     expect(source).toContain('animate={!fastMatchUi}');
+  });
+
+  it('keeps pause compact without sacrificing its touch target or light-theme contrast', () => {
+    const control = source.slice(source.indexOf('    pauseControl: {'), source.indexOf('    pausePressed:'));
+    expect(control).toContain('flexGrow: 0');
+    expect(control).toContain('minWidth: 72');
+    expect(control).toContain('minHeight: 48');
+    expect(control).not.toContain('maxWidth: 190');
+    expect(control).toContain('color: colors.text');
+    expect(control).toContain('fontSize: fontSize.sm');
   });
 
   it('lets Simulate Match finish immediately even when the live match is paused', () => {
@@ -111,11 +134,8 @@ describe('shared match presentation', () => {
     expect(fieldSource).toContain('fieldGeometry(size)');
     expect(fieldSource).toContain('deliveryBouncePoint(size, lastShot?.delivery)');
     expect(fieldSource).toContain('fieldShotPath(size, lastShot)');
-    expect(fieldSource).toContain('inputRange: [0, 0.3, 0.46, 0.74, 1]');
-    expect(fieldSource).toContain('bowler.x - 5');
-    expect(fieldSource).toContain('bounce.x - 5');
-    expect(fieldSource).toContain('striker.x - 5');
-    expect(fieldSource).toContain('shotEnd.x - 5');
+    expect(fieldSource).toContain('fieldSequence(size, lastShot, layout)');
+    expect(fieldSource).toContain('sequence?.ball[axis]');
     expect(fieldSource).toContain('d={deliveryPath}');
   });
 

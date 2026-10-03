@@ -1,5 +1,5 @@
 {
-  "appName": "Cricket Legacy",
+  "appName": "Cricket: Player and Manager",
   "site": {
     "tagline": "Independent games and apps from Maharashtra, India.",
     "description": "Sunlight creates thoughtful games and useful apps with clear support and transparent policies."
@@ -7,13 +7,13 @@
   "products": [
     {
       "slug": "cricket-legacy",
-      "name": "Cricket Legacy",
+      "name": "Cricket: Player and Manager",
       "kind": "Cricket career game",
       "status": "In development",
       "platforms": ["Android"],
       "summary": "Build a complete cricket life as a player or lead a club as a manager in a deep, fictional career simulation.",
       "headline": "Two careers. One cricket world.",
-      "description": "Cricket Legacy is a fictional single-player simulation built around meaningful cricket decisions, long-term progression and seasons that remember what happened.",
+      "description": "Cricket: Player and Manager is a fictional single-player simulation built around meaningful cricket decisions, long-term progression and seasons that remember what happened.",
       "highlights": [
         {
           "title": "Player Career",

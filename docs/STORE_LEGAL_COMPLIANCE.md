@@ -83,10 +83,12 @@ console features, provider dashboards and a production device/network test.
   identifiers, store transaction identifiers/status, environment, refund and
   revocation state. Sunlight does not receive a full payment-card number.
 - **Google Mobile Ads:** the Android AdMob SDK/plugin and an Android app ID are
-  present. Ad requests currently ask for non-personalized inventory, but the SDK
-  may still process device/ad identifiers, IP address, interactions, consent
-  state and diagnostics. Final consent flow, child treatment, production unit
-  IDs and Data safety answers still need provider/device verification.
+  present. Eligible teen requests are non-personalized. Adult requests let
+  Google's UMP/TCF consent signal select personalized, non-personalized or
+  eligible limited inventory. The SDK may still process device/ad identifiers,
+  IP address, interactions, consent state and diagnostics. Final consent flow,
+  child treatment, production unit IDs and Data safety answers still need
+  provider/device verification.
 
 - **Notifications:** Expo Notifications schedules local reminders after device
   permission. The checked-in service does not upload a push token or operate a
@@ -117,11 +119,14 @@ writes get no AdMob SDK initialization, UMP request, or ad. Prior under-18
 answers must be asked again because that band cannot distinguish teens from
 younger children. Adults who answered the prior neutral numeric prompt migrate.
 
-For eligible teens outside India, the app sets child-directed treatment,
-under-age-of-consent treatment and a G-rated maximum before UMP or SDK
-initialization. Adults use adult request treatment. Both paths initialize only
-when UMP permits requests, and every live request asks for non-personalized
-inventory. This conservative teen treatment uses the flags supported by the
+For eligible teens outside India, the app sets under-age-of-consent treatment
+and a G-rated maximum before UMP or SDK initialization. It does not set the
+separate under-13 child-directed flag for this declared 13–17 audience. Adults
+use adult request treatment. Both paths initialize only
+when UMP permits requests. Teen requests ask for non-personalized inventory;
+adult requests rely on Google's consent signal to select the eligible serving
+mode, including limited ads after a decline where available. This conservative
+teen treatment uses the flags supported by the
 project's Google Mobile Ads SDK 24.9.0; the newer TEEN age-restricted treatment
 API is not available in that version. Android rewarded, banner and interstitial
 unit IDs are configured as production-build defaults; debug builds do not default

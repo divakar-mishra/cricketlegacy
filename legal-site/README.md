@@ -3,22 +3,25 @@
 This is a dependency-free static site for Cloudflare Pages. The home page is the
 publisher presence for **Sunlight**, the working name used by Divakar Mishra.
 Products are data-driven so future games and apps can be added without turning
-the site into a Cricket Legacy-only landing page.
+the site into a single-game landing page.
 
 It currently generates:
 
 - `/` — Sunlight publisher home and product directory
-- `/products/cricket-legacy/` — Cricket Legacy product page
+- `/products/cricket-legacy/` — Cricket: Player and Manager product page
 - `/publisher/` — the single public legal-identity disclosure for Sunlight
 
 - `/products/cricket-legacy/privacy/` — app-specific policy for Play Console
-- `/privacy/` — compatibility copy for existing Cricket Legacy app links
+- `/privacy/` — compatibility copy for existing app links
 - `/terms/`
 - `/support/`
 - `/delete-account/`
-- `/app-ads.txt` — Cricket Legacy's authorized AdMob seller record
+- `/app-ads.txt` — the game's authorized AdMob seller record
 
-The four top-level legal/support routes apply specifically to Cricket Legacy
+The `cricket-legacy` URL slug and icon filename remain unchanged so existing
+Play Console, AdMob and in-app links do not break when the displayed name changes.
+
+The four top-level legal/support routes apply specifically to Cricket: Player and Manager
 and stay stable because the app and release readiness gate use them. Do not
 reuse those policies for a future product whose data, commerce or account
 behavior differs. Give that product its own reviewed legal routes before it is
@@ -41,7 +44,7 @@ Support and Account Deletion routes where required.
 
 ## Approved policy configuration
 
-`legal.config.json` also records the owner's approved Cricket Legacy
+`legal.config.json` also records the owner's approved game
 first-release policy:
 
 1. The policy is effective from `2026-08-20`, its first publication date.
@@ -59,7 +62,7 @@ Run `npm run build:legal-site`. Output is written to `legal-site/dist` and is
 ignored by Git.
 
 The build copies the canonical `assets/icon.png` to
-`dist/images/cricket-legacy-icon.png`, used on the home and Cricket Legacy product
+`dist/images/cricket-legacy-icon.png`, used on the home and game product
 pages. Updating the app icon therefore also updates the website on the next build.
 The local September 11 revision describes mode-specific permanent VIP and the
 new local age/UMP controls. Publish it alongside the matching app update after
@@ -87,7 +90,7 @@ EXPO_PUBLIC_ACCOUNT_DELETION_URL=https://YOUR_HOST/delete-account/
 Run `npm run check:release` before any store build. Production EAS builds run
 the legal gate automatically, and tagged/manual release-readiness workflows run
 the complete release check. The gate fetches each configured URL and verifies
-that it serves the expected Cricket Legacy HTML. The Cloudflare deployment,
+that it serves the expected game HTML. The Cloudflare deployment,
 store-console URLs, privacy declarations and account-deletion backend remain
 manual release steps; this repository does not deploy them automatically.
 

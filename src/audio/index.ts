@@ -9,9 +9,12 @@ import * as sfx from './sfx';
 export { haptics, music };
 export { setMusicEnabled, syncMusicWithSettings } from './music';
 export { playHaptic } from './haptics';
+export { preloadMatchSounds } from './sfx';
+export { deliveryMoment, matchMusicScene } from './matchAudio';
 
 type Moment =
   | 'tap'
+  | 'bat'
   | 'four'
   | 'six'
   | 'wicket'
@@ -27,6 +30,9 @@ type Moment =
 
 export function moment(kind: Moment): void {
   switch (kind) {
+    case 'bat':
+      sfx.play('bat');
+      break;
     case 'four':
       sfx.play('four');
       haptics.impact(haptics.ImpactStyle.Light);

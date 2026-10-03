@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Cricket Legacy",
+    "name": "Cricket",
     "slug": "cricket-legacy",
     "platforms": [
       "android"
@@ -12,7 +12,7 @@
         ]
       }
     },
-    "version": "1.0.0",
+    "version": "1.0.8",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "com.coverdrive.cricket",
-      "versionCode": 5,
+      "versionCode": 8,
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#0A1912",

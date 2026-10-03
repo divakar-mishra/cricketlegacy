@@ -17,10 +17,12 @@ describe('popup contrast', () => {
     }
   });
 
-  it('keeps the starter offer on a dark surface with an outlined gold badge', () => {
-    expect(starterPack).toContain("backgroundColor: '#0F241A'");
-    expect(starterPack).toContain("backgroundColor: '#17211B'");
-    expect(starterPack).toContain("color: '#D5B56D'");
+  it('uses shared warm surfaces and restrained borders for the starter offer', () => {
+    expect(starterPack).toContain('backgroundColor: colors.surface');
+    expect(starterPack).toContain('backgroundColor: colors.surfaceAlt');
+    expect(starterPack).toContain('borderColor: colors.borderStrong');
+    expect(starterPack).toContain('color: colors.accent');
+    expect(starterPack).toContain("classic && { backgroundColor: '#0F241A'");
     expect(starterPack).not.toContain("backgroundColor: '#D5B56D'");
     expect(starterPack).toContain('{ color: colors.textMuted }');
     expect(starterPack).not.toContain('{ color: colors.textFaint }');

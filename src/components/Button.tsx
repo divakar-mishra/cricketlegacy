@@ -105,16 +105,12 @@ export const Button = React.memo(function Button({
               size === 'sm' && { fontSize: fontSize.sm },
               size === 'lg' && { fontSize: fontSize.lg },
             ]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.72}
           >
             {label}
           </Text>
           {subtitle ? (
             <Text
               style={[styles.subtitle, { color: isGhost || isSolid ? colors.textMuted : textColor }]}
-              numberOfLines={1}
             >
               {subtitle}
             </Text>
@@ -127,7 +123,14 @@ export const Button = React.memo(function Button({
   return (
     <Animated.View
       style={[
-        { width: fullWidth ? '100%' : undefined, borderRadius: radius.md, overflow: 'hidden' },
+        {
+          width: fullWidth ? '100%' : undefined,
+          maxWidth: '100%',
+          minWidth: 0,
+          flexShrink: fullWidth ? 0 : 1,
+          borderRadius: radius.md,
+          overflow: 'hidden',
+        },
         disabled ? styles.disabled : null,
         animStyle,
         style,
@@ -181,29 +184,33 @@ export const Button = React.memo(function Button({
 
 const styles = StyleSheet.create({
   base: {
-    width: '100%',
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
     flexDirection: 'row',
     // overflow hidden is critical on Android: without it the button background
     // renders outside the borderRadius, creating the "misaligned background" bug.
     overflow: 'hidden',
   },
-  pressable: { alignSelf: 'stretch', width: '100%' },
-  labelWrap: { alignItems: 'center', minWidth: 0 },
+  // Nested percentage widths make an intrinsic button claim its parent's
+  // width in Yoga, squeezing adjacent card copy on every screen using it.
+  pressable: { alignSelf: 'stretch' },
+  labelWrap: { alignItems: 'center', minWidth: 0, flexShrink: 1 },
   label: {
     fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
     fontFamily: fonts.bold,
     letterSpacing: 0.3,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: fontSize.xs,
     fontWeight: fontWeight.medium,
     opacity: 0.85,
     marginTop: 1,
+    textAlign: 'center',
   },
   disabled: { opacity: 0.45 },
 });

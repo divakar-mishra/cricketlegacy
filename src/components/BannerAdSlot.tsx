@@ -48,7 +48,7 @@ export function BannerAdSlot({ entitlements }: Props) {
       <BannerAd
         unitId={unitId}
         size={BannerAdSize.BANNER}
-        requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+        requestOptions={ads.getAdRequestOptions()}
         onAdFailedToLoad={() => setFailed(true)}
       />
     </View>

@@ -30,8 +30,8 @@ export function PrivacyPolicyScreen({ navigation }: ScreenProps<'PrivacyPolicy'>
 
       <Card style={styles.introCard}>
         <Text style={styles.kicker}>YOUR DATA</Text>
-        <Text style={styles.title}>Cricket Legacy Privacy Policy</Text>
-        <Text style={styles.intro}>How Sunlight handles information in Cricket Legacy.</Text>
+        <Text style={styles.title}>Cricket: Player and Manager Privacy Policy</Text>
+        <Text style={styles.intro}>How Sunlight handles information in Cricket: Player and Manager.</Text>
         <Text style={styles.effective}>Effective {PRIVACY_POLICY_EFFECTIVE_DATE}</Text>
         <Text style={styles.update}>Privacy update: {PRIVACY_POLICY_UPDATE_DATE}</Text>
       </Card>

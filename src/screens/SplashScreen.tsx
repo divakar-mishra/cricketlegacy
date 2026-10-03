@@ -34,7 +34,7 @@ export function SplashScreen({ navigation }: ScreenProps<'Splash'>) {
   return (
     <Screen gradient={gradients.pitch} padded={false}>
       <View style={styles.center}>
-        <Animated.View style={{ opacity, transform: [{ scale }], alignItems: 'center' }}>
+        <Animated.View style={{ opacity, transform: [{ scale }], alignItems: 'center', width: '100%' }}>
           <Emblem size={148} />
           <Text style={styles.title}>{APP_NAME}</Text>
           <Text style={styles.tagline}>{APP_TAGLINE}</Text>
@@ -50,11 +50,13 @@ const makeStyles = (colors: ThemeColors) =>
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     title: {
       color: colors.accent,
-      fontSize: fontSize.xxxl,
+      fontSize: fontSize.xxl,
       fontWeight: fontWeight.black,
       fontFamily: fonts.display,
-      letterSpacing: 3,
+      letterSpacing: 1,
       marginTop: spacing.xl,
+      textAlign: 'center',
+      paddingHorizontal: spacing.md,
     },
     tagline: {
       color: colors.textMuted,

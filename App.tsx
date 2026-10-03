@@ -1,9 +1,10 @@
-import { DarkTheme, DefaultTheme, NavigationContainer, Theme } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer, Theme, useNavigationContainerRef } from '@react-navigation/native';
+import { AppearancePrompt } from './src/components/AppearancePrompt';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { PlayerContractMoment } from './src/components/ContractMomentModal';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { syncMusicWithSettings } from './src/audio';
@@ -72,6 +73,9 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   const fontsReady = useAppFonts();
+  const [ageEligible, setAgeEligible] = useState(false);
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+  const [appearanceRoute, setAppearanceRoute] = useState<string>();
   const { colors, isDark } = useTheme();
   const activeSaveId = useCareer((state) => state.save?.id);
   const passPeriodEndsAt = useCareer((state) => state.save?.pass?.periodEndsAt);
@@ -98,6 +102,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (!ageEligible) return undefined;
     // Best-effort platform wiring — all safe no-ops without the native side.
     crash.installGlobalHandler();
     const stopTelemetry = startTelemetry();
@@ -105,13 +110,11 @@ export default function App() {
     syncMusicWithSettings();
     analytics.logEvent(analytics.EVT.APP_OPEN);
     // Monetization providers. No-op in dev / Expo Go / when keys are absent.
-    void purchases
-      .configurePurchases(MONETIZATION.revenueCat)
-      .catch(() => undefined);
+    void purchases.configurePurchases(MONETIZATION.revenueCat).catch(() => undefined);
     // Local sign-in hydration must not wait for the store's network handshake.
     void auth.rehydrateAuth().catch(() => undefined);
     return stopTelemetry;
-  }, []);
+  }, [ageEligible]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -135,8 +138,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (passPeriodEndsAt == null || !Number.isFinite(passPeriodEndsAt))
-      return undefined;
+    if (passPeriodEndsAt == null || !Number.isFinite(passPeriodEndsAt)) return undefined;
     const passClockTargetAt =
       premiumEntitlementActive &&
       premiumEntitlementExpiresAt != null &&
@@ -164,12 +166,7 @@ export default function App() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [
-    activeSaveId,
-    passPeriodEndsAt,
-    premiumEntitlementActive,
-    premiumEntitlementExpiresAt,
-  ]);
+  }, [activeSaveId, passPeriodEndsAt, premiumEntitlementActive, premiumEntitlementExpiresAt]);
 
   useEffect(() => {
     if (!fontsReady) return undefined;
@@ -190,8 +187,11 @@ export default function App() {
           <ModalQueueProvider>
             <GlassBlurProvider target={<View style={{ flex: 1, backgroundColor: colors.bg }} />}>
               <StatusBar style={isDark ? 'light' : 'dark'} />
+              {ageEligible ? (
                 <AppIntegrityGate>
-                  <NavigationContainer theme={navTheme}>
+                  <NavigationContainer theme={navTheme} ref={navigationRef}
+                    onReady={() => setAppearanceRoute(navigationRef.getCurrentRoute()?.name)}
+                    onStateChange={() => setAppearanceRoute(navigationRef.getCurrentRoute()?.name)}>
                     <Stack.Navigator
                       initialRouteName="Splash"
                       screenOptions={{
@@ -317,8 +317,12 @@ export default function App() {
                     </Stack.Navigator>
                   </NavigationContainer>
                 </AppIntegrityGate>
-              <Onboarding />
-              <AdAgePrompt />
+              ) : (
+                <View style={{ flex: 1, backgroundColor: colors.bg }} />
+              )}
+              <AdAgePrompt onEligibilityChange={setAgeEligible} />
+              {ageEligible ? <Onboarding /> : null}
+              <AppearancePrompt eligible={ageEligible} route={appearanceRoute} />
               <GlassAlertHost />
               <PlayerContractMoment />
             </GlassBlurProvider>

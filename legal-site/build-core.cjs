@@ -3,12 +3,12 @@ const AGE_POLICIES = Object.freeze({
     id: 'global_13_parental_consent',
     shortLabel: '13+ with parent or guardian consent where required',
     terms: [
-      'You must be at least 13 years old to use Cricket Legacy.',
+      'You must be at least 13 years old to use Cricket: Player and Manager.',
       'If the law where you live requires consent from a parent or guardian before you can use online services, advertising or paid features, you may use those features only after that consent has been verified. In India, users under 18 are treated as children wherever applicable law requires it.',
-      'Cricket Legacy is not directed to children below 13 and must not be listed or marketed as a children-only app.',
+      'Cricket: Player and Manager is not directed to children below 13 and must not be listed or marketed as a children-only app.',
     ],
     privacy: [
-      'Cricket Legacy is not directed to children below 13. We do not knowingly create an online account for, collect personal data from, or offer paid or advertising features to a child below 13.',
+      'Cricket: Player and Manager is not directed to children below 13. We do not knowingly create an online account for, collect personal data from, or offer paid or advertising features to a child below 13.',
       'For users who are old enough to use the app but are below the digital-consent age that applies where they live, online features require verified permission from a parent or guardian. In India, this treatment applies to users under 18 wherever applicable law requires it. A parent or guardian may contact us to review or delete a child’s data.',
     ],
   }),
@@ -16,12 +16,12 @@ const AGE_POLICIES = Object.freeze({
     id: 'india_18_elsewhere_13',
     shortLabel: '18+ in India and 13+ elsewhere',
     terms: [
-      'You must be at least 18 years old if you live in India, and at least 13 years old elsewhere, to use Cricket Legacy.',
+      'You must be at least 18 years old if you live in India, and at least 13 years old elsewhere, to use Cricket: Player and Manager.',
       'Outside India, if you are below the age of legal majority where you live, you confirm that a parent or guardian has reviewed these Terms and permits your use of the app.',
-      'Cricket Legacy is not directed to children and must not be listed or marketed as a children-only app.',
+      'Cricket: Player and Manager is not directed to children and must not be listed or marketed as a children-only app.',
     ],
     privacy: [
-      'Cricket Legacy is not directed to children. Users in India must be at least 18. Users elsewhere must be at least 13 and, where local law requires it, have permission from a parent or guardian.',
+      'Cricket: Player and Manager is not directed to children. Users in India must be at least 18. Users elsewhere must be at least 13 and, where local law requires it, have permission from a parent or guardian.',
       'We do not knowingly collect personal data from anyone below the applicable minimum age. A parent or guardian who believes a child supplied personal data may contact us so that we can investigate and delete it.',
     ],
   }),
@@ -153,13 +153,13 @@ function list(items) {
   return `<ul>${items.map((item) => `<li>${item}</li>`).join('')}</ul>`;
 }
 
-function contactBlock(config) {
+function contactBlock(config, { showPublisherLink = true } = {}) {
   const publisher = config.publisher;
   return `<address>
     <strong>${escapeHtml(publisher.tradingName)}</strong><br>
     ${escapeHtml(publisher.location)}<br>
     <a href="mailto:${escapeHtml(publisher.email)}">${escapeHtml(publisher.email)}</a>
-    <br><a href="/publisher/">Publisher information</a>
+    ${showPublisherLink ? '<br><a href="/publisher/">Publisher information</a>' : ''}
   </address>`;
 }
 
@@ -219,10 +219,9 @@ function layout(config, { title, description, path, body }) {
       <p>${escapeHtml(config.publisher.location)}</p>
     </div>
     <div class="footer-links">
-      <a href="/products/cricket-legacy/privacy/">Cricket Legacy Privacy</a>
+      <a href="/products/cricket-legacy/privacy/">${escapeHtml(config.appName)} Privacy</a>
       <a href="/terms/">Terms</a>
       <a href="/delete-account/">Account deletion</a>
-      <a href="/publisher/">Publisher</a>
       <a href="mailto:${escapeHtml(config.publisher.email)}">Email</a>
     </div>
   </footer>
@@ -258,7 +257,7 @@ function privacyPage(config, age) {
         `<strong>Purchases:</strong> product, entitlement, transaction status and pseudonymous verification identifiers supplied by Google Play, Apple or RevenueCat. ${escapeHtml(config.publisher.tradingName)} does not receive your full payment-card number.`,
         '<strong>Online play and security:</strong> leaderboard entries you submit, server timestamps, app/build version, fraud checks, IP address and service logs.',
         '<strong>Age preferences:</strong> the app stores your self-declared age band, India/outside-India residence choice and, where applicable, parent or guardian permission on your device. It does not ask for a date of birth or upload these answers. This is a self-declaration, not verified identity or parental consent.',
-        '<strong>Advertising:</strong> Google Mobile Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices according to the build and your settings. Ads are not initialized for unknown-age users, children under 13, teens in India, or teens without parent or guardian permission. Eligible teens outside India receive child-directed, G-rated, non-personalized ads. Adult ads are also requested non-personalized. Both eligible groups wait for the Google consent flow to permit requests. Ad privacy choices are available in Settings. Non-personalized requests do not prevent all technical processing.',
+        '<strong>Advertising:</strong> Google Mobile Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices according to the build and your settings. Ads are not initialized for unknown-age users, children under 13, teens in India, or teens without parent or guardian permission. Eligible teens outside India receive child-directed, G-rated, non-personalized ads. For adults, Google uses the consent choice to determine whether personalized, non-personalized, or eligible limited ads may be served. Both eligible groups wait for the Google consent flow to permit requests. Declining consent does not guarantee that a limited ad will be available. Ad privacy choices are available in Settings. Non-personalized or limited ads may still involve technical processing.',
         '<strong>Support:</strong> your email address, message and attachments if you contact support.',
         '<strong>Optional diagnostics:</strong> if you enable Usage analytics in Settings, Google Firebase Analytics processes app-instance identifiers, app/device information, sessions and limited gameplay events to measure usage. Its SDK may also derive approximate location from masked IP addresses and collect in-app purchase/subscription events, including product and price information. This does not give us your payment-card details or precise GPS location. If you enable Crash reports, Firebase Crashlytics processes installation identifiers, app/device diagnostics, session information and crash traces to diagnose failures. Both choices are off by default and can be withdrawn in Settings. We do not attach account names, emails or save contents to Firebase reports. Analytics advertising-ID collection and advertising consent are disabled. Turning these options off stops future reporting; it does not automatically erase reports already received by Google. Provider retention and deletion procedures apply to previously received data; contact us using the details above for a privacy request.',
         '<strong>Device features:</strong> notification permission and locally scheduled reminders. The current app does not upload a push-notification token.',
@@ -407,7 +406,7 @@ function publisherPage(config) {
 
 function productCard(config, product) {
   return `<article class="product-card">
-    <div class="product-art product-art-${escapeHtml(product.slug)}">${product.slug === 'cricket-legacy' ? '<img class="app-icon" src="/images/cricket-legacy-icon.png" alt="Cricket Legacy app icon" width="512" height="512" loading="lazy">' : '<span class="pitch-mark" aria-hidden="true"></span><span class="ball-mark" aria-hidden="true"></span>'}</div>
+    <div class="product-art product-art-${escapeHtml(product.slug)}">${product.slug === 'cricket-legacy' ? `<img class="app-icon" src="/images/cricket-legacy-icon.png" alt="${escapeHtml(product.name)} app icon" width="512" height="512" loading="lazy">` : '<span class="pitch-mark" aria-hidden="true"></span><span class="ball-mark" aria-hidden="true"></span>'}</div>
     <div class="product-copy">
       <div class="meta-row"><span>${escapeHtml(product.kind)}</span><span>${escapeHtml(product.status)}</span></div>
       <h3>${escapeHtml(product.name)}</h3>
@@ -436,7 +435,7 @@ function homePage(config) {
   <section class="product-list" aria-label="${escapeHtml(config.publisher.tradingName)} products">
     ${config.products.map((product) => productCard(config, product)).join('')}
   </section>
-  <section class="contact-summary"><div><p class="kicker">Publisher</p><h2>Independent, reachable, transparent.</h2></div>${contactBlock(config)}</section>`;
+  <section class="contact-summary"><div><p class="kicker">Publisher</p><h2>Independent, reachable, transparent.</h2></div>${contactBlock(config, { showPublisherLink: false })}</section>`;
   return layout(config, {
     title: config.publisher.tradingName,
     description: config.site.description,
@@ -448,7 +447,7 @@ function homePage(config) {
 function productPage(config, product) {
   const isPrimaryApp = product.name === config.appName;
   const legalCards = [
-    ['/products/cricket-legacy/privacy/', 'Cricket Legacy Privacy Policy', 'How Cricket Legacy and its providers handle information.'],
+    ['/products/cricket-legacy/privacy/', `${config.appName} Privacy Policy`, `How ${config.appName} and its providers handle information.`],
     ['/terms/', 'Terms & Conditions', 'Rules for using the game and its paid features.'],
     ['/support/', 'Support', 'Help with gameplay, purchases, access or privacy.'],
     ['/delete-account/', 'Delete account', 'Delete local data or request deletion of an online account.'],
@@ -460,7 +459,7 @@ function productPage(config, product) {
       <h2>${escapeHtml(product.headline)}</h2>
       <p>${escapeHtml(product.description)}</p>
     </div>
-    ${isPrimaryApp ? '<div class="product-icon-panel"><img class="app-icon" src="/images/cricket-legacy-icon.png" alt="Cricket Legacy app icon" width="512" height="512"><div class="chip-row"><span>Player</span><span>Manager</span></div></div>' : '<div class="product-glyph" aria-hidden="true"><span></span></div>'}
+    ${isPrimaryApp ? `<div class="product-icon-panel"><img class="app-icon" src="/images/cricket-legacy-icon.png" alt="${escapeHtml(product.name)} app icon" width="512" height="512"><div class="chip-row"><span>Player</span><span>Manager</span></div></div>` : '<div class="product-glyph" aria-hidden="true"><span></span></div>'}
   </section>
   <section class="highlight-grid" aria-label="${escapeHtml(product.name)} highlights">
     ${product.highlights.map((highlight, index) => `<article><span class="highlight-number">0${index + 1}</span><h3>${escapeHtml(highlight.title)}</h3><p>${escapeHtml(highlight.description)}</p></article>`).join('')}

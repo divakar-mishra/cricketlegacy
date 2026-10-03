@@ -33,7 +33,7 @@ describe('purchase screen copy', () => {
     expect(purchaseScreen).toContain("Platform.OS === 'ios' ? 'App Store' : 'Google Play'");
     expect(purchaseScreen).toContain('Purchases handled by {storeName}');
     expect(purchaseScreen).toContain('Restore Purchases');
-    expect(purchaseScreen).toContain('Checkout coming soon');
+    expect(purchaseScreen).toContain('Store unavailable');
     expect(purchaseScreen).not.toContain('checkout is not connected yet');
     expect(purchaseScreen).not.toContain('Google Play pricing is unavailable');
     expect(purchaseScreen).toContain('disabled={!available || owned');
@@ -46,12 +46,12 @@ describe('purchase screen copy', () => {
     expect(purchaseScreen).toContain('const compact = useIsCompact(560);');
     expect(purchaseScreen).toContain('fullWidth={compact}');
     expect(purchaseScreen).toContain('itemButtonCompact');
-    expect(purchaseScreen).toContain("unavailableLabel = storeSetupPending ? 'Coming soon'");
+    expect(purchaseScreen).toContain("unavailableLabel = storeSetupPending ? 'Store unavailable'");
   });
 
   it('disables free-energy rewarded ads when no provider is ready', () => {
     expect(purchaseScreen).toContain(
-      "const rewardedEnergyAvailable = ads.isAdsReady() || ads.isReady('rewarded');",
+      'const rewardedEnergyAvailable = useAdsReady();',
     );
     expect(purchaseScreen).toContain(
       "label={rewardedEnergyAvailable ? 'Watch ad' : 'Ad unavailable'}",
@@ -62,6 +62,14 @@ describe('purchase screen copy', () => {
     expect(purchaseScreen).toContain('label={`Refill · ${ENERGY_REFILL_GEMS} gems`}');
     expect(purchaseScreen).toContain('const result = refillEnergy()');
     expect(purchaseScreen).not.toContain("products.find((p) => p.id === 'energy_refill')");
+  });
+
+  it('keeps optional rewarded energy ads available to remove-ads owners', () => {
+    expect(purchaseScreen).toContain('const res = await ads.showRewarded();');
+    expect(purchaseScreen).not.toContain('ads.showRewarded(!removeAds)');
+    expect(purchaseScreen).toContain(
+      'Removes banners and interstitials; optional rewarded ads remain available',
+    );
   });
 
   it('keeps Player energy controls out of the Manager Store', () => {
@@ -127,7 +135,7 @@ describe('purchase screen copy', () => {
     expect(purchaseScreen).toContain('style={styles.itemValue} numberOfLines={1}');
     expect(purchaseScreen).toContain('{coinProducts.length > 0 && (');
     expect(purchaseScreen).toContain("{(gemProducts.length > 0 || save?.mode === 'career') && (");
-    expect(purchaseScreen).toContain('checkout will activate after product setup is finished.');
+    expect(purchaseScreen).toContain('is unavailable. Check your connection and try again.');
   });
 
   it('gates the exact-save sponsor checkout and shows the irreversible binding warning', () => {
@@ -184,6 +192,7 @@ describe('purchase screen copy', () => {
     expect(purchaseScreen).toContain('$1,000,000 fictional Club Balance delivered once to the purchased Manager save; not regranted on restore');
     expect(purchaseScreen).toContain('club reputation +3');
     expect(purchaseScreen).toContain('hideUnavailableReason={false}');
+    expect(purchaseScreen).not.toContain("'Coming soon'");
     expect(purchaseScreen).not.toContain('Google Play setup pending.');
     expect(purchaseScreen).not.toContain(
       'Google Play purchases coming soon. Checkout will be enabled after the Google Play store setup is complete.',

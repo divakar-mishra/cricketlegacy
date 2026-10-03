@@ -1,18 +1,4 @@
-/**
- * Rewarded/interstitial/banner boundary with a lazily loaded AdMob native module.
- *
- * ---------------------------------------------------------------------------
- * The live provider is implemented below and kept behind this interface.
- * Keep all SDK usage inside this module and flip {@link MOCK_MODE} to `false`.
- *
- *   import mobileAds, { RewardedAd, InterstitialAd, RewardedAdEventType,
- *     AdEventType, TestIds } from 'react-native-google-mobile-ads';
- *
- *   // once at startup: await mobileAds().initialize();
- *   // preload RewardedAd/InterstitialAd for a unit id and track `loaded` state
- *   // so isReady() reflects it; on show, resolve completed on EARNED_REWARD.
- * ---------------------------------------------------------------------------
- */
+/** Rewarded/interstitial/banner boundary with a lazily loaded AdMob native module. */
 
 import { isOnline } from './connectivity';
 import { getJSON, setJSON } from '../storage/storage';
@@ -27,10 +13,6 @@ export const MOCK_MODE = typeof __DEV__ !== 'undefined' && __DEV__ && ALLOW_LOCA
  * AdMob provider (react-native-google-mobile-ads), loaded lazily so the app
  * never crashes when the dependency is absent (Expo Go / before EAS build).
  *
- * To go live:
- *   1. npx expo install react-native-google-mobile-ads
- *   2. Add the config plugin + your AdMob app IDs to app.json.
- *   3. Call configureAds({ rewarded, interstitial }) once at App.tsx startup.
  * ------------------------------------------------------------------------- */
 type AdMobModule = any; // no static types — the dep may be absent
 let _admob: AdMobModule | null | undefined;
@@ -90,12 +72,21 @@ export async function configureAds(
       const init = (M.default ?? M.mobileAds)?.();
       if (!init?.setRequestConfiguration || !init?.initialize) return;
       await init.setRequestConfiguration({
-        tagForChildDirectedTreatment: audience === 'teen',
+        // The admitted teen audience is 13–17, not an under-13 child-directed audience.
+        // Keep the stricter under-age-of-consent and G-rated treatment below.
+        tagForChildDirectedTreatment: false,
         tagForUnderAgeOfConsent: audience === 'teen',
         ...(audience === 'teen' ? { maxAdContentRating: M.MaxAdContentRating?.G ?? 'G' } : {}),
       });
-      // Fail closed if UMP is absent, errors or does not allow ad requests.
-      const consent = await M.AdsConsent?.gatherConsent({ tagForUnderAgeOfConsent: audience === 'teen' });
+      // UMP may allow requests using a completed decline's limited-ad signal.
+      // On a transient form/update error, only use UMP's own current/previous
+      // session permission; never infer permission from the age choice alone.
+      let consent: { canRequestAds?: boolean } | undefined;
+      try {
+        consent = await M.AdsConsent?.gatherConsent({ tagForUnderAgeOfConsent: audience === 'teen' });
+      } catch {
+        consent = await M.AdsConsent?.getConsentInfo();
+      }
       if (_audience !== audience || consent?.canRequestAds !== true) {
         notifyAdsStateChanged();
         return;
@@ -169,6 +160,11 @@ export function getBannerAdUnitId(): string | undefined {
   return _unitIds.banner ?? (__DEV__ ? M?.TestIds?.BANNER : undefined);
 }
 
+/** Let AdMob's UMP/TCF signal select adult serving mode, including limited ads. */
+export function getAdRequestOptions(): { requestNonPersonalizedAdsOnly?: boolean } {
+  return _audience === 'teen' ? { requestNonPersonalizedAdsOnly: true } : {};
+}
+
 /** Real rewarded ad — resolves completed=true only on EARNED_REWARD. */
 function showRealRewarded(unitId: string, M: AdMobModule): Promise<{ completed: boolean }> {
   const { RewardedAd, RewardedAdEventType, AdEventType } = M;
@@ -194,7 +190,7 @@ function showRealRewarded(unitId: string, M: AdMobModule): Promise<{ completed: 
       resolve({ completed: earned });
     };
     try {
-      const ad = RewardedAd.createForAdRequest(unitId, { requestNonPersonalizedAdsOnly: true });
+      const ad = RewardedAd.createForAdRequest(unitId, getAdRequestOptions());
       subs.push(
         ad.addAdEventListener(RewardedAdEventType.LOADED, () => {
           try {
@@ -211,9 +207,9 @@ function showRealRewarded(unitId: string, M: AdMobModule): Promise<{ completed: 
       );
       subs.push(ad.addAdEventListener(AdEventType.CLOSED, finish));
       subs.push(ad.addAdEventListener(AdEventType.ERROR, finish));
-      ad.load();
       // Loading plus an optional 60-second rewarded creative may exceed 30s.
       timeout = setTimeout(finish, 180_000); // safety: never hang the caller
+      ad.load();
     } catch {
       finish();
     }
@@ -242,7 +238,7 @@ function showRealInterstitial(unitId: string, M: AdMobModule): Promise<boolean> 
       resolve(shown);
     };
     try {
-      const ad = InterstitialAd.createForAdRequest(unitId, { requestNonPersonalizedAdsOnly: true });
+      const ad = InterstitialAd.createForAdRequest(unitId, getAdRequestOptions());
       subs.push(
         ad.addAdEventListener(AdEventType.LOADED, () => {
           try {
@@ -294,7 +290,7 @@ export function isReady(kind: AdKind): boolean {
 /**
  * Shows a rewarded ad. Resolves `{ completed: true }` only if the user earned
  * the reward. Returns `{ completed: false }` when ads are disabled or offline.
- * @param adsEnabled pass `false` (e.g. for the removeAds entitlement) to skip.
+ * @param adsEnabled pass `false` only when an optional rewarded request must be skipped.
  */
 export async function showRewarded(adsEnabled = true): Promise<{ completed: boolean }> {
   if (!adsEnabled) return { completed: false };

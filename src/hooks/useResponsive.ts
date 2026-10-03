@@ -9,8 +9,8 @@ import { useWindowDimensions } from 'react-native';
 
 export const COMPACT_BREAKPOINT = 380;
 
-/** True on compact-width devices (below the breakpoint). */
+/** Stack dense rows when either the device or larger system text needs room. */
 export function useIsCompact(breakpoint: number = COMPACT_BREAKPOINT): boolean {
-  const { width } = useWindowDimensions();
-  return width < breakpoint;
+  const { width, fontScale } = useWindowDimensions();
+  return width / Math.max(1, fontScale ?? 1) < breakpoint;
 }

@@ -18,17 +18,29 @@ export function ageToAdBand(ageText: string): AdAgeBand | null {
 }
 
 export function adAudience(choice: AdAgeChoice | null): 'none' | 'teen' | 'adult' {
+  if (!isAgeChoiceEligible(choice)) return 'none';
   if (choice?.band === 'adult') return 'adult';
-  if (choice?.band === 'teen' && choice.residence === 'elsewhere' && choice.guardianPermission) return 'teen';
-  return 'none';
+  return 'teen';
+}
+
+/** The same declared-age rule governs game access and AdMob eligibility. */
+export function isAgeChoiceEligible(choice: AdAgeChoice | null): boolean {
+  if (choice?.band === 'adult') return true;
+  if (choice?.band === 'teen' && choice.residence === 'elsewhere' && choice.guardianPermission)
+    return true;
+  return false;
 }
 
 function isChoice(value: unknown): value is AdAgeChoice {
   if (!value || typeof value !== 'object') return false;
   const choice = value as Partial<AdAgeChoice>;
-  return ['under13', 'teen', 'adult'].includes(choice.band ?? '')
-    && (choice.residence === null || choice.residence === 'india' || choice.residence === 'elsewhere')
-    && typeof choice.guardianPermission === 'boolean';
+  return (
+    ['under13', 'teen', 'adult'].includes(choice.band ?? '') &&
+    (choice.residence === null ||
+      choice.residence === 'india' ||
+      choice.residence === 'elsewhere') &&
+    typeof choice.guardianPermission === 'boolean'
+  );
 }
 
 export async function readAdAgeChoice(): Promise<AdAgeChoice | null> {

@@ -34,7 +34,7 @@ export function FeedbackScreen({ navigation }: ScreenProps<'Feedback'>) {
       Alert.alert('Add your feedback', 'Describe what happened or what you would like improved.');
       return;
     }
-    const subject = `Cricket Legacy feedback — ${FEEDBACK_KINDS.find((item) => item.value === kind)?.label ?? kind}`;
+    const subject = `Cricket: Player and Manager feedback — ${FEEDBACK_KINDS.find((item) => item.value === kind)?.label ?? kind}`;
     const body = `${trimmed}\n\n---\n${diagnosticLine}`;
     const url = `mailto:${PRIVACY_CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     try {

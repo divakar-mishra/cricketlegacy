@@ -51,9 +51,8 @@ function loadRevenueCat(): RevenueCatModule | null {
 }
 
 /**
- * Configure RevenueCat only after Supabase has server-validated a recoverable,
- * non-anonymous account. Passing `appUserID` on the first configure prevents
- * the SDK from generating a purchase-capable anonymous customer.
+ * Configure RevenueCat for every player. Guests use RevenueCat's anonymous
+ * customer ID; signing in later links that purchase history to their account.
  */
 export async function configurePurchases(keys: { ios?: string; android?: string }): Promise<void> {
   _rcKeys = { ...keys };
@@ -65,25 +64,32 @@ async function synchronizePurchaseIdentityOnce(): Promise<boolean> {
   if (MOCK_MODE) return false;
   const identityEpoch = _rcIdentityEpoch;
   const appUserId = await currentRecoverableSupabaseUserId();
-  if (!appUserId || identityEpoch !== _rcIdentityEpoch) {
-    _rcIdentityReady = false;
-    _rcAppUserId = null;
-    return false;
-  }
+  if (identityEpoch !== _rcIdentityEpoch) return false;
   const RC = loadRevenueCat();
   if (!RC) return false;
   const apiKey = Platform.OS === 'ios' ? _rcKeys.ios : _rcKeys.android;
   if (!apiKey) return false;
   try {
     if (!_rcConfigured) {
-      RC.configure({ apiKey, appUserID: appUserId });
+      RC.configure({ apiKey });
       _rcConfigured = true;
     }
-    if (_rcAppUserId !== appUserId || !_rcIdentityReady) {
-      await RC.logIn(appUserId);
+    const currentProviderId = await RC.getAppUserID();
+    if (identityEpoch !== _rcIdentityEpoch) return false;
+    if (appUserId) {
+      // logIn aliases an anonymous guest to a new account and switches between
+      // existing accounts without ever sharing a cached entitlement locally.
+      if (currentProviderId !== appUserId) await RC.logIn(appUserId);
+    } else if (!(await RC.isAnonymous())) {
+      // A previous signed-in customer must not remain active for a guest.
+      await RC.logOut();
     }
     if (identityEpoch !== _rcIdentityEpoch) return false;
-    _rcAppUserId = appUserId;
+    const providerId = await RC.getAppUserID();
+    if (identityEpoch !== _rcIdentityEpoch || !providerId ||
+        (appUserId && providerId !== appUserId) ||
+        (!appUserId && !(await RC.isAnonymous()))) return false;
+    _rcAppUserId = providerId;
     _rcIdentityReady = true;
     return true;
   } catch {
@@ -93,7 +99,7 @@ async function synchronizePurchaseIdentityOnce(): Promise<boolean> {
   }
 }
 
-/** Re-checks the Supabase account and synchronizes RevenueCat to its UUID. */
+/** Re-checks the optional account and synchronizes RevenueCat's customer ID. */
 export async function synchronizePurchaseIdentity(): Promise<boolean> {
   if (_rcIdentitySync) return _rcIdentitySync;
   _rcIdentitySync = synchronizePurchaseIdentityOnce().finally(() => {
@@ -103,10 +109,8 @@ export async function synchronizePurchaseIdentity(): Promise<boolean> {
 }
 
 /**
- * Immediately closes every local paid-provider operation on app sign-out.
- * RevenueCat recommends not calling `logOut()` in a custom-ID-only design,
- * because that method creates a new anonymous ID. The next recoverable account
- * switches safely with `logIn()`; no operation can use the cached old identity.
+ * Immediately closes local paid-provider operations on account changes. The
+ * next sync switches RevenueCat to the account or a fresh anonymous customer.
  */
 export function clearPurchaseIdentity(): void {
   _rcIdentityEpoch += 1;
@@ -665,7 +669,7 @@ export async function purchase(productId: string): Promise<PurchaseResult> {
     }
   }
   if (!(await synchronizePurchaseIdentity())) {
-    return { ok: false, productId, error: 'recoverable_sign_in_required' };
+    return { ok: false, productId, error: 'not_configured' };
   }
   const RC = loadRevenueCat();
   if (!RC || !_rcConfigured) return { ok: false, productId, error: 'not_configured' };
@@ -738,7 +742,7 @@ export async function restore(): Promise<RestoreResult> {
     return {
       status: 'NOT_CONFIGURED',
       purchases: [],
-      error: 'recoverable_sign_in_required',
+      error: 'not_configured',
     };
   }
   const RC = loadRevenueCat();

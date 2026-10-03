@@ -12,6 +12,7 @@ import {
   Stop,
 } from 'react-native-svg';
 import { KitDesignLayer } from './KitDesign';
+import type { ActorPose } from './fieldSequence';
 
 export interface CricketerProps {
   kitId?: string;
@@ -22,6 +23,7 @@ export interface CricketerProps {
   primary: string;
   secondary: string;
   role: 'fielder' | 'keeper' | 'bowler' | 'batter';
+  pose?: ActorPose;
 }
 
 function MatchJersey({
@@ -42,11 +44,11 @@ function MatchJersey({
         <ClipPath id={id}>
           <Path d={shape} />
         </ClipPath>
-        <LinearGradient id={id + 'cloth'} x1="0" y1="0" x2="1" y2=".8">
-          <Stop offset="0" stopColor="#FFFFFF" stopOpacity=".38" />
-          <Stop offset=".36" stopColor="#FFFFFF" stopOpacity=".04" />
-          <Stop offset=".68" stopColor="#000000" stopOpacity=".08" />
-          <Stop offset="1" stopColor="#000000" stopOpacity=".52" />
+        <LinearGradient id={id + 'cloth'} x1="0" y1="0" x2="1" y2="0.8">
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.38" />
+          <Stop offset="0.36" stopColor="#FFFFFF" stopOpacity="0.04" />
+          <Stop offset="0.68" stopColor="#000000" stopOpacity="0.08" />
+          <Stop offset="1" stopColor="#000000" stopOpacity="0.52" />
         </LinearGradient>
       </Defs>
       <Path d={shape} fill={primary} stroke="#0A1420" strokeWidth={0.9} />
@@ -88,10 +90,43 @@ function CricketerArtwork({
   primary,
   secondary,
   role,
+  pose = 'ready',
 }: CricketerProps): ReactElement {
   const transform = 'translate(' + x + ' ' + y + ') rotate(' + rotation + ') scale(' + scale + ')';
   const outline = '#06100B';
   const skin = '#B87550';
+
+  if (pose !== 'ready') {
+    const stride = pose === 'run-left' ? -1 : pose === 'run-right' ? 1 : 0;
+    const gathering = pose === 'gather';
+    const raised = pose === 'catch' || pose === 'appeal';
+    const leftHand = raised ? [-7, -8] : gathering ? [-2, 8] : [-6, stride * 4];
+    const rightHand = raised ? [7, -8] : gathering ? [2, 8] : pose === 'throw' ? [5, -10] : [6, -stride * 4];
+    return (
+      <G transform={transform} testID={`cricketer-pose-${pose}`}>
+        <Ellipse cx={0} cy={7} rx={7} ry={2.5} fill="#020504" opacity={0.3} />
+        <Path d={`M-2 3 -4 ${8 + stride * 3}M2 3 4 ${8 - stride * 3}`}
+          stroke={role === 'batter' || role === 'keeper' ? '#F4E8C8' : primary}
+          strokeWidth={3} strokeLinecap="round" />
+        <MatchJersey shape="M-4.8 -.6Q0 -3.1 4.8 -.6L3.8 4.6Q0 5.9 -3.8 4.6Z"
+          primary={primary} secondary={secondary} kitId={kitId} />
+        <Path d={`M-4 0 ${leftHand[0]} ${leftHand[1]}M4 0 ${rightHand[0]} ${rightHand[1]}`}
+          fill="none" stroke={skin} strokeWidth={2.2} strokeLinecap="round" />
+        {role === 'batter' ? (
+          <Path testID="bat-carried" d="M6 1 7.5 1 9 10 6.8 10Z" fill="#E3BE79" stroke="#6D4823" strokeWidth={0.6} />
+        ) : null}
+        {role === 'keeper' ? (
+          <G fill="#F0E8D2" stroke={outline} strokeWidth={0.5}>
+            <Circle cx={leftHand[0]} cy={leftHand[1]} r={2} />
+            <Circle cx={rightHand[0]} cy={rightHand[1]} r={2} />
+          </G>
+        ) : null}
+        <Circle cx={0} cy={-4.6} r={3} fill={skin} stroke={outline} strokeWidth={0.85} />
+        <Path d="M-3 -4.9Q0 -7.1 3 -4.9" fill={role === 'batter' ? outline : primary} stroke={secondary} strokeWidth={1} />
+        <Path d="M-2.8 -4.9Q0 -3.9 3.5 -4.6L4.2 -5.3Q0 -5.6 -2.8 -4.9Z" fill={primary} />
+      </G>
+    );
+  }
 
   if (role === 'batter') {
     return (

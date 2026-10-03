@@ -15,7 +15,7 @@ import Svg, {
   Stop,
   Text as SvgText,
 } from 'react-native-svg';
-import type { Conditions, Dismissal } from '../domain/types';
+import type { BallOutcome, Conditions, Dismissal } from '../domain/types';
 import type { FieldSetting } from '../engine/intent';
 import { useSettings } from '../state/settingsStore';
 import { useColors } from '../theme';
@@ -23,7 +23,10 @@ import { AppText } from './AppText';
 import { kitColorHex, kitDesign } from '../data/cosmetics';
 import { Cricketer, type CricketerProps } from './CricketerArtwork';
 import { StadiumArchitecture } from './StadiumArchitecture';
-import { cricketerScale, deliveryCaption, visualRunningCount } from './fieldPresentation';
+import { cricketerScale, deliveryCaption } from './fieldPresentation';
+import { fieldSequence, poseVisibility } from './fieldSequence';
+import type { ActorPose, PoseFrame, Track } from './fieldSequence';
+import { MatchUmpire } from './MatchUmpire';
 import { GroundAppearance, standSections } from './venueVisuals';
 import {
   deliveryBouncePoint,
@@ -37,7 +40,6 @@ import {
   DELIVERY_ROLE_MOTION_MS,
   DELIVERY_RUN_UP_MS,
   deliveryBallFlightMs,
-  fieldingReaction,
 } from './fieldMotion';
 
 export interface LastShot {
@@ -49,6 +51,7 @@ export interface LastShot {
   delivery?: string;
   shot?: string;
   dismissalType?: Dismissal['type'];
+  outcome?: BallOutcome;
 }
 
 interface Props {
@@ -58,6 +61,8 @@ interface Props {
   lastShot?: LastShot | null;
   stadiumTheme?: string;
   animate?: boolean;
+  playback?: { ball: Animated.Value; roles: Animated.Value; reaction?: Animated.Value };
+  deliveryResolved?: boolean;
   userBatterPosition?: 'striker' | 'nonStriker' | null;
   battingPrimaryColor?: string;
   battingSecondaryColor?: string;
@@ -73,6 +78,15 @@ interface Props {
 interface CricketerSpriteProps extends CricketerProps {
   fieldSize: number;
   style?: ComponentProps<typeof Animated.View>['style'];
+  progress?: Animated.Value;
+  poses?: PoseFrame[];
+}
+
+function motionTrack(progress: Animated.Value, values: Track) {
+  return progress.interpolate({ inputRange: values.times, outputRange: values.values, extrapolate: 'clamp' });
+}
+function directionTrack(progress: Animated.Value, values: Track) {
+  return progress.interpolate({ inputRange: values.times, outputRange: values.values.map(v => `${v}deg`), extrapolate: 'clamp' });
 }
 
 const FIELD_PALETTES = {
@@ -114,24 +128,11 @@ function CricketerSprite({
   role,
   fieldSize,
   style,
+  progress,
+  poses = [],
 }: CricketerSpriteProps): ReactElement {
   const spriteSize = fieldSize * 0.135;
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      testID={`live-player-${role}`}
-      style={[
-        styles.cricketerSprite,
-        {
-          width: spriteSize,
-          height: spriteSize,
-          left: x - spriteSize / 2,
-          top: y - spriteSize / 2,
-        },
-        style,
-      ]}
-    >
+  const art = (pose: ActorPose = 'ready') => (
       <Svg width={spriteSize} height={spriteSize} viewBox="-16 -16 32 32">
         {role === 'batter' ? (
           <Ellipse cx={0} cy={1} rx={12} ry={11} fill="#E4CB8E" opacity={0.12} />
@@ -145,6 +146,7 @@ function CricketerSprite({
           primary={kitId ? kitColorHex(kitId) ?? primary : primary}
           secondary={kitId ? kitDesign(kitId).trim : secondary}
           role={role}
+          pose={pose}
         />
         {role !== 'fielder' ? (
           <G>
@@ -169,6 +171,18 @@ function CricketerSprite({
           </G>
         ) : null}
       </Svg>
+  );
+  return (
+    <Animated.View pointerEvents="none" testID={`live-player-${role}`}
+      style={[styles.cricketerSprite, {
+        width: spriteSize, height: spriteSize, left: x - spriteSize / 2, top: y - spriteSize / 2,
+      }, style]}>
+      {progress && poses.length ? [...new Set<ActorPose>(['ready', ...poses.map(p => p.pose)])].map(pose => (
+        <Animated.View key={pose} style={{ position: 'absolute', width: spriteSize, height: spriteSize,
+          opacity: motionTrack(progress, poseVisibility(poses, pose)) }}>
+          {art(pose)}
+        </Animated.View>
+      )) : art()}
     </Animated.View>
   );
 }
@@ -230,6 +244,8 @@ export function FieldView({
   lastShot,
   stadiumTheme,
   animate = true,
+  playback,
+  deliveryResolved = true,
   userBatterPosition,
   battingPrimaryColor,
   battingSecondaryColor,
@@ -244,7 +260,9 @@ export function FieldView({
   const graphics = useSettings((state) => state.graphics);
   const reducedMotion = useReducedMotion();
   const motionEnabled = animate && !reducedMotion && graphics !== 'low';
-  const caption = deliveryCaption(lastShot);
+  const caption = deliveryResolved ? deliveryCaption(lastShot) : {
+    mark: '·', title: 'Delivery in progress', detail: 'Ball in play',
+  };
   const palette = stadiumTheme === 'stadium_noir' ? FIELD_PALETTES.NOIR : FIELD_PALETTES.STANDARD;
   const capacityLevel = groundAppearance?.capacityLevel ?? 1;
   const experienceLevel = groundAppearance?.experienceLevel ?? 1;
@@ -266,15 +284,11 @@ export function FieldView({
   const pitchColor = conditions ? PITCH_TONE[conditions.pitch] : palette.pitch;
   const bounce = deliveryBouncePoint(size, lastShot?.delivery);
   const defaultShotPath = lastShot ? fieldShotPath(size, lastShot) : null;
-  const reaction = lastShot ? fieldingReaction(size, lastShot, layout) : null;
-  const fieldActionPoint = reaction?.end ?? striker;
+  const sequence = useMemo(() => lastShot ? fieldSequence(size, lastShot, layout) : null, [size, lastShot, layout]);
+  const fieldActionPoint = sequence?.target ?? striker;
   const caught = lastShot?.tone === 'wicket' && lastShot.dismissalType === 'CAUGHT';
   const runOut = lastShot?.tone === 'wicket' && lastShot.dismissalType === 'RUN_OUT';
-  const shotEnd = caught
-    ? fieldActionPoint
-    : runOut
-      ? nonStriker
-      : (defaultShotPath?.end ?? striker);
+  const shotEnd = sequence?.endpoint ?? defaultShotPath?.end ?? striker;
   const shotControl =
     caught || runOut
       ? {
@@ -282,8 +296,7 @@ export function FieldView({
           y: (striker.y + fieldActionPoint.y) / 2,
         }
       : (defaultShotPath?.control ?? striker);
-  const actionPoint = runOut ? fieldActionPoint : shotControl;
-  const showShotPath = Boolean(lastShot && (lastShot.tone !== 'wicket' || caught || runOut));
+  const showShotPath = Boolean(deliveryResolved && lastShot && (lastShot.tone !== 'wicket' || caught || runOut));
   const userBatter =
     userBatterPosition === 'striker'
       ? striker
@@ -373,11 +386,15 @@ export function FieldView({
       }),
     [cx, cy, size, stadiumR],
   );
-  const ballT = useRef(new Animated.Value(0)).current;
-  const roleT = useRef(new Animated.Value(0)).current;
+  const localBallT = useRef(new Animated.Value(0)).current;
+  const localRoleT = useRef(new Animated.Value(0)).current;
+  const ballT = playback && motionEnabled ? playback.ball : localBallT;
+  const roleT = playback && motionEnabled ? playback.roles : localRoleT;
 
   useEffect(() => {
     if (!lastShot) return;
+    // MatchScreen owns the shared clock; do not launch a second animation.
+    if (playback && motionEnabled) return;
     ballT.stopAnimation();
     roleT.stopAnimation();
     ballT.setValue(motionEnabled ? 0 : 1);
@@ -402,20 +419,19 @@ export function FieldView({
     motion.start();
 
     return () => motion.stop();
-  }, [motionEnabled, lastShot?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [motionEnabled, lastShot?.key, playback]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ballColor = lastShot ? toneColors[lastShot.tone] : colors.text;
-  const translateX = ballT.interpolate({
-    inputRange: [0, 0.3, 0.46, 0.74, 1],
-    outputRange: [bowler.x - 5, bounce.x - 5, striker.x - 5, actionPoint.x - 5, shotEnd.x - 5],
-  });
-  const translateY = ballT.interpolate({
-    inputRange: [0, 0.3, 0.46, 0.74, 1],
-    outputRange: [bowler.y - 5, bounce.y - 5, striker.y - 5, actionPoint.y - 5, shotEnd.y - 5],
-  });
-  const scale = ballT.interpolate({
-    inputRange: [0, 0.3, 0.46, 0.74, 1],
-    outputRange: [0.72, 0.82, 1.12, lastShot?.tone === 'six' ? 1.65 : 0.96, 0.9],
+  const ballColor = lastShot && deliveryResolved ? toneColors[lastShot.tone] : colors.text;
+  const contactAt = sequence?.contact ?? 0.33;
+  const ballAxis = (axis: 'x' | 'y') => {
+    const path = sequence?.ball[axis] ?? { times: [0, 1], values: [bowler[axis], bowler[axis]] };
+    return motionTrack(roleT, { ...path, values: path.values.map(v => v - 5) });
+  };
+  const translateX = ballAxis('x');
+  const translateY = ballAxis('y');
+  const scale = roleT.interpolate({
+    inputRange: [0, contactAt, 0.6, 0.86, 1],
+    outputRange: [0.72, 1, lastShot?.tone === 'six' || caught ? 1.55 : 1, 0.9, 0.9],
   });
   const ballOpacity = ballT.interpolate({
     inputRange: [0, 0.02, 1],
@@ -429,7 +445,11 @@ export function FieldView({
     inputRange: [0, 0.02, 0.46, 0.74, 1],
     outputRange: [0, 0.1, 0.16, lastShot?.tone === 'six' ? 0.28 : 0.14, 0.08],
   });
-  const bowlerTranslateY = roleT.interpolate({
+  const bowlerTranslateY = sequence?.bowlerReceive ? roleT.interpolate({
+    inputRange: [0, 0.15, 0.34, 0.48, 0.84, 1],
+    outputRange: [size * 0.055, 0, -size * 0.022, 0,
+      sequence.bowlerReceive.y.values[2], sequence.bowlerReceive.y.values[3]],
+  }) : roleT.interpolate({
     inputRange: [0, 0.15, 0.34, 1],
     outputRange: [size * 0.055, 0, -size * 0.022, 0],
   });
@@ -445,102 +465,36 @@ export function FieldView({
     inputRange: [0, 0.32, 0.5, 0.72, 1],
     outputRange: [1, 1, 1.1, 1.02, 1],
   });
-  const keeperTranslateY = roleT.interpolate({
-    inputRange: [0, 0.38, 0.55, 0.76, 1],
-    outputRange: [0, 0, lastShot?.tone === 'wicket' ? size * 0.018 : size * 0.008, 0, 0],
-  });
+  const keeperTranslateY = sequence ? motionTrack(roleT, sequence.keeper.y) : 0;
   const keeperScale = roleT.interpolate({
     inputRange: [0, 0.4, 0.58, 0.78, 1],
     outputRange: [1, 1, lastShot?.tone === 'wicket' ? 1.14 : 1.06, 1, 1],
   });
-  const fielderTranslateX = roleT.interpolate({
-    inputRange: [0, 0.4, 0.88, 1],
-    outputRange: [
-      0,
-      0,
-      reaction ? reaction.end.x - reaction.start.x : 0,
-      reaction ? reaction.end.x - reaction.start.x : 0,
-    ],
-  });
-  const fielderTranslateY = roleT.interpolate({
-    inputRange: [0, 0.4, 0.88, 1],
-    outputRange: [
-      0,
-      0,
-      reaction ? reaction.end.y - reaction.start.y : 0,
-      reaction ? reaction.end.y - reaction.start.y : 0,
-    ],
-  });
-  const fielderScale = roleT.interpolate({
-    inputRange: [0, 0.42, 0.72, 0.9, 1],
-    outputRange: [1, 1, 1.12, 1.04, 1],
-  });
-
-  const runCount = motionEnabled ? visualRunningCount(lastShot) : 0;
-  const crossingX = nonStriker.x - striker.x;
-  const crossingY = nonStriker.y - striker.y;
-  const runnerInputRange =
-    runCount === 1
-      ? [0, 0.42, 1]
-      : runCount === 2
-        ? [0, 0.4, 0.7, 1]
-        : runCount === 3
-          ? [0, 0.38, 0.58, 0.79, 1]
-          : [0, 1];
-  const strikerRunX = roleT.interpolate({
-    inputRange: runnerInputRange,
-    outputRange:
-      runCount === 1
-        ? [0, 0, crossingX]
-        : runCount === 2
-          ? [0, 0, crossingX, 0]
-          : runCount === 3
-            ? [0, 0, crossingX, 0, crossingX]
-            : [0, 0],
-  });
-  const strikerRunY = roleT.interpolate({
-    inputRange: runnerInputRange,
-    outputRange:
-      runCount === 1
-        ? [0, 0, crossingY]
-        : runCount === 2
-          ? [0, 0, crossingY, 0]
-          : runCount === 3
-            ? [0, 0, crossingY, 0, crossingY]
-            : [0, 0],
-  });
-  const nonStrikerRunX = roleT.interpolate({
-    inputRange: runnerInputRange,
-    outputRange:
-      runCount === 1
-        ? [0, 0, -crossingX]
-        : runCount === 2
-          ? [0, 0, -crossingX, 0]
-          : runCount === 3
-            ? [0, 0, -crossingX, 0, -crossingX]
-            : [0, 0],
-  });
-  const nonStrikerRunY = roleT.interpolate({
-    inputRange: runnerInputRange,
-    outputRange:
-      runCount === 1
-        ? [0, 0, -crossingY]
-        : runCount === 2
-          ? [0, 0, -crossingY, 0]
-          : runCount === 3
-            ? [0, 0, -crossingY, 0, -crossingY]
-            : [0, 0],
-  });
+  const running = motionEnabled && !deliveryResolved && sequence;
+  const strikerRunX = running && sequence.dismissal
+    ? roleT.interpolate({ inputRange: [0, 0.94, 1], outputRange: [0, 0, -size * 0.055] }) : 0;
+  const strikerRunY = running ? motionTrack(roleT, sequence.striker.y) : 0;
+  const nonStrikerRunX = 0;
+  const nonStrikerRunY = running ? motionTrack(roleT, sequence.nonStriker.y) : 0;
+  const strikerHeading = running ? directionTrack(roleT, sequence.striker.heading) : '180deg';
+  const nonStrikerHeading = running ? directionTrack(roleT, sequence.nonStriker.heading) : '0deg';
+  const strikerPoses: PoseFrame[] = running ? [...sequence.striker.poses,
+    ...(sequence.dismissal ? [{ pose: 'walk' as const, from: 0.94, to: 1 }] : [])] : [];
+  const departureOpacity = running && sequence.dismissal
+    ? roleT.interpolate({ inputRange: [0, 0.94, 1], outputRange: [1, 1, 0.25] }) : 1;
+  const reactionT = playback?.reaction ?? roleT;
+  const crowdLift = reactionT.interpolate({ inputRange: [0, 0.2, 0.5, 1], outputRange: [0, -size * 0.005, -size * 0.003, 0] });
+  const crowdOpacity = reactionT.interpolate({ inputRange: [0, 0.2, 0.6, 1], outputRange: [0, 0.55, 0.35, 0] });
   const majorEvent =
     lastShot?.tone === 'four' || lastShot?.tone === 'six' || lastShot?.tone === 'wicket';
   const eventPulseColor = lastShot?.tone === 'wicket' ? colors.danger : ballColor;
-  const stadiumPulseOpacity = ballT.interpolate({
+  const stadiumPulseOpacity = roleT.interpolate({
     inputRange: [0, 0.78, 0.92, 1],
-    outputRange: [0, 0, 0.7, 0],
+    outputRange: [0, 0, 0.16, 0],
   });
   const stadiumPulseScale = ballT.interpolate({
     inputRange: [0, 0.78, 1],
-    outputRange: [0.98, 0.98, 1.045],
+    outputRange: [0.99, 0.99, 1.01],
   });
   const impactPulseOpacity = ballT.interpolate({
     inputRange: [0, 0.78, 0.9, 1],
@@ -595,10 +549,8 @@ export function FieldView({
     strikerStumpY,
     bowlerStumpY,
   } = pitchGeometry(size);
-  const wicketAtStriker =
-    lastShot?.tone === 'wicket' && !caught && !runOut && lastShot.dismissalType !== 'LBW';
   const fieldDescription = fieldSetting.toLowerCase().replace(/_/g, ' ');
-  const eventDescription = lastShot
+  const eventDescription = lastShot && deliveryResolved
     ? '. ' +
       readableDescriptor(lastShot.delivery) +
       ' delivery' +
@@ -903,7 +855,7 @@ export function FieldView({
             </G>
           ) : null}
 
-          {caught ? (
+          {caught && deliveryResolved ? (
             <G>
               <Circle
                 cx={fieldActionPoint.x}
@@ -922,17 +874,17 @@ export function FieldView({
               />
             </G>
           ) : null}
-          {runOut ? (
+          {runOut && deliveryResolved ? (
             <Circle
-              cx={nonStriker.x}
-              cy={nonStriker.y}
+              cx={sequence?.bailsEnd.x ?? nonStriker.x}
+              cy={sequence?.bailsEnd.y ?? nonStriker.y}
               r={size * 0.032}
               fill="none"
               stroke={colors.danger}
               strokeWidth={2}
             />
           ) : null}
-          {lastShot?.dismissalType === 'LBW' ? (
+          {deliveryResolved && lastShot?.dismissalType === 'LBW' ? (
             <Circle
               cx={striker.x}
               cy={striker.y + size * 0.016}
@@ -941,25 +893,9 @@ export function FieldView({
               opacity={0.24}
             />
           ) : null}
-          {wicketAtStriker ? (
-            <G stroke={colors.danger} strokeWidth={1.8} strokeLinecap="round">
-              <Line
-                x1={cx - size * 0.014}
-                y1={strikerStumpY - size * 0.032}
-                x2={cx - size * 0.035}
-                y2={strikerStumpY - size * 0.045}
-              />
-              <Line
-                x1={cx + size * 0.014}
-                y1={strikerStumpY - size * 0.032}
-                x2={cx + size * 0.036}
-                y2={strikerStumpY - size * 0.018}
-              />
-            </G>
-          ) : null}
 
           <G>
-            {userBatter && userBadgeLabel ? (
+            {userBatter && userBadgeLabel && !running ? (
               <G>
                 <Circle
                   cx={userBatter.x}
@@ -1015,7 +951,7 @@ export function FieldView({
           ) : null}
         </Svg>
 
-        {majorEvent ? (
+        {majorEvent && motionEnabled ? (
           <Animated.View
             pointerEvents="none"
             style={[
@@ -1034,7 +970,7 @@ export function FieldView({
           />
         ) : null}
 
-        {majorEvent ? (
+        {majorEvent && motionEnabled ? (
           <>
             <Animated.View
               pointerEvents="none"
@@ -1072,26 +1008,28 @@ export function FieldView({
         ) : null}
 
         {fielders.map((fielder, index) => {
-          const reacting = reaction?.index === index;
+          const actor = motionEnabled ? sequence?.fielders[index] : undefined;
 
           return (
             <CricketerSprite
               key={'fielder-' + index}
               x={fielder.x}
               y={fielder.y}
-              rotation={faceCentreRotation(fielder.x, fielder.y, cx, cy)}
+              rotation={actor ? 0 : faceCentreRotation(fielder.x, fielder.y, cx, cy)}
               scale={cricketerScale('fielder')}
               primary={fielderPrimary}
               secondary={fielderSecondary}
               role="fielder"
               fieldSize={size}
+              progress={roleT}
+              poses={actor?.poses}
               style={
-                reacting
+                actor
                   ? {
                       transform: [
-                        { translateX: fielderTranslateX },
-                        { translateY: fielderTranslateY },
-                        { scale: fielderScale },
+                        { translateX: motionTrack(roleT, actor.x) },
+                        { translateY: motionTrack(roleT, actor.y) },
+                        { rotate: directionTrack(roleT, actor.heading) },
                       ],
                     }
                   : undefined
@@ -1108,6 +1046,8 @@ export function FieldView({
           secondary={fielderSecondary}
           role="keeper"
           fieldSize={size}
+          progress={roleT}
+          poses={motionEnabled ? sequence?.keeper.poses : undefined}
           style={{ transform: [{ translateY: keeperTranslateY }, { scale: keeperScale }] }}
         />
         <CricketerSprite
@@ -1119,7 +1059,12 @@ export function FieldView({
           secondary={fielderSecondary}
           role="bowler"
           fieldSize={size}
-          style={{ transform: [{ translateY: bowlerTranslateY }, { rotate: bowlerRotate }] }}
+          progress={roleT}
+          poses={motionEnabled ? [{ pose: 'run-left', from: 0, to: 0.075 }, { pose: 'run-right', from: 0.075, to: 0.15 }] : undefined}
+          style={{ transform: [
+            { translateX: sequence?.bowlerReceive ? motionTrack(roleT, sequence.bowlerReceive.x) : 0 },
+            { translateY: bowlerTranslateY }, { rotate: bowlerRotate },
+          ] }}
         />
         <CricketerSprite
           x={nonStriker.x}
@@ -1130,27 +1075,73 @@ export function FieldView({
           secondary={batterSecondary}
           role="batter"
           fieldSize={size}
-          style={{ transform: [{ translateX: nonStrikerRunX }, { translateY: nonStrikerRunY }] }}
+          progress={roleT}
+          poses={running ? sequence.nonStriker.poses : undefined}
+          style={{ transform: [{ translateX: nonStrikerRunX }, { translateY: nonStrikerRunY }, { rotate: nonStrikerHeading }] }}
         />
         <CricketerSprite
           x={striker.x}
           kitId={userBatterPosition === 'striker' ? userKitId : undefined}
           y={striker.y}
-          rotation={180}
+          rotation={0}
           scale={cricketerScale('batter')}
           primary={batterPrimary}
           secondary={batterSecondary}
           role="batter"
           fieldSize={size}
+          progress={roleT}
+          poses={strikerPoses}
           style={{
+            opacity: departureOpacity,
             transform: [
               { translateX: strikerRunX },
               { translateY: strikerRunY },
+              { rotate: strikerHeading },
               { rotate: batterRotate },
               { scale: batterScale },
             ],
           }}
         />
+
+        {userBatter && running ? (
+          <Animated.View pointerEvents="none" testID="running-user-marker" style={{ position: 'absolute',
+            left: userBatter.x - size * 0.05, top: userBatter.y - size * 0.05,
+            width: size * 0.1, height: size * 0.1,
+            transform: [{ translateX: userBatterPosition === 'striker' ? strikerRunX : nonStrikerRunX },
+              { translateY: userBatterPosition === 'striker' ? strikerRunY : nonStrikerRunY }],
+          }}>
+            <Svg width={size * 0.1} height={size * 0.1} viewBox="-16 -16 32 32">
+              <Circle r={13} stroke={colors.accentLight} strokeWidth={1.3} fill="none" />
+              <SvgText y={-10} fontSize={5} fontWeight="700" fill={colors.white} textAnchor="middle">YOU</SvgText>
+            </Svg>
+          </Animated.View>
+        ) : null}
+        <View pointerEvents="none" style={{ position: 'absolute', left: cx + size * 0.095,
+          top: cy + size * 0.2, width: size * 0.095, height: size * 0.095 }}>
+          <MatchUmpire size={size * 0.095} signal={deliveryResolved ? sequence?.signal ?? 'none' : 'none'} />
+        </View>
+        {sequence?.bailsAt != null ? (
+          <Animated.View pointerEvents="none" testID="live-bails" style={{ position: 'absolute',
+            left: sequence.bailsEnd.x - size * 0.04, top: sequence.bailsEnd.y - size * 0.04,
+            width: size * 0.08, height: size * 0.08,
+            opacity: motionEnabled ? roleT.interpolate({ inputRange: [0, sequence.bailsAt, sequence.bailsAt + 0.02, 1], outputRange: [0, 0, 1, 1] }) : deliveryResolved ? 1 : 0,
+          }}>
+            <Svg width={size * 0.08} height={size * 0.08} viewBox="-12 -12 24 24">
+              <Path d="M-3 -2 -9 -7M3 -2 10 2" stroke={colors.danger} strokeWidth={1.5} strokeLinecap="round" />
+            </Svg>
+          </Animated.View>
+        ) : null}
+        {majorEvent && deliveryResolved && motionEnabled && playback?.reaction ? (
+          <Animated.View pointerEvents="none" testID="live-crowd-reaction" style={{ position: 'absolute', left: 0, top: 0,
+            width: size, height: size, opacity: crowdOpacity, transform: [{ translateY: crowdLift }] }}>
+            <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+              {crowd.filter((_, index) => index % 3 === 0).map((person, index) => (
+                <Path key={index} d={`M${person.x - 2} ${person.y - 2}l2 2 2 -2`}
+                  stroke={person.color} strokeWidth={1} fill="none" strokeLinecap="round" />
+              ))}
+            </Svg>
+          </Animated.View>
+        ) : null}
 
         {lastShot ? (
           <>

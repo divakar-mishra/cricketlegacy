@@ -147,7 +147,7 @@ export function NewspaperModal({ story, onClose }: Props) {
               <View style={[styles.masthead, compact && styles.mastheadCompact]}>
                 <Image
                   accessible
-                  accessibilityLabel="Cricket Legacy game logo"
+                  accessibilityLabel="Cricket: Player and Manager game logo"
                   source={GAME_LOGO}
                   fadeDuration={0}
                   style={[styles.gameLogo, compact && styles.gameLogoCompact]}

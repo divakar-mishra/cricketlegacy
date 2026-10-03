@@ -313,11 +313,12 @@ const makeStyles = (colors: ThemeColors) =>
     heroContent: { alignItems: 'center', paddingBottom: spacing.xl, paddingHorizontal: spacing.lg },
     title: {
       color: colors.accent,
-      fontSize: fontSize.xxl,
+      fontSize: fontSize.xl,
       fontWeight: fontWeight.black,
       fontFamily: fonts.display,
-      letterSpacing: 3,
+      letterSpacing: 1,
       marginTop: spacing.md,
+      textAlign: 'center',
     },
     tagline: { color: colors.textMuted, fontSize: fontSize.sm, marginTop: 4, letterSpacing: 0.8 },
 

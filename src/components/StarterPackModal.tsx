@@ -14,6 +14,7 @@ import { useCallback, useEffect } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { haptics } from '../audio';
+import { useSettings } from '../state/settingsStore';
 import { MODAL_PRIORITY, useModalQueue } from '../context/ModalQueueContext';
 import { fonts, fontSize, fontWeight, radius, shadow, spacing, useTheme } from '../theme';
 import { AppText as Text } from './AppText';
@@ -29,6 +30,7 @@ interface Props {
 
 export function StarterPackModal({ visible, onPurchase, onDismiss }: Props) {
   const { colors } = useTheme();
+  const classic = useSettings(s => s.appearance) !== 'warm';
   const queueVisible = useModalQueue(visible, MODAL_PRIORITY.engagement, 'starter-pack');
 
   useEffect(() => {
@@ -62,14 +64,15 @@ export function StarterPackModal({ visible, onPurchase, onDismiss }: Props) {
           style={StyleSheet.absoluteFill}
           onPress={onDismiss}
         />
-        <Animated.View entering={SMOOTH_CARD_ZOOM} style={styles.card}>
+        <Animated.View entering={SMOOTH_CARD_ZOOM} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderStrong },
+          classic && { backgroundColor: '#0F241A', borderColor: colors.accentDark }]}>
           <LinearGradient
-            colors={['#17211B', '#0B100D', '#17211B'] as [string, string, string]}
+            colors={[colors.surfaceAlt, colors.surface, colors.surfaceAlt]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.headerBand}
+            style={[styles.headerBand, { borderBottomColor: colors.border }]}
           >
-            <Text style={styles.limitedLabel}>FIRST MATCH COMPLETE</Text>
+            <Text style={[styles.limitedLabel, { color: colors.accent }]}>FIRST MATCH COMPLETE</Text>
           </LinearGradient>
 
           <Text style={[styles.title, { color: colors.text }]}>Starter Pack</Text>
@@ -92,8 +95,8 @@ export function StarterPackModal({ visible, onPurchase, onDismiss }: Props) {
 
           {/* Pricing */}
           <View style={styles.priceRow}>
-            <View style={styles.saveBadge}>
-              <Text style={styles.saveText}>ONE PER ACCOUNT</Text>
+            <View style={[styles.saveBadge, { backgroundColor: colors.surfaceAlt, borderColor: colors.borderStrong }]}>
+              <Text style={[styles.saveText, { color: colors.accent }]}>ONE PER ACCOUNT</Text>
             </View>
           </View>
 
@@ -128,7 +131,7 @@ function RewardRow({ icon, label, desc }: { icon: IconName; label: string; desc:
   return (
     <View style={styles.rewardRow}>
       <View style={styles.rewardIcon}>
-        <Icon name={icon} size={24} color="#D5B56D" />
+        <Icon name={icon} size={24} color={colors.accent} />
       </View>
       <View>
         <Text style={[styles.rewardLabel, { color: colors.text }]}>{label}</Text>
@@ -148,10 +151,8 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    backgroundColor: '#0F241A',
     borderRadius: radius.xl,
-    borderWidth: 1.5,
-    borderColor: '#C6902A',
+    borderWidth: 1,
     overflow: 'hidden',
     ...shadow.card,
   },
@@ -159,10 +160,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(213,181,109,0.4)',
   },
   limitedLabel: {
-    color: '#D5B56D',
     fontSize: fontSize.xs,
     fontWeight: fontWeight.black,
     letterSpacing: 1.5,
@@ -201,12 +200,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
-    backgroundColor: '#17211B',
     borderWidth: 1,
-    borderColor: '#8A6A26',
   },
   saveText: {
-    color: '#D5B56D',
     fontSize: fontSize.xs,
     fontWeight: fontWeight.black,
     letterSpacing: 0.5,

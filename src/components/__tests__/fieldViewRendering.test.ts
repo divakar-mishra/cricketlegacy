@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { FieldView } from '../FieldView';
+import { Animated } from 'react-native';
 
 let mockQuality = 'high';
 let mockReducedMotion = false;
@@ -87,6 +88,41 @@ beforeEach(() => {
 });
 
 describe('live match renderer', () => {
+  it.each(['high', 'low', 'reduced'])('gates result signals and restrained crowd motion in %s mode', mode => {
+    mockQuality = mode === 'low' ? 'low' : 'high';
+    mockReducedMotion = mode === 'reduced';
+    const props = {
+      size: 280,
+      playback: { ball: new Animated.Value(0), roles: new Animated.Value(0), reaction: new Animated.Value(0) },
+      lastShot: { key: 1, tone: 'six' as const, runs: 6, reach: 1, angleDeg: 90 },
+    };
+    let tree!: ReactTestRenderer;
+    act(() => { tree = create(createElement(FieldView, { ...props, deliveryResolved: false })); });
+    expect(JSON.stringify(tree.toJSON())).toContain('umpire-signal-none');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('live-crowd-reaction');
+    act(() => tree.update(createElement(FieldView, { ...props, deliveryResolved: true })));
+    expect(JSON.stringify(tree.toJSON())).toContain('umpire-signal-six');
+    expect(JSON.stringify(tree.toJSON()).includes('live-crowd-reaction')).toBe(mode === 'high');
+    act(() => tree.unmount());
+  });
+  it('uses the shared clock without starting a second animation or revealing the result early', () => {
+    const playback = { ball: new Animated.Value(0), roles: new Animated.Value(0) };
+    const props = {
+      size: 280, playback,
+      lastShot: { key: 1, tone: 'four' as const, runs: 4, reach: 0.9, angleDeg: 90 },
+    };
+    let tree!: ReactTestRenderer;
+    act(() => { tree = create(createElement(FieldView, { ...props, deliveryResolved: false })); });
+    expect(mockMotionStart).not.toHaveBeenCalled();
+    expect(JSON.stringify(tree.toJSON())).toContain('Delivery in progress');
+    expect(JSON.stringify(tree.toJSON())).not.toContain('Boundary');
+    const fieldBefore = tree.root.findAll(node => node.type === 'svg').map(node => [node.props.width, node.props.height]);
+    act(() => tree.update(createElement(FieldView, { ...props, deliveryResolved: true })));
+    expect(JSON.stringify(tree.toJSON())).toContain('Boundary');
+    expect(mockMotionStart).not.toHaveBeenCalled();
+    expect(tree.root.findAll(node => node.type === 'svg').map(node => [node.props.width, node.props.height])).toEqual(fieldBefore);
+    act(() => tree.unmount());
+  });
   it.each(['striker', 'nonStriker', 'bowler'] as const)('equips only the controlled %s', (position) => {
     let tree!: ReactTestRenderer;
     act(() => {
