@@ -146,7 +146,7 @@ export function fieldSequence(size: number, shot: SequenceShot, layout: FieldLay
   const stumpEnd = { x: cx, y: pitch.strikerStumpY };
   const bounce = deliveryBouncePoint(size, shot.delivery);
   const ballTimes = [0, release, release + flight * 0.3, contact];
-  const ballPoints = [bowler, bowler, bounce, striker];
+  const ballPoints = [{ x: bowler.x, y: bowler.y + size * 0.1 }, bowler, bounce, striker];
   let endpoint = shotPath.end;
   let impactAt = collectAt;
   if (stumped) {

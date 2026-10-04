@@ -1,4 +1,4 @@
-import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
+import Svg, { Ellipse, G, Path } from 'react-native-svg';
 import type { UmpireSignal } from './fieldSequence';
 
 /** Small field-local official; no overlay or extra layout space. */
@@ -16,12 +16,12 @@ export function MatchUmpire({ size, signal }: { size: number; signal: UmpireSign
   return (
     <Svg width={size} height={size} viewBox="-16 -16 32 32">
       <G testID={`umpire-signal-${signal}`}>
-        <Path d="M-2 4 -3 11M2 4 3 11" stroke="#233039" strokeWidth={3} />
-        <Path d="M-4 -1Q0 -3 4 -1L3 5H-3Z" fill="#EEE8D8" stroke="#233039" strokeWidth={0.7} />
+        <Ellipse cx={1} cy={2} rx={6} ry={4} fill="#020504" opacity={0.25} />
+        <Path d="M-2 2 -2.5 4M2 2 2.5 4" stroke="#233039" strokeWidth={2.3} />
+        <Ellipse rx={4.8} ry={2.8} fill="#EEE8D8" stroke="#233039" strokeWidth={0.7} />
         <Path d={arms[signal]} fill="none" stroke="#EEE8D8" strokeWidth={2.2} strokeLinecap="round" />
-        <Circle cy={-5} r={3} fill="#B87550" />
-        <Rect x={-3.5} y={-10} width={7} height={4} rx={1} fill="#EEE8D8" />
-        <Path d="M-6 -6H6" stroke="#EEE8D8" strokeWidth={2} strokeLinecap="round" />
+        <Ellipse cy={-1.2} rx={4.5} ry={3.4} fill="#EEE8D8" stroke="#233039" strokeWidth={0.6} />
+        <Ellipse cy={-1.6} rx={2.8} ry={2.3} fill="#FFF8E5" stroke="#A89D88" strokeWidth={0.5} />
         {signal === 'out' ? <Path d="M5 -10V-13" stroke="#B87550" strokeWidth={1} /> : null}
       </G>
     </Svg>

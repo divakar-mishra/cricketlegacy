@@ -24,6 +24,7 @@ export interface FieldGeometry {
   striker: FieldPoint;
   nonStriker: FieldPoint;
   keeper: FieldPoint;
+  umpire: FieldPoint;
   closeCatcher: FieldPoint;
 }
 
@@ -84,10 +85,12 @@ export function fieldGeometry(size: number): FieldGeometry {
     innerR: size * 0.253,
     // The striker is always shown at the top end. The bowler and non-striker
     // approach from the bottom so the direction of the delivery is immediate.
-    bowler: { x: cx + size * 0.035, y: cy + size * 0.27 },
-    striker: { x: cx, y: cy - size * 0.16 },
-    nonStriker: { x: cx - size * 0.085, y: cy + size * 0.18 },
-    keeper: { x: cx, y: cy - size * 0.292 },
+    // Bowler anchor is the release point, not the start of the run-up.
+    bowler: { x: cx + size * 0.025, y: cy + size * 0.145 },
+    striker: { x: cx, y: cy - size * 0.155 },
+    nonStriker: { x: cx - size * 0.065, y: cy + size * 0.155 },
+    keeper: { x: cx, y: cy - size * 0.235 },
+    umpire: { x: cx, y: cy + size * 0.235 },
     closeCatcher: { x: cx - size * 0.085, y: cy - size * 0.205 },
   };
 }

@@ -155,9 +155,12 @@ describe('live match renderer', () => {
     expect(spriteCount('bowler')).toBe(1);
     expect(spriteCount('keeper')).toBe(1);
     expect(tree.root.findAll(node => node.type === 'g' && node.props.testID === 'match-jersey-tailoring')).toHaveLength(13);
-    expect(tree.root.findAll(node => node.type === 'path' && node.props.testID === 'bat-blade')).toHaveLength(2);
-    expect(tree.root.findAll(node => node.type === 'path' && node.props.testID === 'keeper-gloves')).toHaveLength(1);
-    expect(tree.root.findAll(node => node.type === 'path' && node.props.testID === 'fielder-cap-brim')).toHaveLength(9);
+    expect(tree.root.findAll(node => node.type === 'path' && node.props.testID === 'overhead-bat')).toHaveLength(2);
+    expect(tree.root.findAll(node => node.type === 'g' && node.props.testID === 'cricketer-overhead-keeper-ready')).toHaveLength(1);
+    expect(tree.root.findAll(node => node.type === 'g' && node.props.testID === 'cricketer-overhead-fielder-ready')).toHaveLength(9);
+    for (const sprite of tree.root.findAll(node => String(node.type) === 'AnimatedView' && String(node.props.testID).startsWith('live-player-'))) {
+      expect(sprite.props.style[1].width).toBeCloseTo(size * 0.09);
+    }
     expect(
       tree.root.find((node) => node.props.accessibilityRole === 'image').props.accessibilityLabel,
     ).toContain('Your player is on strike');

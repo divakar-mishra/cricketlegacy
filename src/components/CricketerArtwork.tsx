@@ -24,6 +24,7 @@ export interface CricketerProps {
   secondary: string;
   role: 'fielder' | 'keeper' | 'bowler' | 'batter';
   pose?: ActorPose;
+  overhead?: boolean;
 }
 
 function MatchJersey({
@@ -91,10 +92,36 @@ function CricketerArtwork({
   secondary,
   role,
   pose = 'ready',
+  overhead = false,
 }: CricketerProps): ReactElement {
   const transform = 'translate(' + x + ' ' + y + ') rotate(' + rotation + ') scale(' + scale + ')';
   const outline = '#06100B';
   const skin = '#B87550';
+
+  if (overhead) {
+    const stride = pose === 'run-left' ? -1 : pose === 'run-right' ? 1 : 0;
+    const reaching = pose === 'catch' || pose === 'appeal' || pose === 'throw';
+    const handY = reaching ? -6 : pose === 'gather' ? -3 : 1;
+    return (
+      <G transform={transform} testID={`cricketer-overhead-${role}-${pose}`}>
+        <Ellipse cx={1} cy={2} rx={6} ry={4} fill="#020504" opacity={0.25} />
+        <Path d={`M-2 2L-2.5 ${4 + stride * 2}M2 2L2.5 ${4 - stride * 2}`}
+          stroke={role === 'batter' || role === 'keeper' ? '#EEE4CB' : primary}
+          strokeWidth={2.3} strokeLinecap="round" />
+        <Path d={`M-4 0L-5.5 ${handY + stride}M4 0L5.5 ${handY - stride}`}
+          stroke={skin} strokeWidth={2.2} strokeLinecap="round" />
+        <G transform="translate(0 -1) scale(1 .6)">
+          <MatchJersey shape="M-4.8 0Q0 -3 4.8 0L4 4Q0 6 -4 4Z" primary={primary} secondary={secondary} kitId={kitId} />
+        </G>
+        {role === 'batter' ? <Path testID="overhead-bat" d="M5 0L6 -8" stroke="#E3BE79" strokeWidth={2} strokeLinecap="round" /> : null}
+        {role === 'keeper' ? <G fill="#EEE4CB"><Circle cx={-5.5} cy={handY} r={1.7} /><Circle cx={5.5} cy={handY} r={1.7} /></G> : null}
+        {/* Crown above shoulders, with the visor indicating facing direction. */}
+        <Circle cy={-1.2} r={3} fill={role === 'batter' ? '#24333D' : primary} stroke={outline} strokeWidth={0.7} />
+        <Path d="M-2.4 -3Q0 -5 2.4 -3" fill={secondary} stroke={outline} strokeWidth={0.5} />
+        <Path d="M-1.5 -2.4Q0 -3.2 1 -2.4" fill="none" stroke="#FFFFFF" strokeOpacity={0.3} strokeWidth={0.6} />
+      </G>
+    );
+  }
 
   if (pose !== 'ready') {
     const stride = pose === 'run-left' ? -1 : pose === 'run-right' ? 1 : 0;

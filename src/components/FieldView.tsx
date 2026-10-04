@@ -131,7 +131,7 @@ function CricketerSprite({
   progress,
   poses = [],
 }: CricketerSpriteProps): ReactElement {
-  const spriteSize = fieldSize * 0.135;
+  const spriteSize = fieldSize * 0.09;
   const art = (pose: ActorPose = 'ready') => (
       <Svg width={spriteSize} height={spriteSize} viewBox="-16 -16 32 32">
         {role === 'batter' ? (
@@ -147,29 +147,8 @@ function CricketerSprite({
           secondary={kitId ? kitDesign(kitId).trim : secondary}
           role={role}
           pose={pose}
+          overhead
         />
-        {role !== 'fielder' ? (
-          <G>
-            <Rect
-              x={-8}
-              y={11}
-              width={16}
-              height={4.8}
-              rx={2}
-              fill={role === 'batter' ? '#F4E8C8' : '#102737'}
-            />
-            <SvgText
-              x={0}
-              y={14.7}
-              textAnchor="middle"
-              fontSize={4}
-              fontWeight="800"
-              fill={role === 'batter' ? '#17262D' : '#FFFFFF'}
-            >
-              {role === 'batter' ? 'BAT' : role === 'keeper' ? 'WK' : 'BWL'}
-            </SvgText>
-          </G>
-        ) : null}
       </Svg>
   );
   return (
@@ -447,11 +426,11 @@ export function FieldView({
   });
   const bowlerTranslateY = sequence?.bowlerReceive ? roleT.interpolate({
     inputRange: [0, 0.15, 0.34, 0.48, 0.84, 1],
-    outputRange: [size * 0.055, 0, -size * 0.022, 0,
+    outputRange: [size * 0.1, 0, -size * 0.022, 0,
       sequence.bowlerReceive.y.values[2], sequence.bowlerReceive.y.values[3]],
   }) : roleT.interpolate({
     inputRange: [0, 0.15, 0.34, 1],
-    outputRange: [size * 0.055, 0, -size * 0.022, 0],
+    outputRange: [size * 0.1, 0, -size * 0.022, 0],
   });
   const bowlerRotate = roleT.interpolate({
     inputRange: [0, 0.15, 0.3, 0.48, 1],
@@ -811,6 +790,16 @@ export function FieldView({
           />
           <Stumps x={cx} y={strikerStumpY} direction={-1} size={size} color={colors.white} />
           <Stumps x={cx} y={bowlerStumpY} direction={1} size={size} color={colors.white} />
+          {[-1, 1].map(end => (
+            <G key={`popping-crease-${end}`} stroke={colors.white} strokeWidth={1} opacity={0.85}>
+              <Line x1={cx - size * 0.065} y1={cy + end * size * 0.145}
+                x2={cx + size * 0.065} y2={cy + end * size * 0.145} />
+              {[-1, 1].map(side => (
+                <Line key={side} x1={cx + side * size * 0.05} y1={cy + end * size * 0.145}
+                  x2={cx + side * size * 0.05} y2={cy + end * size * 0.19} />
+              ))}
+            </G>
+          ))}
 
           {lastShot ? (
             <G>
@@ -1116,9 +1105,9 @@ export function FieldView({
             </Svg>
           </Animated.View>
         ) : null}
-        <View pointerEvents="none" style={{ position: 'absolute', left: cx + size * 0.095,
-          top: cy + size * 0.2, width: size * 0.095, height: size * 0.095 }}>
-          <MatchUmpire size={size * 0.095} signal={deliveryResolved ? sequence?.signal ?? 'none' : 'none'} />
+        <View pointerEvents="none" style={{ position: 'absolute', left: fieldGeometry(size).umpire.x - size * 0.045,
+          top: fieldGeometry(size).umpire.y - size * 0.045, width: size * 0.09, height: size * 0.09 }}>
+          <MatchUmpire size={size * 0.09} signal={deliveryResolved ? sequence?.signal ?? 'none' : 'none'} />
         </View>
         {sequence?.bailsAt != null ? (
           <Animated.View pointerEvents="none" testID="live-bails" style={{ position: 'absolute',

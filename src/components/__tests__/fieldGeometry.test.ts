@@ -27,7 +27,18 @@ describe('live field geometry', () => {
     expect(field.nonStriker.y).toBeGreaterThan(field.cy);
     expect(
       Math.hypot(field.bowler.x - field.nonStriker.x, field.bowler.y - field.nonStriker.y),
-    ).toBeGreaterThan(size * 0.13);
+    ).toBeGreaterThan(size * 0.08);
+  });
+
+  it.each([220, 280, 420])('anchors the delivery at the creases at size %s', size => {
+    const field = fieldGeometry(size);
+    const pitch = pitchGeometry(size);
+    expect(field.bowler.y).toBeLessThan(pitch.bowlerStumpY);
+    expect(field.striker.y).toBeGreaterThan(pitch.strikerStumpY);
+    expect(field.keeper.y).toBeLessThan(pitch.strikerStumpY - size * 0.04);
+    expect(field.umpire.x).toBe(field.cx);
+    expect(field.umpire.y).toBeGreaterThan(pitch.bowlerStumpY + size * 0.04);
+    expect(field.nonStriker.x).toBeLessThan(field.cx - pitch.width / 2);
   });
 
   it('keeps the pitch near half the playable ground diameter', () => {
