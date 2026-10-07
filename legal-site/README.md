@@ -33,6 +33,16 @@ Terms link to that disclosure.
 
 ## Adding another product
 
+Auction XI was added on 5 October 2026 at `/products/auction-xi/`, with its own
+`privacy/`, `terms/`, `support/` and `delete-data/` routes. Its copy lives in
+`auction-xi.cjs` and describes local careers, conditional RevenueCat purchasing,
+disabled testing-build ads and provider-data requests. Do not copy Cricket's
+cloud accounts, Firebase diagnostics, age policy or timed retention commitments
+into Auction XI without checking its implementation and owner decisions.
+Run `node --test legal-site/auction-xi.test.cjs` before deployment.
+Publish with `npx wrangler pages deploy legal-site/dist --project-name sunlight-publisher-site --branch main`.
+
+
 Add a product object to `legal.config.json` with a unique slug, product kind,
 status, platforms, summary, headline, description and product highlights. The
 generator will add it to the Sunlight home and create

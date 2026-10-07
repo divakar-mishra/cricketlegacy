@@ -6,11 +6,26 @@
   },
   "products": [
     {
+      "slug": "auction-xi",
+      "name": "Auction XI",
+      "kind": "Cricket club management",
+      "status": "In testing",
+      "platforms": ["Android"],
+      "summary": "Build your club, compete in player auctions and guide your XI through a fictional cricket league world.",
+      "headline": "Build the club. Pick the XI. Chase the title.",
+      "description": "Auction XI is a single-player cricket management game with squad building, staff, facilities, player development and simulated matchdays.",
+      "highlights": [
+        { "title": "Build your squad", "description": "Recruit players at auction, develop talent and balance club finances." },
+        { "title": "Run matchday", "description": "Choose your XI and tactics, follow matches and compete across leagues and cups." }
+      ]
+    },
+    {
       "slug": "cricket-legacy",
       "name": "Cricket: Player and Manager",
       "kind": "Cricket career game",
-      "status": "In development",
+      "status": "Available on Google Play",
       "platforms": ["Android"],
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.coverdrive.cricket",
       "summary": "Build a complete cricket life as a player or lead a club as a manager in a deep, fictional career simulation.",
       "headline": "Two careers. One cricket world.",
       "description": "Cricket: Player and Manager is a fictional single-player simulation built around meaningful cricket decisions, long-term progression and seasons that remember what happened.",

@@ -1,3 +1,4 @@
+const { auctionPages } = require('./auction-xi.cjs');
 const AGE_POLICIES = Object.freeze({
   global_13_parental_consent: Object.freeze({
     id: 'global_13_parental_consent',
@@ -172,6 +173,9 @@ function primaryProduct(config) {
 }
 
 function layout(config, { title, description, path, body }) {
+  const isAuction = path.startsWith('/products/auction-xi/');
+  const legalRoot = isAuction ? '/products/auction-xi/' : '/';
+  const legalName = isAuction ? 'Auction XI' : config.appName;
   const pageId =
     {
       '/privacy/': 'privacy',
@@ -180,13 +184,13 @@ function layout(config, { title, description, path, body }) {
       '/support/': 'support',
       '/delete-account/': 'delete-account',
       '/publisher/': 'publisher',
-    }[path] ?? (path.startsWith('/products/') ? 'product' : 'home');
-  const featuredProduct = primaryProduct(config);
+    }[path] ?? (isAuction ? ({ privacy: 'privacy', terms: 'terms', support: 'support', 'delete-data': 'delete-data' }[path.split('/')[3]] ?? 'product') : (path.startsWith('/products/') ? 'product' : 'home'));
+  const featuredProduct = isAuction ? config.products.find(product => product.slug === 'auction-xi') : primaryProduct(config);
   const nav = [
     ['/', 'Studio'],
     [productPath(featuredProduct), featuredProduct.name],
-    ['/terms/', 'Terms'],
-    ['/support/', 'Support'],
+    [`${legalRoot}terms/`, 'Terms'],
+    [`${legalRoot}support/`, 'Support'],
   ];
   const widePage = path === '/' || path.startsWith('/products/');
   return `<!doctype html>
@@ -219,9 +223,9 @@ function layout(config, { title, description, path, body }) {
       <p>${escapeHtml(config.publisher.location)}</p>
     </div>
     <div class="footer-links">
-      <a href="/products/cricket-legacy/privacy/">${escapeHtml(config.appName)} Privacy</a>
-      <a href="/terms/">Terms</a>
-      <a href="/delete-account/">Account deletion</a>
+      <a href="${isAuction ? legalRoot + 'privacy/' : '/products/cricket-legacy/privacy/'}">${escapeHtml(legalName)} Privacy</a>
+      <a href="${legalRoot}terms/">Terms</a>
+      <a href="${isAuction ? legalRoot + 'delete-data/' : '/delete-account/'}">${isAuction ? 'Data deletion' : 'Account deletion'}</a>
       <a href="mailto:${escapeHtml(config.publisher.email)}">Email</a>
     </div>
   </footer>
@@ -412,7 +416,7 @@ function productCard(config, product) {
       <h3>${escapeHtml(product.name)}</h3>
       <p>${escapeHtml(product.summary)}</p>
       <div class="chip-row">${product.platforms.map((platform) => `<span class="chip">${escapeHtml(platform)}</span>`).join('')}</div>
-      <p class="card-actions"><a class="button" href="${productPath(product)}">View product</a>${product.name === config.appName ? ' <a class="text-link" href="/terms/">Terms &amp; Conditions</a>' : ''}</p>
+      <p class="card-actions"><a class="button" href="${productPath(product)}">View product</a>${product.playStoreUrl ? ` <a class="text-link" href="${escapeHtml(product.playStoreUrl)}" target="_blank" rel="noopener noreferrer">Google Play</a>` : ''}${product.name === config.appName ? ' <a class="text-link" href="/terms/">Terms &amp; Conditions</a>' : ''}</p>
     </div>
   </article>`;
 }
@@ -458,6 +462,7 @@ function productPage(config, product) {
       <p class="kicker">${escapeHtml(product.status)}</p>
       <h2>${escapeHtml(product.headline)}</h2>
       <p>${escapeHtml(product.description)}</p>
+      ${product.playStoreUrl ? `<p class="card-actions"><a class="button" href="${escapeHtml(product.playStoreUrl)}" target="_blank" rel="noopener noreferrer">Get it on Google Play</a></p>` : ''}
     </div>
     ${isPrimaryApp ? `<div class="product-icon-panel"><img class="app-icon" src="/images/cricket-legacy-icon.png" alt="${escapeHtml(product.name)} app icon" width="512" height="512"><div class="chip-row"><span>Player</span><span>Manager</span></div></div>` : '<div class="product-glyph" aria-hidden="true"><span></span></div>'}
   </section>
@@ -532,6 +537,7 @@ function renderLegalSite(config) {
       path: '/publisher/',
       body: publisherPage(config),
     }),
+    ...(config.products.some(product => product.slug === 'auction-xi') ? auctionPages(config, { layout, escapeHtml, contactBlock }) : {}),
   };
 }
 
