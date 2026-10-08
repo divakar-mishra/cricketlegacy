@@ -410,7 +410,7 @@ function publisherPage(config) {
 
 function productCard(config, product) {
   return `<article class="product-card">
-    <div class="product-art product-art-${escapeHtml(product.slug)}">${product.slug === 'cricket-legacy' ? `<img class="app-icon" src="/images/cricket-legacy-icon.png" alt="${escapeHtml(product.name)} app icon" width="512" height="512" loading="lazy">` : '<span class="pitch-mark" aria-hidden="true"></span><span class="ball-mark" aria-hidden="true"></span>'}</div>
+    <div class="product-art product-art-${escapeHtml(product.slug)}">${product.name === config.appName ? `<img class="app-icon" src="/images/cricket-legacy-icon.png" alt="${escapeHtml(product.name)} app icon" width="512" height="512" loading="lazy">` : '<span class="pitch-mark" aria-hidden="true"></span><span class="ball-mark" aria-hidden="true"></span>'}</div>
     <div class="product-copy">
       <div class="meta-row"><span>${escapeHtml(product.kind)}</span><span>${escapeHtml(product.status)}</span></div>
       <h3>${escapeHtml(product.name)}</h3>

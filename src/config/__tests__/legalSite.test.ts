@@ -21,7 +21,7 @@ const approvedFacts = {
   },
   products: [
     {
-      slug: 'cricket-legacy',
+      slug: 'cricket-player-manager',
       name: 'Cricket: Player and Manager',
       kind: 'Cricket career game',
       status: 'In development',
@@ -59,9 +59,9 @@ describe('Cloudflare legal and support site', () => {
     const pages = renderLegalSite(config);
     expect(config.appName).toBe('Cricket: Player and Manager');
     expect(pages['index.html']).toContain('<h3>Cricket: Player and Manager</h3>');
-    expect(pages['products/cricket-legacy/index.html']).toContain('<h1>Cricket: Player and Manager</h1>');
+    expect(pages['products/cricket-player-manager/index.html']).toContain('<h1>Cricket: Player and Manager</h1>');
     expect(pages['products/cricket-legacy/privacy/index.html']).toContain('Cricket: Player and Manager Privacy Policy');
-    expect(pages['index.html']).toContain('href="/products/cricket-legacy/"');
+    expect(pages['index.html']).toContain('href="/products/cricket-player-manager/"');
     expect(Object.values(pages).join('')).not.toContain('Cricket Legacy');
   });
 
@@ -72,7 +72,7 @@ describe('Cloudflare legal and support site', () => {
     expect(privacy).toContain('data-legal-page="privacy"');
     expect(privacy).toContain('It does not apply to other apps');
     expect(pages['privacy/index.html']).toContain('It does not apply to other apps');
-    expect(pages['products/cricket-legacy/index.html']).toContain('href="/products/cricket-legacy/privacy/"');
+    expect(pages['products/cricket-player-manager/index.html']).toContain('href="/products/cricket-legacy/privacy/"');
   });
   it('omits city-level location from every production page and metadata', () => {
     const config = JSON.parse(fs.readFileSync(path.join(root, 'legal-site', 'legal.config.json'), 'utf8'));
@@ -98,8 +98,8 @@ describe('Cloudflare legal and support site', () => {
       'delete-account/index.html',
       'index.html',
       'privacy/index.html',
-      'products/cricket-legacy/index.html',
       'products/cricket-legacy/privacy/index.html',
+      'products/cricket-player-manager/index.html',
       'publisher/index.html',
       'support/index.html',
       'terms/index.html',
@@ -119,9 +119,9 @@ describe('Cloudflare legal and support site', () => {
     expect(pages['privacy/index.html']).toContain('href="/publisher/"');
     expect(pages['terms/index.html']).toContain('href="/publisher/"');
     expect(pages['index.html']).not.toContain('href="/publisher/"');
-    expect(pages['products/cricket-legacy/index.html']).not.toContain('href="/publisher/"');
+    expect(pages['products/cricket-player-manager/index.html']).not.toContain('href="/publisher/"');
     expect(pages['index.html']).not.toContain('Divakar Mishra');
-    expect(pages['products/cricket-legacy/index.html']).not.toContain('Divakar Mishra');
+    expect(pages['products/cricket-player-manager/index.html']).not.toContain('Divakar Mishra');
   });
 
   it('renders a publisher-first Sunlight home and a dedicated product page', () => {
@@ -130,21 +130,21 @@ describe('Cloudflare legal and support site', () => {
       agePolicy: 'india_18_elsewhere_13',
     });
     expect(pages['index.html']).toContain('<h1>Sunlight</h1>');
-    expect(pages['index.html']).toContain('href="/products/cricket-legacy/"');
+    expect(pages['index.html']).toContain('href="/products/cricket-player-manager/"');
     expect(pages['index.html']).not.toContain('Built to grow');
     expect(pages['index.html']).not.toContain('One publisher home for every future release.');
-    expect(pages['products/cricket-legacy/index.html']).toContain(
+    expect(pages['products/cricket-player-manager/index.html']).toContain(
       'data-legal-page="product"',
     );
-    expect(pages['products/cricket-legacy/index.html']).toContain('Player Career');
+    expect(pages['products/cricket-player-manager/index.html']).toContain('Player Career');
     expect(pages['index.html']).toContain('src="/images/cricket-legacy-icon.png"');
-    expect(pages['products/cricket-legacy/index.html']).toContain('alt="Cricket: Player and Manager app icon"');
-    expect(pages['products/cricket-legacy/index.html']).toContain('<span>Player</span>');
-    expect(pages['products/cricket-legacy/index.html']).toContain('<span>Manager</span>');
-    expect(pages['products/cricket-legacy/index.html']).not.toContain('<span>PLR</span>');
-    expect(pages['products/cricket-legacy/index.html']).not.toContain('<span>MGR</span>');
-    expect(pages['products/cricket-legacy/index.html']).toContain('href="/terms/"');
-    expect(pages['products/cricket-legacy/index.html']).toContain('Terms &amp; Conditions');
+    expect(pages['products/cricket-player-manager/index.html']).toContain('alt="Cricket: Player and Manager app icon"');
+    expect(pages['products/cricket-player-manager/index.html']).toContain('<span>Player</span>');
+    expect(pages['products/cricket-player-manager/index.html']).toContain('<span>Manager</span>');
+    expect(pages['products/cricket-player-manager/index.html']).not.toContain('<span>PLR</span>');
+    expect(pages['products/cricket-player-manager/index.html']).not.toContain('<span>MGR</span>');
+    expect(pages['products/cricket-player-manager/index.html']).toContain('href="/terms/"');
+    expect(pages['products/cricket-player-manager/index.html']).toContain('Terms &amp; Conditions');
   });
 
   it('keeps the two approved age-policy alternatives materially distinct', () => {

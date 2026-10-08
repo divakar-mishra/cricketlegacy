@@ -384,15 +384,15 @@ h3 {
   background: radial-gradient(circle at 68% 28%, rgba(255, 201, 92, 0.14), transparent 11rem), #14241c;
 }
 
-.product-art-cricket-legacy {
+.product-art-cricket-player-manager {
   display: grid;
   place-items: center;
   padding: 24px;
   background: radial-gradient(circle, #173b2a, #0d251a);
 }
 
-.product-art-cricket-legacy::before,
-.product-art-cricket-legacy::after {
+.product-art-cricket-player-manager::before,
+.product-art-cricket-player-manager::after {
   content: none;
   position: absolute;
   left: 50%;
@@ -402,11 +402,11 @@ h3 {
   transform: translateX(-50%);
 }
 
-.product-art-cricket-legacy::before {
+.product-art-cricket-player-manager::before {
   top: 31%;
 }
 
-.product-art-cricket-legacy::after {
+.product-art-cricket-player-manager::after {
   bottom: 31%;
 }
 
@@ -442,8 +442,8 @@ h3 {
   transform: translateX(-50%) rotate(31deg);
 }
 
-.product-art-cricket-legacy .pitch-mark,
-.product-art-cricket-legacy .ball-mark {
+.product-art-cricket-player-manager .pitch-mark,
+.product-art-cricket-player-manager .ball-mark {
   display: block;
 }
 

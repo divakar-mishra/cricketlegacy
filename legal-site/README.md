@@ -8,7 +8,7 @@ the site into a single-game landing page.
 It currently generates:
 
 - `/` — Sunlight publisher home and product directory
-- `/products/cricket-legacy/` — Cricket: Player and Manager product page
+- `/products/cricket-player-manager/` — Cricket: Player and Manager product page
 - `/publisher/` — the single public legal-identity disclosure for Sunlight
 
 - `/products/cricket-legacy/privacy/` — app-specific policy for Play Console
@@ -18,8 +18,9 @@ It currently generates:
 - `/delete-account/`
 - `/app-ads.txt` — the game's authorized AdMob seller record
 
-The `cricket-legacy` URL slug and icon filename remain unchanged so existing
-Play Console, AdMob and in-app links do not break when the displayed name changes.
+The old `/products/cricket-legacy/` URL redirects to the new product page. The
+app-specific privacy URL and icon filename remain unchanged so existing Play
+Console, AdMob and in-app links keep working.
 
 The four top-level legal/support routes apply specifically to Cricket: Player and Manager
 and stay stable because the app and release readiness gate use them. Do not

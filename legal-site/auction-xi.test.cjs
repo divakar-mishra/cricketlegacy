@@ -26,7 +26,7 @@ test('homepage includes both apps, and existing policies are unchanged by the ad
 test('Cricket: Player and Manager links to its Google Play listing only on its own pages', () => {
   const url = 'https://play.google.com/store/apps/details?id=com.coverdrive.cricket';
   assert.ok(pages['index.html'].includes(`href="${url}"`));
-  assert.ok(pages['products/cricket-legacy/index.html'].includes(`href="${url}"`));
+  assert.ok(pages['products/cricket-player-manager/index.html'].includes(`href="${url}"`));
   assert.ok(!pages['products/auction-xi/index.html'].includes(url));
 });
 test('all internal links and images resolve in generated pages or static assets', () => {

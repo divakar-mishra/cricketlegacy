@@ -3,4 +3,6 @@
 /terms /terms/ 301
 /support /support/ 301
 /delete-account /delete-account/ 301
-/products/cricket-legacy /products/cricket-legacy/ 301
+/products/cricket-player-manager /products/cricket-player-manager/ 301
+/products/cricket-legacy /products/cricket-player-manager/ 301
+/products/cricket-legacy/ /products/cricket-player-manager/ 301
