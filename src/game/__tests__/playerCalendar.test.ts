@@ -24,6 +24,49 @@ function player(age: number) {
 }
 
 describe('player career calendar', () => {
+  it.each([-1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, 10_000])(
+    'recovers an invalid saved cursor (%s) without skipping or replaying a match', cursor => {
+      const save = createCareerSave({
+        player: player(18), teamId: TEAM_BLUEPRINTS[0].id,
+        difficulty: 'NORMAL', seed: 94,
+      });
+      const calendar = buildPlayerSeasonCalendar(save)!;
+      const firstFixtureId = calendar.events[0].fixtureId!;
+      const secondFixtureId = calendar.events[1].fixtureId!;
+      save.fixtures[firstFixtureId].played = true;
+      calendar.events[0].completed = false; // The fixture result still owns completion.
+      calendar.events[1].completed = true; // An old flag cannot skip an unplayed match.
+      calendar.cursor = cursor;
+
+      expect(currentPlayerCalendarEvent(save)).toMatchObject({
+        kind: 'MATCH', fixtureId: secondFixtureId, completed: false,
+      });
+      expect(save.fixtures[firstFixtureId].played).toBe(true);
+      expect(save.playerCalendar?.cursor).toBe(1);
+      expect(nextUserFixtureId(save)).toBe(secondFixtureId);
+    },
+  );
+
+  it.each([16, 18, 21])('repairs a stale completed-match flag/cursor at age %i using the fixture result', age => {
+    const save = createCareerSave({
+      player: player(age), teamId: TEAM_BLUEPRINTS[0].id,
+      difficulty: 'NORMAL', seed: 90 + age,
+    });
+    nextUserFixtureId(save);
+    const calendar = buildPlayerSeasonCalendar(save)!;
+    const firstMatch = calendar.events.findIndex(item => item.kind === 'MATCH');
+    expect(firstMatch).toBeGreaterThanOrEqual(0);
+    for (const item of calendar.events) item.completed = true;
+    calendar.cursor = calendar.events.length;
+    const fixtureId = calendar.events[firstMatch].fixtureId!;
+    expect(save.fixtures[fixtureId].played).toBe(false);
+
+    expect(currentPlayerCalendarEvent(save)).toMatchObject({
+      kind: 'MATCH', fixtureId, completed: false,
+    });
+    expect(nextUserFixtureId(save)).toBe(fixtureId);
+  });
+
   it('splits U19 fixtures into List A followed by T20 blocks', () => {
     const save = createCareerSave({
       player: player(18),

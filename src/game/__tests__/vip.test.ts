@@ -1,5 +1,6 @@
 import { MONTHLY_PASS_CONTENT } from '../../data/seasonPassContent';
 import { runMigrations } from '../../storage/migrate';
+import { SAVE_SCHEMA_VERSION } from '../../domain/types';
 import {
   activateSeasonPass,
   isSeasonPassActive,
@@ -133,7 +134,7 @@ describe('mode-specific permanent VIP collections', () => {
     save.inventory = { old_unknown_item: 2, [first.kit.id]: 1 };
     const wallet = { ...save.wallet };
     const migrated = runMigrations(save)!;
-    expect(migrated.schemaVersion).toBe(44);
+    expect(migrated.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     expect(hasModeVip(migrated)).toBe(true);
     expect(migrated.inventory).toEqual({ old_unknown_item: 2, [first.kit.id]: 1 });
     expect(migrated.wallet).toEqual(wallet);

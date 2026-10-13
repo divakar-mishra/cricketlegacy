@@ -225,6 +225,7 @@ export function resolveStoryChoice(
   choiceId: string,
   rng: Rng,
 ): ChoiceResult {
+  if (save.mode !== 'career' || save.story?.pendingEventIds[0] !== eventId) return { ok: false };
   const event = findEvent(eventId);
   if (!event) return { ok: false };
   const choice = event.choices.find((c) => c.id === choiceId);
@@ -271,6 +272,7 @@ export function resolveStoryChoice(
     text: `${renderText(event.title, save)}: ${resultText}`,
   });
   markSeen(save, eventId);
+  save.story!.flags.resolutionSequence = Number(save.story!.flags.resolutionSequence ?? 0) + 1;
   return { ok: true, resultText, applied };
 }
 

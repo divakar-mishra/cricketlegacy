@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Button, Card, Screen, ScreenHeader, AppText as Text } from '../components';
 import { resolveNextCareerStep } from '../game/careerStep';
@@ -26,9 +26,11 @@ export function PressConferenceScreen({ navigation }: ScreenProps<'Press'>) {
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [result, setResult] = useState<ResultView | null>(null);
+  const choosing = useRef(false);
   const [fade] = useState(() => new Animated.Value(0));
 
   const rendered = save ? useCareer.getState().pendingPress() : null;
+  const sequence = Number(save?.managerStory?.flags.resolutionSequence ?? 0);
 
   useEffect(() => {
     fade.setValue(0);
@@ -36,8 +38,10 @@ export function PressConferenceScreen({ navigation }: ScreenProps<'Press'>) {
   }, [rendered?.id, result, fade]);
 
   const onChoose = (choiceId: string) => {
-    if (!rendered) return;
-    const res = resolvePress(rendered.id, choiceId);
+    if (!rendered || !save || choosing.current) return;
+    choosing.current = true;
+    const res = resolvePress(rendered.id, choiceId, save.id, sequence);
+    if (!res.ok) choosing.current = false;
     if (res.ok) setResult({ text: res.resultText ?? '', applied: res.applied ?? [] });
   };
 
@@ -61,6 +65,7 @@ export function PressConferenceScreen({ navigation }: ScreenProps<'Press'>) {
         : 'RETURN TO MANAGER HOME';
     const continueFromResult = () => {
       if (nextIsPress) {
+        choosing.current = false;
         setResult(null);
         return;
       }

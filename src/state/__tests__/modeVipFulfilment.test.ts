@@ -144,3 +144,8 @@ describe('mode VIP purchase fulfilment', () => {
     expect(useCareer.getState().save!.wallet).toEqual(before);
   });
 });
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn(async () => null),
+  setItemAsync: jest.fn(async () => undefined),
+  deleteItemAsync: jest.fn(async () => undefined),
+}));

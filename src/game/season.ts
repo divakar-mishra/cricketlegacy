@@ -1,3 +1,4 @@
+import { recordRecoveryFixture } from './squadRecovery';
 import {
   Conditions,
   DailyChallenge,
@@ -33,7 +34,7 @@ import {
   prizeFor,
   seasonWageBill,
 } from './finance';
-import { refreshFreeAgents, rolloverSquads } from './lifecycle';
+import { refreshFreeAgents, repairDepletedManagerRoster, rolloverSquads } from './lifecycle';
 import { recallLoan } from './manager';
 import {
   careerPlayingTeamId,
@@ -587,6 +588,8 @@ export function updateCalendarMonth(save: SaveGame): void {
  */
 export function validateSeasonState(save: SaveGame): SaveGame {
   if (!save.flags) save.flags = {};
+  const year = (save.currentSeasonId ? save.seasons?.[save.currentSeasonId]?.year : undefined) ?? 2026;
+  repairDepletedManagerRoster(save, year, makeRng(hashSeed(`${save.id}:roster-recovery:${year}`)));
 
   // A few older builds could persist the completed-result ledger while leaving
   // the fixture's `played` bit stale. That combination reopened the same match
@@ -646,6 +649,7 @@ export function applyResult(save: SaveGame, match: MatchState): void {
   if (!fx || fx.played) return;
   const u19WorldCupStatusBefore = save.u19WorldCup?.status;
   const resolved = resolveMatchResult(match, fx);
+  recordRecoveryFixture(save, fx);
   fx.played = true;
   fx.resultMatchId = match.id;
   fx.resultKind = resolved.kind;
@@ -1571,7 +1575,7 @@ export function stagePlayoffsForUser(save: SaveGame): void {
         f.awayTeamId !== t,
     );
     if (!fx) return;
-    applyResult(save, runFixture(save, fx.id));
+    simulateBackgroundFixture(save, fx);
     ensurePlayoffs(save);
   }
 }
@@ -1605,12 +1609,12 @@ export function catchUpLeague(save: SaveGame): void {
       (f) => !f.played && !f.playoff && f.competition !== 'CUP' && isLeagueTableFixture(f),
     );
     if (!fx) break;
-    applyResult(save, runFixture(save, fx.id));
+    simulateBackgroundFixture(save, fx);
   }
 }
 
 /** Play every remaining domestic fixture and playoff (the Cup finishes separately). */
-export function finishSeason(save: SaveGame): void {
+export function finishSeason(save: SaveGame, backgroundOnly = false): void {
   const level = save.careerPathLevel ?? 'DOMESTIC';
   const fullCareerCalendar = save.mode === 'career' && level !== 'SCHOOL' && level !== 'U19';
   if (save.mode === 'career' && save.capped) prepareInternationalCalendar(save);
@@ -1630,7 +1634,8 @@ export function finishSeason(save: SaveGame): void {
         (fullCareerCalendar || isLeagueTableFixture(f) || f.playoff),
     );
     if (!fx) break;
-    applyResult(save, runFixture(save, fx.id));
+    if (backgroundOnly) simulateBackgroundFixture(save, fx);
+    else applyResult(save, runFixture(save, fx.id));
   }
   if (save.mode === 'career') {
     let calendarGuard = 0;
@@ -1799,7 +1804,7 @@ export function startNewSeason(save: SaveGame, options: StartNewSeasonOptions = 
     for (const playerId of [...team.playerIds]) {
       const p = save.players[playerId];
       if (p?.loanedFrom && (p.loanEnd ?? 0) <= currentYear2) {
-        recallLoan(save, playerId);
+        recallLoan(save, playerId, true);
       }
     }
   }

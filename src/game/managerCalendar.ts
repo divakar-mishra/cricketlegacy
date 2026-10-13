@@ -737,9 +737,12 @@ export function advanceManagerCalendar(
   simulate: (fixtureId: string) => void,
   maxFixtures = Number.MAX_SAFE_INTEGER,
 ): AdvanceManagerCalendarResult {
-  if (!save.managerCalendar) return { kind: 'YEAR_COMPLETE' };
-  if (save.managerCalendar.phase === 'OFF_SEASON') return { kind: 'YEAR_COMPLETE' };
+  if (!managerCalendarEnabled(save) || !save.managerCalendar) return { kind: 'YEAR_COMPLETE' };
   const phase = save.managerCalendar.phase;
+  // Old/interrupted saves may reach this phase before preparation or before
+  // all off-season international results are settled. Do not report a complete
+  // year while seasonComplete still blocks the next campaign.
+  if (phase === 'OFF_SEASON' && !save.managerCalendar.offSeasonPrepared) prepareOffSeason(save);
   const unlocked = managerPhaseUnlocked(save.managerCareerLevel ?? 'CLUB', phase);
   let walletCoins = save.managerCalendar.backgroundCoinsThisPhase ?? 0;
   let simulated = 0;
@@ -807,6 +810,7 @@ export function advanceManagerCalendar(
       continue;
     }
     if (!managerPhaseComplete(save)) continue;
+    if (phase === 'OFF_SEASON') return { kind: 'YEAR_COMPLETE' };
     const salaryCoins = phase === 'T20' ? processManagerSalary(save, save.managerCalendar.year) : 0;
     const summary = buildPhaseSummary(save, phase, walletCoins, salaryCoins);
     save.managerCalendar.lastSummary = summary;

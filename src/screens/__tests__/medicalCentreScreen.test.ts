@@ -38,7 +38,7 @@ describe('Manager Medical Centre', () => {
     expect(medical).not.toContain('{recoveryOfferVisible ? (');
     expect(medical).toContain('disabled={!recoveryOfferVisible}');
     expect(medical).toContain('Squad already fit');
-    expect(medical).toContain('Recovery not needed yet');
+    expect(medical).toContain('Needs 3 tired non-injured players');
     expect(medical).toContain('if (!recoveryOfferVisible) return;');
     expect(medical).toContain('Your tokens are kept until used.');
     expect(medical).toContain('const RECOVERY_THRESHOLD = 60;');
@@ -46,6 +46,14 @@ describe('Manager Medical Centre', () => {
     expect(medical).toContain('Squad readiness');
     expect(medical).toContain('Needs attention');
     expect(medical).toContain('<Text style={styles.tokenPillValue}>{recoveryTokens}</Text>');
+  });
+
+  it('explains why injured players are excluded instead of calling an injured squad ready', () => {
+    expect(medical).toContain('Eligible below {RECOVERY_THRESHOLD}');
+    expect(medical).toContain('injured.length > 0 && lowCondition.length === 0');
+    expect(medical).toContain('Tokens do not treat injuries');
+    expect(medical).toContain('Requires at least 3 non-injured players below 60 condition.');
+    expect(medical).not.toContain('Recovery not needed yet');
   });
 
   it('returns a frozen retained-club state during National duty', () => {

@@ -8,7 +8,7 @@
  *   4. Hold-out option: form drops but the offer improves
  *   5. Sign once happy with the terms
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
@@ -58,6 +58,7 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
   const [held, setHeld] = useState(false); // has the player held out once?
   const [heldImprovedOffer, setHeldImprovedOffer] = useState<ContractOffer | null>(null);
   const [signedOffer, setSignedOffer] = useState<ContractOffer | null>(null);
+  const signing = useRef(false);
 
   if (!save || !save.userPlayerId) {
     return (
@@ -110,12 +111,17 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
   };
 
   const doSign = (offer: ContractOffer) => {
+    if (signing.current) return;
+    signing.current = true;
     // Route through the store action so the signing bonus is actually credited
     // to the wallet, a timeline entry is written, and the save is persisted.
     const signed = signNegotiatedContract(offer);
     if (signed.ok) {
       setSignedOffer(signed.offer ?? offer);
       setStage('SIGNED');
+    } else {
+      signing.current = false;
+      Alert.alert('Offer no longer available', 'Return to your career and review the current contract.');
     }
   };
 
@@ -133,12 +139,13 @@ export function ContractNegotiationScreen({ navigation }: ScreenProps<'ContractN
             signed
           />
         </Animated.View>
-        <Button
-          label="Back to Hub"
-          variant="gold"
-          style={{ marginHorizontal: spacing.lg, marginTop: spacing.xl }}
-          onPress={() => navigation.goBack()}
-        />
+        <View style={styles.actions}>
+          <Button
+            label="Back to Hub"
+            variant="gold"
+            onPress={() => navigation.goBack()}
+          />
+        </View>
       </Screen>
     );
   }

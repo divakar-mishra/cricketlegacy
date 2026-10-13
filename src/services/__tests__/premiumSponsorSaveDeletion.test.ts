@@ -76,8 +76,12 @@ describe('exact-save premium sponsor deletion', () => {
       path.join(root, 'src', 'screens', 'SavedGamesScreen.tsx'),
       'utf8',
     );
+    expect(screen).toContain('await deleteSave(mode, slot, save.id)');
     expect(screen.indexOf('deletePremiumSponsorExactSave(save)')).toBeLessThan(
-      screen.indexOf('deleteSave(mode, slot)'),
+      screen.indexOf('deleteSave(mode, slot, save.id)'),
+    );
+    expect(screen.indexOf('await assertNoPendingPurchaseForSlot(mode, slot)')).toBeLessThan(
+      screen.indexOf('deletePremiumSponsorExactSave(save)'),
     );
     expect(screen).toContain("result.status !== 'DELETED'");
     expect(screen).toContain('Nothing was deleted.');

@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { benefitsFromRecovery, ensureRecoveryClock, recoveredCondition } from '../game/squadRecovery';
+import { clearPendingCheckout, isCheckoutAccountVerified, readPendingCheckout, writePendingCheckout, type PendingCheckout, type PurchaseRecoveryOutcome } from '../services/purchaseRecovery';
+import { clearPendingExchange, readPendingExchange, writePendingExchange, type PendingExchange } from '../services/walletExchangeRecovery';
 import { presentSignedPlayerContract } from './contractPresentationStore';
 import { authorizeReviewerAccess } from '../services/reviewerAccess';
 import { applyReviewerSupplies } from '../game/reviewerAccess';
@@ -41,6 +44,7 @@ import {
   collectAcademyRevenue,
   ContractDemand,
   contractOffer,
+  contractRenewalKey,
   ContractOffer,
   declareInternationalCountry as declareInternationalCountryPure,
   ensureCareerPathLevel,
@@ -199,7 +203,7 @@ import {
   ensureManagerLeadership,
   ManagerLeadershipRole,
 } from '../game/leadership';
-import { transferWindowClosedReason } from '../game/transferMarket';
+import { clubTransferAccessReason, transferWindowClosedReason } from '../game/transferMarket';
 import { checkManagerLevelPromotion, updateManagerReputation } from '../game/managerCareer';
 import {
   acceptManagerJob,
@@ -252,6 +256,7 @@ import {
   releaseFromInternationalTourIfOutOfForm,
 } from '../game/intlCalendar';
 import {
+  currentPlayerCalendarEvent,
   PlayerCalendarChoice,
   playerCalendarAllowsFixture,
   resolvePlayerCalendarEvent,
@@ -274,7 +279,11 @@ import {
   SocialTone,
   transferPlayerBank,
 } from '../game/playerLife';
-import { AdvanceManagerCalendarResult, managerControlledTeamId } from '../game/managerCalendar';
+import {
+  AdvanceManagerCalendarResult,
+  managerCalendarEnabled,
+  managerControlledTeamId,
+} from '../game/managerCalendar';
 import { updateRecords } from '../game/records';
 import { applyMatchToStats } from '../game/stats';
 import { careerPlayingTeamId, generateYouthFixtures } from '../game/youthFixtures';
@@ -306,7 +315,7 @@ import {
   purchases,
 } from '../services';
 import { maybeRequestReview } from '../services/storeReview';
-import { listAllSaves, listSlots, loadSave, setLastPlayed, writeSave } from '../storage/saveGames';
+import { listAllSaves, listSlots, loadSave, replaceSave, SaveDeletedError, setLastPlayed, writeSave } from '../storage/saveGames';
 import { runMigrations } from '../storage/migrate';
 import { synchronizeSchema14State } from '../storage/schema14';
 import { synchronizeSchema15State } from '../storage/schema15';
@@ -379,6 +388,19 @@ interface ActiveRef {
 }
 
 const purchaseRequestsInFlight = new Set<string>();
+let purchaseRecoveryInFlight: Promise<PurchaseRecoveryOutcome> | null = null;
+let exchangeInFlight = false;
+let exchangeRecoveryInFlight: Promise<void> | null = null;
+let exchangeSequence = 0;
+let commerceDeliveryTail: Promise<unknown> = Promise.resolve();
+
+// Serialise read-modify-write delivery, not just disk writes: two recoveries
+// loading the same inactive career must not overwrite one another's grants.
+function serializeCommerceDelivery<T>(operation: () => Promise<T>): Promise<T> {
+  const next = commerceDeliveryTail.catch(() => undefined).then(operation);
+  commerceDeliveryTail = next;
+  return next;
+}
 
 export interface RewardBalanceChange {
   previousCoins: number;
@@ -460,7 +482,6 @@ export interface SquadRecoveryOutcome extends PremiumActionOutcome {
 const dayIndex = (now: number = Date.now()): number => Math.floor(now / 86_400_000);
 const STANDARD_RECOVERY_GEMS = 79;
 const FULL_FITNESS_RECOVERY_GEMS = 149;
-const STANDARD_RECOVERY_FITNESS_CAP = 95;
 const STANDARD_RECOVERY_FIXTURE_COOLDOWN = 3;
 const STANDARD_RECOVERY_DAY_COOLDOWN = 7;
 const FULL_FITNESS_RECOVERY_FIXTURE_COOLDOWN = 5;
@@ -472,13 +493,6 @@ function inventoryCount(save: SaveGame, key: string): number {
 
 function setInventoryCount(save: SaveGame, key: string, value: number): void {
   save.inventory = { ...(save.inventory ?? {}), [key]: Math.max(0, Math.floor(value)) };
-}
-
-function userFixturePlayCount(save: SaveGame): number {
-  if (!save.userTeamId) return 0;
-  return Object.values(save.fixtures ?? {}).filter(
-    (f) => f.played && (f.homeTeamId === save.userTeamId || f.awayTeamId === save.userTeamId),
-  ).length;
 }
 
 function recordSaveResult(save: SaveGame, matchId: string, userWon: boolean, tie: boolean): void {
@@ -595,8 +609,8 @@ function squadRecoveryPreview(save: SaveGame, fullFitness = false): SquadRecover
         injured += 1;
         return sum + current;
       }
-      affected += 1;
-      const next = fullFitness ? 100 : Math.min(STANDARD_RECOVERY_FITNESS_CAP, current + 20);
+      if (benefitsFromRecovery(p, fullFitness)) affected += 1;
+      const next = recoveredCondition(p, fullFitness);
       return sum + next;
     }, 0) / squad.length;
   return {
@@ -818,6 +832,8 @@ export interface RestorePurchasesOutcome {
 }
 
 interface CareerState {
+  recoverPendingPurchases: () => Promise<PurchaseRecoveryOutcome>;
+  recoverPendingExchange: () => Promise<void>;
   save: SaveGame | null;
   ref: ActiveRef | null;
   /** Last background/autosave failure. Cleared by the next successful write. */
@@ -909,13 +925,13 @@ interface CareerState {
   claimDaily: () => DailyRewardClaim;
   pendingStory: () => RenderedEvent | null;
   storyCount: () => number;
-  resolveStory: (eventId: string, choiceId: string) => ChoiceResult;
+  resolveStory: (eventId: string, choiceId: string, expectedSaveId?: string, expectedSequence?: number) => ChoiceResult;
   retire: () => { epitaph: string } | null;
   contractStatus: () => { expiring: boolean; offer: ContractOffer } | null;
   renewUserContract: () => { ok: boolean; bonus: number };
   pendingPress: () => RenderedMgrEvent | null;
   pressCount: () => number;
-  resolvePress: (eventId: string, choiceId: string) => MgrChoiceResult;
+  resolvePress: (eventId: string, choiceId: string, expectedSaveId?: string, expectedSequence?: number) => MgrChoiceResult;
   claimQuestReward: (id: string) => { ok: boolean; coins: number; gems: number };
   claimWeeklyReward: (id: string) => { ok: boolean; coins: number; gems: number };
   grantAdReward: (coins: number, transactionId: string) => { ok: boolean; reason?: string };
@@ -1002,7 +1018,7 @@ interface CareerState {
   clearPromotion: () => void;
   setCareerRestNext: (rest: boolean) => { ok: boolean; reason?: string };
   markNewspaperSeen: (storyId: string) => void;
-  resolvePlayerWeek: (choice?: PlayerCalendarChoice) => {
+  resolvePlayerWeek: (choice: PlayerCalendarChoice | undefined, expectedEventId: string, expectedSaveId?: string) => {
     ok: boolean;
     reason?: string;
     outcome?: string;
@@ -1135,6 +1151,220 @@ async function persistActiveSave(save: SaveGame, ref: ActiveRef, immediate = fal
   }
 }
 
+function fulfillExchange(pending: PendingExchange, get: () => CareerState, publish: (save: SaveGame) => void): Promise<boolean> {
+  return serializeCommerceDelivery(() => fulfillExchangeNow(pending, get, publish));
+}
+
+async function fulfillExchangeNow(pending: PendingExchange, get: () => CareerState, publish: (save: SaveGame) => void): Promise<boolean> {
+  let save = get().save?.id === pending.saveId ? get().save : await loadSave('career', pending.slot);
+  if (get().save?.id === pending.saveId) save = get().save;
+  if (!save || save.id !== pending.saveId || save.mode !== 'career') throw new Error('Original exchange career unavailable.');
+  if (!save.flags?.[pending.token]) {
+    const wallet = convertPlayerGemsToCoins(save.wallet, pending.gems);
+    if (!wallet) {
+      await clearPendingExchange();
+      return false;
+    }
+    save.wallet = wallet;
+    save.flags = { ...save.flags, [pending.token]: true };
+  }
+  if (get().save?.id === save.id) publish(save);
+  // The intent survives this write failing and replays exactly once on reload.
+  synchronizeSchema14State(save);
+  await writeSave('career', pending.slot, save);
+  await clearPendingExchange();
+  return true;
+}
+
+function fulfillCheckout(
+  intent: PendingCheckout,
+  get: () => CareerState,
+  publish: (save: SaveGame) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  return serializeCommerceDelivery(() => fulfillCheckoutNow(intent, get, publish));
+}
+
+async function fulfillCheckoutNow(
+  intent: PendingCheckout,
+  get: () => CareerState,
+  publish: (save: SaveGame) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  const res = intent.result;
+  if (!res?.ok || !res.purchaseToken || res.productId !== intent.productId ||
+      !purchaseLedger.canGrantLedgerEntry(purchaseLedger.createLedgerEntry({
+        result: { ...res, purchaseToken: res.purchaseToken }, userId: intent.saveId,
+      }))) return { ok: false, error: 'purchase_not_verified' };
+  // Never resurrect a deleted save, replace a slot, or borrow a different career.
+  let save = get().save?.id === intent.saveId ? get().save : await loadSave(intent.mode, intent.slot);
+  if (get().save?.id === intent.saveId) save = get().save;
+  if (!save || save.id !== intent.saveId || save.mode !== intent.mode) {
+    return { ok: false, error: 'purchase_delivery_pending' };
+  }
+  const result = applyPurchaseGrant(save, res, intent);
+  if (!result.ok) return result;
+  if (get().save?.id === save.id) {
+    publish(save);
+    await get().persistCritical(true);
+  } else {
+    synchronizeSchema14State(save);
+    await writeSave(intent.mode, intent.slot, save);
+  }
+  if (intent.productId === 'starter_pack') await accountPurchases.markStarterPackPurchased(res.purchaseToken);
+  await clearPendingCheckout();
+  return { ok: true };
+}
+
+function applyPurchaseGrant(save: SaveGame, res: purchases.PurchaseResult, intent: PendingCheckout): { ok: boolean; error?: string } {
+  const productId = res.productId;
+  const tokenFlag = purchaseLedger.ledgerFlagKey(res.purchaseToken!);
+  const budgetSeasonFlag = `budgetBoost:${productId}:${intent.seasonId ?? 'season'}`;
+  if (save.flags?.[tokenFlag]) return { ok: true };
+  if (productId === 'season_pass' && !res.entitlement) return { ok: false, error: 'season_pass_entitlement_inactive' };
+  if ((productId === 'manager_legend_pack' || productId === 'transfer_budget_sm') &&
+      (managerClubOperationsPaused(save) || save.userTeamId !== intent.clubId || !save.teams[intent.clubId ?? ''])) {
+    return { ok: false, error: 'purchase_context_changed' };
+  }
+  const grant = purchases.GRANTS[productId] ?? {};
+  save.wallet = purchases.applyGrantToWallet(save.wallet, grant);
+  save.flags = { ...(save.flags ?? {}), [tokenFlag]: true };
+  save.firstPurchaseDone = true;
+  if (grant.entitlement?.removeAds) save.entitlements.removeAds = true;
+  if (productId === vipProductId(save.mode)) grantModeVip(save, productId, res.accountId);
+  if (productId === 'starter_pack') {
+    // Deliver the advertised "Remove Ads (7 days)" as a real timed grant.
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    save.entitlements.removeAdsUntil = Math.max(
+      save.entitlements.removeAdsUntil ?? 0,
+      Date.now() + SEVEN_DAYS_MS,
+    );
+  }
+  if (productId === 'season_pass') {
+    if (!res.entitlement) return { ok: false, error: 'season_pass_entitlement_inactive' };
+    activateSeasonPass(save, {
+      now: res.entitlement.lastVerifiedAt,
+      expiresAt: res.entitlement.expiresAt,
+      periodStartedAt: res.entitlement.periodStartedAt,
+      lastVerifiedAt: res.entitlement.lastVerifiedAt,
+      provider: res.verificationState === 'LOCAL_MOCK' ? 'LOCAL_MOCK' : 'REVENUECAT',
+      willRenew: res.entitlement.willRenew,
+    });
+  }
+  analytics.logEvent(analytics.EVT.PURCHASE, { productId });
+  // Legend Bundle: also grant removeAds + VIP energy cap
+  if (productId === 'bundle_legend') {
+    grantModeVip(save, 'bundle_legend', res.accountId);
+    save.entitlements.removeAds = true;
+    save.vipEnergyBonusActive = true;
+    save.inventory = {
+      ...(save.inventory ?? {}),
+      avatar_legend_frame: 1,
+      kit_all_colors: 1,
+      player_legend_bundle_owned: 1,
+    };
+  }
+
+  // ── Manager-specific IAP ──────────────────────────────────────────────
+  if (productId === 'transfer_budget_sm' && save.userTeamId) {
+    save.teams[save.userTeamId].budget += 1_000_000;
+    if (save.finances) save.finances.transferBudget += 1_000_000;
+    save.flags = { ...(save.flags ?? {}), [budgetSeasonFlag!]: true };
+    recordPremiumAssistance(save, 'transfer_budget_sm');
+  }
+  if (productId === 'recovery_pack') {
+    setInventoryCount(
+      save,
+      'squad_recovery_token',
+      inventoryCount(save, 'squad_recovery_token') + 1,
+    );
+  }
+  if (productId === 'manager_legend_pack') {
+    grantModeVip(save, 'manager_legend_pack', res.accountId);
+    applyManagerLegendBacking(save);
+    // One-time purchase grant only. Restore/ownership refresh never pays club cash.
+    const club = save.teams[save.userTeamId!];
+    club.budget += 1_000_000;
+    if (save.finances) save.finances.transferBudget = club.budget;
+    setInventoryCount(
+      save,
+      'scout_full_reveal_token',
+      inventoryCount(save, 'scout_full_reveal_token') + 2,
+    );
+    setInventoryCount(
+      save,
+      'facility_upgrade_token',
+      inventoryCount(save, 'facility_upgrade_token') + 1,
+    );
+    setInventoryCount(
+      save,
+      'squad_recovery_token',
+      inventoryCount(save, 'squad_recovery_token') + 1,
+    );
+  }
+  if (productId === 'scout_full_reveal') {
+    setInventoryCount(
+      save,
+      'scout_full_reveal_token',
+      inventoryCount(save, 'scout_full_reveal_token') + 1,
+    );
+  }
+  if (productId === 'facility_upgrade_token') {
+    save.inventory = {
+      ...(save.inventory ?? {}),
+      facility_upgrade_token: (save.inventory?.facility_upgrade_token ?? 0) + 1,
+    };
+  }
+
+  // ── Career-player specific IAP ────────────────────────────────────────
+  if (productId === 'contract_boost' && save.userPlayerId) {
+    setInventoryCount(
+      save,
+      'contract_boost_token',
+      inventoryCount(save, 'contract_boost_token') + 1,
+    );
+  }
+  if (productId === 'form_recovery' && save.userPlayerId) {
+    const user = save.players[save.userPlayerId];
+    if (user) {
+      user.meta.form = Math.max(user.meta.form, 99);
+      user.meta.confidence = Math.max(user.meta.confidence, 99);
+      save.wallet = {
+        ...save.wallet,
+        energy: Math.max(save.wallet.energy, visibleEnergyCap(save)),
+        energyUpdatedAt: Date.now(),
+      };
+    }
+  }
+  if (productId === 'training_accelerator' && save.userPlayerId) {
+    save.inventory = {
+      ...(save.inventory ?? {}),
+      training_accelerator: (save.inventory?.training_accelerator ?? 0) + 3,
+    };
+  }
+  if (productId === 'player_save_sponsor' || productId === 'manager_save_sponsor') {
+    const sponsorGrant = grantPremiumSponsorToCurrentSave(
+      save,
+      productId,
+      res.purchaseToken!,
+    );
+    if (!sponsorGrant.ok) return { ok: false, error: 'premium_sponsor_grant_failed' };
+  }
+  // First-purchase bonus: DOUBLE the gems on the player's first-ever
+  // gem-bearing purchase (this is the store's advertised "2× gems"). Only
+  // consumed when a gem bonus is actually granted, so buying a gem-less item
+  // first (e.g. Remove Ads) doesn't silently waste the bonus.
+  if (
+    !save.flags?.['promo:first_gem_pack_bonus'] &&
+    (productId === 'gems_medium' || productId === 'gems_large')
+  ) {
+    const bonusGems = grant.gems ?? 0;
+    if (bonusGems > 0) {
+      save.wallet = addGems(save.wallet, bonusGems); // extra 1× on top of the base grant
+      save.flags = { ...(save.flags ?? {}), 'promo:first_gem_pack_bonus': true };
+    }
+  }
+  return { ok: true };
+}
+
 export const useCareer = create<CareerState>(
   withProtectedWallet((set, get) => ({
     save: null,
@@ -1144,6 +1374,7 @@ export const useCareer = create<CareerState>(
     lastPromotion: null,
 
     setActive: (save, mode, slot) => {
+      ensureRecoveryClock(save);
       ensureVipState(save);
       if (save.flags?.retired || (save.userPlayerId && save.players[save.userPlayerId]?.retired))
         grantRetirementCollections(save);
@@ -1205,6 +1436,8 @@ export const useCareer = create<CareerState>(
         queueManagerEvent(save, 'PRE_SEASON', storyRng(save, 1));
       }
       set({ save, ref: { mode, slot }, targetFixtureId: undefined, persistenceError: null });
+      void get().recoverPendingPurchases();
+      void get().recoverPendingExchange();
       const loadedSaveId = save.id;
       // Compare only the small archive-owned portion, never serialize the whole
       // career just to decide whether a background refresh needs another save.
@@ -1291,9 +1524,10 @@ export const useCareer = create<CareerState>(
       return save ? managerEventCount(save) : 0;
     },
 
-    resolvePress: (eventId, choiceId) => {
+    resolvePress: (eventId, choiceId, expectedSaveId, expectedSequence) => {
       const save = get().save;
-      if (!save) return { ok: false };
+      if (!save || (expectedSaveId !== undefined && save.id !== expectedSaveId)) return { ok: false };
+      if (expectedSequence !== undefined && Number(save.managerStory?.flags.resolutionSequence ?? 0) !== expectedSequence) return { ok: false };
       const res = resolveManagerChoice(save, eventId, choiceId);
       if (res.ok) {
         set({ save: { ...save } });
@@ -1361,10 +1595,14 @@ export const useCareer = create<CareerState>(
       if (!save || !ref) return;
       try {
         await persistActiveSave(save, ref);
-        set({ persistenceError: null });
+        if (get().save?.id === save.id && get().ref?.mode === ref.mode && get().ref?.slot === ref.slot) set({ persistenceError: null });
       } catch (error) {
+        if (error instanceof SaveDeletedError) {
+          if (get().save?.id === save.id && get().ref?.mode === ref.mode && get().ref?.slot === ref.slot) get().clear();
+          return;
+        }
         const message = persistenceErrorMessage(error);
-        set({ persistenceError: message });
+        if (get().save?.id === save.id && get().ref?.mode === ref.mode && get().ref?.slot === ref.slot) set({ persistenceError: message });
         crash.captureException(error, { context: 'save.autosave', mode: ref.mode, slot: ref.slot });
       }
     },
@@ -1374,10 +1612,14 @@ export const useCareer = create<CareerState>(
       if (!save || !ref) return;
       try {
         await persistActiveSave(save, ref, immediate);
-        set({ persistenceError: null });
+        if (get().save?.id === save.id && get().ref?.mode === ref.mode && get().ref?.slot === ref.slot) set({ persistenceError: null });
       } catch (error) {
+        if (error instanceof SaveDeletedError) {
+          if (get().save?.id === save.id && get().ref?.mode === ref.mode && get().ref?.slot === ref.slot) get().clear();
+          return;
+        }
         const message = persistenceErrorMessage(error);
-        set({ persistenceError: message });
+        if (get().save?.id === save.id && get().ref?.mode === ref.mode && get().ref?.slot === ref.slot) set({ persistenceError: message });
         crash.captureException(error, {
           context: 'save.critical',
           mode: ref.mode,
@@ -2338,9 +2580,8 @@ export const useCareer = create<CareerState>(
     signPlayer: (playerId, feeOverride) => {
       const save = get().save;
       if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
-      if (managerClubOperationsPaused(save)) {
-        return { ok: false, cost: 0, reason: 'Club transfers are paused during national duty.' };
-      }
+      const accessReason = clubTransferAccessReason(save);
+      if (accessReason) return { ok: false, cost: 0, reason: accessReason };
       const closedReason = transferWindowClosedReason(save);
       if (closedReason) return { ok: false, cost: 0, reason: closedReason };
       const res = signFreeAgent(save, playerId, feeOverride);
@@ -2355,13 +2596,8 @@ export const useCareer = create<CareerState>(
     releasePlayer: (playerId) => {
       const save = get().save;
       if (!save) return { ok: false, recouped: 0, reason: 'No active save.' };
-      if (managerClubOperationsPaused(save)) {
-        return {
-          ok: false,
-          recouped: 0,
-          reason: 'Club operations are paused during national duty.',
-        };
-      }
+      const accessReason = clubTransferAccessReason(save);
+      if (accessReason) return { ok: false, recouped: 0, reason: accessReason };
       const res = releaseFromSquad(save, playerId);
       if (res.ok) {
         if (save.mode === 'manager') ensureManagerLeadership(save);
@@ -2374,7 +2610,7 @@ export const useCareer = create<CareerState>(
     removeFreeAgent: (playerId) => {
       const save = get().save;
       if (!save?.freeAgents?.includes(playerId)) return;
-      if (managerClubOperationsPaused(save)) return;
+      if (clubTransferAccessReason(save)) return;
       save.freeAgents = save.freeAgents.filter((id) => id !== playerId);
       set({ save: { ...save } });
       void get().persist();
@@ -2611,7 +2847,7 @@ export const useCareer = create<CareerState>(
     simRestOfSeason: () => {
       const save = get().save;
       if (!save) return;
-      if (save.managerCalendar) {
+      if (managerCalendarEnabled(save)) {
         advanceManagerCalendarPhase(save);
         set({ save: { ...save } });
         void get().persist();
@@ -2626,23 +2862,27 @@ export const useCareer = create<CareerState>(
     advanceSeason: () => {
       const save = get().save;
       if (!save) return;
-      if (save.managerCalendar) {
+      if (managerCalendarEnabled(save)) {
         get().advanceManagerCalendar();
         return;
       }
+      // Re-entry or a stale Continue tap must not skip the next player week or
+      // simulate a newly-created user semifinal/final behind their back.
+      if (save.mode === 'career' && currentPlayerCalendarEvent(save)) return;
+      if (nextUserFixtureId(save)) return;
       // Catch the league up, then progress the knockout bracket. If the user
       // reaches a semi/final they'll play it live; otherwise sim the rest so a
       // champion is crowned.
       catchUpLeague(save);
       stagePlayoffsForUser(save);
-      if (!nextUserFixtureId(save)) finishSeason(save);
+      if (!nextUserFixtureId(save)) finishSeason(save, true);
       set({ save: { ...save } });
       void get().persist();
     },
 
     advanceManagerCalendar: (maxFixtures) => {
       const save = get().save;
-      if (!save?.managerCalendar || save.managerRetired) return null;
+      if (!save || !managerCalendarEnabled(save) || save.managerRetired) return null;
       const result = advanceManagerCalendarPhase(save, maxFixtures);
       set({ save: { ...save } });
       if (result.kind !== 'IN_PROGRESS') void get().persist();
@@ -2926,9 +3166,10 @@ export const useCareer = create<CareerState>(
       return save ? pendingEventCount(save) : 0;
     },
 
-    resolveStory: (eventId, choiceId) => {
+    resolveStory: (eventId, choiceId, expectedSaveId, expectedSequence) => {
       const save = get().save;
-      if (!save) return { ok: false };
+      if (!save || (expectedSaveId !== undefined && save.id !== expectedSaveId)) return { ok: false };
+      if (expectedSequence !== undefined && Number(save.story?.flags.resolutionSequence ?? 0) !== expectedSequence) return { ok: false };
       const rng = storyRng(save, (save.story?.seenEventIds.length ?? 0) * 17 + choiceId.length + 1);
       const res = resolveStoryChoice(save, eventId, choiceId, rng);
       if (res.ok) {
@@ -2962,6 +3203,7 @@ export const useCareer = create<CareerState>(
       const { save, ref } = get();
       if (!save || ref?.mode !== 'career' || !save.userPlayerId) return { ok: false, bonus: 0 };
       if (!seniorProfessionalFeaturesUnlocked(save)) return { ok: false, bonus: 0 };
+      if (!userContractExpiring(save)) return { ok: false, bonus: 0 };
       const baseOffer = contractOffer(save);
       const boostTokens = inventoryCount(save, 'contract_boost_token');
       const offer =
@@ -3451,25 +3693,53 @@ export const useCareer = create<CareerState>(
       if (save.wallet.gems < spend) {
         return { ok: false, reason: `You need ${spend} gems for this exchange.` };
       }
-      const previousWallet = { ...save.wallet };
-      const nextWallet = convertPlayerGemsToCoins(save.wallet, spend);
-      if (!nextWallet) return { ok: false, reason: 'The exchange could not be completed.' };
-      const coins = playerGemConversionCoins(spend);
-      save.wallet = nextWallet;
-      set({ save: { ...save } });
+      if (exchangeRecoveryInFlight) await exchangeRecoveryInFlight;
+      if (exchangeInFlight) return { ok: false, reason: 'An exchange is already saving.' };
+      exchangeInFlight = true;
+      let committed = false;
       try {
+        if (await readPendingExchange()) return { ok: false, reason: 'Reopen the original career to finish its pending exchange.' };
+        // No speculative coins/gems are exposed while this write is pending.
+        // A failure therefore cannot roll back newer rewards, spending or careers.
         await get().persistCritical();
-        return { ok: true, gems: spend, coins };
+        const current = get().save;
+        const ref = get().ref;
+        if (!current || current.id !== save.id || !ref || ref.mode !== 'career') {
+          return { ok: false, reason: 'The active career changed. No gems were spent.' };
+        }
+        if (current.wallet.gems < spend) return { ok: false, reason: `You need ${spend} gems for this exchange.` };
+        const pending: PendingExchange = { version: 1, saveId: save.id, slot: ref.slot,
+          token: `exchange:${Date.now()}:${++exchangeSequence}`, gems: spend };
+        await writePendingExchange(pending);
+        committed = true;
+        if (!(await fulfillExchange(pending, get, next => set({ save: { ...next } })))) {
+          return { ok: false, reason: 'Your gem balance changed. The exchange was cancelled without charge.' };
+        }
+        return { ok: true, gems: spend, coins: playerGemConversionCoins(spend) };
       } catch {
-        save.wallet = previousWallet;
-        set({ save: { ...save } });
-        return { ok: false, reason: 'The exchange was not saved. No gems were spent.' };
+        return { ok: false, reason: committed
+          ? 'The exchange is pending saving. Keep your data and reopen this career to finish it; do not exchange again.'
+          : 'The exchange was not saved. No gems were spent.' };
+      } finally {
+        exchangeInFlight = false;
       }
+    },
+
+    recoverPendingExchange: async () => {
+      if (exchangeInFlight) return;
+      if (exchangeRecoveryInFlight) return exchangeRecoveryInFlight;
+      exchangeRecoveryInFlight = (async () => {
+        const pending = await readPendingExchange();
+        if (pending) await fulfillExchange(pending, get, save => set({ save: { ...save } }));
+      })().catch(error => {
+        set({ persistenceError: persistenceErrorMessage(error) });
+      }).finally(() => { exchangeRecoveryInFlight = null; });
+      return exchangeRecoveryInFlight;
     },
 
     applySquadRecovery: (payment, transactionId) => {
       const save = get().save;
-      if (!save) return { ok: false, reason: 'No active manager squad.' };
+      if (!save || save.mode !== 'manager') return { ok: false, reason: 'No active manager squad.' };
       if (managerClubOperationsPaused(save)) {
         return { ok: false, reason: 'Club recovery is paused during national duty.' };
       }
@@ -3485,7 +3755,7 @@ export const useCareer = create<CareerState>(
       if (save.flags?.[txFlag])
         return { ok: false, reason: 'Recovery transaction already applied.', preview };
 
-      const played = userFixturePlayCount(save);
+      const played = ensureRecoveryClock(save);
       const now = Date.now();
       const nextFixture = inventoryCount(save, 'squad_recovery_next_fixture');
       const nextAt = inventoryCount(save, 'squad_recovery_next_at');
@@ -3495,6 +3765,9 @@ export const useCareer = create<CareerState>(
       const nextFullFitnessFixture = inventoryCount(save, 'full_fitness_recovery_next_fixture');
       if (fullFitness && nextFullFitnessFixture > 0 && played < nextFullFitnessFixture) {
         return { ok: false, reason: 'Full Fitness Recovery is still cooling down.', preview };
+      }
+      if (preview.affectedPlayers === 0) {
+        return { ok: false, reason: 'No eligible players need recovery.', preview };
       }
 
       if (fullFitness) {
@@ -3517,11 +3790,8 @@ export const useCareer = create<CareerState>(
         const p = save.players[id];
         if (!p || p.injury) continue;
         const currentFitness = Math.max(0, Math.min(100, p.meta.fitness ?? 70));
-        const currentCondition = Math.max(0, Math.min(100, p.condition ?? p.meta.fitness ?? 70));
+        p.condition = recoveredCondition(p, fullFitness);
         p.meta.fitness = fullFitness ? 100 : Math.min(100, currentFitness + 20);
-        p.condition = fullFitness
-          ? 100
-          : Math.min(STANDARD_RECOVERY_FITNESS_CAP, currentCondition + 20);
         p.morale = Math.min(100, (p.morale ?? 70) + 15);
       }
       if (fullFitness) {
@@ -3665,6 +3935,9 @@ export const useCareer = create<CareerState>(
 
     purchaseProduct: async (productId) => {
       analytics.logEvent(analytics.EVT.PURCHASE_INITIATED, { productId });
+      const requestedSaveId = get().save?.id;
+      if (purchaseRecoveryInFlight) await purchaseRecoveryInFlight;
+      if (get().save?.id !== requestedSaveId) return { ok: false, error: 'active_save_changed' };
       const currentSave = get().save;
       if (!currentSave) return { ok: false, error: 'no_save' };
       if (productId === 'season_pass' || productId === 'remove_ads')
@@ -3795,197 +4068,104 @@ export const useCareer = create<CareerState>(
       if (budgetSeasonFlag && currentSave.flags?.[budgetSeasonFlag]) {
         return { ok: false, error: 'season_limit_reached' };
       }
-      const purchaseRequestKey =
-        productId === 'starter_pack' ? 'account:starter_pack' : `${currentSave.id}:${productId}`;
-      if (purchaseRequestsInFlight.has(purchaseRequestKey)) {
+      if (purchaseRequestsInFlight.size) {
         return { ok: false, error: 'purchase_in_progress' };
       }
-      purchaseRequestsInFlight.add(purchaseRequestKey);
-      let res: Awaited<ReturnType<typeof purchases.purchase>>;
+      purchaseRequestsInFlight.add('checkout');
       try {
-        res = await purchases.purchase(productId);
-      } finally {
-        purchaseRequestsInFlight.delete(purchaseRequestKey);
-      }
-      if (!res.ok) return { ok: false, error: res.error };
-      if (res.productId !== productId) return { ok: false, error: 'product_mismatch' };
-      const save = get().save;
-      if (!save) return { ok: false, error: 'no_save' };
-      if (save.id !== currentSave.id) return { ok: false, error: 'active_save_changed' };
-      if (
-        productId === 'manager_legend_pack' &&
-        (managerClubOperationsPaused(save) || !save.userTeamId || !save.teams[save.userTeamId])
-      ) {
-        return { ok: false, error: 'club_unavailable' };
-      }
-      if (!res.purchaseToken?.trim()) return { ok: false, error: 'missing_transaction_id' };
-      const ledgerEntry = purchaseLedger.createLedgerEntry({
-        result: { ...res, purchaseToken: res.purchaseToken.trim() },
-        userId: save.id,
-      });
-      if (!purchaseLedger.canGrantLedgerEntry(ledgerEntry)) {
-        return { ok: false, error: `purchase_${ledgerEntry.purchaseState.toLowerCase()}` };
-      }
-      const tokenFlag = purchaseLedger.ledgerFlagKey(ledgerEntry.purchaseToken);
-      if (save.flags?.[tokenFlag]) {
-        try {
-          await get().persistCritical(true);
-          if (productId === 'starter_pack') {
-            await accountPurchases.markStarterPackPurchased(ledgerEntry.purchaseToken);
-          }
-          return { ok: true };
-        } catch {
-          return { ok: false, error: 'persistence_failed' };
+        if (await readPendingCheckout()) return { ok: false, error: 'purchase_delivery_pending' };
+        const ref = get().ref;
+        const snapshot = await purchases.getPurchaseRecoverySnapshot();
+        if (!snapshot) return { ok: false, error: 'not_configured' };
+        if (!ref || get().save?.id !== currentSave.id) return { ok: false, error: 'active_save_changed' };
+        // Starter is consumed by the provider but sold only once per account.
+        // Older clients could lose local ownership after a paid checkout failed.
+        // Do not charge them again or guess which historical save received it.
+        if (productId === 'starter_pack' &&
+            snapshot.transactions.some(transaction => transaction.productId === 'starter_pack')) {
+          return { ok: false, error: 'starter_pack_history_requires_support' };
         }
-      }
-      const grant = purchases.GRANTS[productId] ?? {};
-      save.wallet = purchases.applyGrantToWallet(save.wallet, grant);
-      save.flags = { ...(save.flags ?? {}), [tokenFlag]: true };
-      save.firstPurchaseDone = true;
-      if (grant.entitlement?.removeAds) save.entitlements.removeAds = true;
-      if (productId === vipProductId(save.mode)) grantModeVip(save, productId, res.accountId);
-      if (productId === 'starter_pack') {
-        // Deliver the advertised "Remove Ads (7 days)" as a real timed grant.
-        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-        save.entitlements.removeAdsUntil = Math.max(
-          save.entitlements.removeAdsUntil ?? 0,
-          Date.now() + SEVEN_DAYS_MS,
-        );
-      }
-      if (productId === 'season_pass') {
-        if (!res.entitlement) return { ok: false, error: 'season_pass_entitlement_inactive' };
-        activateSeasonPass(save, {
-          now: res.entitlement.lastVerifiedAt,
-          expiresAt: res.entitlement.expiresAt,
-          periodStartedAt: res.entitlement.periodStartedAt,
-          lastVerifiedAt: res.entitlement.lastVerifiedAt,
-          provider: res.verificationState === 'LOCAL_MOCK' ? 'LOCAL_MOCK' : 'REVENUECAT',
-          willRenew: res.entitlement.willRenew,
-        });
-      }
-      analytics.logEvent(analytics.EVT.PURCHASE, { productId });
-      // Legend Bundle: also grant removeAds + VIP energy cap
-      if (productId === 'bundle_legend') {
-        grantModeVip(save, 'bundle_legend', res.accountId);
-        save.entitlements.removeAds = true;
-        save.vipEnergyBonusActive = true;
-        save.inventory = {
-          ...(save.inventory ?? {}),
-          avatar_legend_frame: 1,
-          kit_all_colors: 1,
-          player_legend_bundle_owned: 1,
-        };
-      }
-
-      // ── Manager-specific IAP ──────────────────────────────────────────────
-      if (productId === 'transfer_budget_sm' && save.userTeamId) {
-        save.teams[save.userTeamId].budget += 1_000_000;
-        if (save.finances) save.finances.transferBudget += 1_000_000;
-        save.flags = { ...(save.flags ?? {}), [budgetSeasonFlag!]: true };
-        recordPremiumAssistance(save, 'transfer_budget_sm');
-      }
-      if (productId === 'recovery_pack') {
-        setInventoryCount(
-          save,
-          'squad_recovery_token',
-          inventoryCount(save, 'squad_recovery_token') + 1,
-        );
-      }
-      if (productId === 'manager_legend_pack') {
-        grantModeVip(save, 'manager_legend_pack', res.accountId);
-        applyManagerLegendBacking(save);
-        // One-time purchase grant only. Restore/ownership refresh never pays club cash.
-        const club = save.teams[save.userTeamId!];
-        club.budget += 1_000_000;
-        if (save.finances) save.finances.transferBudget = club.budget;
-        setInventoryCount(
-          save,
-          'scout_full_reveal_token',
-          inventoryCount(save, 'scout_full_reveal_token') + 2,
-        );
-        setInventoryCount(
-          save,
-          'facility_upgrade_token',
-          inventoryCount(save, 'facility_upgrade_token') + 1,
-        );
-        setInventoryCount(
-          save,
-          'squad_recovery_token',
-          inventoryCount(save, 'squad_recovery_token') + 1,
-        );
-      }
-      if (productId === 'scout_full_reveal') {
-        setInventoryCount(
-          save,
-          'scout_full_reveal_token',
-          inventoryCount(save, 'scout_full_reveal_token') + 1,
-        );
-      }
-      if (productId === 'facility_upgrade_token') {
-        save.inventory = {
-          ...(save.inventory ?? {}),
-          facility_upgrade_token: (save.inventory?.facility_upgrade_token ?? 0) + 1,
-        };
-      }
-
-      // ── Career-player specific IAP ────────────────────────────────────────
-      if (productId === 'contract_boost' && save.userPlayerId) {
-        setInventoryCount(
-          save,
-          'contract_boost_token',
-          inventoryCount(save, 'contract_boost_token') + 1,
-        );
-      }
-      if (productId === 'form_recovery' && save.userPlayerId) {
-        const user = save.players[save.userPlayerId];
-        if (user) {
-          user.meta.form = Math.max(user.meta.form, 99);
-          user.meta.confidence = Math.max(user.meta.confidence, 99);
-          save.wallet = {
-            ...save.wallet,
-            energy: Math.max(save.wallet.energy, visibleEnergyCap(save)),
-            energyUpdatedAt: Date.now(),
-          };
-        }
-      }
-      if (productId === 'training_accelerator' && save.userPlayerId) {
-        save.inventory = {
-          ...(save.inventory ?? {}),
-          training_accelerator: (save.inventory?.training_accelerator ?? 0) + 3,
-        };
-      }
-      if (productId === 'player_save_sponsor' || productId === 'manager_save_sponsor') {
-        const sponsorGrant = grantPremiumSponsorToCurrentSave(
-          save,
-          productId,
-          ledgerEntry.purchaseToken,
-        );
-        if (!sponsorGrant.ok) return { ok: false, error: 'premium_sponsor_grant_failed' };
-      }
-      // First-purchase bonus: DOUBLE the gems on the player's first-ever
-      // gem-bearing purchase (this is the store's advertised "2× gems"). Only
-      // consumed when a gem bonus is actually granted, so buying a gem-less item
-      // first (e.g. Remove Ads) doesn't silently waste the bonus.
-      if (
-        !save.flags?.['promo:first_gem_pack_bonus'] &&
-        (productId === 'gems_medium' || productId === 'gems_large')
-      ) {
-        const bonusGems = grant.gems ?? 0;
-        if (bonusGems > 0) {
-          save.wallet = addGems(save.wallet, bonusGems); // extra 1× on top of the base grant
-          save.flags = { ...(save.flags ?? {}), 'promo:first_gem_pack_bonus': true };
-        }
-      }
-      set({ save: { ...save } });
-      try {
+        // Confirm the original career is durable BEFORE opening a paid checkout.
         await get().persistCritical(true);
-        if (productId === 'starter_pack') {
-          await accountPurchases.markStarterPackPurchased(ledgerEntry.purchaseToken);
+        if (get().save?.id !== currentSave.id) return { ok: false, error: 'active_save_changed' };
+        const intent: PendingCheckout = {
+          version: 1, saveId: currentSave.id, mode: ref.mode, slot: ref.slot,
+          productId, clubId: currentSave.userTeamId, seasonId: currentSave.currentSeasonId,
+          accountId: snapshot.accountId, startedAt: snapshot.observedAt ?? Date.now(),
+          previousTransactions: snapshot.transactions.filter(t => t.productId === productId).map(t => t.token),
+        };
+        await writePendingCheckout(intent);
+        if (get().save?.id !== currentSave.id) {
+          await clearPendingCheckout();
+          return { ok: false, error: 'active_save_changed' };
         }
-        return { ok: true };
-      } catch {
+        const res = await purchases.purchase(productId, intent.accountId);
+        if (!res.ok) {
+          // Ambiguous network/account/pending errors retain the original binding.
+          if (res.checkoutNotStarted || res.purchaseState === 'CANCELLED' ||
+              ['cancelled', 'not_configured', 'unavailable', 'already_owned_restore_purchases',
+                'retired_product', 'unknown_product', 'save_sponsor_checkout_not_ready',
+                'This product is not available at launch.',
+                'Connect to verify the official Google Play installation before purchasing.'].includes(res.error ?? '')) {
+            await clearPendingCheckout();
+          }
+          return { ok: false, error: res.error };
+        }
+        if (res.productId !== productId) return { ok: false, error: 'product_mismatch' };
+        if (!res.purchaseToken?.trim()) return { ok: false, error: 'missing_transaction_id' };
+        if (!purchaseLedger.canGrantLedgerEntry(purchaseLedger.createLedgerEntry({
+          result: { ...res, purchaseToken: res.purchaseToken.trim() }, userId: currentSave.id,
+        }))) return { ok: false, error: 'purchase_not_verified' };
+        if (intent.accountId !== 'LOCAL_MOCK' && res.accountId !== intent.accountId) {
+          return { ok: false, error: 'purchase_account_changed' };
+        }
+        intent.result = { ...res, purchaseToken: res.purchaseToken.trim() };
+        await writePendingCheckout(intent);
+        return await fulfillCheckout(intent, get, save => set({ save: { ...save } }));
+      } catch (error) {
+        set({ persistenceError: persistenceErrorMessage(error) });
         return { ok: false, error: 'persistence_failed' };
+      } finally {
+        purchaseRequestsInFlight.delete('checkout');
       }
+    },
+
+    recoverPendingPurchases: async () => {
+      if (purchaseRequestsInFlight.size) return { status: 'PENDING' };
+      if (purchaseRecoveryInFlight) return purchaseRecoveryInFlight;
+      purchaseRecoveryInFlight = (async (): Promise<PurchaseRecoveryOutcome> => {
+        const intent = await readPendingCheckout();
+        if (!intent) return { status: 'NONE' };
+        const snapshot = await purchases.getPurchaseRecoverySnapshot();
+        if (!snapshot || !isCheckoutAccountVerified(intent, snapshot)) return { status: 'PENDING' };
+        if (!intent.result) {
+          const candidates = snapshot.transactions.filter(t => t.productId === intent.productId &&
+            !intent.previousTransactions.includes(t.token) && t.purchasedAt >= intent.startedAt);
+          // Never guess which receipt belongs to the checkout if history is ambiguous.
+          if (candidates.length === 0 && await purchases.isCheckoutNoLongerPayable(intent)) {
+            // A successful fresh Play/provider check, not absence of history
+            // or elapsed time, releases the checkout without granting anything.
+            await clearPendingCheckout();
+            return { status: 'NOT_PURCHASED' };
+          }
+          if (candidates.length !== 1) return { status: 'PENDING' };
+          if (snapshot.accountId !== 'LOCAL_MOCK' && purchases.isRestorableProduct(intent.productId) &&
+              !snapshot.activeProductIds?.includes(intent.productId)) return { status: 'PENDING' };
+          intent.result = { ok: true, productId: intent.productId, accountId: intent.accountId,
+            purchaseToken: candidates[0].token, purchaseState: 'PURCHASED', verificationState: 'VERIFIED' };
+          await writePendingCheckout(intent);
+        }
+        if (snapshot.accountId !== 'LOCAL_MOCK' && purchases.isRestorableProduct(intent.productId) &&
+            !snapshot.activeProductIds?.includes(intent.productId)) return { status: 'PENDING' };
+        const result = await fulfillCheckout(intent, get, save => set({ save: { ...save } }));
+        return result.ok
+          ? { status: 'DELIVERED', mode: intent.mode, saveId: intent.saveId, productId: intent.productId }
+          : { status: 'PENDING' };
+      })().catch(error => {
+        set({ persistenceError: persistenceErrorMessage(error) });
+        return { status: 'PENDING' } as const;
+      }).finally(() => { purchaseRecoveryInFlight = null; });
+      return purchaseRecoveryInFlight;
     },
 
     claimReviewerAccess: async () => {
@@ -4090,7 +4270,7 @@ export const useCareer = create<CareerState>(
     },
 
     clearPendingAchievements: () => set({ pendingAchievementIds: [] }),
-    clear: () => set({ save: null, ref: null, pendingAchievementIds: [], persistenceError: null }),
+    clear: () => set({ save: null, ref: null, targetFixtureId: undefined, lastPromotion: null, pendingAchievementIds: [], persistenceError: null }),
 
     // ── In-game inbox ────────────────────────────────────────────────────────
     addInboxMessage: (msg) => {
@@ -4284,10 +4464,13 @@ export const useCareer = create<CareerState>(
       void get().persist();
     },
 
-    resolvePlayerWeek: (choice) => {
+    resolvePlayerWeek: (choice, expectedEventId, expectedSaveId) => {
       const save = get().save;
       if (!save || save.mode !== 'career') {
         return { ok: false, reason: 'No active player career.' };
+      }
+      if ((expectedSaveId !== undefined && save.id !== expectedSaveId) || currentPlayerCalendarEvent(save)?.id !== expectedEventId) {
+        return { ok: false, reason: 'This calendar choice is no longer current.' };
       }
       const result = resolvePlayerCalendarEvent(save, choice);
       if (result.ok) {
@@ -4554,9 +4737,15 @@ export const useCareer = create<CareerState>(
       else if (imported.sponsorship) imported.sponsorship.premium = undefined;
       imported.updatedAt = Date.now();
       validateSeasonState(imported);
-      get().setActive(imported, 'career', ref.slot);
       try {
         await get().persistCritical(true);
+        if (get().save?.id !== current.id || get().ref?.mode !== ref.mode || get().ref?.slot !== ref.slot) {
+          return { ok: false, reason: 'The active career changed. Reopen the destination before importing.' };
+        }
+        await replaceSave('career', ref.slot, imported, current.id);
+        if (get().save?.id === current.id && get().ref?.mode === ref.mode && get().ref?.slot === ref.slot) {
+          get().setActive(imported, 'career', ref.slot);
+        }
         return { ok: true };
       } catch {
         return { ok: false, reason: 'The career was read but could not be saved to this slot.' };
@@ -4649,9 +4838,8 @@ export const useCareer = create<CareerState>(
     loanPlayer: (playerId, seasons = 1) => {
       const save = get().save;
       if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
-      if (managerClubOperationsPaused(save)) {
-        return { ok: false, cost: 0, reason: 'Club loans are paused during national duty.' };
-      }
+      const accessReason = clubTransferAccessReason(save);
+      if (accessReason) return { ok: false, cost: 0, reason: accessReason };
       const closedReason = transferWindowClosedReason(save);
       if (closedReason) return { ok: false, cost: 0, reason: closedReason };
       const res = loanPlayerPure(save, playerId, seasons);
@@ -4665,7 +4853,7 @@ export const useCareer = create<CareerState>(
     recallLoan: (playerId) => {
       const save = get().save;
       if (!save) return false;
-      if (managerClubOperationsPaused(save)) return false;
+      if (clubTransferAccessReason(save)) return false;
       const ok = recallLoanPure(save, playerId);
       if (ok) {
         set({ save: { ...save } });
@@ -4677,9 +4865,8 @@ export const useCareer = create<CareerState>(
     offerFreeAgentContract: (playerId, years = 2) => {
       const save = get().save;
       if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
-      if (managerClubOperationsPaused(save)) {
-        return { ok: false, cost: 0, reason: 'Club contracts are paused during national duty.' };
-      }
+      const accessReason = clubTransferAccessReason(save);
+      if (accessReason) return { ok: false, cost: 0, reason: accessReason };
       const closedReason = transferWindowClosedReason(save);
       if (closedReason) return { ok: false, cost: 0, reason: closedReason };
       const res = offerFreeAgentContractPure(save, playerId, years);
@@ -4717,7 +4904,14 @@ export const useCareer = create<CareerState>(
 
     signNegotiatedContract: (offer) => {
       const save = get().save;
-      if (!save) return { ok: false, bonus: 0 };
+      if (!save || save.mode !== 'career' || !save.userPlayerId ||
+          !seniorProfessionalFeaturesUnlocked(save) ||
+          !userContractExpiring(save) || offer.renewalKey !== contractRenewalKey(save) ||
+          !Number.isInteger(offer.years) || offer.years < 1 || offer.years > 5 ||
+          !Number.isFinite(offer.wage) || offer.wage < 0 ||
+          !Number.isFinite(offer.signingBonus) || offer.signingBonus < 0) {
+        return { ok: false, bonus: 0 };
+      }
       const boostTokens = inventoryCount(save, 'contract_boost_token');
       const signedOffer =
         boostTokens > 0

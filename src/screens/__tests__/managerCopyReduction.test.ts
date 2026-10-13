@@ -45,7 +45,7 @@ describe('compact manager copy', () => {
 
   it('shortens empty Press copy without changing choice resolution', () => {
     expect(press).toContain('No media duties right now.');
-    expect(press).toContain('resolvePress(rendered.id, choiceId)');
+    expect(press).toContain('resolvePress(rendered.id, choiceId, save.id, sequence)');
     expect(press).toContain('rendered.choices.map((c) =>');
     expect(press).not.toContain('the press and the board will want a word');
   });

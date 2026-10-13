@@ -1,4 +1,9 @@
 import type { DailyChallenge } from '../../domain/types';
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn(async () => null),
+  setItemAsync: jest.fn(async () => undefined),
+  deleteItemAsync: jest.fn(async () => undefined),
+}));
 jest.mock('../../services/vipArchive', () => ({ syncVipArchive: jest.fn(async () => {}) }));
 
 // This suite tests fulfilment; native AES/Keystore and durable storage have their
@@ -614,6 +619,7 @@ describe('career reward integrity', () => {
     );
 
     const pending = useCareer.getState().purchaseProduct('player_save_sponsor');
+    await new Promise<void>(resolve => setImmediate(resolve));
     useCareer.getState().setActive(replacement, 'career', 2);
     resolvePurchase({
       ok: true,
@@ -623,7 +629,7 @@ describe('career reward integrity', () => {
       verificationState: 'VERIFIED',
     });
 
-    await expect(pending).resolves.toEqual({ ok: false, error: 'active_save_changed' });
+    await expect(pending).resolves.toEqual({ ok: false, error: 'purchase_delivery_pending' });
     expect(original.sponsorship?.premium).toBeUndefined();
     expect(replacement.sponsorship?.premium).toBeUndefined();
   });
@@ -674,7 +680,7 @@ describe('career reward integrity', () => {
         new Promise<void>((resolve) => {
           releasePersist = resolve;
         }),
-    );
+    ).mockResolvedValueOnce(); // Pre-checkout save succeeds; grant persistence is pending.
     let settled = false;
 
     const purchase = useCareer
@@ -684,10 +690,9 @@ describe('career reward integrity', () => {
         settled = true;
         return result;
       });
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise<void>(resolve => setImmediate(resolve));
 
-    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledTimes(2);
     expect(settled).toBe(false);
     releasePersist();
     await expect(purchase).resolves.toEqual({ ok: true });
@@ -1082,6 +1087,7 @@ describe('career reward integrity', () => {
 
   it('contract boost grants one token and consumes it on real renewal', async () => {
     const save = makeCareerSave();
+    save.players[save.userPlayerId!].contract = { wage: 1000, yearsLeft: 0 };
     useCareer.getState().setActive(save, 'career', 1);
     const baseOffer = contractOffer(save);
     jest.spyOn(purchases, 'purchase').mockResolvedValue({
@@ -1105,6 +1111,7 @@ describe('career reward integrity', () => {
 
   it('contract boost also applies to a negotiated contract', () => {
     const save = makeCareerSave();
+    save.players[save.userPlayerId!].contract = { wage: 1000, yearsLeft: 0 };
     const offer = contractOffer(save);
     save.inventory = { ...(save.inventory ?? {}), contract_boost_token: 1 };
     useCareer.getState().setActive(save, 'career', 1);
@@ -1117,6 +1124,88 @@ describe('career reward integrity', () => {
     expect(signed.offer?.signingBonus).toBe(roundContractCoins(offer.signingBonus * 1.25));
     expect(after.players[after.userPlayerId!].contract?.wage).toBe(roundContractCoins(offer.wage * 1.25));
     expect(after.inventory?.contract_boost_token).toBe(0);
+  });
+
+  it('duplicate and stale contract acceptances never pay or consume another boost', () => {
+    const save = makeCareerSave();
+    save.players[save.userPlayerId!].contract = { wage: 1000, yearsLeft: 0 };
+    save.inventory = { contract_boost_token: 2 };
+    useCareer.getState().setActive(save, 'career', 1);
+    const offer = contractOffer(useCareer.getState().save!);
+    expect(useCareer.getState().signNegotiatedContract(offer).ok).toBe(true);
+    const coins = useCareer.getState().save!.wallet.coins;
+    expect(useCareer.getState().signNegotiatedContract(offer).ok).toBe(false);
+    expect(useCareer.getState().renewUserContract().ok).toBe(false);
+    expect(useCareer.getState().save!.wallet.coins).toBe(coins);
+    expect(useCareer.getState().save!.inventory?.contract_boost_token).toBe(1);
+
+    const current = useCareer.getState().save!;
+    current.players[current.userPlayerId!].contract!.yearsLeft = 0;
+    current.currentSeasonId = 'next-contract-season';
+    expect(useCareer.getState().signNegotiatedContract(offer).ok).toBe(false);
+    expect(useCareer.getState().signNegotiatedContract(contractOffer(current)).ok).toBe(true);
+    expect(useCareer.getState().save!.inventory?.contract_boost_token).toBe(0);
+  });
+
+  it('rejects contract offers from another career and malformed terms without spending', () => {
+    const first = makeCareerSave();
+    first.players[first.userPlayerId!].contract = { wage: 1000, yearsLeft: 0 };
+    const oldOffer = contractOffer(first);
+    const other = makeCareerSave(17);
+    other.id = 'another-contract-career';
+    other.players[other.userPlayerId!].contract = { wage: 1000, yearsLeft: 0 };
+    useCareer.getState().setActive(other, 'career', 2);
+    const coins = useCareer.getState().save!.wallet.coins;
+    expect(useCareer.getState().signNegotiatedContract(oldOffer).ok).toBe(false);
+    const offer = contractOffer(useCareer.getState().save!);
+    for (const terms of [{ years: 0 }, { years: 1.5 }, { years: 6 }, { wage: NaN }, { signingBonus: -1 }]) {
+      expect(useCareer.getState().signNegotiatedContract({ ...offer, ...terms }).ok).toBe(false);
+    }
+    expect(useCareer.getState().save!.wallet.coins).toBe(coins);
+  });
+
+  it.each(['token', 'gems', 'full_fitness'] as const)('no-benefit recovery never charges %s', payment => {
+    const save = makeManagerSave();
+    save.wallet.gems = 1000;
+    save.inventory = { squad_recovery_token: 2 };
+    const squad = save.teams[save.userTeamId!].playerIds.map(id => save.players[id]);
+    squad.forEach(p => { p.condition = 100; p.meta.fitness = 100; p.morale = 100; p.injury = undefined; });
+    useCareer.getState().setActive(save, 'manager', 1);
+    expect(useCareer.getState().applySquadRecovery(payment).ok).toBe(false);
+    squad.forEach(p => { p.condition = 40; p.injury = { type: 'strain', severity: 'STRAIN', matchesOut: 2 }; });
+    expect(useCareer.getState().applySquadRecovery(payment).ok).toBe(false);
+    expect(useCareer.getState().save!.wallet.gems).toBe(1000);
+    expect(useCareer.getState().save!.inventory?.squad_recovery_token).toBe(2);
+  });
+
+  it('recovery respects 3/5 fixture waits and the standard 7-day alternative', () => {
+    const save = makeManagerSave();
+    save.inventory = { squad_recovery_token: 3 };
+    save.wallet.gems = 1000;
+    save.recoveryCompletedFixtures = 20;
+    useCareer.getState().setActive(save, 'manager', 1);
+    const tire = () => {
+      const current = useCareer.getState().save!;
+      current.teams[current.userTeamId!].playerIds.forEach(id => {
+        current.players[id].condition = 40;
+        current.players[id].injury = undefined;
+      });
+      return current;
+    };
+    tire();
+    expect(useCareer.getState().applySquadRecovery('token').ok).toBe(true);
+    tire().recoveryCompletedFixtures = 22;
+    expect(useCareer.getState().applySquadRecovery('token').ok).toBe(false);
+    tire().recoveryCompletedFixtures = 23;
+    expect(useCareer.getState().applySquadRecovery('token', 'after-three').ok).toBe(true);
+    tire().inventory!.squad_recovery_next_at = Date.now() - 1;
+    expect(useCareer.getState().applySquadRecovery('token', 'after-seven-days').ok).toBe(true);
+    tire();
+    expect(useCareer.getState().applySquadRecovery('full_fitness').ok).toBe(true);
+    tire().recoveryCompletedFixtures = 27;
+    expect(useCareer.getState().applySquadRecovery('full_fitness').ok).toBe(false);
+    tire().recoveryCompletedFixtures = 28;
+    expect(useCareer.getState().applySquadRecovery('full_fitness', 'after-five').ok).toBe(true);
   });
 
   it('does not open checkout when a contract boost is already stored', async () => {

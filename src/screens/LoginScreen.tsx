@@ -10,6 +10,7 @@ import { useHallOfFame } from '../state/hofStore';
 import { useSettings } from '../state/settingsStore';
 import { clearAllLocalData } from '../storage/storage';
 import { fontSize, fontWeight, spacing, ThemeColors, useThemedStyles } from '../theme';
+import { AccountBackupCard } from '../components/AccountBackupCard';
 
 export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   const user = useAuth((s) => s.user);
@@ -56,12 +57,12 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
     }
   };
 
-  const onGoogle = async () => {
+  const onGoogle = async (existingAccount = true) => {
     setPassword('');
     setEmailForm(false);
     setBusy(true);
     try {
-      const googleUser = await auth.signInGoogle();
+      const googleUser = existingAccount ? await auth.signInGoogle({ existingAccount: true }) : await auth.signInGoogle();
       setFlash(
         googleUser.displayName
           ? `Signed in with Google as ${googleUser.displayName}.`
@@ -88,13 +89,6 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
     } catch {
       Alert.alert('Sign-out incomplete', 'The device could not clear the local account marker.');
     }
-  };
-
-  const onBackup = () => {
-    Alert.alert(
-      'Cloud save unavailable',
-      'Cloud save is not available in this build. Your local-only progress can be permanently removed if the app is uninstalled or app data is cleared.',
-    );
   };
 
   const completeLocalDeletion = async (remoteDeleted: boolean) => {
@@ -198,10 +192,15 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
                 label={user.remoteId ? 'Link Google account' : 'Continue with Google'}
                 variant="primary"
                 loading={busy}
-                onPress={onGoogle}
+                onPress={() => void onGoogle(false)}
               />
             ) : null}
-            <Button label="Cloud save unavailable" variant="secondary" onPress={onBackup} />
+            {user.provider === 'guest' ? <Button
+              label="Sign in to existing Google account"
+              variant="secondary"
+              disabled={busy}
+              onPress={() => void onGoogle(true)}
+            /> : null}
             <Button label="Sign out" variant="secondary" onPress={onSignOut} />
             <Button
               label={user.remoteId ? 'Delete account & data' : 'Delete local account & data'}
@@ -210,6 +209,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
               onPress={onDelete}
             />
           </View>
+          <AccountBackupCard />
         </>
       ) : (
         <View style={styles.buttons}>
@@ -217,7 +217,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
             label="Continue with Google"
             variant="secondary"
             loading={busy}
-            onPress={onGoogle}
+            onPress={() => void onGoogle(true)}
           />
           <Button label="Play as Guest" variant="primary" loading={busy} onPress={onGuest} />
           <Button
@@ -269,8 +269,8 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
         </Text>
         <Text style={styles.noteText}>
           {user && user.provider !== 'guest'
-            ? 'Sign-in protects purchase ownership and restores. Cloud save is unavailable.'
-            : 'Guest saves stay on this device and may be lost if the app is removed. Cloud save is unavailable.'}
+            ? 'Sign-in reconnects purchase ownership. Career progress and remaining pack benefits are recoverable only after an account backup is confirmed above.'
+            : 'Guest saves stay on this device and may be lost if the app is removed. Sign in and confirm an account backup before uninstalling.'}
         </Text>
       </Card>
     </Screen>

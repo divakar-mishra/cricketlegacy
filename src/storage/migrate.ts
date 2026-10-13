@@ -31,6 +31,7 @@ import { synchronizeSchema41ManagerAge } from './schema41';
 import { synchronizeSchema42Portfolio } from './schema42';
 import { synchronizeSchema43InternationalRankingPeaks } from './schema43';
 import { ensureVipState } from '../game/vip';
+import { ensureRecoveryClock } from '../game/squadRecovery';
 
 type AnySave = Record<string, unknown> & { schemaVersion?: number };
 type Migration = (save: AnySave) => AnySave;
@@ -58,6 +59,10 @@ function recomputePlayerOveralls(save: AnySave): void {
  * When bumping SAVE_SCHEMA_VERSION, add MIGRATIONS[oldVersion] here.
  */
 const MIGRATIONS: Record<number, Migration> = {
+  44: (save) => {
+    ensureRecoveryClock(save as unknown as SaveGame);
+    return save;
+  },
   43: (save) => {
     ensureVipState(save as unknown as SaveGame);
     return save;

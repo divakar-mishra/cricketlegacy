@@ -22,5 +22,15 @@ allprojects {
   }
 }
 
+// SDK 57 inline Kotlin modules compile in :expo, not :app. Give the
+// read-only Play checkout probe the same Billing version RevenueCat uses.
+subprojects { subproject ->
+  if (subproject.name == "expo") {
+    subproject.plugins.withId("com.android.library") {
+      subproject.dependencies.add("implementation", "com.android.billingclient:billing:8.3.0")
+    }
+  }
+}
+
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"

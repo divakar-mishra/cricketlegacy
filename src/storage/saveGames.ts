@@ -1,9 +1,11 @@
 import { GameMode, SaveGame } from '../domain/types';
 import { isSeasonPassActive } from '../game/seasonPass';
 import { syncVipArchive } from '../services/vipArchive';
+import { assertNoPendingPurchaseForSlot } from '../services/purchaseRecovery';
 import { deleteSaveKey, markSaveSealed, openSave, sealSave, verifySaveIdentity } from './saveEncryption';
 import { runMigrations } from './migrate';
 import { getJSON, getJSONStrict, removeKey, setJSON } from './storage';
+import { backupBindings, backupOwner, BackupBinding, bindRecoveredSave, deleteAccountBackup, markBackupDirty, reportBackupWriteFailure } from './accountBackupJournal';
 
 export const BASE_MAX_SLOTS = 5;
 export const MAX_SLOTS = 6;
@@ -11,6 +13,12 @@ const LAST_PLAYED_KEY = 'sg:lastPlayed';
 const slotKey = (mode: GameMode, slot: number): string => `sg:${mode}:${slot}`;
 const bakKey = (mode: GameMode, slot: number): string => `sg:${mode}:${slot}:bak`;
 const slotOperationQueues = new Map<string, Promise<unknown>>();
+// Revokes references still held by a screen or an in-flight autosave. A newly
+// created career has a different identity and can still reuse the slot.
+const deletedSaveIds = new Map<string, Set<string>>();
+export class SaveDeletedError extends Error {
+  constructor() { super('This career has been deleted.'); this.name = 'SaveDeletedError'; }
+}
 const traceSaveTiming = () => (typeof __DEV__ !== 'undefined' && __DEV__) ||
   process.env.EXPO_PUBLIC_QA_TOOLS === 'true';
 
@@ -92,10 +100,13 @@ export function loadSave(mode: GameMode, slot: number): Promise<SaveGame | null>
   });
 }
 
-async function writeSaveNow(mode: GameMode, slot: number, save: SaveGame): Promise<void> {
+async function writeSaveNow(mode: GameMode, slot: number, save: SaveGame, expectedId?: string): Promise<void> {
   const trace = traceSaveTiming();
   const startedAt = trace ? performance.now() : 0;
   const key = slotKey(mode, slot);
+  if (deletedSaveIds.get(key)?.has(save.id)) throw new SaveDeletedError();
+  const bindings = await backupBindings().catch(() => null);
+  if (bindings?.some((entry) => entry.saveId === save.id && entry.deleted)) throw new SaveDeletedError();
   // Roll the last-known-good primary into the backup before overwriting it, so a
   // failure mid-write leaves a recoverable previous state.
   const previous = await readBackupCandidate(key, key);
@@ -107,8 +118,10 @@ async function writeSaveNow(mode: GameMode, slot: number, save: SaveGame): Promi
   if (!previous.save && !backup.save && (previous.occupied || backup.occupied)) {
     throw new SaveUnavailableError();
   }
-  if (previous.save && previous.save.id !== save.id) throw new Error('Save slot is occupied.');
-  if (backup.save && !previous.save && backup.save.id !== save.id)
+  const occupiedId = (previous.save ?? backup.save)?.id;
+  if (expectedId !== undefined && occupiedId !== expectedId)
+    throw new Error('The destination career changed. Reopen it before importing.');
+  if (occupiedId && occupiedId !== save.id && occupiedId !== expectedId)
     throw new Error('Save slot is occupied.');
   const verifiedAt = trace ? performance.now() : 0;
   const next = await sealSave(save, key);
@@ -139,6 +152,18 @@ async function writeSaveNow(mode: GameMode, slot: number, save: SaveGame): Promi
   });
 }
 
+/** Explicit Player Life replacement, never the ordinary autosave path. */
+export function replaceSave(mode: GameMode, slot: number, save: SaveGame, expectedId: string): Promise<void> {
+  const key = slotKey(mode, slot);
+  const snapshot = JSON.parse(JSON.stringify(save)) as SaveGame;
+  const capturedOwner = backupOwner();
+  return enqueueSlotOperation(key, async () => {
+    await assertNoPendingPurchaseForSlot(mode, slot);
+    await writeSaveNow(mode, slot, snapshot, expectedId);
+    await recordBackupWrite(snapshot, slot, capturedOwner);
+  });
+}
+
 /**
  * Serialize writes per slot. Gameplay can request several saves in quick
  * succession; without a queue, an older AsyncStorage write may finish after a
@@ -151,22 +176,75 @@ export function writeSave(mode: GameMode, slot: number, save: SaveGame): Promise
   save.updatedAt = Date.now();
   const snapshot = JSON.parse(JSON.stringify(save)) as SaveGame;
   const snapshotAt = trace ? performance.now() : 0;
-  return enqueueSlotOperation(key, () => {
+  const capturedOwner = backupOwner();
+  return enqueueSlotOperation(key, async () => {
     if (trace) console.info('[save queue]', {
       snapshotMs: Math.round(snapshotAt - startedAt),
       waitMs: Math.round(performance.now() - snapshotAt),
     });
-    return writeSaveNow(mode, slot, snapshot);
+    await writeSaveNow(mode, slot, snapshot);
+    await recordBackupWrite(snapshot, slot, capturedOwner);
   });
 }
 
-export function deleteSave(mode: GameMode, slot: number): Promise<void> {
+async function recordBackupWrite(save: SaveGame, slot: number, capturedOwner: string | null) {
+  // Reserved QA capture slots are device-only. They are not account careers
+  // and must never poison the six-slot backup journal or reach the server.
+  if (!Number.isInteger(slot) || slot < 1 || slot > MAX_SLOTS) return;
+  try { await markBackupDirty(save.id, save.mode, slot, capturedOwner); }
+  catch {
+    // Local persistence has succeeded. A network/metadata failure must not turn
+    // a fulfilled purchase into a failed purchase or block offline progression.
+    console.warn('Account backup pending; local career retained. Retry backup from Account.');
+    reportBackupWriteFailure();
+  }
+}
+
+/** Recovery only fills an authenticated, empty slot; it never rolls back an active career. */
+export function recoverSaveToEmptySlot(save: SaveGame, binding: BackupBinding, stillSignedIn: () => boolean): Promise<void> {
+  const snapshot = JSON.parse(JSON.stringify(save)) as SaveGame;
+  const key = slotKey(binding.mode, binding.slot);
+  return enqueueSlotOperation(key, async () => {
+    if (!stillSignedIn() || snapshot.mode !== binding.mode || snapshot.id !== binding.saveId) {
+      throw new Error('The backup account changed.');
+    }
+    const primary = await readCopy(key, key);
+    const backup = await readCopy(bakKey(binding.mode, binding.slot), key);
+    if (primary.occupied || backup.occupied) throw new Error('Recovery destination is no longer empty. Nothing was overwritten.');
+    await assertNoPendingPurchaseForSlot(binding.mode, binding.slot);
+    const sealed = await sealSave(snapshot, key);
+    if (!stillSignedIn()) throw new Error('The backup account changed.');
+    await bindRecoveredSave(binding);
+    // Binding is another asynchronous write. Sign-out/account switching during
+    // it must invalidate recovery before the career becomes visible on disk.
+    if (!stillSignedIn()) throw new Error('The backup account changed.');
+    // Keep the original updatedAt and absolute ad-free expiry. This is a state
+    // restore, not a new purchase, grant, or extension of a paid timer.
+    await setJSON(key, sealed);
+    await markSaveSealed(key);
+  });
+}
+
+export function deleteSave(mode: GameMode, slot: number, expectedSaveId?: string): Promise<void> {
   const key = slotKey(mode, slot);
   return enqueueSlotOperation(key, async () => {
     // Wait behind any pending save for this slot so a late write cannot
     // resurrect a career after the player confirms deletion.
+    await assertNoPendingPurchaseForSlot(mode, slot);
+    const primary = await readBackupCandidate(key, key);
+    const backup = await readBackupCandidate(bakKey(mode, slot), key);
+    const existingId = (primary.save ?? backup.save)?.id;
+    if (expectedSaveId !== undefined && existingId && existingId !== expectedSaveId) {
+      throw new Error('This slot now contains a different career. Reopen Saved Games before deleting.');
+    }
+    if (existingId || expectedSaveId) await deleteAccountBackup(existingId ?? expectedSaveId!);
     await removeKey(key);
     await removeKey(bakKey(mode, slot));
+    const revoked = deletedSaveIds.get(key) ?? new Set<string>();
+    if (primary.save) revoked.add(primary.save.id);
+    if (backup.save) revoked.add(backup.save.id);
+    if (expectedSaveId) revoked.add(expectedSaveId);
+    deletedSaveIds.set(key, revoked);
     await deleteSaveKey(key);
   });
 }

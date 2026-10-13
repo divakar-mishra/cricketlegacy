@@ -49,8 +49,10 @@ export function Screen({
     activeScrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [activeScrollRef, scroll, scrollResetKey]);
 
-  // Responsive horizontal padding: ~4% of width, bounded between md and xl.
-  const hPad = padded ? Math.max(spacing.md, Math.min(spacing.xl, Math.round(width * 0.045))) : 0;
+  // Leave breathing room even on compact devices and outside 12dp scene bleeds.
+  const hPad = padded
+    ? Math.max(spacing.lg + spacing.xs, Math.min(spacing.xl, Math.round(width * 0.045)))
+    : 0;
   const contentWidthStyle: ViewStyle = useMemo(
     () =>
       padded
@@ -77,13 +79,14 @@ export function Screen({
       width: '100%',
       flexShrink: 0,
       paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.md,
-      paddingHorizontal: hPad,
+      paddingLeft: insets.left,
+      paddingRight: insets.right,
       paddingTop: spacing.md,
       backgroundColor: colors.bgElevated,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
     }),
-    [colors.bgElevated, colors.border, insets.bottom, hPad],
+    [colors.bgElevated, colors.border, insets.bottom, insets.left, insets.right],
   );
 
   const inner = scroll ? (
@@ -106,10 +109,17 @@ export function Screen({
       style={{ backgroundColor: colors.bg }}
       target={<LinearGradient colors={bg} style={styles.fill} />}
     >
-      <SafeAreaView style={styles.fill} edges={['top']}>
+      <SafeAreaView
+        style={styles.fill}
+        edges={footer ? ['top', 'left', 'right'] : ['top', 'left', 'right', 'bottom']}
+      >
         {inner}
       </SafeAreaView>
-      {footer ? <View style={footerStyle}>{footer}</View> : null}
+      {footer ? (
+        <View style={footerStyle}>
+          <View style={[contentWidthStyle, { paddingHorizontal: hPad }]}>{footer}</View>
+        </View>
+      ) : null}
     </GlassBlurProvider>
   );
 }

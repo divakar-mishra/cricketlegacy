@@ -4,7 +4,7 @@
  * at full strength and makes long dynasties feel alive.
  */
 import { COUNTRIES } from '../data/countries';
-import { Role, SaveGame } from '../domain/types';
+import { Role, SaveGame, Team } from '../domain/types';
 import { Rng } from '../engine/rng';
 import {
   generatePlayer,
@@ -16,6 +16,33 @@ import {
 export const RETIRE_AGE = 37;
 const FILL_ROLES: Role[] = ['BATTER', 'BOWLER', 'ALLROUNDER', 'WK_BATTER', 'BATTER', 'BOWLER'];
 const FREE_AGENT_TARGET = 24;
+
+/** Existing youth pathway, also used to recover legacy depleted club rosters. */
+function promoteToRoster(save: SaveGame, team: Team, year: number, rng: Rng, target: number): number {
+  let promoted = 0;
+  let n = 0;
+  while (team.playerIds.length < target) {
+    const role = FILL_ROLES[n % FILL_ROLES.length];
+    const id = `y-${year}-${team.id}-${n++}`;
+    if (save.players[id]) continue; // Never overwrite an existing prospect.
+    save.players[id] = generateYouth({ id, nationality: team.country, role,
+      quality: Math.max(45, team.reputation - 6), rng });
+    save.players[id].condition = save.managerCalendar ? 100 : undefined;
+    team.playerIds.push(id);
+    promoted++;
+  }
+  return promoted;
+}
+
+export function repairDepletedManagerRoster(save: SaveGame, year: number, rng: Rng): void {
+  if (save.mode !== 'manager' || save.managerCareerLevel === 'NATIONAL' || !save.userTeamId) return;
+  const team = save.teams[save.userTeamId];
+  if (!team || team.isNationalTeam) return;
+  team.playerIds = [...new Set(team.playerIds)].filter(id => Boolean(save.players[id]));
+  if (team.playerIds.length >= 11) return;
+  promoteToRoster(save, team, year, rng, 11);
+  team.xi = undefined;
+}
 
 export interface RolloverReport {
   retired: number;
@@ -48,22 +75,7 @@ export function rolloverSquads(
       return true;
     });
 
-    let n = 0;
-    while (team.playerIds.length < rosterTarget) {
-      const role = FILL_ROLES[n % FILL_ROLES.length];
-      const id = `y-${year}-${team.id}-${n}`;
-      save.players[id] = generateYouth({
-        id,
-        nationality: team.country,
-        role,
-        quality: Math.max(45, team.reputation - 6),
-        rng,
-      });
-      save.players[id].condition = save.managerCalendar ? 100 : undefined;
-      team.playerIds.push(id);
-      promoted++;
-      n++;
-    }
+    promoted += promoteToRoster(save, team, year, rng, rosterTarget);
 
     // Drop a stale XI selection that references departed players.
     if (team.xi && !team.xi.every((id) => save.players[id])) team.xi = undefined;

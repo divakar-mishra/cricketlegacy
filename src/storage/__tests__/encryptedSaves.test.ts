@@ -72,7 +72,9 @@ jest.mock('expo-crypto', () => {
 });
 jest.mock('../migrate', () => ({ runMigrations: (save: unknown) => save }));
 import { SaveGame } from '../../domain/types';
-import { deleteSave, firstFreeSlot, listSlots, loadSave, writeSave } from '../saveGames';
+import { deleteSave, firstFreeSlot, listSlots, loadSave, recoverSaveToEmptySlot, replaceSave, SaveDeletedError, writeSave } from '../saveGames';
+import { setBackupOwner } from '../accountBackupJournal';
+import * as backupJournal from '../accountBackupJournal';
 import { wrapSave } from '../integrity';
 import { openSave, sealSave, verifySaveIdentity } from '../saveEncryption';
 
@@ -87,6 +89,39 @@ const makeSave = (coins = 500) =>
   }) as unknown as SaveGame;
 const key = 'sg:career:1';
 describe('encrypted career persistence', () => {
+  it('keeps reserved high-numbered QA slots out of account backup metadata', async () => {
+    setBackupOwner('owner-a');
+    await writeSave('career', 900, { ...makeSave(), id: 'qa-reserved-slot' });
+    expect(await backupJournal.backupBindings()).toEqual([]);
+    await writeSave('career', 1, { ...makeSave(), id: 'ordinary-slot' });
+    expect(await backupJournal.backupBindings()).toEqual([expect.objectContaining({ saveId: 'ordinary-slot', slot: 1 })]);
+  });
+  it('rejects a sign-out while recovered-save ownership is being written, before committing the career', async () => {
+    const snapshot = { ...makeSave(), id: 'recovery-account-changed-during-binding' };
+    let signedIn = true;
+    const bind = backupJournal.bindRecoveredSave;
+    jest.spyOn(backupJournal, 'bindRecoveredSave').mockImplementationOnce(async (binding) => {
+      await bind(binding);
+      signedIn = false;
+    });
+    await expect(recoverSaveToEmptySlot(snapshot, { saveId: snapshot.id, ownerId: 'owner-a', mode: 'career', slot: 1,
+      revision: 1, generation: 0, pending: false, deleted: false }, () => signedIn)).rejects.toThrow('account changed');
+    expect(await loadSave('career', 1)).toBeNull();
+  });
+  it('retries an interrupted restored-career write without duplication or timer restart', async () => {
+    const snapshot = { ...makeSave(2100), id: 'recovery-interrupted-primary',
+      entitlements: { removeAdsUntil: 50 }, flags: { 'iap:tx:original-order': true } } as unknown as SaveGame;
+    const binding = { saveId: snapshot.id, ownerId: 'owner-a', mode: 'career' as const, slot: 1,
+      revision: 3, generation: 0, pending: false, deleted: false };
+    mockFailRow = key;
+    await expect(recoverSaveToEmptySlot(snapshot, binding, () => true)).rejects.toThrow('disk full');
+    expect(await loadSave('career', 1)).toBeNull();
+    mockFailRow = undefined;
+    await recoverSaveToEmptySlot(snapshot, binding, () => true);
+    expect(await loadSave('career', 1)).toEqual(snapshot);
+    await expect(recoverSaveToEmptySlot(snapshot, binding, () => true)).rejects.toThrow('no longer empty');
+    expect(await loadSave('career', 1)).toEqual(snapshot);
+  });
   it('does not treat stored JSON null as an empty slot', async () => {
     mockRows.set(key, 'null');
     await expect(loadSave('career', 1)).rejects.toThrow('kept');
@@ -103,8 +138,44 @@ describe('encrypted career persistence', () => {
     mockKeys.clear();
     mockFailKeyWrite = false;
     mockFailRow = undefined;
+    setBackupOwner(null);
   });
   afterEach(() => jest.restoreAllMocks());
+  it('reseals an account snapshot with a fresh device key after reinstall, preserving remaining paid state', async () => {
+    setBackupOwner('owner-a');
+    const paid = { ...makeSave(900), wallet: { ...makeSave().wallet, coins: 900, gems: 25 },
+      entitlements: { removeAds: false, removeAdsUntil: 123456 }, flags: { 'iap:tx:paid-once': true } } as SaveGame;
+    await writeSave('career', 1, paid);
+    const oldCiphertext = mockRows.get(key);
+    const oldDeviceKeys = new Map(mockKeys);
+    const backedUp = (await loadSave('career', 1))!;
+    // Uninstall loses device ciphertext/keys, but the server snapshot survives.
+    mockRows.clear(); mockKeys.clear();
+    await recoverSaveToEmptySlot(backedUp, { saveId: backedUp.id, ownerId: 'owner-a', mode: 'career', slot: 1,
+      revision: 3, generation: 0, pending: false, deleted: false }, () => true);
+    expect(await loadSave('career', 1)).toEqual(backedUp);
+    expect(mockRows.get(key)).not.toBe(oldCiphertext);
+    expect(mockKeys).not.toEqual(oldDeviceKeys);
+    expect((await loadSave('career', 1))!.entitlements.removeAdsUntil).toBe(123456);
+  });
+  it('account recovery never overwrites an occupied or unreadable slot', async () => {
+    const snapshot = makeSave();
+    const binding = { saveId: snapshot.id, ownerId: 'owner-a', mode: 'career' as const, slot: 1,
+      revision: 1, generation: 0, pending: false, deleted: false };
+    await writeSave('career', 1, snapshot);
+    const old = mockRows.get(key);
+    await expect(recoverSaveToEmptySlot(snapshot, binding, () => true)).rejects.toThrow('no longer empty');
+    expect(mockRows.get(key)).toBe(old);
+    mockRows.set(key, 'unreadable');
+    await expect(recoverSaveToEmptySlot(snapshot, binding, () => true)).rejects.toThrow('no longer empty');
+    expect(mockRows.get(key)).toBe('unreadable');
+  });
+  it('account recovery requires the same signed-in identity at the commit point', async () => {
+    const snapshot = makeSave();
+    await expect(recoverSaveToEmptySlot(snapshot, { saveId: snapshot.id, ownerId: 'owner-a', mode: 'career', slot: 1,
+      revision: 1, generation: 0, pending: false, deleted: false }, () => false)).rejects.toThrow('account changed');
+    expect(mockRows.has(key)).toBe(false);
+  });
   it('reopens persisted base64 ciphertext through the Android byte-array API without rewriting it', async () => {
     const save = makeSave();
     await writeSave('career', 1, save);
@@ -272,11 +343,52 @@ describe('encrypted career persistence', () => {
     expect(backup?.wallet.coins).toBe(100);
   });
   it('deletes the key only on explicit slot deletion and can reuse that slot', async () => {
-    await writeSave('career', 1, makeSave());
+    const oldSave = { ...makeSave(), id: 'career-deleted' };
+    await writeSave('career', 1, oldSave);
     await deleteSave('career', 1);
     expect(mockKeys.size).toBe(0);
     await expect(loadSave('career', 1)).resolves.toBeNull();
+    await expect(writeSave('career', 1, oldSave)).rejects.toBeInstanceOf(SaveDeletedError);
     await writeSave('career', 1, makeSave());
     expect((await loadSave('career', 1))?.wallet.coins).toBe(500);
+  });
+  it('only explicitly replaces the expected career and keeps the old primary on write failure', async () => {
+    const oldSave = makeSave(500);
+    const imported = { ...makeSave(700), id: 'career-imported' };
+    await writeSave('career', 1, oldSave);
+    await expect(writeSave('career', 1, imported)).rejects.toThrow('occupied');
+    await expect(replaceSave('career', 1, imported, 'stale-destination')).rejects.toThrow('destination career changed');
+    mockFailRow = key;
+    await expect(replaceSave('career', 1, imported, oldSave.id)).rejects.toThrow('disk full');
+    mockFailRow = undefined;
+    expect((await loadSave('career', 1))?.id).toBe(oldSave.id);
+    expect((await loadSave('career', 1))?.wallet.coins).toBe(500);
+    await replaceSave('career', 1, imported, oldSave.id);
+    expect((await loadSave('career', 1))?.id).toBe(imported.id);
+    await expect(writeSave('career', 1, oldSave)).rejects.toThrow();
+    expect((await loadSave('career', 1))?.wallet.coins).toBe(700);
+    // Replacing is not deleting: if the new primary is damaged, the rolling
+    // backup must still be recoverable AND saveable under its old identity.
+    mockRows.set(key, JSON.stringify({ __env: 2, algorithm: 'AES-256-GCM', data: 'corrupt' }));
+    const recovered = (await loadSave('career', 1))!;
+    expect(recovered.id).toBe(oldSave.id);
+    await writeSave('career', 1, recovered);
+    expect((await loadSave('career', 1))?.wallet.coins).toBe(500);
+  });
+  it('a stale deletion confirmation cannot delete a replacement career', async () => {
+    const original = { ...makeSave(), id: 'delete-confirmation-original' };
+    const replacement = { ...makeSave(), id: 'delete-confirmation-replacement' };
+    await writeSave('career', 1, original);
+    await replaceSave('career', 1, replacement, original.id);
+    await expect(deleteSave('career', 1, original.id)).rejects.toThrow('different career');
+    expect((await loadSave('career', 1))?.id).toBe(replacement.id);
+  });
+  it('revokes the confirmed active identity even when disk copies became unreadable', async () => {
+    const active = { ...makeSave(), id: 'deleted-after-disk-corruption' };
+    await writeSave('career', 1, active);
+    mockRows.set(key, JSON.stringify({ __env: 2, algorithm: 'AES-256-GCM', data: 'corrupt' }));
+    await deleteSave('career', 1, active.id);
+    await expect(writeSave('career', 1, active)).rejects.toBeInstanceOf(SaveDeletedError);
+    await expect(loadSave('career', 1)).resolves.toBeNull();
   });
 });

@@ -36,7 +36,9 @@ function currentMonthName(save: SaveGame): string {
 }
 
 export function isTransferWindowOpen(save: SaveGame): boolean {
-  if (save.managerCalendar) return save.managerCalendar.phase === 'OFF_SEASON';
+  if (save.mode === 'manager' && save.managerCalendar) {
+    return save.managerCalendar.phase === 'OFF_SEASON';
+  }
   const month = save.currentMonth ?? 1;
   return TRANSFER_WINDOW_MONTHS.includes(month);
 }
@@ -66,7 +68,7 @@ export function isDeadlineDay(save: SaveGame): boolean {
 
 export function transferWindowLabel(save: SaveGame): string {
   const month = currentMonthName(save);
-  if (save.managerCalendar) {
+  if (save.mode === 'manager' && save.managerCalendar) {
     return save.managerCalendar.phase === 'OFF_SEASON'
       ? `Transfer window open in ${month}. Contracts, releases, scouting and training are available.`
       : `Transfer window closed during the ${save.managerCalendar.phase.replace('_', ' ').toLowerCase()} block. It opens from June through August.`;
@@ -75,6 +77,16 @@ export function transferWindowLabel(save: SaveGame): string {
     return `Transfer window open in ${month}. Signings, loans and scouting are available.`;
   }
   return `Transfer window closed in ${month}. Opens in January, June, July and December.`;
+}
+
+/** Route and store guard: players negotiate their own deals, not the club's squad. */
+export function clubTransferAccessReason(save: SaveGame): string | null {
+  if (save.mode !== 'manager') return 'Club transfers are only available in Manager Career.';
+  if (save.managerCareerLevel === 'NATIONAL') {
+    return 'Club operations are paused during national duty.';
+  }
+  if (!save.userTeamId || !save.teams[save.userTeamId]) return 'No active club.';
+  return null;
 }
 
 export function transferWindowClosedReason(save: SaveGame): string | null {

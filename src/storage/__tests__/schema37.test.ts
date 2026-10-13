@@ -117,6 +117,7 @@ describe('schema 37 dynamic sponsor branding', () => {
 
     const migrated = runMigrations(JSON.parse(JSON.stringify(legacy)))!;
     eraseBrandFields(migrated);
+    expected.recoveryCompletedFixtures = 0;
 
     expect(migrated).toEqual(expected);
     expect(migrated.sponsorship?.seniorDomesticDebutFixtureId).toBeUndefined();

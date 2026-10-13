@@ -209,6 +209,8 @@ export function renewContract(save: SaveGame, playerId: string, years = 2): Rene
   const p = save.players[playerId];
   if (!p || !team.playerIds.includes(playerId))
     return { ok: false, cost: 0, reason: 'Not in your squad.' };
+  if (p.loanedFrom)
+    return { ok: false, cost: 0, reason: 'A borrowed player cannot sign a club renewal. Their loan must end first.' };
   const fee = Math.round(computeValue(p) * 0.1);
   const budgetBlock = optionalClubSpendBlockReason(save, fee);
   if (budgetBlock) return { ok: false, cost: fee, reason: budgetBlock };
@@ -227,7 +229,7 @@ export function expiringContracts(save: SaveGame): Player[] {
     .map((id) => save.players[id])
     .filter(
       (p): p is Player =>
-        Boolean(p) && (p.contract?.yearsLeft ?? 2) <= 1 && p.id !== save.userPlayerId,
+        Boolean(p) && !p.loanedFrom && (p.contract?.yearsLeft ?? 2) <= 1 && p.id !== save.userPlayerId,
     );
 }
 
@@ -244,7 +246,7 @@ export function tickContracts(save: SaveGame): string[] {
   const departed: string[] = [];
   for (const id of [...team.playerIds]) {
     const p = save.players[id];
-    if (!p || !p.contract || id === save.userPlayerId) continue;
+    if (!p || !p.contract || p.loanedFrom || id === save.userPlayerId) continue;
     p.contract.yearsLeft -= 1;
     if (p.contract.yearsLeft <= 0) {
       if (team.playerIds.length <= XI_SIZE) {
@@ -718,13 +720,16 @@ export function loanPlayer(save: SaveGame, playerId: string, seasons = 1): LoanO
 
 /**
  * Return a loaned player to their parent club at season end.
- * Safe no-op if the player is not on loan or the loan hasn't expired.
+ * Manual returns cannot dismantle the final XI. Season settlement may return
+ * expired loans before the ordinary rollover roster replenishment.
  */
-export function recallLoan(save: SaveGame, playerId: string): boolean {
+export function recallLoan(save: SaveGame, playerId: string, atSeasonEnd = false): boolean {
   if (!save.userTeamId) return false;
   const team = save.teams[save.userTeamId];
   const p = save.players[playerId];
-  if (!p || !p.loanedFrom) return false;
+  if (!team || !p?.loanedFrom || !team.playerIds.includes(playerId)) return false;
+  const roster = [...new Set(team.playerIds)].filter(id => Boolean(save.players[id]));
+  if (!atSeasonEnd && roster.length <= XI_SIZE) return false;
 
   // Remove from user squad.
   team.playerIds = team.playerIds.filter((id) => id !== playerId);
@@ -739,7 +744,7 @@ export function recallLoan(save: SaveGame, playerId: string): boolean {
     const parent = save.teams[parentId];
     if (!parent.playerIds.includes(playerId)) parent.playerIds.push(playerId);
   } else {
-    save.freeAgents = [...(save.freeAgents ?? []), playerId];
+    save.freeAgents = [...new Set([...(save.freeAgents ?? []), playerId])];
     p.contract = undefined;
   }
 

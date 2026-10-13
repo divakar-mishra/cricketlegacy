@@ -175,7 +175,7 @@ function callbackError(params: Record<string, string>, errorCode: string | null)
  * Signs in with Google, or upgrades the current anonymous Supabase user by
  * linking Google to that same user ID. Local saves remain untouched.
  */
-export async function signInGoogle(): Promise<AuthUser> {
+export async function signInGoogle(options: { existingAccount?: boolean } = {}): Promise<AuthUser> {
   if (!isSupabaseBackendEnabled()) {
     throw new Error('Google sign-in is not configured in this build.');
   }
@@ -195,7 +195,8 @@ export async function signInGoogle(): Promise<AuthUser> {
     provider: 'google' as const,
     options: { redirectTo, skipBrowserRedirect: true },
   };
-  const oauth = existing?.isAnonymous
+  const linkingGuest = Boolean(existing?.isAnonymous && !options.existingAccount);
+  const oauth = linkingGuest
     ? await supabase.auth.linkIdentity(credentials)
     : await supabase.auth.signInWithOAuth(credentials);
 
@@ -218,7 +219,7 @@ export async function signInGoogle(): Promise<AuthUser> {
   } else if (params.code) {
     const { error } = await supabase.auth.exchangeCodeForSession(params.code);
     if (error) throw new Error(error.message);
-  } else if (existing?.isAnonymous) {
+  } else if (linkingGuest) {
     // Identity linking keeps the existing session. Refresh its JWT so the
     // server-side `is_anonymous` claim reflects the newly linked identity.
     const { error } = await supabase.auth.refreshSession();
@@ -237,7 +238,7 @@ export async function signInGoogle(): Promise<AuthUser> {
   setCurrent(user);
   // The RevenueCat key was registered at app startup. Re-run identity sync now
   // that a server-validated, recoverable Supabase UUID is available.
-  void synchronizePurchaseIdentity();
+  void synchronizePurchaseIdentity().catch(() => undefined);
   return user;
 }
 

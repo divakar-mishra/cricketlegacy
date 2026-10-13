@@ -25,6 +25,9 @@ import {
 import { ScreenProps } from '../navigation';
 import { accountPurchases, ads, purchases } from '../services';
 import { authorizeReviewerAccess } from '../services/reviewerAccess';
+import { readPendingCheckout } from '../services/purchaseRecovery';
+import { AccountBackupCard } from '../components/AccountBackupCard';
+import { syncAccountCareers } from '../services/accountRecovery';
 import { ECONOMY } from '../data/gameConfig';
 import {
   areAdsRemoved,
@@ -213,7 +216,11 @@ const PURCHASE_ERROR_MESSAGE: Record<string, string> = {
   sponsorship_not_unlocked: 'Sponsorship has not unlocked in this career yet.',
   save_sponsor_checkout_not_ready: 'Secure per-save checkout is not available yet.',
   active_save_changed: 'The active save changed, so nothing was applied.',
-  persistence_failed: 'The device did not confirm the purchase save. Please try again.',
+  persistence_failed: 'The device could not save the purchase. Do not buy it again or clear app data. Free some storage and reopen this career to retry delivery.',
+  purchase_delivery_pending: 'An earlier checkout still needs delivery. Reopen its original career while online. If it stays pending, contact support; do not buy it again.',
+  cancelled: 'Checkout was cancelled. No purchase was applied.',
+  purchase_context_changed: 'Your purchase is saved for the original club. Return to that club to finish delivery, or contact support.',
+  starter_pack_history_requires_support: 'Google Play purchase history already contains a Starter Pack. Another payment was not started. If its rewards are missing, contact support with the Google Play order ID; do not buy it again.',
 };
 
 function ProductRow({
@@ -419,9 +426,27 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
 
   const removeAds = areAdsRemoved(save?.entitlements);
 
+  const reportPurchaseFailure = async (error?: string) => {
+    // A billing error is not proof that no charge occurred. Pending payments
+    // and failed post-payment writes retain their original checkout intent.
+    let deliveryPending = true;
+    try {
+      deliveryPending = Boolean(await readPendingCheckout());
+    } catch {
+      // An unreadable recovery record must not invite another payment.
+    }
+    Alert.alert(
+      deliveryPending ? 'Payment confirmation or delivery pending' : 'Purchase unavailable',
+      deliveryPending
+        ? 'Your checkout needs confirmation or delivery. Do not buy it again or clear app data. Reopen the original career while online. If the rewards are still missing, contact support with your Google Play order ID.'
+        : (PURCHASE_ERROR_MESSAGE[error ?? ''] ?? error ?? 'The request could not be completed.'),
+    );
+  };
+
   const completePurchase = async (p: purchases.Product) => {
     if (busy != null) return;
-    if (!useCareer.getState().save) {
+    const purchaseSave = useCareer.getState().save;
+    if (!purchaseSave) {
       Alert.alert('Open a career', PURCHASE_ERROR_MESSAGE.no_save);
       return;
     }
@@ -430,16 +455,55 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
     try {
       const res = await purchaseProduct(p.id);
       if (res.ok && p.id === 'starter_pack') setStarterPackOwned(true);
+      if (!res.ok) {
+        await reportPurchaseFailure(res.error);
+        return;
+      }
+      // Payment delivery has already succeeded locally. Start the account
+      // backup promptly, but never report a network backup failure as another
+      // purchase failure or invite the customer to pay again.
+      void syncAccountCareers(false).catch(() => undefined);
+      const targetCareer = useCareer.getState().save?.id === purchaseSave.id ? 'this career'
+        : `the original ${purchaseSave.mode === 'career' ? 'Player' : 'Manager'} career`;
       Alert.alert(
-        res.ok ? 'Purchase complete ✓' : 'Purchase failed',
-        res.ok
-          ? purchases.isSaveSponsorProduct(p.id)
-            ? `${p.title} is now bound to this save.`
-            : `${p.title} applied to this career.`
-          : (PURCHASE_ERROR_MESSAGE[res.error ?? ''] ?? res.error ?? 'Please try again.'),
+        'Purchase complete ✓',
+        purchases.isSaveSponsorProduct(p.id)
+          ? `${p.title} is now bound to ${targetCareer}.`
+          : `${p.title} applied to ${targetCareer}.`,
       );
     } catch {
-      Alert.alert('Purchase unavailable', 'Could not complete the request. Check your connection and try again.');
+      await reportPurchaseFailure();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onCheckPendingPurchase = async () => {
+    if (busy != null) return;
+    setBusy('check_pending_purchase');
+    try {
+      // This only reconciles the existing receipt into its original career.
+      // It never opens checkout or restores arbitrary historical consumables.
+      const result = await useCareer.getState().recoverPendingPurchases();
+      if (result.status === 'NOT_PURCHASED') {
+        Alert.alert('Checkout no longer pending',
+          'Google Play has no pending or undelivered order and fresh purchase history contains no new payment. Nothing was granted. You can use the Store again. If your payment history shows a charge, contact support before buying again.');
+        return;
+      }
+      if (result.status === 'NONE') {
+        Alert.alert('No pending checkout recorded',
+          'There is no recoverable checkout recorded on this device. If a paid pack is missing, contact support with your order ID. Do not buy it again.');
+        return;
+      }
+      if (result.status !== 'DELIVERED') {
+        await reportPurchaseFailure('purchase_delivery_pending');
+        return;
+      }
+      setStarterPackOwned(await accountPurchases.hasStarterPackPurchase());
+      Alert.alert('Purchase recovered',
+        `The pending purchase was saved to its original ${result.mode === 'career' ? 'Player' : 'Manager'} career. No new payment was made.`);
+    } catch {
+      await reportPurchaseFailure('purchase_delivery_pending');
     } finally {
       setBusy(null);
     }
@@ -1322,6 +1386,19 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
               <Text style={styles.restoreHint}>Complimentary review access. No purchase or charge.</Text>
             </> : null}
             <Button
+              label="Check pending purchase"
+              variant="secondary"
+              size="sm"
+              fullWidth
+              loading={busy === 'check_pending_purchase'}
+              disabled={busy != null}
+              onPress={() => void onCheckPendingPurchase()}
+              style={styles.restoreButton}
+            />
+            <Text style={styles.restoreHint}>
+              Checks unfinished checkout delivery without making another payment.
+            </Text>
+            <Button
               label="Restore Purchases"
               variant="secondary"
               size="sm"
@@ -1339,6 +1416,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
           </View>
         </>
       )}
+      <AccountBackupCard onSignIn={() => navigation.navigate('Login')} />
     </Screen>
   );
 }

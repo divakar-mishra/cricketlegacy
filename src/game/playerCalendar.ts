@@ -311,8 +311,15 @@ function youthCalendar(save: SaveGame, year: number): PlayerCalendarEvent[] {
 function synchronizeCursor(save: SaveGame): PlayerCalendarState | undefined {
   const state = save.playerCalendar;
   if (!state) return undefined;
-  for (const item of state.events) {
-    if (item.fixtureId && save.fixtures[item.fixtureId]?.played) item.completed = true;
+  state.cursor = Number.isFinite(state.cursor)
+    ? Math.max(0, Math.min(state.events.length, Math.floor(state.cursor)))
+    : 0;
+  for (const [index, item] of state.events.entries()) {
+    if (!item.fixtureId) continue;
+    // Fixture results own match completion, not a stale saved calendar flag.
+    // Rewind only for an unplayed match; never re-grant completed weekly events.
+    item.completed = Boolean(save.fixtures[item.fixtureId]?.played);
+    if (!item.completed && index < state.cursor) state.cursor = index;
   }
   while (state.cursor < state.events.length && state.events[state.cursor].completed) {
     state.cursor += 1;

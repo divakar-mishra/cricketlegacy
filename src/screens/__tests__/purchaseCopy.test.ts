@@ -29,6 +29,28 @@ const walletBar = fs.readFileSync(
 );
 
 describe('purchase screen copy', () => {
+  it('offers pending-delivery recovery separately from checkout and permanent-product restore', () => {
+    expect(purchaseScreen).toContain('label="Check pending purchase"');
+    expect(purchaseScreen).toContain('Checks unfinished checkout delivery without making another payment.');
+    const handler = purchaseScreen.slice(purchaseScreen.indexOf('const onCheckPendingPurchase ='),
+      purchaseScreen.indexOf('const onRestorePurchases ='));
+    expect(handler).toContain('await useCareer.getState().recoverPendingPurchases()');
+    expect(handler).toContain("if (result.status !== 'DELIVERED')");
+    expect(handler).toContain('No pending checkout recorded');
+    expect(handler).toContain('No new payment was made.');
+    expect(handler).not.toContain('purchaseProduct(');
+    expect(handler).not.toContain('restorePurchases(');
+  });
+
+  it('does not describe unresolved paid delivery as a failed charge or invite another payment', () => {
+    expect(purchaseScreen).toContain('await readPendingCheckout()');
+    expect(purchaseScreen).toContain('Payment confirmation or delivery pending');
+    expect(purchaseScreen).toContain('Do not buy it again or clear app data.');
+    expect(purchaseScreen).toContain('Another payment was not started.');
+    expect(purchaseScreen).toContain('await reportPurchaseFailure(res.error)');
+    expect(purchaseScreen).not.toContain("'Purchase failed'");
+  });
+
   it('uses the active platform store and exposes a guarded restore action', () => {
     expect(purchaseScreen).toContain("Platform.OS === 'ios' ? 'App Store' : 'Google Play'");
     expect(purchaseScreen).toContain('Purchases handled by {storeName}');

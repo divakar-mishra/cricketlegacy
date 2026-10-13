@@ -172,7 +172,7 @@ export function WageBreakdownScreen({ navigation }: ScreenProps<'WageBreakdown'>
             player={player}
             wageCap={wageCap}
             userPlayerId={save.userPlayerId}
-            canRenew={isManager && player.id !== save.userPlayerId}
+            canRenew={isManager && !player.loanedFrom && player.id !== save.userPlayerId}
             onRenew={onRenew}
           />
         )}

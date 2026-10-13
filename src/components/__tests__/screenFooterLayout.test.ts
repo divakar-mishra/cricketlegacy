@@ -10,12 +10,13 @@ describe('shared screen footer layout', () => {
     expect(screen).not.toContain('onLayout=');
     expect(screen).toContain('flexShrink: 0');
     expect(screen).toContain('{inner}');
-    expect(screen).toContain('{footer ? <View style={footerStyle}>{footer}</View> : null}');
+    expect(screen).toContain('<View style={footerStyle}>');
+    expect(screen).toContain('<View style={[contentWidthStyle, { paddingHorizontal: hPad }]}>{footer}</View>');
   });
 
   it('keeps the scroll viewport below the status bar while content moves', () => {
     expect(screen).toContain('import { SafeAreaView, useSafeAreaInsets }');
-    expect(screen).toContain("<SafeAreaView style={styles.fill} edges={['top']}>\n        {inner}");
+    expect(screen).toContain("edges={footer ? ['top', 'left', 'right'] : ['top', 'left', 'right', 'bottom']}");
     expect(screen).not.toContain('paddingTop: insets.top');
     expect(screen).toContain('Math.max(insets.bottom, spacing.md)');
   });

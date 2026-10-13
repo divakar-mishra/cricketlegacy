@@ -8,6 +8,7 @@
  */
 
 import { Platform } from 'react-native';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import type { Entitlements, Wallet } from '../domain/types';
 import { currentRecoverableSupabaseUserId } from './supabaseClient';
 
@@ -37,6 +38,99 @@ let _rcAppUserId: string | null = null;
 let _rcIdentityEpoch = 0;
 let _rcIdentitySync: Promise<boolean> | null = null;
 let _rcKeys: { ios?: string; android?: string } = {};
+
+export interface PurchaseRecoverySnapshot {
+  accountId: string;
+  /** Provider-owned original identity, not a locally inferred login alias. */
+  originalAccountId?: string;
+  /** Provider time avoids a fast device clock excluding a real receipt. */
+  observedAt?: number;
+  activeProductIds?: string[];
+  transactions: { token: string; productId: string; purchasedAt: number }[];
+}
+
+/** Resolves only an unpaid one-time checkout, not a lost/ambiguous paid grant.
+ * Missing SDK history alone is NOT cancellation evidence. Google Play must
+ * report no unfinished inventory before AND after an uncached, online provider
+ * read. RevenueCat consumes coins only after successfully posting the receipt,
+ * so a paid order is either still in Play inventory or in provider history.
+ * No SDK sync/restore, consumption, account transfer or new payment is invoked.
+ */
+export async function isCheckoutNoLongerPayable(intent: {
+  accountId: string; productId: string; previousTransactions: string[]; result?: PurchaseResult;
+}): Promise<boolean> {
+  if (MOCK_MODE || Platform.OS !== 'android' || intent.result ||
+      storeProductCategory(intent.productId) !== 'NON_SUBSCRIPTION' ||
+      !(await synchronizePurchaseIdentity()) || _rcAppUserId !== intent.accountId) return false;
+  const accountId = _rcAppUserId;
+  const epoch = _rcIdentityEpoch;
+  const apiKey = _rcKeys.android;
+  if (!apiKey) return false;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const probe = requireOptionalNativeModule<{
+      hasUnfinishedPurchase(productId: string): Promise<boolean>;
+    }>('PlayCheckoutStatusModule');
+    if (!probe) return false;
+    if (await probe.hasUnfinishedPurchase(intent.productId) !== false) return false;
+    // Direct HTTPS read deliberately cannot fall back to cached/offline SDK info.
+    // This is the existing public SDK key, never a RevenueCat secret/admin key.
+    const response = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(accountId)}`, {
+      headers: { Authorization: `Bearer ${apiKey}`, 'Cache-Control': 'no-cache', 'X-Platform': 'android' },
+      signal: controller.signal,
+    });
+    if (!response.ok) return false;
+    const body = await response.json();
+    const history = body?.subscriber?.non_subscriptions;
+    if (!Number.isFinite(body?.request_date_ms) || !history || typeof history !== 'object' || Array.isArray(history)) return false;
+    for (const [productId, rows] of Object.entries(history)) {
+      if (productId.split(':')[0] !== intent.productId) continue;
+      if (!Array.isArray(rows)) return false;
+      // Even a new receipt with a malformed/older date is unresolved paid
+      // evidence. Do not silently discard it based on clock/timestamp guesses.
+      if (rows.some(row => typeof row?.id !== 'string' || !intent.previousTransactions.includes(row.id))) return false;
+    }
+    if (await probe.hasUnfinishedPurchase(intent.productId) !== false) return false;
+    // Revalidate login after native/network awaits, including a sign-in started
+    // during the last probe. A changed provider identity cannot clear the intent.
+    return await synchronizePurchaseIdentity() && epoch === _rcIdentityEpoch && accountId === _rcAppUserId;
+  } catch { return false; }
+  finally { clearTimeout(timeout); }
+}
+
+/** Read provider-confirmed history only to reconcile a pre-existing checkout intent.
+ * This is not Restore Purchases and must never grant arbitrary historical packs.
+ */
+export async function getPurchaseRecoverySnapshot(): Promise<PurchaseRecoverySnapshot | null> {
+  if (MOCK_MODE) return { accountId: 'LOCAL_MOCK', transactions: [] };
+  if (!(await synchronizePurchaseIdentity())) return null;
+  const RC = loadRevenueCat();
+  const accountId = _rcAppUserId;
+  const epoch = _rcIdentityEpoch;
+  if (!RC || !accountId) return null;
+  try {
+    await RC.invalidateCustomerInfoCache();
+    const info = await RC.getCustomerInfo();
+    if (epoch !== _rcIdentityEpoch || accountId !== _rcAppUserId ||
+        !Array.isArray(info.nonSubscriptionTransactions)) return null;
+    const transactions = info.nonSubscriptionTransactions.flatMap((t: {
+      transactionIdentifier?: string; productIdentifier?: string; purchaseDate?: string;
+    }) => {
+      const token = t.transactionIdentifier?.trim();
+      const purchasedAt = Date.parse(t.purchaseDate ?? '');
+      return token && t.productIdentifier && Number.isFinite(purchasedAt)
+        ? [{ token, productId: t.productIdentifier, purchasedAt }] : [];
+    });
+    const observedAt = Date.parse(info.requestDate ?? '');
+    if (!Number.isFinite(observedAt)) return null;
+    const originalAccountId = typeof info.originalAppUserId === 'string'
+      ? info.originalAppUserId.trim() : '';
+    return { accountId, transactions, observedAt,
+      ...(originalAccountId ? { originalAccountId } : {}),
+      activeProductIds: restorableProductIdsFromCustomerInfo(info) };
+  } catch { return null; }
+}
 
 function loadRevenueCat(): RevenueCatModule | null {
   if (_rc !== undefined) return _rc;
@@ -246,6 +340,8 @@ export interface PurchaseResult {
     willRenew?: boolean;
   };
   error?: string;
+  /** Definitive failure before the native checkout was invoked. */
+  checkoutNotStarted?: boolean;
 }
 
 interface ProviderEntitlement {
@@ -622,7 +718,7 @@ export async function getProducts(): Promise<ExtendedProduct[]> {
  * In {@link MOCK_MODE} this resolves `ok: true` for any known product so the
  * downstream entitlement/wallet flow can be tested without a store.
  */
-export async function purchase(productId: string): Promise<PurchaseResult> {
+export async function purchase(productId: string, expectedAccountId?: string): Promise<PurchaseResult> {
   // The unreleased standalone refill was merged into Mental Coaching.
   if (productId === 'energy_refill') {
     return { ok: false, productId, error: 'retired_product' };
@@ -674,15 +770,23 @@ export async function purchase(productId: string): Promise<PurchaseResult> {
   const RC = loadRevenueCat();
   if (!RC || !_rcConfigured) return { ok: false, productId, error: 'not_configured' };
 
+  let checkoutStarted = false;
   try {
     const purchaseAccountId = _rcAppUserId;
     const purchaseEpoch = _rcIdentityEpoch;
+    if (expectedAccountId && expectedAccountId !== purchaseAccountId) {
+      return { ok: false, productId, error: 'purchase_account_changed', checkoutNotStarted: true };
+    }
     if (isRestorableProduct(productId) && activeProviderEntitlement(await RC.getCustomerInfo(), productId)) {
       return { ok: false, productId, error: 'already_owned_restore_purchases' };
     }
     const store = await fetchStoreProducts(RC, [productId]);
     const sku = store.find((s) => s.identifier === productId);
     if (!sku) return { ok: false, productId, error: 'unavailable' };
+    if (purchaseEpoch !== _rcIdentityEpoch || purchaseAccountId !== _rcAppUserId) {
+      return { ok: false, productId, error: 'purchase_account_changed', checkoutNotStarted: true };
+    }
+    checkoutStarted = true;
     const result = await RC.purchaseStoreProduct(sku);
     if (purchaseEpoch !== _rcIdentityEpoch || purchaseAccountId !== _rcAppUserId) {
       return { ok: false, productId, error: 'purchase_account_changed' };
@@ -717,7 +821,7 @@ export async function purchase(productId: string): Promise<PurchaseResult> {
   } catch (e) {
     const err = e as { userCancelled?: boolean };
     if (err?.userCancelled) return { ok: false, productId, error: 'cancelled' };
-    return { ok: false, productId, error: describePurchaseError(e) };
+    return { ok: false, productId, error: describePurchaseError(e), checkoutNotStarted: !checkoutStarted };
   }
 }
 

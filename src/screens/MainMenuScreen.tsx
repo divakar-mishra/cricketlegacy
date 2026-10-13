@@ -15,6 +15,7 @@ import { purchases } from '../services';
 import { useCareer } from '../state/careerStore';
 import { useSettings } from '../state/settingsStore';
 import { getLastPlayed, ResolvedSave } from '../storage/saveGames';
+import { useAccountBackup } from '../services/accountRecovery';
 import {
   fonts,
   fontSize,
@@ -166,6 +167,7 @@ export function MainMenuScreen({ navigation }: ScreenProps<'MainMenu'>) {
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const t = useT();
+  const backupRefresh = useAccountBackup((state) => state.refresh);
 
   useFocusEffect(
     useCallback(() => {
@@ -177,7 +179,7 @@ export function MainMenuScreen({ navigation }: ScreenProps<'MainMenu'>) {
       return () => {
         alive = false;
       };
-    }, []),
+    }, [backupRefresh]),
   );
 
   const onContinue = () => {

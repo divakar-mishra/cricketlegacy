@@ -215,7 +215,7 @@ reserved for modals, hero cards and high-value moments.
 `Screen` is the shared full-screen wrapper:
 
 - safe-area top and bottom insets are respected;
-- horizontal padding is about 4.5% of viewport width, clamped to 12-24dp;
+- horizontal padding is about 4.5% of viewport width, clamped to 20-24dp so even existing 12dp scene bleeds retain at least 8dp at the edge;
 - padded content is centered and capped at 980dp;
 - scrolling screens hide the vertical indicator and disable overscroll;
 - Android scroll content is not aggressively clipped, avoiding disappearing

@@ -66,6 +66,7 @@ import { TransferDeadlineDayScreen } from './src/screens/TransferDeadlineDayScre
 import { YouthGraduateCeremonyScreen } from './src/screens/YouthGraduateCeremonyScreen';
 import { analytics, auth, crash, notifications, purchases } from './src/services';
 import { startTelemetry } from './src/services/telemetry';
+import { startAccountRecovery, syncAccountCareers } from './src/services/accountRecovery';
 import { useCareer } from './src/state/careerStore';
 import { useAppFonts, useTheme } from './src/theme';
 
@@ -106,6 +107,7 @@ export default function App() {
     // Best-effort platform wiring — all safe no-ops without the native side.
     crash.installGlobalHandler();
     const stopTelemetry = startTelemetry();
+    const stopAccountRecovery = startAccountRecovery();
     notifications.configureForegroundHandler();
     syncMusicWithSettings();
     analytics.logEvent(analytics.EVT.APP_OPEN);
@@ -113,12 +115,15 @@ export default function App() {
     void purchases.configurePurchases(MONETIZATION.revenueCat).catch(() => undefined);
     // Local sign-in hydration must not wait for the store's network handshake.
     void auth.rehydrateAuth().catch(() => undefined);
-    return stopTelemetry;
+    return () => { stopAccountRecovery(); stopTelemetry(); };
   }, [ageEligible]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
+        if (ageEligible) void syncAccountCareers(true).catch(() => undefined);
+        void useCareer.getState().recoverPendingPurchases();
+        void useCareer.getState().recoverPendingExchange();
         // Native timers pause with the app. Reconcile the UTC month as soon as
         // any screen returns to the foreground.
         void useCareer
@@ -132,10 +137,11 @@ export default function App() {
       void useCareer
         .getState()
         .persistCritical(true)
+        .then(() => ageEligible ? syncAccountCareers(false) : undefined)
         .catch(() => undefined);
     });
     return () => subscription.remove();
-  }, []);
+  }, [ageEligible]);
 
   useEffect(() => {
     if (passPeriodEndsAt == null || !Number.isFinite(passPeriodEndsAt)) return undefined;

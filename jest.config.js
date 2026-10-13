@@ -4,6 +4,7 @@ module.exports = {
     '^.+\\.[jt]sx?$': 'babel-jest',
   },
   testMatch: ['**/src/**/__tests__/**/*.test.ts'],
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/output/', '<rootDir>/test-artifacts/'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   moduleNameMapper: {
     '^expo/virtual/env$': '<rootDir>/src/test/expoVirtualEnv.js',

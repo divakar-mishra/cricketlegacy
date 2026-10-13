@@ -4,6 +4,7 @@ import { showShortageOffer } from '../components/showShortageOffer';
 import { FacilityScene } from '../components/FacilityScene';
 import { AppText as Text, Button, Card, Icon, Screen, ScreenHeader } from '../components';
 import { injuryLabel } from '../game/injuries';
+import { benefitsFromRecovery, recoveredCondition } from '../game/squadRecovery';
 import { managerControlledTeamId } from '../game/managerCalendar';
 import { ScreenProps } from '../navigation';
 import { useCareer } from '../state/careerStore';
@@ -75,13 +76,13 @@ export function MedicalCentreScreen({ navigation }: ScreenProps<'MedicalCentre'>
     player.condition ?? player.meta.fitness ?? 70;
   const averageCondition = average(squad.map(conditionFor));
   const injured = squad.filter((player) => Boolean(player.injury));
-  const lowCondition = squad.filter((player) => conditionFor(player) < RECOVERY_THRESHOLD);
+  const lowCondition = squad.filter((player) => !player.injury && conditionFor(player) < RECOVERY_THRESHOLD);
   const recoveryOfferVisible = lowCondition.length >= MINIMUM_TIRED_PLAYERS;
   const recoveryTokens = Math.max(0, save.inventory?.squad_recovery_token ?? 0);
-  const affected = squad.filter((player) => !player.injury);
+  const affected = squad.filter((player) => benefitsFromRecovery(player));
   const averageAfterRecovery = average(
     squad.map((player) =>
-      player.injury ? conditionFor(player) : Math.min(95, conditionFor(player) + 20),
+      player.injury ? conditionFor(player) : recoveredCondition(player),
     ),
   );
   const attention = squad
@@ -167,7 +168,7 @@ export function MedicalCentreScreen({ navigation }: ScreenProps<'MedicalCentre'>
           <Text style={[styles.statValue, lowCondition.length > 0 && styles.warningValue]}>
             {lowCondition.length}
           </Text>
-          <Text style={styles.statLabel}>Below {RECOVERY_THRESHOLD}</Text>
+          <Text style={styles.statLabel}>Eligible below {RECOVERY_THRESHOLD}</Text>
         </Card>
         <Card style={styles.statCard}>
           <Text style={[styles.statValue, injured.length > 0 && styles.dangerValue]}>
@@ -191,13 +192,15 @@ export function MedicalCentreScreen({ navigation }: ScreenProps<'MedicalCentre'>
             <Text style={styles.recoveryEffect}>
               {recoveryOfferVisible
                 ? 'Preview squad recovery'
-                : 'Available when at least 3 players are below 60 condition. Your tokens are kept until used.'}
+                : 'Requires at least 3 non-injured players below 60 condition. Tokens do not treat injuries. Your tokens are kept until used.'}
             </Text>
             <Button
               label={!recoveryOfferVisible
-                ? squad.length > 0 && squad.every((player) => conditionFor(player) >= 100)
+                ? injured.length > 0 && lowCondition.length === 0
+                  ? 'Tokens do not treat injuries'
+                  : squad.length > 0 && squad.every((player) => conditionFor(player) >= 100)
                   ? 'Squad already fit'
-                  : 'Recovery not needed yet'
+                  : 'Needs 3 tired non-injured players'
                 : recoveryTokens > 0 ? 'Preview recovery · 1 token' : 'Buy 1 recovery token'}
               disabled={!recoveryOfferVisible}
               variant={recoveryTokens > 0 ? 'secondary' : 'gold'}

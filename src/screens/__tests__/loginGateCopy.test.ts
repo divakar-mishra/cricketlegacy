@@ -28,7 +28,14 @@ describe('Login offline-first copy', () => {
 
   it('makes local-only persistence and offline guest play explicit', () => {
     expect(loginSource).toContain('Guest saves stay on this device');
-    expect(loginSource).toMatch(/Cloud save is\s+not available in this build/);
+    expect(loginSource).toContain('only after an account backup is confirmed');
+    expect(loginSource).toContain('confirm an account backup before uninstalling');
+    expect(loginSource).toContain('<AccountBackupCard');
+    expect(loginSource).not.toContain('Cloud save is unavailable');
+  });
+  it('offers returning Google users a sign-in path separate from guest identity linking', () => {
+    expect(loginSource).toContain('Sign in to existing Google account');
+    expect(loginSource).toContain('auth.signInGoogle({ existingAccount: true })');
   });
 
   it('warns that deleting local data also destroys save-bound sponsor ownership', () => {

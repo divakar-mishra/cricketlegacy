@@ -35,6 +35,7 @@ import { Player } from '../domain/types';
 import { SCOUT_FEE, superstarPrefersClub } from '../game/manager';
 import { MANAGER_FAST_TRACK_SCOUT_COINS } from '../game/managerResources';
 import {
+  clubTransferAccessReason,
   isTransferWindowOpen,
   rivalInterestCount,
   transferWindowLabel,
@@ -320,12 +321,27 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
     }
   }, []);
 
-  if (!save || !save.userTeamId) {
+  if (!save || !save.userTeamId || !save.teams[save.userTeamId]) {
     return (
       <Screen>
         <ScreenHeader title="Transfers" onBack={() => navigation.goBack()} />
         <Text style={styles.msg}>No active team.</Text>
         <Button label="Back" variant="secondary" onPress={() => navigation.goBack()} />
+      </Screen>
+    );
+  }
+
+  if (save.mode === 'career') {
+    return (
+      <Screen>
+        <ScreenHeader title="Player Career" onBack={() => navigation.navigate('CareerHub')} />
+        <Card>
+          <Text style={styles.msg}>
+            {clubTransferAccessReason(save)} Your own contract offers appear in Player Career.
+            Return there to continue your season.
+          </Text>
+          <Button label="Return to Player Career" onPress={() => navigation.navigate('CareerHub')} />
+        </Card>
       </Screen>
     );
   }
@@ -863,15 +879,15 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
         <Text style={styles.ovr}>{p.overall}</Text>
         {isOnLoan ? (
           <Button
-            label="Recall"
+            label={canRelease ? 'Return loan' : 'Keep legal XI'}
             size="sm"
             variant="ghost"
             fullWidth={false}
-            disabled={actionPending}
+            disabled={!canRelease || actionPending}
             onPress={() => {
               const ok = runTransferAction(`recall:${p.id}`, () => recallLoan(p.id));
               if (ok == null) return;
-              showFlash(ok ? `${p.name} recalled from loan` : 'Cannot recall.', ok);
+              showFlash(ok ? `${p.name} returned to their parent club` : 'Keep at least eleven players before returning a loan.', ok);
             }}
           />
         ) : (

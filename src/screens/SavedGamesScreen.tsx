@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import { Button, Card, Screen, ScreenHeader, SegmentedControl, AppText as Text } from '../components';
@@ -8,33 +8,50 @@ import { saveSubtitle, saveTitle } from '../game/saveMeta';
 import { isSeasonPassActive } from '../game/seasonPass';
 import { ScreenProps } from '../navigation';
 import { premiumSponsorSave } from '../services';
+import { assertNoPendingPurchaseForSlot } from '../services/purchaseRecovery';
 import { useCareer } from '../state/careerStore';
 import { BASE_MAX_SLOTS, deleteSave, listSlots, SlotView } from '../storage/saveGames';
 import { fontSize, fontWeight, spacing, ThemeColors, useThemedStyles } from '../theme';
+import { AccountBackupCard } from '../components/AccountBackupCard';
+import { useAccountBackup } from '../services/accountRecovery';
 
 export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
   const [mode, setMode] = useState<GameMode>('career');
-  const [slots, setSlots] = useState<SlotView[]>([]);
+  const [loaded, setLoaded] = useState<{ mode: GameMode; slots: SlotView[] } | null>(null);
+  const selectedMode = useRef(mode);
+  const refreshRequest = useRef(0);
+  // Encrypted loads are asynchronous. Never leave the previous mode's actions
+  // active while the new tab loads, or accept a late response for another tab.
+  const slots = loaded?.mode === mode ? loaded.slots : [];
   const setActive = useCareer((s) => s.setActive);
   const styles = useThemedStyles(makeStyles);
+  const backupRefresh = useAccountBackup((state) => state.refresh);
   const premiumSlotUnlocked = slots.some((entry) => isSeasonPassActive(entry.save ?? undefined));
 
   const refresh = useCallback(async () => {
-    setSlots(await listSlots(mode));
+    if (selectedMode.current !== mode) return;
+    const request = ++refreshRequest.current;
+    const next = await listSlots(mode);
+    if (request === refreshRequest.current && selectedMode.current === mode) {
+      setLoaded({ mode, slots: next });
+    }
   }, [mode]);
 
   useFocusEffect(
     useCallback(() => {
-      refresh();
-    }, [refresh]),
+      void refresh();
+      return () => { refreshRequest.current += 1; };
+    }, [refresh, backupRefresh]),
   );
 
   const onPlay = (save: SaveGame, slot: number) => {
-    setActive(save, mode, slot);
-    navigation.navigate(mode === 'career' ? 'CareerHub' : 'ManagerHub');
+    if (selectedMode.current !== mode || save.mode !== mode) return;
+    setActive(save, save.mode, slot);
+    navigation.navigate(save.mode === 'career' ? 'CareerHub' : 'ManagerHub');
   };
 
   const onDelete = (slot: number, save: SaveGame) => {
+    if (selectedMode.current !== mode || save.mode !== mode) return;
     const permanentSponsor = save.sponsorship?.premium;
     const permanentSponsorWarning = permanentSponsor
       ? permanentSponsor.purchaseToken.startsWith('mock:')
@@ -48,6 +65,8 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
         style: 'destructive',
         onPress: async () => {
           try {
+            // Check before any remote exact-save deletion as well as in storage.
+            await assertNoPendingPurchaseForSlot(mode, slot);
             if (save.sponsorship?.premium) {
               const result = await premiumSponsorSave.deletePremiumSponsorExactSave(save);
               if (result.status !== 'DELETED' && result.status !== 'LOCAL_ONLY') {
@@ -60,12 +79,15 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
                 return;
               }
             }
-            await deleteSave(mode, slot);
+            await deleteSave(mode, slot, save.id);
+            const active = useCareer.getState();
+            if (active.save?.id === save.id && active.ref?.mode === mode && active.ref?.slot === slot) active.clear();
             await refresh();
-          } catch {
+          } catch (error) {
             Alert.alert(
               'Save not deleted',
-              'The device did not confirm deletion. The save has been left in place.',
+              error instanceof Error ? error.message
+                : 'The device did not confirm deletion. The save has been left in place.',
             );
           }
         },
@@ -74,6 +96,7 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
   };
 
   const onNew = (slot: number) => {
+    if (selectedMode.current !== mode) return;
     if (mode === 'career') navigation.navigate('PlayerCreation', { slot });
     else navigation.navigate('TeamSelect', { slot });
   };
@@ -86,16 +109,20 @@ export function SavedGamesScreen({ navigation }: ScreenProps<'SavedGames'>) {
         onBack={() => navigation.goBack()}
       />
 
+      <AccountBackupCard onSignIn={() => navigation.navigate('Login')} />
+
       <SegmentedControl
         value={mode}
         options={[
           { value: 'career', label: 'Player' },
           { value: 'manager', label: 'Manager' },
         ]}
-        onChange={setMode}
+        onChange={(next) => { selectedMode.current = next; setMode(next); }}
         accessibilityLabel="Career mode"
         style={styles.tabs}
       />
+
+      {loaded?.mode !== mode ? <Text>Loading saves…</Text> : null}
 
       {slots.map(({ slot, save, unavailable }) => (
         <Card key={slot} style={styles.slot}>

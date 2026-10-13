@@ -38,8 +38,10 @@ export function NarrativeScreen({ navigation, route }: ScreenProps<'Narrative'>)
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [result, setResult] = React.useState<ResultView | null>(null);
+  const choosing = React.useRef(false);
 
   const rendered = save ? nextPendingEvent(save) : null;
+  const sequence = Number(save?.story?.flags.resolutionSequence ?? 0);
   const adviserAdvice = save && route.params?.adviser
     ? nextPlayerAdvice(save, nextUserFixtureId(save))
     : undefined;
@@ -72,12 +74,14 @@ export function NarrativeScreen({ navigation, route }: ScreenProps<'Narrative'>)
   };
 
   const onChoose = (choiceId: string) => {
-    if (!rendered) return;
-    const res = resolveStory(rendered.event.id, choiceId);
+    if (!rendered || !save || choosing.current) return;
+    choosing.current = true;
+    const res = resolveStory(rendered.event.id, choiceId, save.id, sequence);
+    if (!res.ok) choosing.current = false;
     if (res.ok) setResult({ text: res.resultText ?? '', applied: res.applied ?? [] });
   };
 
-  const onContinue = () => setResult(null);
+  const onContinue = () => { choosing.current = false; setResult(null); };
 
   if (!save) {
     return (

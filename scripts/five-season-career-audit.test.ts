@@ -130,7 +130,7 @@ const FULL_MANAGER_RUNS = Math.max(
   Math.floor(Number(process.env.CAREER_AUDIT_MANAGER_RUNS ?? 1)),
 );
 const FULL_CAREER_ROLES = new Set(
-  (process.env.CAREER_AUDIT_ROLES ?? 'BATTER,BOWLER,ALLROUNDER')
+  (process.env.CAREER_AUDIT_ROLES ?? 'BATTER,BOWLER,ALLROUNDER,WK_BATTER')
     .split(',')
     .map((role: string) => role.trim().toUpperCase())
     .filter(Boolean),
@@ -452,12 +452,13 @@ function resetStore(): void {
 }
 
 function createPlayerAuditSave(role: Role = 'ALLROUNDER', seed = PLAYER_SEED): SaveGame {
-  // Mirrors legal Grade A creation allocations. Specialists spend 150 points
-  // in their visible discipline/mental attributes; the All-Rounder spends 230.
-  const batter = role === 'BATTER';
+  // Mirrors legal Grade A creation allocations, including the wicketkeeper's
+  // separately visible keeping attribute; hidden disciplines stay at base 35.
+  const keeper = role === 'WK_BATTER';
+  const batter = role === 'BATTER' || keeper;
   const bowler = role === 'BOWLER';
   const player = buildUserPlayer({
-    name: `${role === 'ALLROUNDER' ? 'All-Rounder' : role === 'BATTER' ? 'Batter' : 'Bowler'} Audit`,
+    name: `${role === 'ALLROUNDER' ? 'All-Rounder' : keeper ? 'Wicket-Keeper' : batter ? 'Batter' : 'Bowler'} Audit`,
     nationality: 'india',
     role,
     battingStyle: 'RHB',
@@ -477,7 +478,7 @@ function createPlayerAuditSave(role: Role = 'ALLROUNDER', seed = PLAYER_SEED): S
       variations: bowler || role === 'ALLROUNDER' ? 50 : 35,
       stamina: bowler || role === 'ALLROUNDER' ? 50 : 35,
     },
-    fielding: { catching: 35, throwing: 35, agility: 35, keeping: 35 },
+    fielding: { catching: 35, throwing: 35, agility: 35, keeping: keeper ? 85 : 35 },
     meta: { fitness: 50, confidence: 50, aggression: 50, discipline: 50 },
     age: 16,
     attrScale: 0.52,
@@ -1094,7 +1095,7 @@ function runMode(
                 : calendarEvent.kind === 'NCA_CAMP'
                   ? 'ATTEND'
                   : undefined;
-          const outcome = useCareer.getState().resolvePlayerWeek(choice);
+          const outcome = useCareer.getState().resolvePlayerWeek(choice, calendarEvent.id, before.id);
           if (!outcome.ok) {
             errors.push(
               `player:${calendarEvent.id} could not resolve (${outcome.reason ?? 'unknown reason'}).`,
@@ -1621,12 +1622,13 @@ baselineAuditTest(
 );
 
 fullCareerAuditTest(
-  'runs Batter, Bowler, All-Rounder and Manager careers to canonical retirement',
+  'runs the requested Player roles and Manager careers to canonical retirement',
   () => {
     const playerRuns = [
       { role: 'BATTER' as const, seed: 81_001 },
       { role: 'BOWLER' as const, seed: 82_002 },
       { role: 'ALLROUNDER' as const, seed: 83_003 },
+      { role: 'WK_BATTER' as const, seed: 84_004 },
     ]
       .filter(({ role }) => FULL_CAREER_ROLES.has(role))
       .flatMap(({ role, seed: baseSeed }) =>
@@ -1651,6 +1653,11 @@ fullCareerAuditTest(
           });
         });
     const allAudits = [...playerRuns, ...managerRuns];
+    // Never certify a mistyped/unsupported role filter without running a career.
+    expect(allAudits.length).toBeGreaterThan(0);
+    for (const role of FULL_CAREER_ROLES) {
+      expect(playerRuns.some((audit) => audit.role === role)).toBe(true);
+    }
     const status = allAudits.every((audit) => audit.errors.length === 0 && audit.retired)
       ? 'PASS'
       : 'FAIL';

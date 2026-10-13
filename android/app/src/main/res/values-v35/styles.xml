@@ -1,0 +1,9 @@
+<resources>
+  <!-- Android 15+ owns edge-to-edge transparency; use insets and icon style,
+       not deprecated system-bar background colours or legacy cutout modes. -->
+  <style name="AppTheme" parent="BaseAppTheme">
+    <item name="android:windowLayoutInDisplayCutoutMode">always</item>
+    <item name="android:windowLightStatusBar">false</item>
+    <item name="android:windowLightNavigationBar">false</item>
+  </style>
+</resources>

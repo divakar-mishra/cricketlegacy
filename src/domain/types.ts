@@ -1197,7 +1197,7 @@ export interface ManagerJobOffer {
 }
 
 /** Current canonical save schema. Bump + add a migration on any shape change. */
-export const SAVE_SCHEMA_VERSION = 44;
+export const SAVE_SCHEMA_VERSION = 45;
 
 export type CareerArchetype = 'PRODIGY' | 'LATE_BLOOMER' | 'SPECIALIST' | 'COMEBACK';
 export type CoachPersonality = 'DEVELOPER' | 'TACTICIAN' | 'DISCIPLINARIAN' | 'MENTOR';
@@ -1418,6 +1418,8 @@ export interface LastSeasonSettlement {
 }
 
 export interface SaveGame {
+  /** Monotonic domestic-fixture clock across seasons/clubs for recovery cooldowns. */
+  recoveryCompletedFixtures?: number;
   schemaVersion: number; // bump + migrate on change
   id: string;
   mode: GameMode;

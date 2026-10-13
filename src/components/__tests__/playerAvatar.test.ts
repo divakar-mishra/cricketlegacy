@@ -44,7 +44,7 @@ describe('fixed player portraits', () => {
     expect(rendererSource).toContain("width: '100%'");
     expect(rendererSource).toContain('<ProfileFrame frameId={activeFrame} size={size} />');
     expect(frameSource).toContain("frameId === 'frame_gold'");
-    expect(frameSource).toContain('stroke="#24D63B"');
+    expect(frameSource).toContain("stroke={warm ? '#82735B' : '#24D63B'}");
     expect(frameSource).toContain('legend-engraved-frame');
     expect(frameSource).toContain('vip-segmented-frame');
     expect(rendererSource).toContain('const borderRadius = size / 2');

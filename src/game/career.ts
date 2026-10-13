@@ -746,9 +746,17 @@ export function userContractExpiring(save: SaveGame): boolean {
 }
 
 export interface ContractOffer {
+  /** Binds a rendered offer to this save, club, season and expiring contract. */
+  renewalKey?: string;
   wage: number;
   years: number;
   signingBonus: number; // paid to the player in coins on signing
+}
+
+export function contractRenewalKey(save: SaveGame): string {
+  const contract = save.userPlayerId ? save.players[save.userPlayerId]?.contract : undefined;
+  return JSON.stringify([save.id, save.userPlayerId, save.userTeamId, save.currentSeasonId,
+    contract?.wage, contract?.yearsLeft]);
 }
 
 /** Contract money is offered in readable 500-coin steps. */
@@ -772,7 +780,7 @@ export function contractOffer(save: SaveGame): ContractOffer {
     ((user.overall - 40) * 22 * tierMult + (save.userCaps ?? 0) * 8) * relationshipMult,
   );
   const years = user.overall >= 72 ? 3 : 2;
-  return { wage, years, signingBonus };
+  return { wage, years, signingBonus, renewalKey: contractRenewalKey(save) };
 }
 
 /** Accept a renewal: sets the contract and returns the coin signing bonus. */
@@ -862,6 +870,7 @@ export function negotiateContract(
   if (rng() < pAccept) {
     // Club accepts!
     const finalOffer: ContractOffer = {
+      renewalKey: base.renewalKey,
       wage: demandedWage,
       years: demandedYears,
       signingBonus: roundContractCoins(Math.max(base.signingBonus, demandedBonus)),
@@ -879,6 +888,7 @@ export function negotiateContract(
   // Club sends a counter at roughly halfway between original and demand.
   const counterWage = roundContractCoins(base.wage + (demandedWage - base.wage) * 0.45);
   const counter: ContractOffer = {
+    renewalKey: base.renewalKey,
     wage: counterWage,
     years: demandedYears,
     signingBonus: roundContractCoins(base.signingBonus * 1.12),
@@ -908,6 +918,7 @@ export function holdOut(save: SaveGame): ContractOffer {
   const base = contractOffer(save);
   return {
     wage: roundContractCoins(base.wage * 1.1),
+    renewalKey: base.renewalKey,
     years: base.years,
     signingBonus: roundContractCoins(base.signingBonus * 1.25),
   };

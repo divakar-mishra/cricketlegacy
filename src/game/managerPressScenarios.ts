@@ -1,4 +1,16 @@
 import type { MgrEvent, MgrEffect, MgrTrigger } from './managerEvents';
+import type { SaveGame } from '../domain/types';
+
+function venueMatches(save: SaveGame, away: boolean): boolean {
+  const teamId = save.managerCareerLevel === 'NATIONAL' ? save.managerNationalTeamId : save.userTeamId;
+  if (!teamId) return false;
+  const season = save.currentSeasonId ? save.seasons[save.currentSeasonId] : undefined;
+  // Calendar order is canonical across competitions; don't compare their round numbers.
+  const fixtures = (season?.fixtureIds ?? []).map(id => save.fixtures[id])
+    .filter(f => f?.played && (f.homeTeamId === teamId || f.awayTeamId === teamId));
+  const latest = fixtures[fixtures.length - 1];
+  return Boolean(latest && (away ? latest.awayTeamId === teamId : latest.homeTeamId === teamId));
+}
 
 type PressLine = readonly [string, string, MgrTrigger, string, string, string, string, string];
 
@@ -74,6 +86,8 @@ export const MANAGER_PRESS_SCENARIOS: MgrEvent[] = LINES.map((line, index) => {
     trigger,
     speaker: 'Press Room',
     weight: 1,
+    condition: id === 'away_win' || id === 'travel_fatigue' ? save => venueMatches(save, true)
+      : id === 'home_expectation' ? save => venueMatches(save, false) : undefined,
     body,
     choices: [
       { id: 'first', label: firstLabel, effects: firstEffects, resultText: firstResult },

@@ -602,7 +602,8 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     navigation.navigate('AcademyManagement');
   };
   const resolveCalendar = (choice?: PlayerCalendarChoice) => {
-    const result = resolvePlayerWeek(choice);
+    if (!calendarEvent) return;
+    const result = resolvePlayerWeek(choice, calendarEvent.id, save.id);
     if (result.ok && result.outcome) {
       setContractFlash(result.outcome);
       timers.schedule('contract-flash', () => setContractFlash(null), 2400);
@@ -657,9 +658,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         break;
       case 'ADVANCE_CAREER_CALENDAR':
         advanceSeason();
-        break;
-      case 'OPEN_TRANSFERS':
-        navigation.navigate('Transfers');
         break;
       case 'OPEN_TRAINING':
         navigation.navigate('Training');

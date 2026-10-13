@@ -521,7 +521,11 @@ function fmt(label: string, delta: number, goodWhenPositive = true): AppliedEffe
 
 export function applyMgrEffects(save: SaveGame, e: MgrEffect): AppliedEffect[] {
   const out: AppliedEffect[] = [];
-  const team = save.userTeamId ? save.teams[save.userTeamId] : undefined;
+  const national = save.managerCareerLevel === 'NATIONAL';
+  const teamId = national ? save.managerNationalTeamId : save.userTeamId;
+  const team = teamId ? save.teams[teamId] : undefined;
+  const retainedClubPlayers = new Set(national && save.userTeamId
+    ? save.teams[save.userTeamId]?.playerIds ?? [] : []);
   if (e.boardConfidence != null) {
     const protectedDelta =
       (save.managerGraceMatchesRemaining ?? 0) > 0 && e.boardConfidence < 0 ? 0 : e.boardConfidence;
@@ -530,9 +534,9 @@ export function applyMgrEffects(save: SaveGame, e: MgrEffect): AppliedEffect[] {
   }
   if (team && e.reputation != null) {
     team.reputation = clamp(team.reputation + e.reputation, 40, 95);
-    out.push(fmt('Club reputation', e.reputation));
+    out.push(fmt(national ? 'Team reputation' : 'Club reputation', e.reputation));
   }
-  if (team && e.budget) {
+  if (team && !national && e.budget) {
     team.budget = Math.max(0, team.budget + e.budget);
     out.push({
       label: `${e.budget > 0 ? '+' : ''}${Math.round(e.budget / 1000)}k budget`,
@@ -541,6 +545,9 @@ export function applyMgrEffects(save: SaveGame, e: MgrEffect): AppliedEffect[] {
   }
   if (team && (e.squadMorale != null || e.squadForm != null)) {
     for (const id of team.playerIds) {
+      // A national XI can share player IDs with domestic squads. The retained
+      // club is frozen during national duty, including those shared records.
+      if (retainedClubPlayers.has(id)) continue;
       const p = save.players[id];
       if (!p) continue;
       if (e.squadMorale != null) p.morale = clamp((p.morale ?? 70) + e.squadMorale, 0, 100);
@@ -646,6 +653,7 @@ export function resolveManagerChoice(
   eventId: string,
   choiceId: string,
 ): MgrChoiceResult {
+  if (save.mode !== 'manager' || save.managerStory?.pendingEventIds[0] !== eventId) return { ok: false };
   const ev = MANAGER_EVENTS.find((e) => e.id === eventId);
   const choice = ev?.choices.find((c) => c.id === choiceId);
   if (!ev || !choice) return { ok: false };
@@ -659,5 +667,6 @@ export function resolveManagerChoice(
   if (choice.nextEventId && !save.managerStory!.pendingEventIds.includes(choice.nextEventId)) {
     save.managerStory!.pendingEventIds.push(choice.nextEventId);
   }
+  save.managerStory!.flags.resolutionSequence = Number(save.managerStory!.flags.resolutionSequence ?? 0) + 1;
   return { ok: true, resultText: renderMgr(choice.resultText, save), applied };
 }

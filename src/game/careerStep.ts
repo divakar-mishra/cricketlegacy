@@ -36,7 +36,6 @@ export type CareerStepAction =
   | 'RESOLVE_CALENDAR'
   | 'PLAY_MATCH'
   | 'SIMULATE_MATCH'
-  | 'OPEN_TRANSFERS'
   | 'ADVANCE_SEASON'
   | 'ADVANCE_CAREER_CALENDAR'
   | 'ACKNOWLEDGE_PROMOTION'
@@ -189,16 +188,8 @@ function resolvePlayerStep(save: SaveGame, context: CareerStepContext): Resolved
     };
   }
 
-  if ((save.currentMonth ?? 1) >= 6 && (save.currentMonth ?? 1) <= 8) {
-    return {
-      mode: 'career',
-      type: CareerStepType.OFFSEASON_TRANSFER,
-      action: 'OPEN_TRANSFERS',
-      title: 'Off-season window',
-      detail: 'Contracts, transfers and recovery are available before the next campaign.',
-    };
-  }
-
+  // An exhausted player calendar can still have AI league/playoff results to
+  // settle. Month alone must never send the player to club squad management.
   return {
     mode: 'career',
     type: CareerStepType.CALENDAR_ADVANCE,
@@ -257,7 +248,7 @@ function resolveManagerStep(save: SaveGame): ResolvedManagerStep {
     };
   }
   const progress = save.managerCalendar ? managerPhaseProgress(save) : undefined;
-  if (progress?.phase === 'OFF_SEASON') {
+  if (progress?.phase === 'OFF_SEASON' && seasonComplete(save)) {
     return {
       mode: 'manager',
       type: ManagerStepType.OFFSEASON,
@@ -272,11 +263,22 @@ function resolveManagerStep(save: SaveGame): ResolvedManagerStep {
       mode: 'manager',
       type: ManagerStepType.CALENDAR_ADVANCE,
       action: 'ADVANCE_MANAGER_CALENDAR',
-      title: progress.unlocked ? `Advance ${progress.label}` : `Simulate ${progress.label}`,
+      title: progress.phase === 'OFF_SEASON'
+        ? 'Complete off-season calendar'
+        : progress.unlocked ? `Advance ${progress.label}` : `Simulate ${progress.label}`,
       detail: progress.unlocked
         ? 'Simulate other clubs until your next required fixture.'
         : 'This locked competition runs in the background.',
       phase: progress.phase,
+    };
+  }
+  if (!seasonComplete(save)) {
+    return {
+      mode: 'manager',
+      type: ManagerStepType.CALENDAR_ADVANCE,
+      action: 'ADVANCE_CAREER_CALENDAR',
+      title: 'Complete remaining league fixtures',
+      detail: 'Settle other clubs and the knockout bracket before the season review.',
     };
   }
   return {

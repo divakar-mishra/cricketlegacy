@@ -196,7 +196,9 @@ export function releasePlayer(save: SaveGame, playerId: string): ReleaseOutcome 
     return { ok: false, recouped: 0, reason: 'You cannot release yourself.' };
   if (!team.playerIds.includes(playerId))
     return { ok: false, recouped: 0, reason: 'Not in your squad.' };
-  if (team.playerIds.length <= MIN_SQUAD)
+  if (save.players[playerId]?.loanedFrom)
+    return { ok: false, recouped: 0, reason: 'Borrowed players must be returned through Return loan, not sold or released.' };
+  if ([...new Set(team.playerIds)].filter(id => Boolean(save.players[id])).length <= MIN_SQUAD)
     return { ok: false, recouped: 0, reason: 'Squad at minimum size.' };
 
   const recouped = Math.round(computeValue(save.players[playerId]) * 0.5);

@@ -488,12 +488,11 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
       case 'ADVANCE_MANAGER_CALENDAR':
         advanceCalendarBlock();
         break;
+      case 'ADVANCE_CAREER_CALENDAR':
+        advanceSeason();
+        break;
       case 'ADVANCE_SEASON':
-        if (nextStep.mode === 'manager' && nextStep.type === ManagerStepType.OFFSEASON) {
-          startNextSeason();
-        } else {
-          advanceSeason();
-        }
+        startNextSeason();
         break;
       case 'OPEN_JOB_SEARCH':
         Alert.alert('Club appointments', 'Select a club below.');

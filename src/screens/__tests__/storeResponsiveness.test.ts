@@ -14,7 +14,8 @@ describe('Store prerequisites and background work', () => {
   });
   it('blocks purchases without a save and translates stale no-save errors', () => {
     expect(screen).toContain('const available = hasSave &&');
-    expect(screen).toContain('if (!useCareer.getState().save)');
+    expect(screen).toContain('const purchaseSave = useCareer.getState().save');
+    expect(screen).toContain('if (!purchaseSave)');
     expect(screen).toContain("no_save: 'Open a career before making a purchase.'");
     expect(screen).toContain(
       'disabled={!save || busy != null || !purchases.isProductAvailable(legendProduct)}',

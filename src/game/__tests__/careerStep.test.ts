@@ -6,9 +6,52 @@ import { advisorVisitKey, nextPlayerAdvice } from '../playerAdvisor';
 import { synchronizeCareerPromotion } from '../careerTransition';
 import { buildPlayerSeasonCalendar } from '../playerCalendar';
 import { generateYouthFixtures, YOUTH_COMP_U19 } from '../youthFixtures';
+import { isTransferWindowOpen } from '../transferMarket';
 import { makeCareerSave, makeManagerSave } from './_depthHelpers';
 
 describe('career next-step resolver', () => {
+  test.each([6, 7, 8])('an exhausted Player calendar in month %i can advance without club transfers', (month) => {
+    const save = makeCareerSave();
+    save.careerPathLevel = 'DOMESTIC';
+    save.players[save.userPlayerId!].age = 21;
+    save.wallet.coins = 0;
+    if (save.story) save.story.pendingEventIds = [];
+    // All the player's fixtures/events are done, but other clubs still have
+    // league matches to settle. This is a valid existing-save state.
+    const calendar = buildPlayerSeasonCalendar(save)!;
+    for (const event of calendar.events) {
+      event.completed = true;
+      if (event.fixtureId) save.fixtures[event.fixtureId].played = true;
+    }
+    save.currentMonth = month;
+    if (month === 8) expect(isTransferWindowOpen(save)).toBe(false);
+
+    expect(resolveNextCareerStep(save)).toMatchObject({
+      type: CareerStepType.CALENDAR_ADVANCE,
+      action: 'ADVANCE_CAREER_CALENDAR',
+    });
+  });
+
+  test('the actual Player contract week remains skippable without buying or signing anyone', () => {
+    const save = makeCareerSave();
+    save.careerPathLevel = 'DOMESTIC';
+    save.wallet.coins = 0;
+    save.wallet.gems = 0;
+    if (save.story) save.story.pendingEventIds = [];
+    const calendar = buildPlayerSeasonCalendar(save)!;
+    for (const event of calendar.events) {
+      if (event.kind === 'TRANSFER_WINDOW') continue;
+      event.completed = true;
+      if (event.fixtureId) save.fixtures[event.fixtureId].played = true;
+    }
+    save.currentMonth = 8;
+    expect(resolveNextCareerStep(save)).toMatchObject({
+      type: CareerStepType.OFFSEASON_TRANSFER,
+      action: 'RESOLVE_CALENDAR',
+      calendarEvent: { kind: 'TRANSFER_WINDOW' },
+    });
+  });
+
   test('shows the exact age change on the season rollover action', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'careerStep.ts'), 'utf8');
     expect(source).toContain('title: `Season ${completedSeasonNumber} complete`');
