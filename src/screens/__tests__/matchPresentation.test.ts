@@ -9,6 +9,13 @@ describe('shared match presentation', () => {
   );
   const spriteSource = fs.readFileSync(path.join(__dirname, '..', '..', 'components', 'CricketerArtwork.tsx'), 'utf8');
 
+  it('binds the async result reward to the career that requested the ad', () => {
+    const handler = source.slice(source.indexOf('const rewardSaveId = save?.id;'), source.indexOf('{adError ?'));
+    expect(handler).toMatch(/const rewardSaveId = save\?\.id;[\s\S]*await ads\.showRewarded\(\)/);
+    expect(handler).toMatch(/grantAdReward\(\s*coinsAwarded,\s*`match-double:\$\{result.fixtureId\}`,\s*rewardSaveId,/);
+    expect(handler).toContain('The ad could not be completed. Please try again later.');
+  });
+
   it('keeps matchday dimensions and connects field, contact and score reveal to one clock', () => {
     expect(source).toContain('size={fastMatchUi ? Math.min(220, fieldWidth) : fieldWidth}');
     expect(source).toContain('playback={fieldPlayback}');
@@ -244,8 +251,11 @@ describe('shared match presentation', () => {
     );
   });
 
-  it('uses the dismissible first-match guide without a live coach-card overlay', () => {
-    expect(source).toContain('<FirstMatchGuide');
+  it('uses role-specific scene pointers instead of the old timed match modal', () => {
+    expect(source).toContain("'player.match.batting'");
+    expect(source).toContain("'player.match.bowling'");
+    expect(source).toContain('onActiveChange: setGuidePaused');
+    expect(source).not.toContain('<FirstMatchGuide');
     expect(source).not.toContain('<CoachTip');
     expect(source).not.toContain('tipShownThisMatchRef');
   });

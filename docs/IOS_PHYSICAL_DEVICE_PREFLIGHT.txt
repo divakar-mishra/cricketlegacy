@@ -1,0 +1,368 @@
+PHYSICAL IPHONE CONNECTION / SIGNING PREFLIGHT
+Focused device checks; not whole-app or store-release certification
+
+LATEST — MAIN-MENU RESPONSIVENESS REPORT REMAINS OPEN
+====================================================
+CURRENT UPDATE: Input QA 4 (Release 1.0.12/build 4) installed IN PLACE after
+owner-approved diagnostics isolated up to 5.347 seconds synchronous save UTF-8
+decoding. Candidate yields between 16 KiB standard streaming-decoder chunks;
+encryption/keys/checksums/format/backup/contents unchanged. 76 focused Jest +
+8 Node checks (actual Expo decoder included), root/candidate typecheck/lint
+pass. Full root293suites/2,210tests/2snapshots PASS. Phone listing/Back and
+both-list inspection pass; authenticated controls observed, Player6/Manager4.
+Strict old5-Player assertion failed; extra VIP slot dated today, origin unknown,
+left untouched. No exact original-save parity or manual responsiveness pass.
+Automation stopped, manual retest requested. No reset/sign-out/purchase/upload. Original
+nine-career Google recovery below is historical, NOT post-update preservation.
+Owner reports Saved Games freezes about 15 seconds with neither list visible;
+do not clear the issue until controlled and manual retests pass. Build-2 AX
+check failed before taps; build-3 listing check ended at MainMenu with possible
+manual/locator interference. Not lost data or controlled list timeout proof.
+Detailed evidence/current result: docs/IOS_RESPONSIVENESS_DIAGNOSIS_2026-10-24.txt.
+
+HISTORICAL BUILD-1 CHECKS (superseded install/update status):
+Owner confirms5–10taps needed even before a career, with popups closed and no
+automation. Treat as an unresolved iOS release blocker, not normal Debug lag;
+the installed game is a Release build.
+LATEST owner comparison: Cricket misses finger taps; iPhone Settings works
+normally. Investigate the app-specific input report, not a presumed OS issue.
+Owner clarified both Cricket Settings and Back fail intermittently; not the
+system Settings app. Pressed feedback/event timestamps still unknown. Proposed
+temporary input-logging update was later approved/installed as above.
+Preserve saves/sign-in; no uninstall or reset.
+Additional quick-contact/hit-area driver passed9Settings/Back trips,18actions
+in45.873s, one attempt each, no retry. Total synthetic actions28; not a manual
+pass. Direct profile table export recovered:15s idle334ms main/55ms JS sample
+weights;30s requested manual window555ms main/96ms JS. No continuous CPU
+saturation sampled; not blocked-thread or touch-latency proof. Manual failure
+and visible pressed feedback IN the30s window remain owner-unconfirmed.
+No game rebuild/install or speculative fix. See detailed report below.
+Saved old Apple-prep screenshot now inspected: Choose your look modal covered
+Login; the prior scrolling diagnosis
+was wrong. This explains that old failure, not the owner's current report.
+After owner reconnected, a separate diagnostic runner completed5Settings/Back
+round trips:10center-coordinate actions, ONE tap each, no retries, all observed
+destinations reached.28.703s test total is NOT measured app input latency.
+First diagnostic failed a case-sensitive Audio/AUDIO selector; its screenshot
+already showed successful navigation. Corrected in runner only; failures kept.
+15s app-only Time Profiler trace recorded; index export exited139 twice, later
+direct table export succeeded as above. No cause claimed or game patch.
+Apple documents an iPhone16/16Pro touchscreen fix in18.0.1; this phone runs18.0.
+Relevant historical possibility only, not an explanation of the reported
+Cricket-only missed taps. Apple/sandbox remains paused.
+Details/evidence/safe next checks: docs/IOS_RESPONSIVENESS_DIAGNOSIS_2026-10-24.txt.
+
+OWNER PAUSE — APPLE / SANDBOX FOLLOW-UP, 24 OCTOBER
+=================================================
+Owner said it is late and to continue tomorrow. STOPPED; all started commands
+completed. No background retry, reminder or automatic resumption scheduled.
+Apple-preparation driver failed BEFORE game sign-out: Login was not hittable.
+Later screenshot review found the covering appearance modal, not offscreen
+Login. Google session /9recovered careers not intentionally changed;
+not an Apple OAuth failure. No provider button, purchase, restore, new career,
+deletion or private credential entry occurred. No game source/binary rebuild.
+Separate read-only app capture passed0.435s; screenshot/accessibility evidence
+saved and subsequently inspected in the responsiveness investigation above:
+  output/ios-device/ui-driver-2026-10-24/game-state-before-apple-r5.xcresult
+  .../game-state-before-apple-r5-attachments/
+Failed prep: .../prepare-apple-sign-in-r4.{log,xcresult}.
+Helper has Apple prep/post-auth checks, neither passed. Sandbox tester existence
+and device sign-in UNCONFIRMED; owner deferred setup. Before resuming: resolve
+manual responsiveness, then prepare game-only sign-out
+after confirmed Google backup; stop automation for private Apple auth. Preserve
+the Google careers and do not assume Apple is the same identity.
+Then verify store metadata, use an appropriate QA save without replacing old
+careers, and require [Environment: Sandbox] before confirming any test payment.
+For this development-signed app on iOS18: Settings > Developer > Sandbox Apple
+Account (may appear only after first checkout attempt). Do not sign out of
+iCloud. If needed, owner creates tester in App Store Connect > Users and Access
+> Sandbox > + using an email not already used as an Apple Account, private
+password, test name and desired country. Never send private credentials.
+Official references checked:
+https://developer.apple.com/documentation/storekit/testing-in-app-purchases-with-sandbox
+https://developer.apple.com/help/app-store-connect/test-in-app-purchases/create-a-sandbox-apple-account
+https://www.revenuecat.com/docs/test-and-launch/sandbox/apple-app-store
+No provider/backend configuration change, deployment or store upload occurred.
+
+LATEST — GOOGLE SIGN-IN / FRESH-IPHONE CAREER RECOVERY VERIFIED
+=============================================================
+24 October: owner replied "automation ready". XCTest UI automation then
+initialized successfully on the physical iPhone16Pro/iOS18.0. Initial menu
+lookup failed because native labels include icon glyphs; later save-list
+lookup failed on rendered uppercase SLOT labels. Both were test locators, not
+game failures. Narrow icon-delimited menu fallback and case-insensitive exact
+slot lookup added ONLY to qa/ios-device/DeviceRecoveryTests.swift. Action
+allowlist and app-scoped scrolling retained. No game binary/source rebuild.
+
+Verified by native actions and inspected saved game screenshots:
+  - Main menu > Login > Account opened. Selected test passed in5.089seconds.
+  - Automation stopped before any provider button; owner completed Google
+    authentication/2FA privately and replied "done". Subsequent game screenshot
+    explicitly shows Google sign-in success, not just enabled-provider flags.
+  - Career backup & recovery reports "Account backup confirmed. Remaining
+    balances and original ad-free expiry are saved."
+  - Saved Games contains5Player and4Manager careers:9total on this fresh game
+    installation, with real restored names, clubs, seasons and dates visible.
+    No local career was created before restoration. Both tabs inspected.
+  - Requested Backup now / recover careers ONCE; returned confirmed.
+  - Recount after that retry remains5Player/4Manager: no duplicated career
+    slots. This is not an exact wallet/inventory/expiry or content-parity audit.
+Four selected native executions passed: Account navigation, initial two-mode
+inspection42.139s, manual recovery17.889s, post-retry inspection33.780s. Earlier
+failed attempts retained and are not counted as passing. No matches, new careers,
+deletions, purchase/charge, permission choice, account linking or sign-out.
+Regular signed-in cloud synchronization was requested; no provider config,
+backend deployment, App Store upload or production release was performed.
+Installed game build remains1.0.12/build1. Artifact JS SHA256 rechecked unchanged:
+1c682e7ff3b2c9a8912452156f55fb1335ddf9b1ad0b4565534648ad52b7788e
+Other agent's runtime/quick-start files remain untouched by this task; this
+still tests the earlier frozen QA snapshot, not their later integrated source.
+
+Evidence, local/ignored to protect account/device information:
+  output/ios-device/ui-driver-2026-10-24/open-account-labels-r2.{log,xcresult}
+  .../inspect-google-recovery-r3.{log,xcresult}
+  .../manual-recovery-once-r3.{log,xcresult}
+  .../inspect-after-retry-r3.{log,xcresult}
+Inspected app screenshots came only from completed tests. No live capture or
+automation during private authentication. Broad failure diagnostics disabled
+with -collect-test-diagnostics never; raw results are not for public upload.
+The old first failure's partial diagnostics archive remains unopened/unshared.
+Sanitized register: docs/evidence/ios-device-qa-2026-10-24/verification-summary.json.
+
+Still NOT certified: Apple sign-in/identity linking/deletion revocation; second
+Google-account isolation (only one account available); offline retry on this
+phone; opening/playing every restored career; exact balances/tokens/expiry
+comparison; sandbox purchase/owned restore; ads/consent/ATT; memory/stability
+soak; latest integrated-source QA, distribution signing and TestFlight.
+
+HISTORICAL — APP-ONLY UI DRIVER BUILT / PHONE AUTOMATION PENDING
+===================================================================
+Owner asked the agent to handle the in-app recovery/navigation steps. No direct
+physical-phone tap connector is available; prepared an isolated native XCTest
+UI runner instead, using the existing pinned xcodeproj tooling. Files:
+  qa/ios-device/DeviceRecoveryTests.swift
+  qa/ios-device/create-project.rb
+Generated project/build/results: output/ios-device/ui-driver-2026-10-24/.
+Build-for-testing SUCCEEDED. Runner signature deep/strict verification passed
+with host signing-keychain access; sandbox-only trust check failed, not a
+reason to replace certificates or alter trust. Team25PTZT5DNC, development
+wildcard profile. Runner bundle com.coverdrive.cricket.deviceqatests.xctrunner
+is separate from the installed game; no game rebuild/reinstall/data reset.
+Runner activates only com.coverdrive.cricket. Separate named tests open Account,
+inspect backup status / Saved Games, or request one manual recovery retry.
+No authentication, password entry, account choice, new career, delete, match
+advance, store checkout or permission-response automation is implemented.
+Run ONE selected test, serially, never while owner enters credentials.
+
+First selected testOpenAccountForOwnerSignIn FAILED BEFORE test execution:
+"Timed out while enabling automation mode." The native runner started but
+could not initialize UI automation. No game taps or planned screenshots ran;
+do not mark Account navigation, OAuth or restoration passed. Phone lock-state
+after failure reported passcodeRequired=false / unlockedSinceBoot=true; the
+exact cause / current Enable UI Automation switch is not remotely verified.
+Owner asked: on iPhone Settings > Developer > Enable UI Automation, enable and
+handle any passcode/Allow prompt privately, then reopen Cricket QA unlocked.
+This is a phone setting, not Xcode Settings or Safari Remote Automation. Turn
+off UI automation after the QA session if it is no longer needed.
+Primary setup reference:
+https://github.com/appium/appium-xcuitest-driver/blob/master/docs/getting-started/device-setup.md
+Apple cross-app proxy API used:
+https://developer.apple.com/documentation/xcuiautomation/xcuiapplication/init(bundleidentifier:)
+
+Xcode attempted broad automatic failure diagnostics and left a partial archive
+inside the ignored local xcresult. Archive contents were NOT opened or shared.
+Future test commands MUST include -collect-test-diagnostics never to prevent
+that broad automatic collection. Do not publish raw xcresult/device logs.
+Retry only after owner confirms automation readiness, using a NEW result path:
+  xcodebuild test-without-building -project <generated project> \
+    -scheme CricketDeviceQA -destination 'platform=iOS,id=<resolved device>' \
+    -derivedDataPath <driver derived-data> -parallel-testing-enabled NO \
+    -collect-test-diagnostics never \
+    -only-testing:CricketDeviceQA/DeviceRecoveryTests/testOpenAccountForOwnerSignIn \
+    -resultBundlePath <new ignored local result path>
+Google password/2FA and permission/account choices stay owner-controlled even
+after automation is available. Preserve the other agent's runtime work.
+
+HISTORICAL INSTALL-ONLY OUTCOME — OWNER CONFIRMS OPENING
+================================================================
+24 October follow-up: owner replied "main menu ready" after the welcome /
+age-residence / privacy handoff. This confirms the owner's reported location,
+not an automated screen capture or verification of the private declarations.
+Read-only CoreDevice recheck confirms the phone connected, Cricket QA1.0.12 /
+build1 installed and its exact executable running. Initial process predicate
+used CONTAINS on an NSURL and failed; filename equality retry succeeded. That
+diagnostic failure was not an application error. No new launch/install used.
+Next owner-assisted check: Main menu > Login > Sign in to existing Google
+account (or Continue with Google when signed out). Use the Google account that
+already owns the Android cloud careers; handle credentials/2FA privately.
+Wait for Career backup & recovery to settle; if needed tap Backup now / recover
+careers once. Record its exact status, then check Saved Games and both modes
+without starting a match or creating/replacing/deleting saves. Existing Google
+recovery is tested before Apple identity; do not infer they are one account.
+Real Google/Apple OAuth, restoration and account isolation remain PENDING until
+the observed owner-assisted results are recorded. No purchase is needed.
+
+Build retry after isolated CocoaPods path regeneration SUCCEEDED. Release arm64
+iPhoneOS app signature verified deep/strict: Apple Development, team25PTZT5DNC.
+Embedded development profile authorizes com.coverdrive.cricket and the connected
+phone, get-task-allow=true, expires2027-10-23T18:54:31Z. Minimum iOS16.4;
+actual phone18.0. No App Store distribution archive or TestFlight upload.
+Display name Cricket QA; version1.0.12/build1. Embedded Hermes bytecode98.
+Fresh bytecode checks confirm QA tools=false, mock purchases=false and local
+ad simulation=false; all three Google iOS test ad unit strings are embedded.
+Public Supabase/RevenueCat configuration comes from the existing client profile.
+JS bundle SHA256:
+1c682e7ff3b2c9a8912452156f55fb1335ddf9b1ad0b4565534648ad52b7788e
+App path:
+output/ios-device/device-qa-2026-10-24-r2/derived-data/Build/Products/
+Release-iphoneos/CricketSimulator.app
+The native target/executable keeps the reused name CricketSimulator, but the
+validated platform is iPhoneOS and display name Cricket QA: not a simulator app.
+
+Rechecked exact bundle before install: no existing game installation to replace.
+devicectl install succeeded; a subsequent bundle-filtered query confirms
+Cricket QA/com.coverdrive.cricket/version1.0.12 is installed. No uninstall/erase.
+Automatic devicectl launch timed out after20seconds; do not mark this automated
+launch successful or infer a crash. Later lock-state check required no passcode.
+Owner then opened the app manually and replied "The app opens". That is
+OWNER-REPORTED opening, not an automated screenshot/UI/performance pass.
+Welcome/age/residence/privacy input is left to the owner. Next stop is the main
+menu before creating careers, signing in or buying anything, so recovery can
+be tested before introducing local save conflicts. Credentials/2FA remain private.
+
+Read-only public Auth settings checked2026-10-23T19:10:36.228Z:
+HTTP200; Apple=true; Google=true; anonymous=true. This verifies enabled flags,
+not private keys, redirects, successful OAuth or a new backend deployment.
+No live login, cloud restoration, sandbox purchase/owned restore, ad playback,
+account deletion, memory soak or full physical UI QA was completed in this pass.
+The later PlayerCreationScreen worktree change remains outside this snapshot.
+
+Build helpers and checks:
+  node --test scripts/prepareIosDeviceQa.test.cjs —3tests passed.
+  Targeted ESLint on the3new helpers passed; git diff --check passed.
+  Snapshot typecheck passed;5focused Jest suites /35tests passed.
+  Root runtime/game/onboarding sources were not edited by this work.
+  Source hashes in source-snapshot.json still match the isolated source copy.
+Reproduction, using a NEW label and currently resolved Xcode device ID:
+  node scripts/prepareIosDeviceQa.cjs UNIQUE_LABEL
+  node scripts/buildIosDeviceQa.cjs UNIQUE_LABEL XCODE_PHYSICAL_DEVICE_ID
+The build helper regenerates stale copied Pod paths with the existing local
+CocoaPods1.16.2 tooling/no-repo-update and rejects any changed locked PODS list.
+It allows normal Xcode development provisioning/device registration only; it
+does not install, upload or submit. Installation/launch are separate actions.
+Raw evidence, failed attempts, copied source and native build logs are retained
+under output/ios-device/. Do not share raw profiles/device identifiers publicly.
+Original preflight/setup instructions below are historical, not repeat requests.
+
+24 OCTOBER FOLLOW-UP — SIGNING RESOLVED / ISOLATED DEVICE BUILD
+============================================================
+Owner completed Xcode's Apple Development certificate step. The new identity
+existed but was initially not valid for codesigning. Its public certificate
+issuer is Apple WWDR G3 and its team is25PTZT5DNC. A public certificate-chain
+check identified the missing intermediate; no private key was read/exported.
+Downloaded Apple's public AppleWWDRCAG3.cer over HTTPS from the official PKI
+site, inspected issuer/subject/dates and verified it against the existing macOS
+Apple root before importing that intermediate into the login keychain.
+No root added, Always Trust override, existing identity deletion or revocation.
+security find-identity -v -p codesigning now reports1valid Apple Development
+identity. This supersedes the earlier0identity/next-owner-certificate step below.
+G3 public certificate SHA256:
+DCF21878C77F4198E4B4614F03D696D89C66C66008D4244E1B99161AAC91601F
+Source: https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer
+Apple explanation: https://developer.apple.com/help/account/certificates/wwdr-intermediate-certificates/
+
+Resolved the exact Xcode physical-device destination and confirmed there is no
+existing com.coverdrive.cricket app installed before preparing a QA install.
+No unrelated apps or personal content inspected. A separate source snapshot is
+under output/ios-device/device-qa-2026-10-24-r2/. It contains1117explicitly
+allowlisted source/assets/test files with per-file hashes, captured at
+2026-10-23T18:53:51.492Z (24October in Asia/Kolkata). Source was compared before
+and after copying and against the copy to reject mixed concurrent changes.
+The other agent's later PlayerCreationScreen edit is not in this snapshot.
+No shared game/onboarding source was edited by this device-build task.
+
+Snapshot typecheck and35focused tests passed (quick-start pure/interaction,
+onboarding, iOS layouts and platform behavior). Three new build-helper checks
+and targeted helper lint passed. Initial staging missed one pure shared test
+module; explicit allowlist corrected and a new snapshot prepared. No app fix.
+Initial native build failed on copied simulator-relative CocoaPods paths.
+Regenerated integration only in the new workspace using the already pinned
+local CocoaPods1.16.2 tooling. Deployment-mode attempt rejected relocated path
+metadata; normal no-repo-update regeneration succeeded. Compared locked PODS
+entries before/after: unchanged184entries /116pods, not a dependency upgrade.
+System Ruby2.6 emits known precompiled-config warnings; native source mode used.
+Earlier failed logs/snapshots retained, not counted as successful builds.
+
+Current build: development-signed Release/iphoneos, isolated native workspace
+and derived data,4parallel jobs. Display name Cricket QA; production bundle
+identifier com.coverdrive.cricket is required for the configured real services.
+Existing shared public Supabase/RevenueCat client wiring enabled; no private
+root .env copied; Google test ad units; QA cheats/mock purchases disabled.
+Remote push entitlement omitted only from this QA target to avoid automatically
+enabling a new production capability; this does not certify push notifications.
+No release/archive/upload authorization inferred from this QA build.
+Build/install/launch outcome is recorded separately when actually observed.
+
+OWNER-REPORTED
+==============
+iPhone16Pro on iOS18.0 connected. Another independent agent is implementing
+the first60seconds/onboarding loop; keep that work separate and preserve it.
+
+VERIFIED READ-ONLY
+==================
+CoreDevice identifies a physical iPhone16Pro, iOS18.0/build22A3351.
+Pairing paired; transport wired; tunnel connected; Developer Mode enabled;
+DDI services available. The phone does not need the trust/Developer Mode steps
+repeated while these conditions remain valid. No OS update was performed.
+security find-identity -v -p codesigning returned0valid identities. This means
+no usable local signing identity was available at the check; it does not prove
+the Apple developer account has no remotely issued or cloud-managed certificate.
+No certificate/private key contents, passwords, passcodes or2FA were read.
+
+NEXT OWNER STEP — LOCAL APPLE DEVELOPMENT SIGNING
+================================================
+  1. Xcode > Settings > Accounts (Apple Accounts in some versions).
+  2. Sign into the existing paid developer Apple Account yourself if needed.
+  3. Select Divakar Mishra, team25PTZT5DNC > Manage Certificates.
+  4. If no usable Apple Development identity exists, choose + > Apple Development.
+     This creates the local development signing identity; it is NOT an App Store
+     Connect API key, RevenueCat key or Sign in with Apple .p8 key.
+  5. Click Done and report completion. If the panel shows a missing private key,
+     certificate limit or another error, report its text/status instead of
+     revoking/deleting certificates. Do not export/send a .p12 or private key.
+
+Primary Apple instructions checked:
+https://developer.apple.com/documentation/xcode/sharing-your-teams-signing-certificates
+https://help.apple.com/xcode/mac/current/en.lproj/dev3a05256b8.html
+
+AFTER SIGNING / CONCURRENT WORK BOUNDARY
+======================================
+Recheck local identity and device readiness. A signed DEVICE target and proper
+provisioning are required; the existing simulator .app/ZIP cannot run on iPhone.
+Do not build an unlabelled mixture of the other agent's in-progress onboarding
+edits. Coordinate a completed source checkpoint before an integrated build, or
+explicitly label an isolated earlier baseline and its excluded changes.
+Do not rerun the simulator staging helper on a workspace another task is using.
+Source currently contains additional energy/IAP work beyond the last simulator
+artifact as well. Earlier simulator results do not certify those new changes.
+
+Physical test order once a suitable signed build exists:
+  - Touch, keyboard, safe areas, the three UI fixes, sound/haptics and resume.
+  - Apple/Google login/cancel/sign-out, cloud recovery and offline/retry with
+    QA data; preserve existing local/cloud careers and identity separation.
+  - Store product metadata, verified Apple sandbox checkout/delivery and restore
+    of an actually owned permanent item. No real charge or consumable regrant.
+  - Consent/privacy flows, marked test ad formats and exactly-once ad rewards.
+  - Repeated navigation/gameplay and observed stability/memory. Deletion needs
+    a disposable QA account and explicit approval; not the owner's account.
+The planned order is NOT evidence these tests have run or that the build exists.
+
+SCOPE OF THE ORIGINAL PREFLIGHT (BEFORE THE DEVICE BUILD ABOVE)
+======================
+No app build, signing/provisioning mutation, install, launch, data inspection,
+purchase, restore, save/account deletion, match advancement or provider write.
+No runtime source/config changes; other agent's loop files left untouched.
+No physical app QA, signed archive, TestFlight upload or submission is verified.
+Device's personal name, unique identifiers and unrelated app data are omitted
+from this handbook record. Future checks must resolve the exact connected
+device again rather than assuming an old identifier or ambiguous booted target.

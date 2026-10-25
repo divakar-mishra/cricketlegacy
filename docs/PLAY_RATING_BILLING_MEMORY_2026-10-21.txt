@@ -1,0 +1,302 @@
+CRICKET: PLAYER & MANAGER — RATING / BILLING / MEMORY FOLLOW-UP
+21 October 2026, Asia/Kolkata
+===========================================================
+
+Later production packaging was separately authorized and completed: production
+1.0.12/code20 AAB, QA tools off, verified signature/bundle/compiled flags.
+See docs/PRODUCTION_AAB_2026-10-21.txt for its exact file/hash and CSV status.
+The QA-only/no-AAB statements below describe their original earlier test scope;
+no Google Play submission has been performed by the later packaging pass.
+
+Final internal APK build and live retest (later on 21 October)
+-------------------------------------------------------------
+The owner subsequently approved building/testing this implementation. This
+section supersedes the initial source-only scope and pending APK verification
+below. Final deliverable is an INTERNAL, DEBUG-SIGNED QA APK, not a Play upload:
+
+  output/rating-qa-2026-10-21/cricket-player-manager-rating-qa-vc22.apk
+  package com.coverdrive.cricket / versionName1.0.12 / local QA code22
+  73,990,102 bytes / arm64-v8a / embedded production JS / not debuggable
+  SHA256 8292b162cc5faf21350f1e81d903e3c84ab0e843524924f97290fdc7532b11e8
+
+Verified the same debug signing identity as existing code20; installed only with
+adb install -r on authorized Pixel_10_Pro_XL/emulator-5556. Pulled its installed
+base.apk and verified the identical SHA256, package, versionName and code22.
+No uninstall/clear-data, purchases, review submission, fixture progression,
+console changes, direct backend mutations, production signing, AAB or store upload.
+Pixel8 and Recovery_QA_34 were left untouched in this pass.
+
+Live rating verification on final code22:
+  PASS: actual dialog layout, both actions visible and readable.
+  PASS: Not now, Android Back and outside-backdrop dismissal.
+  PASS: explicit Rate on Google Play opens the public Cricket: Player & Manager
+        listing in com.android.vending (this account sees Internal Beta).
+  PASS: Android Back returns to Settings with the invitation closed.
+  No stars/review/submit/install/payment control was touched in Play Store.
+
+Used the new QA-only Settings entry Preview rating invitation (QA only). It
+renders the same modal/CTA but never reads/writes real prompt history or changes
+completed-match counts, careers or balances. Production ignores the preview
+prop unless QA_TOOLS_ENABLED is true. Enabling QA tools alone does not bypass
+the normal five-match/history policy. Natural fifth-match triggering, serialized
+one-time claim, old-history suppression, inactive/overlay deferral, failed-link
+handling and production-preview isolation are automated coverage, not claimed
+as a new live five-match playthrough. Existing QA careers were not advanced.
+
+The first code21 visual test exposed background labels bleeding through the
+non-blurred glass card. Added an opaque colors.surface base to this card only,
+retaining the theme sheen and no extra native blur. A component assertion guards
+that base. Rebuilt as code22 and repeated the actual controls/store-link tests;
+code21 is superseded and is not the handoff artifact.
+
+Live billing on final code22:
+  Real prices: Legacy899INR, Manager VIP449INR, Transfer Boost99INR, Scout49INR.
+  Actual non-charging Restore Purchases completed: Nothing to restore / No
+  active permanent upgrade or Season Pass was found for this Google Play account.
+  Wallet before/after: 11,000Coins /0Gems. Same Manager/club/age/season/press duty.
+This clears the prior connection failure for the now-signed-in Play Store.
+It is an empty-account restore response, NOT an owned-entitlement restore or
+checkout/test-payment certification. No purchase-provider bypass was added.
+
+Preservation: read-only, fixed-nine-ID Supabase evidence before installation and
+after all tests shows all nine fullSnapshotSha256, paidStateSha256, remaining
+benefit hashes and revisions unchanged (5 Player, 4 Manager). No auth.users or
+unrelated career query was made. The five critical save/recovery/fingerprint/
+journal source hashes also remain unchanged from the preceding validated APK.
+
+Final current game PID32485, explicit birth10-21 02:38:58.463,554 scoped lines:
+zero fatal, ANR, stale-view/mounting or splash-SurfaceControl failure matches;
+zero BILLING_UNAVAILABLE, billing-service-unavailable or unsupported-API messages.
+This is a bounded emulator smoke check, not OEM/all-day stability certification.
+Left the device on the normal Mumbai Sharks Manager hub, Age35/Season2026.
+
+Automated/artifact gate for the final source:
+  Full Jest: 279 suites /2073 tests /2 snapshots PASS (101.499s), zero failed.
+  Native UnityConsentPolicy:18 tests, zero failed/skipped.
+  Typecheck PASS; quiet lint PASS; git diff --check PASS.
+  Native stability harness previously rerun this pass: patched12/12 PASS;
+    vulnerable control deliberately fails7/12. Native wrapper source unchanged.
+  QA native test-device and no-game-reward guards retained in final DEX.
+  Reanimated/Worklets native library hashes unchanged from code20.
+Caught existing expo-secure-store/Jest mock warnings and third-party R8/Gradle
+warnings remain in evidence; passing does not mean a warning-free toolchain.
+
+Reproduction/build configuration
+-------------------------------
+The exact Expo57 version docs were checked before implementation. No dependency
+version changes were needed. Android Studio's Java25 initially failed the
+Worklets native configuration. Reused the already-installed JDK17:
+  /Users/divakarmishra/.gradle/jdks/eclipse_adoptium-17-aarch64-os_x.2/jdk-17.0.20+8/Contents/Home
+
+Build helper: output/rating-qa-2026-10-21/build-qa.cjs
+  node output/rating-qa-2026-10-21/build-qa.cjs build-3-solid-card-jdk17
+Runs :app:assembleQa :app:testQaUnitTest, arm64-v8a, QA-only versionCode override,
+NODE_ENV=production, EXPO_PUBLIC_QA_TOOLS=true. Excludes only QA Crashlytics
+mapping upload to avoid an external metadata write, not compilation/tests.
+Final build succeeded in2m18s. Production android/app/build.gradle code17 was
+NOT changed to22: these higher codes are isolated local QA identities.
+
+All four legal URL environment variables were absent from the local default
+build environment. Supplied the already-approved deployed links explicitly
+for this QA build (no website deployment/edit):
+  EXPO_PUBLIC_PRIVACY_POLICY_URL=https://sunlight-publisher-site.pages.dev/privacy/
+  EXPO_PUBLIC_TERMS_URL=https://sunlight-publisher-site.pages.dev/terms/
+  EXPO_PUBLIC_SUPPORT_URL=https://sunlight-publisher-site.pages.dev/support/
+  EXPO_PUBLIC_ACCOUNT_DELETION_URL=https://sunlight-publisher-site.pages.dev/delete-account/
+The existing legal-readiness script passes with these values and network access;
+all four full URLs were also verified inside the final embedded JS bundle.
+An unconfigured local command still correctly fails closed. Carry the URLs
+into the later production build environment; do not bypass the gate.
+
+Next packaging step is a separately approved production-signed AAB with QA tools
+off, the four legal URLs configured, correct upload signing/versionCode and
+release-artifact inspection. Never upload this debug-signed QA APK or reuse its
+QA-only test tools as a production bundle. Play Data safety remains owner-owned;
+this APK test does not establish that private declarations were finalized/saved.
+No additional Data safety task or APK failure was discovered by asking its status.
+
+Remaining coverage is carried forward, not silently marked passed: real switching
+between two distinct Google accounts (only one available), an actual owned-item
+restore/checkout, teen Unity creatives when no-fill persists, affected Oppo
+hardware and proof of leak freedom/low-RAM endurance. Prior fresh same-account
+recovery, US privacy and adult Unity serving results remain in the release QA
+report. Owner accepted the bounded memory/ad follow-up; no dashboard protection
+or SDK consent behavior was relaxed to get a passing result.
+
+Evidence: output/rating-qa-2026-10-21/artifact-vc22.json,
+installed-artifact-vc22.json, full-regression-final.json,
+preservation-and-runtime.json, build-3-solid-card-jdk17.log and
+build-3-solid-card-jdk17-result.json.
+UI: output/release-qa-2026-10-21/rating22-* XML/PNG;
+public listing: output/rating-qa-2026-10-21/rating22-play-listing.xml/png.
+Scoped log: output/final-qa-2026-10-20/rating22-final-process-scoped.log.
+Cloud baseline/final: output/production-1.0.12/evidence/
+release18-cloud-rating-qa-before-update.json and
+release18-cloud-rating-qa-after-tests.json. Local raw evidence is not for shipping.
+
+Scope and outcome
+-----------------
+Owner approved a visible rating invitation once after five completed matches,
+without a win/loss filter or reward. Implemented in source with focused tests.
+In this initial source-only iteration no APK/AAB was built. Existing code20 was used for
+device billing/memory work; it does NOT yet contain the new rating invitation.
+The later code22 build/retest above supersedes that initial APK-pending status.
+No purchase/checkout/consumption/refund, clear-data, uninstall, account deletion,
+production dashboard change or direct backend mutation was performed.
+Only authorized Pixel_10_Pro_XL / emulator-5556 was interacted with. Pixel8 and
+Cricket_Recovery_QA_34 were not used. Ad settings/Developer Data remain unchanged.
+
+Rating implementation
+---------------------
+src/components/PlayRatingPrompt.tsx: a dismissible, theme-based, compact-safe
+modal. It runs only on focused, foreground Android career hubs, after settings
+hydrate/onboarding and five completed matches in the existing device counter.
+It does not inspect whether those matches were won, lost or drawn. The existing
+counter is already driven by canonical match commits/daily challenge settlement;
+no new progression or reward path was added.
+
+Uses the existing global prompt-priority modal queue; explicit hub guards defer
+for guides, achievements, rewards, newspapers, contracts, offers and simulation.
+The Player hub also waits for its existing interstitial attempt and starter
+lookup. The ad policy/caps/units are not changed. No extra native blur is added.
+
+Actions: Rate on Google Play / Not now. Android Back and outside taps dismiss.
+src/services/storeReview.ts now records sr:play-prompt:v1 before showing the
+invitation. This is installation-local, survives ordinary updates/settings
+reset, and is not added to careers or Supabase payloads. Existing sr:lastPrompt
+history is honored; corrupt/unreadable history fails closed. Simultaneous
+retained hubs cannot both claim an invitation. It never repeats weekly or
+changes based on whether a rating was submitted (the app cannot observe that).
+
+The explicit CTA opens market://details?id=com.coverdrive.cricket&showAllReviews=true,
+then the equivalent public HTTPS URL if necessary. It does not call Google's
+quota-limited native review API from a button. Failed links leave an inline
+error and Not now remains available. No stars, currency or gameplay incentive
+is requested/granted. Settings has the same voluntary Play link for later use.
+The old win-only native review request in careerStore was removed.
+
+Verification: 16 focused suites /145 tests PASS across rating service/components,
+banner lifecycle, hub navigation, newspapers, guides, match settlement/rewards,
+match authority, settings migration and purchase/account recovery provider logic.
+Typecheck PASS; quiet lint PASS. Full Jest suite was not rerun for this UI
+iteration. Native visual/store-link verification needs a later approved QA build;
+opening a real review submission or writing a review was not performed.
+
+Earlier billing retry (before Play Store sign-in)
+-------------------------------------------------
+The owner reported signing into a license-tester account but was unsure whether
+that sign-in was in Play Store, game OAuth/browser, or another QA emulator.
+Actual Store prices remained unavailable. Retried only Restore Purchases;
+its error remained Could not reach Google Play. Closed the error, cold-restarted
+only the game (no clearing/uninstall), and repeated the non-charging restore.
+The fresh process PID30348 reported:
+  BillingClient: In-app billing API version 3 is not supported on this device.
+  RevenueCat: BILLING_UNAVAILABLE / Billing service unavailable on device.
+The UI again reported Restore failed. This is not a successful restore or
+proof that existing customers' purchases are broken. Exact provider/device
+root cause beyond current billing unavailability remains unproven.
+
+The owner asked to finish other tests first, then direct them to the right
+sign-in screen. Pixel10 has the installed Play Store launcher component
+com.android.vending/.AssetBrowserActivity. Next step: owner signs into that
+Play Store with the license-tester account and finishes any Play setup themselves.
+No passwords, 2FA or payment details should be sent to the agent. After owner
+confirmation, retry prices/non-charging restore before considering checkout.
+Never confirm a payment unless explicitly authorized and a test instrument is
+visibly confirmed. This pass did not start any purchase sheet.
+
+After all other checks, launched only that resolved Play Store component. Android
+reported Status: ok and activity
+com.google.android.finsky.unauthenticated.activity.UnauthenticatedMainActivity.
+This confirms Pixel10 currently reaches the unauthenticated Play Store flow;
+game/browser Google sign-in did not establish a signed-in Play Store session
+there. Left that screen for the owner. No auth UI/password/2FA was read or
+operated. Owner sign-in and the subsequent restore retry were pending at that
+point; the later completed retest below supersedes that pending status.
+
+Later same-day retest after owner Play Store sign-in
+---------------------------------------------------
+Owner confirmed sign-in complete. Cold-restarted only the same QA game on
+Pixel10, keeping the installed code20 APK and all data. Did not inspect or
+operate Google password/2FA/account setup screens.
+
+Real product prices now load: Manager Legacy899.00INR, Manager VIP449.00INR,
+Transfer Budget99.00INR and Scout49.00INR were visible, with available controls.
+No Buy/price/checkout control was tapped. The existing QA wallet showed
+11,000Coins /0Gems before restoration.
+
+Tapped only the actual Restore Purchases control. The call completed normally
+and the app returned Nothing to restore / No active permanent upgrade or
+Season Pass was found for this Google Play account. This verifies the
+empty-account restore response and clears the earlier billing-connectivity
+failure for this device/session. It does NOT prove that an owned non-consumable
+or subscription was delivered by restore, or that checkout/test-payment works.
+Provider returned no active restorable entitlement; no new purchase was made.
+
+Dismissed that result and reopened the same Store: the same prices remained
+available and wallet remained11,000Coins /0Gems. Left Pixel10 on the normal
+Manager hub. Did not interact with Pixel8 or Recovery_QA_34. No source changes,
+APK/AAB build/install, console changes, direct backend mutations, new charges,
+refunds, consumption or save clearing were performed in this retest.
+
+Current game process PID14629, explicit birth10-21 02:11:42.664,422 scoped log
+lines: zero BILLING_UNAVAILABLE, Billing service unavailable or unsupported
+Billing API messages. Fatal/stale-view/mounting/ANR/splash-failure scans also
+returned zero. Debug restore/network-success log patterns were not present;
+their absence is not independently claimed as receipt verification. The actual
+UI result plus inspected Restore implementation establish the completed,
+empty-account flow. No automated suite was rerun in this device-only retest.
+
+New evidence under output/release-qa-2026-10-21/:
+  billing-signedin-prices.xml/png
+  billing-signedin-before-restore.xml/png
+  billing-signedin-restore-result.xml/png
+  billing-signedin-wallet-after.xml/png
+Process evidence:
+  output/final-qa-2026-10-20/october21-billing-play-signedin-process-scoped.log
+
+Memory comparison and decision
+------------------------------
+Existing source already unmounts offscreen/background banners, removes their
+subscriptions/native AdViews and avoids duplicate career section stacks. No
+further concrete low-risk source fix was established. Per owner's instruction,
+those behaviors were left unchanged rather than disabling ads/graphics or
+forcing GC. This is not a claim of leak freedom or an Oppo fix.
+
+Historical Oct19 report: warmed equivalent-screen PSS468334 ->472264KB after
+another30 transitions (~457 ->461MiB). Oct20 run stopped at29 transitions;
+Oct21 earlier run stopped at43. These are not controlled old/new binary A/B runs.
+
+This time the existing code20 completed all8 rounds /48 guarded information-tab
+transitions, idle60seconds, background15seconds and resume, without Ad Inspector:
+  Cold-session Manager home 288419KB (~282MiB)
+  Navigation rounds         330541,357388,385686,403463,
+                            420671,439703,437859,439131KB
+  Idle15/30/45/60 seconds   426699,424965,424421,423813KB
+  Background15seconds      415205KB (~405MiB)
+  Resumed home             456581KB (~446MiB)
+One Activity /27 contexts throughout; WebViews oscillated1 ->4/5 ->4. The last
+navigation rounds were around429MiB, not an indefinitely increasing count in
+this bounded run. Memory remains above the cold baseline and resume costs more;
+no heap-retaining-path analysis or low-RAM/all-day soak was done. Do not compare
+these results as a measured improvement from the old build.
+
+Current-process log check: 817 lines, explicit birth10-21 01:53:41.832, zero
+fatal/stale-view/mounting/ANR/splash-failure matches. Billing errors are retained
+as billing errors, not mislabeled as crashes. Affected Oppo hardware remains
+unavailable and was not certified by this emulator run.
+
+Evidence
+--------
+output/release-qa-2026-10-21/billing-recheck-* XML/PNG (game UI only)
+output/release-qa-2026-10-21/memory-followup-comparison.json
+output/final-qa-2026-10-20/october21-owner-followup-memory-result.json
+output/final-qa-2026-10-20/october21-billing-after-owner-signin-process-scoped.log
+output/final-qa-2026-10-20/october21-owner-followup-complete-process-scoped.log
+
+Primary guidance checked before implementation
+----------------------------------------------
+https://docs.expo.dev/versions/v57.0.0/
+https://docs.expo.dev/versions/v57.0.0/sdk/storereview/
+https://developer.android.com/guide/playcore/in-app-review
+https://developer.android.com/google/play/billing/test

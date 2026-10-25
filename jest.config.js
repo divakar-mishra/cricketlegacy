@@ -12,6 +12,6 @@ module.exports = {
     '^expo-application$': '<rootDir>/src/test/expoApplication.js',
     '\\.(png|jpe?g|webp|wav|mp3)$': '<rootDir>/src/test/assetMock.js',
   },
-  // Engine/content tests are pure TS; allow transforming ESM-only deps if needed.
-  transformIgnorePatterns: ['/node_modules/(?!(zod)/)'],
+  // Pure engine tests and real navigation-router regressions use these ESM-only dependencies.
+  transformIgnorePatterns: ['/node_modules/(?!(zod|@react-navigation/routers|nanoid)/)'],
 };

@@ -40,6 +40,7 @@ import { synchronizeU19WorldCupState } from './u19WorldCup';
 import { synchronizeManagerClubState } from './managerClubState';
 
 export interface UserPlayerInput {
+  sex?: import('../avatar').AvatarSex;
   name: string;
   nationality: string;
   role: Role;
@@ -98,6 +99,7 @@ export function buildUserPlayer(input: UserPlayerInput): Player {
     id: 'user',
     name: input.name,
     nationality: input.nationality,
+    sex: input.sex ?? 'male',
     age: input.age ?? 21,
     role: input.role,
     battingStyle: input.battingStyle,
@@ -167,8 +169,11 @@ export function createCareerSave(params: {
 }): SaveGame {
   const now = params.now ?? Date.now();
   params.player.condition ??= 100;
+  const sex = params.avatarConfig ? normalizeAvatarConfig(params.avatarConfig).sex : params.player.sex ?? 'male';
+  params.player.sex = sex;
   const selectedBlueprint = TEAM_BLUEPRINTS.find((team) => team.id === params.teamId);
   const world = buildPlayerLeagueWorld(params.seed ?? now >>> 0, {
+    sex,
     seasonId: SEASON_ID,
     format: params.format,
     userDivision: 3,

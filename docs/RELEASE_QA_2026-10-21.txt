@@ -1,0 +1,212 @@
+CRICKET: PLAYER & MANAGER — LIVE QA RESULTS
+21 October 2026, Asia/Kolkata
+==========================================
+
+Later same-day billing retest: after the owner signed into Pixel10's Play
+Store, prices loaded and Restore Purchases completed with Nothing to restore.
+This clears the earlier device billing-connectivity failure, not owned-item
+restore/checkout certification. See the later subsection in
+docs/PLAY_RATING_BILLING_MEMORY_2026-10-21.txt. Historical observations below
+are preserved with their original scope.
+
+Later rating-build completion: the new rating invitation was built and tested
+on Pixel10 in internal code22, with279 suites/2073 tests and18 native tests PASS.
+All nine QA cloud snapshots/paid-state hashes remained unchanged. Final APK,
+store-link/dismissal tests, empty-account billing retest and AAB prerequisites
+are recorded at the top of docs/PLAY_RATING_BILLING_MEMORY_2026-10-21.txt.
+This is an internal QA artifact, not a signed production AAB or store submission.
+
+Outcome
+-------
+PASS: fresh-installation same-Google-account recovery of all nine careers;
+remaining-benefit examples; in-place update preserves that recovered session;
+actual in-app US privacy opt-out and reopening; Unity-only adult banner serving;
+Unity-only adult interstitial loaded/shown/closed and return to the QA panel.
+
+NOT PASSED: live switching between two different Google accounts (owner has
+only one); teen Unity creative serving/closeability (both tested formats return
+no fill); purchase checkout and successful restore (billing unavailable);
+leak-free memory/Oppo-specific stability certification.
+
+No AAB, store submission, production backend deployment, migration, paid checkout,
+save/account deletion or dashboard-setting change was performed. Data safety
+remains owner-owned. Developer Data and the existing age/content/Families,
+blocking-controls and privacy-sharing dashboard choices remain unchanged.
+
+What code changed, and what the older test actually covered
+---------------------------------------------------------
+The recent Supabase optimization changed accountRecovery.ts, accountCareerCloud.ts,
+accountBackupJournal.ts and the new backupFingerprint.ts. It merges equivalent
+queued jobs for the same owner/auth epoch, validates identity once per bounded
+sync, and avoids unchanged uploads only after verifying the matching server
+revision/checksum. Existing owner-change checks, financial fields and strict
+server conflicts are retained. schema14.ts was separately corrected to preserve
+premiumWallet.updatedAt when canonical balances do not change. See the October
+20 reports for negative controls and the settled real-device deduplication test.
+
+The branch also has Google sign-in retry/exact-callback guards. This October 21
+session did not edit production recovery, ads, purchase, gameplay or economy
+code. It exercised the prior verified QA build and improved evidence-only UI
+drivers. All ten recorded privacy/recovery source hashes still match that build.
+The purchase-provider code was not changed during this recovery/ads round;
+purchase/restore testing is a regression check, not a claim of a new IAP fix.
+
+Historical evidence was checked, not inferred: October 11's qa-summary.json
+records a real same-account uninstall/reinstall recovery on version 1.0.10/code14.
+October 20 checked sign-out -> guest -> the original Google account, plus backup,
+offline/retry and deterministic owner-switch races. Those are not a live test
+between two Google owners. One emulator can test two accounts sequentially;
+the missing prerequisite here is another account, not another physical phone.
+
+Devices and artifact
+--------------------
+Pixel_10_Pro_XL / emulator-5556: owner explicitly authorized exclusive QA use.
+Cricket_Recovery_QA_34 / emulator-5580: independent Android14/API34 installation,
+previously verified empty/signed out, with no database/save/token copy from Pixel10.
+Pixel8 / emulator-5554 was not interacted with, installed to or cleared.
+
+Both authorized QA devices now have the exact same APK, version1.0.12/local code20:
+SHA256 b09593db85a56c4475e15f50a9469902caf8062d214b7597fd8ae5dfaa94fc7d.
+Installed base-APK hashes were checked directly, not only the build output.
+Both updates used adb install -r. Original first-install timestamps remain
+October16 on Pixel10 and October20 on Recovery_QA_34. Internal debug-signed,
+standalone, embedded-bundle QA artifact; NOT a Play release/AAB. Production
+version-code selection was not changed by this local QA variant override.
+
+Fresh-device recovery
+---------------------
+The owner's Chrome setup/sign-in initially left an old, incomplete game OAuth
+attempt. Existing retry copy accurately reported incomplete. Restarting the
+game and starting a fresh Continue with Google completed using the owner's
+existing browser sign-in. No password/2FA screen was inspected or operated.
+The actual Account screen then showed Google signed in and Account backup
+confirmed. Five Player and four Manager careers appeared in the local lists;
+Manager slot5 remained empty. This was live recovery, not an AVD snapshot restore.
+
+Opened the recovered QA Starter before / Player slot3: 4,000 Coins, 50 Gems.
+Opened recovered Manager slot1: Medical Centre still has exactly one remaining
+recovery token, not an original unspent pack grant. No treatment/spending was used.
+The fresh-device guide/appearance overlays were dismissed, not gameplay advanced.
+The fresh installation then updated to code20 in place; its Google session and
+Account backup confirmed state survived. No second Google owner was available.
+
+Read-only cloud preservation checks were limited to the same nine authorized
+QA career IDs. All nine full paid-state hashes match the start of this session:
+balances, inventory, entitlement/ad-free expiry and purchase/flag markers remain
+unchanged. Eight complete snapshots/revisions are also identical. Manager slot1
+advanced revision23 ->26 while Pixel10 navigation/normal saves ran concurrently.
+Therefore this combined test does NOT establish zero uploads or attribute that
+snapshot change solely to recovery. The attempted stricter comparison correctly
+failed; the bounded final comparison retains the difference rather than hiding it.
+
+US consent and actual Unity serving
+----------------------------------
+The QA-only regulated-US profile invokes the real configureAds/UMP path and
+real Settings -> Ad privacy choices entry point. The published My data preferences
+form appeared. Selected Don't sell or share my data, saved, and reopened it:
+the selected opt-out was still visibly present. Screenshots were visually reviewed;
+this WebView's XML does not reliably expose radio checked state.
+Native readback: gppPresent=true, unityPersonalizationAllowed=false. These are
+sanitized signal/policy checks, not an independent Unity-server metadata readback.
+
+Verified the current Pixel10 advertising ID still matches the device the owner
+registered for Unity test mode. Read-only Ads settings were used; the ID was not
+reset/deleted or exported in the match report. Google also reported testDevice=true.
+Enabled Unity Ads (Bidding) single-source testing locally in Ad Inspector and
+cold-restarted to remove previously cached ads. No production source was toggled.
+
+Adult US-opt-out banner: actual Unity test banner visible; LOADED and response
+adapter com.google.ads.mediation.unity.UnityMediationAdapter, latency1122ms,
+errorCode=null. Left the QA panel to destroy its native banner before changing
+profiles. No creative/learn-more click was scripted and no game reward was granted.
+
+Simulated teen session: real native readback tfua=1, tfcd=0, rating=G, npa=true,
+Unity personalization denied. Saved age answers were not rewritten. Unity-only
+interstitial and banner each returned GMA code3, No fill, with no displayed ad.
+This verifies restrictive client request treatment and safe error handling, NOT
+teen Unity creative content or closeability. We did not relax protection to get
+a teen fill. TFUA suppresses advertising ID/third-party requests per Google's
+documentation, so no fill alone does not prove a bad mapping or its exact cause.
+The earlier general-audience Unity screenshot versus its per-user Mixed Audience
+requirements still needs owner review; no legal designation was changed blindly.
+
+Ended the ephemeral teen/region session and restored the actual saved adult
+audience. Adult interstitial then LOADED through UnityMediationAdapter (2106ms),
+SHOWN and CLOSED, returning to the isolated panel. The creative identified itself
+as Test game android. It included an unsolicited Play authentication detour and
+two end-card close layers. Backed out of Play without signing in/installing and
+used only the observed Close controls. No intentional CTA/Install click or game
+reward was performed. The final callback evidence, not the first end-card
+screenshot misleadingly named adult-interstitial-closed, establishes CLOSED.
+
+Cleanup verified: Ad Inspector single-source test Inactive; end-session removed
+the test geography; cold restart then read back tfua=0, tfcd=0, blank rating,
+npa=false and gppPresent=false. No prior consent grant was forcibly replayed.
+Native panel closed and Pixel10 left at the normal game menu. Unity's existing
+per-device QA registration remains; no other device or live dashboard was changed.
+
+Memory and Android stability
+----------------------------
+On code20 before opening Ad Inspector: seven full information-tab rounds and
+one further transition (43 total). PSS KB: baseline261960; successive complete
+rounds344681, 367626, 398603, 421907, 444267, 427694, 432424. Thus approximately
+256MiB initial /434MiB peak, not a monotonic increase every round. The eight-round
+driver stopped safely when Play came forward; that run is NOT marked completed.
+ActivityTaskManager identifies the 00:55:46 Play launch as uid2000/android.shell,
+not a direct launch from the game. The source of that external command was not
+identified or terminated. This is not evidence of an application crash.
+
+A SEPARATE controlled idle run completed on the same PID: PSS406744 ->391368
+->382824 ->383576 ->382904 at 0/15/30/45/60 seconds; background15s388648;
+resumed414702. Activities stayed1, contexts26; idle views1004/WebViews4.
+There is reclamation and a short idle plateau around374MiB, still substantially
+above baseline. No retained-object heap analysis or all-day/low-RAM soak was done.
+Do not label this leak-free or treat post-Ad-Inspector memory as baseline.
+
+Source confirms offscreen/background banners unmount and the pinned native
+wrapper destroys dropped AdViews; navigation already avoids duplicate section
+stacks. These are mitigations, not proof that every SDK/Chromium allocation is freed.
+Scoped current-process checks on both devices reported zero fatal, stale-view,
+mounting exception, ANR or splash SurfaceControl matches. No affected Oppo A18/A79
+or splash-crash phone is available. OEM verification remains open; low historical
+crash frequency cannot certify a fix.
+
+Billing / restore
+-----------------
+Only an emulator is available. That does not inherently prevent Play license
+testing: a matching package, working Play Store/account and registered license
+tester can test sideloaded QA builds without a new AAB. A test track alone does
+not guarantee zero charges. Never confirm a non-test payment instrument.
+
+This Pixel10 currently reports BILLING_UNAVAILABLE / billing API unsupported.
+Real Store product buttons are unavailable, not mock prices. The explicit
+non-charging Restore Purchases action returned Restore failed / Could not reach
+Google Play. No success was inferred from that error. No checkout, new payment,
+consumption or refund was attempted. Successful purchase/restore retesting needs
+the owner's working Play Store sign-in/license-test setup; no phone is required
+merely to replace that missing prerequisite. Root cause beyond current billing
+availability was not proven; purchase-provider code was not modified to bypass it.
+
+Checks and evidence
+-------------------
+Prior code20 gate: 277 Jest suites /2036 tests /2 snapshots, 18 native consent
+tests, typecheck, quiet lint and native stability harness PASS. That gate was
+not rerun in this device-only session; the ten affected source hashes were
+rechecked unchanged. Final git diff --check PASS.
+
+output/release-qa-2026-10-21/: UI XML/PNG, action log, installed-artifact-verification,
+combined-recovery-navigation-cloud-comparison, final-cloud-preservation and the
+Unity test-device-ID boolean match. Raw account UI/logs remain local QA evidence.
+output/final-qa-2026-10-20/october21-final-qa-memory-result.json and
+october21-idle-after-play-result.json, plus current-process logs, retain detailed
+measurements and failures, not only successful screenshots.
+October11 historical evidence: test-artifacts/account-cloud-reinstall-2026-10-11/qa-summary.json.
+Reusable procedure: docs/UNITY_ADMOB_REUSABLE_SETUP_GUIDE.txt.
+
+Primary references checked
+--------------------------
+https://docs.expo.dev/versions/v57.0.0/
+https://developer.android.com/google/play/billing/test
+https://developers.google.com/admob/android/targeting#users_under_the_age_of_consent
+https://developers.google.com/admob/android/mediation/unity#set_age_treatment
+https://developers.google.com/admob/android/ad-inspector/test-ad-units

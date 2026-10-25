@@ -6,7 +6,7 @@
  * `SaveGame.schemaVersion` and add a migration (see src/storage).
  */
 
-import type { AvatarConfig } from '../avatar/types';
+import type { AvatarConfig, AvatarSex } from '../avatar/types';
 
 // ---------- Core enums ----------
 export type Format = 'T20' | 'ODI' | 'TEST' | 'HUNDRED' | 'T10';
@@ -66,6 +66,8 @@ export interface Player {
   id: string;
   name: string;
   nationality: string; // country id from data/countries.ts
+  /** Cricket-world identity, independent of subsequent cosmetic portrait edits. */
+  sex?: AvatarSex;
   age: number;
   role: Role;
   battingStyle: BattingStyle;
@@ -1197,7 +1199,7 @@ export interface ManagerJobOffer {
 }
 
 /** Current canonical save schema. Bump + add a migration on any shape change. */
-export const SAVE_SCHEMA_VERSION = 45;
+export const SAVE_SCHEMA_VERSION = 46;
 
 export type CareerArchetype = 'PRODIGY' | 'LATE_BLOOMER' | 'SPECIALIST' | 'COMEBACK';
 export type CoachPersonality = 'DEVELOPER' | 'TACTICIAN' | 'DISCIPLINARIAN' | 'MENTOR';

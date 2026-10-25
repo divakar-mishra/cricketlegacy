@@ -46,6 +46,51 @@ describe('National Manager retained-club action guards', () => {
     });
   });
 
+  it('keeps retired Manager live operations inert without changing balances, inventory, records or saves', () => {
+    const save = makeManagerSave(9_203);
+    save.managerRetired = true;
+    save.managerAge = 60;
+    save.inventory = { ...save.inventory, facility_upgrade_token: 1, squad_recovery_token: 1 };
+    useCareer.getState().setActive(save, 'manager', 1);
+    const persist = jest.fn(async () => undefined);
+    useCareer.setState({ persist });
+    const active = useCareer.getState().save!;
+    const clubId = active.userTeamId!;
+    const playerId = active.teams[clubId].playerIds[0];
+    const targetId = active.freeAgents?.[0] ?? playerId;
+    const before = clone(active);
+    const store = useCareer.getState();
+    expect(store.signPlayer(targetId).ok).toBe(false);
+    expect(store.releasePlayer(playerId).ok).toBe(false);
+    expect(store.loanPlayer(playerId).ok).toBe(false);
+    expect(store.recallLoan(playerId)).toBe(false);
+    expect(store.offerFreeAgentContract(targetId).ok).toBe(false);
+    expect(store.investStaff('HEAD_COACH').ok).toBe(false);
+    expect(store.hireStaff(active.staffCandidates?.[0]?.id ?? 'missing').ok).toBe(false);
+    expect(store.upgradeFacilityLevel('medical', 'TOKEN').ok).toBe(false);
+    expect(store.upgradeFacilityLevel('medical', 'CLUB_BUDGET').ok).toBe(false);
+    expect(store.upgradeStadium().ok).toBe(false);
+    expect(store.upgradeMatchday().ok).toBe(false);
+    expect(store.setTicketPreset('T20', 'PREMIUM')).toBe(false);
+    expect(store.scout(targetId).ok).toBe(false);
+    expect(store.promoteYouth(playerId).ok).toBe(false);
+    expect(store.releaseYouth(playerId).ok).toBe(false);
+    expect(store.renewDeal(playerId).ok).toBe(false);
+    expect(store.setManagerTrainingPlan({ focus: 'BATTING' })).toBe(false);
+    expect(store.setManagerTrainingOverride(playerId, 'BATTING')).toBe(false);
+    expect(store.appointManagerLeader('CAPTAIN', playerId).ok).toBe(false);
+    expect(store.applySquadRecovery('token').ok).toBe(false);
+    expect(store.useFullScoutReveal(targetId, 'token').ok).toBe(false);
+    expect(store.useManagerResource('ELITE_STAFF_SEARCH').ok).toBe(false);
+    expect(store.acceptEarnedSponsorOffer('manager-all-formats').ok).toBe(false);
+    store.setTrainFocus(playerId, 'batting');
+    store.setXI([...active.teams[clubId].playerIds].reverse().slice(0, 11));
+    store.reorderXI([...active.teams[clubId].playerIds].reverse());
+    store.setTactics({ ...active.tactics! });
+    expect(useCareer.getState().save).toEqual(before);
+    expect(persist).not.toHaveBeenCalled();
+  });
+
   it('rejects club mutations while preserving the retained club and paid tokens', async () => {
     const save = makeManagerSave(9_201) as SaveGame;
     save.managerCareerLevel = 'NATIONAL';

@@ -1,0 +1,142 @@
+CREATION GUIDE + FEMALE PLAYER ROSTER — SOURCE FIX
+=================================================
+24 October 2026, Asia/Kolkata. Owner reported issues during manual QA code24.
+Originally implemented in shared source only. The later owner-authorized build
+and Pixel10 install below supersede that source-only handoff status.
+
+NEW SOURCE FOLLOW-UP AFTER OWNER REVIEW OF QA25
+-----------------------------------------------
+Owner found skipped name/country, free guide scrolling and missing colour step.
+Follow-up implementation/evidence:
+docs/CREATION_GUIDE_SEQUENCE_SCROLL_FIX_2026-10-24.txt.
+These later fixes are SOURCE ONLY; the installed QA25 below predates them.
+
+LATER QA BUILD / INSTALL — 24 OCTOBER,22:56IST
+---------------------------------------------
+Owner explicitly requested installation. Built standalone internal QA1.0.12/
+code25 with existing JDK17/Gradle, NODE_ENV=production,EXPO_PUBLIC_QA_TOOLS=true,
+arm64, existing four approved public legal URLs. Local init-script override25;
+production version config untouched. :app:assembleQa + :app:testQaUnitTest PASS;
+Gradle2m26s, wrapper147seconds. Native UnityConsentPolicy18tests/0failures/
+0errors/0skips. Existing third-party Kotlin/R8/Gradle warnings retained; no
+dependency upgrade, warning suppression or intended mapping-file upload.
+Fresh typecheck/src quiet lint/diff PASS. Prior26suites/320tests/1snapshot gate
+remains separate; no full Jest rerun claimed during this install request.
+382fingerprinted source/config files unchanged across build;367bundled project
+source-map files match current source. Specific creation/coach/gender/schema
+inputs independently checked. Generated build metadata excluded from comparison.
+
+Artifact:
+output/creation-fix-qa-2026-10-24/
+cricket-player-manager-creation-fix-qa-vc25.apk
+SHA256:ea9b44b30c1229aa149b873b8d06c0def1f03a1010cb39301ea0dcd5254fae93
+Verified package com.coverdrive.cricket,version1.0.12/code25,min24/target36,
+v2 debug signature matching existing installs; embedded JS8,223,392bytes.
+Certificate SHA256:
+8027990eb28a934f33052c41c617c6278494238b58e5c0390837d8c09ee4d290.
+No Metro required. Build log/result/source fingerprints/source-map comparison
+are in that same output folder.
+
+Verified target Pixel_10_Pro_XL/emulator-5556 and existingcode24. adb install -r
+returned Success. Installed1.0.12/code25,lastUpdateTime2026-10-24 22:56:48;
+original firstInstallTime2026-10-16 02:13:57 retained. Installed base.apk SHA256
+matches artifact exactly. Opened game; inspected screenshot of normal main menu
+with retained Mumbai Sharks Continue card and no pre-mode pointer guide.
+Screenshot:output/play-vip-qa-2026-10-24/creation-fix25-pixel10-handoff.png.
+No career entered/created/advanced, guide reset/step tap, purchase, sign-in/out,
+uninstall or app-data clear. Full post-update save/VIP parity and the actual
+creation-country-avatar/female squad flow are NOT native passes from this
+install; owner is reviewing them. Existing main-menu hydration may perform the
+normal schema migration; no raw device save export or fabricated parity claim.
+No iPhone/other emulator control, backend/provider/website change, production
+AAB or store submission. Existing productioncode20AAB hash remains unchanged.
+Schema46 compatibility warning below still applies to older Android/iOS apps.
+All build commands completed; device automation stopped for owner testing.
+
+REPORT / CAUSES
+---------------
+Owner: empty name can advance; coach hides country/gender/avatar choices;
+guidance should begin only AFTER Player/Manager selection; female protagonist
+has male teammates. Source confirms:
+- Real Player form Next already checked a trimmed2character name/country, but
+  the independent coach Next did not. Owner's exact native form transition was
+  not independently reproduced during this source-only pass.
+- Portrait coach highlighted only a100pixel slice of the entire tall picker;
+  its overlay could cover the remaining options.
+- MainMenu and mode-choice screens both mounted common pointer chapters.
+- Female selection lived only in cosmetics. Generated names came from male
+  pools; PlayerAvatar's NPC fallback explicitly hard-coded male portraits.
+
+IMPLEMENTED
+------------
+1. No pointer coach mounts on MainMenu or NewGame's mode picker. Player identity
+   / Manager creation coaching begins after the actual career-mode selection.
+2. Required creation targets expose live readiness. Coach Next is disabled and
+   its handler also refuses progress until the relevant valid choice exists;
+   old completed-tip state cannot bypass a currently empty required field.
+   Skip guide remains an optional opt-out, NOT a form-validation bypass.
+3. Player form requires a trimmed2character name, known country, explicitly
+   chosen Male/Female, portrait and role before advancing. Default preview and
+   default All-Rounder do not count as user selections. Changing gender requires
+   choosing a portrait again. Manual portrait, Randomize and Reset are explicit
+   portrait actions. Review includes gender; no points auto-spent.
+4. Gender tabs and actual portrait grid have separate measured targets, with
+   no100pixel crop. Creation coach reserves its own lower-screen area and leaves
+   a scrollable body above; it does not overlay the avatar grid. Country modal
+   temporarily suppresses the guide and then resumes it after closing.
+5. Manager creation requires an explicitly chosen country and club. Country
+   change clears club selection. Default difficulty/rules remain unchanged.
+6. Player.sex records cricket-world identity at creation, while later portrait
+   editing remains cosmetic. Names and avatars now use the selected sex.
+   Added fictional female given-name pools for all12supported countries, using
+   existing surnames. Same RNG call count; ability, role balance, potential,
+   selection, match outcome, prices and energy rules unchanged.
+7. Propagated identity into domestic rosters, national reserve pools, free agents,
+   Grade A/U19 teams/opponents, U19 World Cup squads, replacement nationals,
+   seasonal recruits and academy intake. Squad/profile/award NPC portraits use
+   the actual Player.sex instead of always male. Standalone Manager creation
+   retains its existing male world; this does not add a Manager gender selector.
+8. Save schema45->46 migration derives old female career identity from the
+   existing chosen portrait and deterministically repairs generated NPC names/
+   sex once. User name, IDs, attributes, stats, teams, fixtures, results, wallets,
+   inventory and ownership are retained. No gameplay RNG consumed, no player
+   replacement, currency grant or historical story-text rewrite. Male/Manager
+   names remain unchanged. Subsequent cosmetic edits do not switch competition.
+
+VERIFICATION — COMPLETED
+-------------------------
+26 focused suites /320tests /1snapshot PASS,38.521seconds.
+Includes actual mounted guide/form/picker interactions, empty/short-name direct
+handler attempts, explicit choices, country-modal yielding, gender invalidating
+portrait choice, mode timing, reserved coach layout, creation save-failure/
+occupied-slot guards, female world/recruits/nationals, unchanged seeded cricket
+ability, schema migration/idempotence/preservation, existing U19/intl/Manager,
+local storage and account backup/recovery/commerce/VIP tests.
+TypeScript --noEmit PASS; quiet ESLint across src PASS; git diff --check PASS.
+Earlier test-only unknown node.props typing error corrected; no runtime
+workaround. Existing caught expo-secure-store Jest/mock console warnings remain
+in evidence; passing suite does not mean warning-free output or native failure.
+
+Local logs:
+  /private/tmp/cricket-creation-female-final-targeted.log
+  /private/tmp/cricket-creation-female-types-final.log
+  /private/tmp/cricket-creation-female-lint-final.log
+Earlier narrower/failed typecheck attempts retained, not counted as final passes.
+
+HISTORICAL SOURCE-ONLY REVIEW / NEXT BUILD BOUNDARY
+----------------------------
+Owner needs to review these source fixes before a full-suite/new APK/install,
+per the project skill. No emulator/phone controlled this turn. Pixel10 remains
+on the unchanged existing QA code24; its APK does NOT contain these fixes.
+No production AAB, native visual/keyboard/large-font pass, female career native
+playthrough, new live purchase, backend/website/provider change or deployment.
+Other dirty worktree/iOS changes preserved. Shared Android/iOS source changed;
+the new schema46 saves require a compatible new build on BOTH platforms.
+Do not open newly written schema46 saves using older schema45 QA builds or
+mistake the intentional newer-save rejection for data deletion. No device save
+has been migrated by this source-only work.
+Native guide placement/pacing, required-choice flow and female squad/profile
+appearance need the next approved QA build and owner review. Broader release
+checks and final-source production packaging remain separate.
+Exact Expo57 reference read before edits:
+https://docs.expo.dev/versions/v57.0.0/

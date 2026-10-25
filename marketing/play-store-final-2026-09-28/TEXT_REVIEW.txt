@@ -1,0 +1,268 @@
+OCR text audit — actual UI text is retained; no OCR rewriting.
+
+## 01-live-match.png
+- LIVE MATCHDAY
+Make every
+match count.
+Follow the action. Shape your approach.
+28/1
+Bengaluru Grade A XI
+WK
+BAT
+BAT
+BWL
+4
+Boundary
+Short • Sweep
+Cricket: Player and Manager
+01
+3.1 ov
+CRR 8.84
+LIVE
+
+## 02-player-career.png
+- PLAYER CAREER
+Earn your place.
+Build your story.
+Create your cricketer. Train. Work towards selection.
+02
+<
+Player Career
+Bengaluru Grade A XI • Season 1 • 2026
+AR
+Arjun Rao
+RIGHT-HAND BAT • ALL-ROUNDER
+Grade A Cricket • India • Age 16
+AVAILABLE
+FORM 60 • CONDITION 100 • TRUST 55
+PLAYER LIFE >
+750
+4 36/36
+GRA
+Bengaluru Grade A XI
+VENUE
+Bengaluru Grade A XI
+NEXT FIXTURE
+Matchday: selected
+VS
+T20
+ROUND 1
+STATUS
+SELECTED
+NDI
+Mumbai District XI
+Play match
+Plan rest
+• 3 energy
+Cricket: Player and Manager
+
+## 03-manager-career.png
+- MANAGER CAREER
+Your club.
+Your call.
+Choose the XI. Set the order. Lead the season.
+PLAYING XI & BATTING ORDER
+2
+3
+Vikram Reddy
+BAT
+•100
+Tejas lyer
+BAT
+• 100
+Aakash Chauhan
+BAT
+• 88
+Romario Sealy
+WK
+• 100
+5
+6
+8
+Tejas Reddy
+BAT
+•100
+Manish Chauhan
+WK
+• 100
+Rohan Grewal
+AR
+• 88
+Ishaan Deshmukh
+BOWL
+•100
+Cricket: Player and Manager
+75
+74
+69
+73
+66
+71
+67
+75
+03
+V
+V
+V
+V
+V
+V
+V
+^
+V
+
+## 04-tactics-and-field.png
+- TACTICS & FIELD
+Set the plan.
+Shape the field.
+Choose your approach, bowling plan and field setting.
+Squad & Tactics
+Mumbai Northstar
+04
+Captain &
+vice-captain
+Set the leaders for your
+selected XI.
+Leadership
+BATTING APPROACH
+Defensive
+Balanced
+Aggressive
+BOWLING PLAN
+4 Attack
+• Contain
+3 Mix it up
+FIELD SETTING
+All-Out Attack
+Attacking
+= Balanced
+Defensive
+2 outside • legal in every phase
+Powerplay • max 2 outside
+{} Boundary Protection
+Cricket: Player and Manager
+
+## 05-training-recovery.png
+- TRAINING & RECOVERY
+Train smarter.
+Come back ready.
+Plan squad training. Explore personal recovery support.
+MANAGER CAREER • SQUAD TRAINING
+05
+COACH'S BOARD
+TRAINING GROUND • LEVEL 3/5
+SESSION FOCUS
+Batting
+Bowling
+Fielding
+Fitness
+Balanced
+* Recovery
+PLAYER CAREER • PHYSIO SUPPORT
+Personal Physio
+Restores 25 condition, improves morale by 4, and shortens an
+active injury by one match. Up to three visits each season.
+OK
+Cricket: Player and Manager
+
+## 06-club-development.png
+- BUILD YOUR CLUB
+Find talent.
+Build the future.
+Scout recruits. Develop your academy and ground.
+SCOUTING
+India
+BWL
+72
+OVR
+68
+FORM
+Core ratings
+Batting
+Bowling
+Mental
+Scout report
+Assessed ~72 OVR • Certainty 100% • Recommended
+YOUTH ACADEMY
+HOME GROUND
+LEVEL 2 • Twin practice lanes
+Academy development
+Level 2/5
+Stands view • Upgrades shown separately
+YOUR STANDS TODAY
+East & west seating
+Level 2 . 12.000 seats
+Cricket: Player and Manager
+06
+47
+74
+69
+
+## 07-player-life.png
+- PLAYER LIFE
+Your life.
+Beyond cricket.
+Explore contracts, kit, media and off-field choices.
+07
+Player Life
+Career
+Kit & media
+Finances
+Y Legacy
+Career Contracts
+Domestic
+Bengaluru Stars | 0 year(s)
+T20 franchise
+Bengaluru Stars | affiliated
+National
+0/100 national reputation
+Sponsors
+No active endorsement
+Beyond cricket
+Portfolio unlocks at 18 in senior cricket
+Cricket Academy
+Portfolio • Locked
+Cricket: Player and Manager
+
+## 08-records-and-story.png
+- RECORDS & STORY
+More than
+the scorecard.
+Face the press. Keep a record of your career.
+MANAGER CAREER • PRESS ROOM
+PRESS ROOM
+The Unveiling
+08
+Your first press conference at Chennai Arclight.
+Cameras flash. "Manager — what should the fans
+expect from you this season?"
+YOUR RESPONSE
+Promise silverware
+Raise expectations
+Preach patience
+Play the long game
+Credit the players
+Deflect to the squad
+PLAYER CAREER • CAREER RECORDS
+Arjun Rao
+1
+MATCHES
+30.0
+AVERAGE
+Overall
+WICKETS
+30
+RUNS
+107.1
+STRIKE RATE
+-
+BEST BOWLING
+30
+HIGH SCORE
+0 / 0
+100S / 50S
+CATCHES
+Cricket: Player and Manager
+...•
+
+Blocked phrase findings: None

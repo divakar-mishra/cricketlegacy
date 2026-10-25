@@ -1,0 +1,140 @@
+SUPABASE CLIENT OPTIMIZATION — 20 OCTOBER 2026
+=============================================
+
+Result and limits
+-----------------
+FOLLOW-UP: owner-authorized device QA found and fixed an additional wallet-clock
+mutation in schema14.ts. Sixteen new regressions and the full 2,022-test gate
+pass. See docs/RELEASE_QA_2026-10-20.txt for APK/device, live QA backup and
+remaining verification evidence. The code-only scope below describes the
+INITIAL implementation pass, not the later QA authorization/results.
+
+Implemented and verified client-side backup request/write reductions. This is
+not a deployment, a production traffic measurement or a storage migration.
+No remote SQL/schema/data/configuration changes, save deletion, APK/AAB build,
+installation, publishing or Git push were performed. The existing database's
+reported size has NOT been claimed to fall because of unreleased client code.
+
+1. Coalesced sync requests
+---------------------------
+accountRecovery.ts merges pending jobs for the SAME captured owner/auth epoch.
+If any queued caller needs recovery, the merged job retains recovery intent.
+A request arriving after a job starts gets a later queued pass, so a manual
+Backup now cannot silently join older in-flight work that predates its writes.
+Repeated calls merge into that later pass instead of creating a long queue.
+Auth changes invalidate old jobs, including ones that have not started yet.
+Explicit passes cancel a superseded autosave timer; writes that arrive during
+a pass still retain the existing follow-up behavior.
+
+The existing 2-second trailing debounce is unchanged. Immediate local encrypted
+saves, rolling backups, critical purchase persistence and offline progress are
+unchanged. No new backup-age interval, retry limit or retention period was added.
+
+2. One verified identity per sync batch
+--------------------------------------
+accountCareerCloud.ts opens a short-lived session after server-validating the
+recoverable account. List/read/upload operations reuse that session, checking
+the captured auth epoch before/after work and again after asynchronous payload
+preparation. Each RPC still passes the captured owner and remains protected by
+the existing server authorization, revision/CAS and deletion guards.
+The session is closed in finally; another sync validates again. This is NOT a
+global auth cache or a relaxation of purchase-account verification.
+Standalone helpers still validate through their own one-shot sessions.
+
+3. Avoided timestamp-only full uploads
+---------------------------------------
+backupFingerprint.ts uses the already-installed Expo Crypto SHA-256 API to hash
+a snapshot with ONLY its root updatedAt normalized to zero. Wallets, consumable
+inventory, IAP transaction markers, ad-free expiry, player/world state, nested
+timestamps, fixtures and history remain part of the fingerprint.
+
+Actual upload JSON/checksums/server API are unchanged. Fingerprints are local
+optimization metadata only, never a purchase or tamper-proof save authority.
+An unavailable/invalid native digest falls back to a normal full upload.
+There is no new dependency or native configuration requirement.
+
+A fingerprint becomes reusable only after successful remote acknowledgement.
+It is explicitly bound to that remote revision and checksum. This binding
+invalidates stale caches carried through an older app/downgrade that does not
+know about the new fields but updates revision/checksum.
+
+Before skipping any pending full upload, the app verifies remote metadata:
+same save/mode/slot, not deleted, same acknowledged revision and checksum.
+Missing/changed/deleted/moved rows use the normal guarded upload path, preserving
+server CONFLICT/DELETED behavior. Offline or failed metadata reads cannot report
+success. Journal acknowledgement failure leaves the write pending.
+
+A successful no-op records the checked local checksum but retains the actual
+remote checksum, revision and last real acknowledgement time. It does not
+fabricate a fresh upload date. A newer local generation stays pending even if
+an older no-op check finishes later. No full save strings are retained in a
+process-wide deduplication cache.
+
+Compatibility
+--------------
+Only optional cache fields were added to the existing v1 local backup journal:
+contentHash, contentHashBinding and localChecksum. Legacy journals remain
+readable and lazily gain the cache after a successful real upload. Remote save
+payloads and SaveGame schema did not change; no Supabase migration is needed.
+Recovery of a different revision clears unknown/stale fingerprint cache data.
+Older clients continue using the original RPC and full-save behavior.
+
+Measured automated checks (not production percentages)
+-------------------------------------------------------
+- 25 equivalent queued requests share one identity/list/upload pass.
+- 25 requests during an older in-flight upload share one later pass; the later
+  callers wait until their newer target state has been handled.
+- Ten bookkeeping-only writes of a >1 MB synthetic snapshot require ZERO
+  additional full-save transfers after the initial acknowledged backup.
+- A batch using list/read/upload validates recoverable identity once, not once
+  for every helper call. Every RPC retains its owner parameter.
+- Genuine state changes are still uploaded, even with unchanged updatedAt.
+
+Verification
+-------------
+Added 45 regression cases relative to the prior full-suite baseline.
+Focused backup/fingerprint/journal gate: 4 suites, 83 tests PASS.
+npm run typecheck: PASS.
+npm run lint -- --quiet: PASS.
+npm test -- --runInBand: 276 suites, 2,006 tests, 2 snapshots PASS (69.213 s).
+git diff --check: PASS.
+
+Covered auth switch/sign-out/closed sessions, recovery intent, queued and
+in-flight generations, unchanged and changed paid state, remote conflicts,
+tombstones/deletion, corrupt/unreadable/future saves, offline and metadata
+failures, failed journal writes, missing hashing, legacy journals/downgrades,
+large payloads and superseded timers. Existing commerce, save recovery,
+progression, navigation, ad and match tests passed in the complete gate.
+This is automated verification, not a new physical-device/reinstall/payment
+test or a guarantee of zero defects on every device.
+
+Remaining storage work / rollout
+---------------------------------
+These changes primarily reduce auth/network/serialization/database WRITE churn.
+They do not remove the 39.08 MB of current compressed save values measured in
+the 19 October audit. Storage will not drop merely by installing this code.
+No live improvement percentage can be claimed until an approved build rolls
+out and aggregate write/egress/size deltas are measured over a known interval.
+
+Further footprint reduction needs a separately designed lossless encoding or
+blob-storage protocol with legacy-reader/writer compatibility and staged server
+rollout. PostgreSQL already compresses the snapshots, so additional compression
+must be benchmarked before making size/CPU claims. Do not delete history,
+transaction records or accounts, drop guards, or run blocking VACUUM FULL as a
+shortcut. Production rollout and the AAB remain owner-authorized separate work.
+
+Source / tests
+---------------
+src/services/accountRecovery.ts
+src/services/accountCareerCloud.ts
+src/storage/accountBackupJournal.ts
+src/storage/backupFingerprint.ts
+src/services/__tests__/accountRecovery.test.ts
+src/services/__tests__/accountCareerCloud.test.ts
+src/storage/__tests__/accountBackupJournal.test.ts
+src/storage/__tests__/backupFingerprint.test.ts
+
+Audit: docs/SUPABASE_RESOURCE_AUDIT_2026-10-19.txt
+Versioned API reference checked before implementation:
+https://docs.expo.dev/versions/v57.0.0/
+https://docs.expo.dev/versions/v57.0.0/sdk/crypto/

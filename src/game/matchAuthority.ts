@@ -16,15 +16,17 @@ export interface MatchAuthority {
  * alter team tactics, or make the toss election before earning the armband.
  */
 export function matchDecisionAuthority(
-  save: Pick<SaveGame, 'mode' | 'captainClub' | 'captainCountry'>,
+  save: Pick<SaveGame, 'mode' | 'captainClub' | 'captainCountry' | 'managerRetired'>,
   fixture?: Pick<Fixture, 'competition'>,
 ): MatchAuthority {
   if (save.mode === 'manager') {
     return {
       kind: 'MANAGER',
-      canControlTeam: true,
+      canControlTeam: !save.managerRetired,
       title: 'Head coach control',
-      detail: 'You control the XI, batting order, team tactics, and toss election.',
+      detail: save.managerRetired
+        ? 'This Manager career is retired. Your team sheet is read-only.'
+        : 'You control the XI, batting order, team tactics, and toss election.',
     };
   }
 

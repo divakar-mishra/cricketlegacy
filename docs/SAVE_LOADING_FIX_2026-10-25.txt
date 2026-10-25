@@ -1,0 +1,117 @@
+SAVED CAREER LOADING — IMPLEMENTED SOURCE FIX
+25 October 2026 | Source changes, not a new installed app or store artifact
+
+WHAT CHANGED
+============
+Saved Games and the main-menu Continue preview now read a small, versioned,
+encrypted per-slot summary instead of opening every full cricket world. The
+summary contains display labels/date/season/wallet and VIP display hints, not
+players, fixtures, history or a playable SaveGame. There is no mutable full-world
+cache shared between UI, backup and gameplay.
+
+The summary uses the existing device-local slot key, AES-256-GCM and a separate
+summary-only authenticated-data context. It cannot be substituted for a playable
+save or copied to another slot. Key loss/tampering fails closed. Primary saves,
+checksums, rolling backups, legacy migration and write serialization remain.
+
+Writes/import replacements/recovery/deletion invalidate old summaries BEFORE
+changing playable copies, then publish derived metadata after the primary commit.
+Failure to publish a summary does not turn a durable purchase/save into a failed
+purchase/save. Missing/corrupt/older-schema summaries fall back to verified full
+loading. Occupancy is checked independently: a missing summary is NEVER an empty
+slot. Existing slot-selection and paid deletion/pending-purchase guards remain.
+
+Play, Continue and Delete first open the actual selected career and verify its
+mode/save identity. Summaries never activate gameplay, grant an entitlement,
+authorize a destructive operation or decide creation eligibility. Duplicate
+Play/Continue taps are guarded and show an opening state. Switching tabs, Back
+or leaving the screen invalidates pending action results, including an away-and-
+back-to-the-same-tab race. A backup status refresh does not cancel a deliberate
+selected-career open while the screen remains focused.
+
+CANCELLATION AND BACKUP
+=======================
+List/selected reads check cancellation before queued work, between primary and
+backup, between slots, and before publishing. Lists yield between slots, letting
+input and queued saves proceed. Native crypto already in flight and synchronous
+JSON/migration work cannot be preempted midway; this is bounded abandonment, not
+a promise that every instruction stops at the instant Back is pressed.
+
+Account backup/recovery scans the small summaries. A confirmed unchanged local
+token avoids another full-world open/checksum/migration/VIP sync. The token is
+bound to account, mode, slot, save ID, local generation and the remote/local
+acknowledgement checksums/revision. Older clients retaining unknown fields cannot
+keep a token valid after changing those acknowledgements. Cold verified scans
+record the existing cloud checksum contract in the protected summary, avoiding
+a second full read just to establish the first token for unchanged backups.
+
+Dirty bound careers are opened once in the upload loop, not during a whole-mode
+scan followed immediately by another upload read. A changed token still forces
+verified inspection even if the dirty journal hook failed. New writes during
+uploads remain pending; follow-up requests and recover=true are not discarded.
+Account switch/sign-out/teardown cancels queued reads and rejects late recovery.
+The cloud checksum algorithm, remote conflict/deletion contract and provider
+configuration have NOT changed. Purchase/restore fulfilment is not replaced by
+index data, and consumables are not re-granted.
+
+REPRODUCED HOST WORK COUNTS — NOT DEVICE TIMINGS
+================================================
+Run: node qa/ios-device/audit-save-load-work.cjs
+Real orchestration with synthetic 6 Player + 4 Manager careers, healthy primary
+and backup copies; mocked storage/crypto/provider boundaries. Frozen iPhone QA4
+source remains a historical comparison, not a fresh installed build.
+
+Scenario                                  Old QA4 opens   New full-world opens
+Player list                                      12         0 with summaries
+Two simultaneous Player lists                    24         0 with summaries
+Backup + Player list + Continue                  34         0 with confirmed index
+Active backup plus required follow-up            40         0 if unchanged
+Two simultaneous cold Player lists               24        12 (one bootstrap)
+Cold confirmed backup + list + Continue           34        20 (ten worlds once)
+
+Small summary decryptions/storage lookups still occur. A fresh legacy index can
+still take time on its first scan. Unbound/new/changed careers need full verified
+reads and uploads; these cold/dirty cases are not represented by the warm 0.
+Standard requested empty creation slot remains 0 full opens / 2 occupancy checks.
+
+VERIFICATION AND LIMITS
+=======================
+Focused tests cover real AES-GCM/Android byte-array round trips, fallback/backups,
+key loss/cross-slot summary substitution, cancellation, simultaneous cold readers,
+summary-publication failures, selected identity/duplicate taps, account changes,
+dirty generation races, cloud recovery, storage writes and purchase recovery.
+Final counts/typecheck/lint evidence is recorded in:
+  docs/evidence/save-loading-fix-2026-10-25/verification.json
+Final focused run: 11 suites / 235 tests / 0 snapshots PASS (37.815 seconds).
+Additional rewards/VIP fulfilment: 2 suites / 75 tests PASS (4.698 seconds).
+Total 13 distinct focused suites / 310 tests. Typecheck, quiet repository lint,
+git diff --check and actual-source work-count regression PASS. Fault-injection
+warnings in storage tests are expected; this is not a new full-suite run.
+
+This is NOT a fresh physical iPhone/Android timing, a manual missed-tap pass, a
+native-memory benchmark or proof that all other app CPU work is now cheap.
+Full selected-career decode/migrations/activation, critical-save cloning/encryption
+and network/provider waits remain real work. No demonstrated memory leak was
+claimed or removed. The previous iPhone up-to-8.1-second trace stays historical.
+
+No full-suite/build/install/public upload/provider/backend operation was performed
+for this source fix. Public versions and release targets were left unchanged.
+Existing signed Android 1.0.13/code23 and iPhone Input QA4 predate this change and
+DO NOT contain it. A newly authorized QA rebuild/install and manual timing/input
+check are required before claiming the owner's phone issue is resolved.
+
+FILES
+=====
+src/storage/saveSummary.ts — disposable display projection/schema validity.
+src/storage/saveEncryption.ts — small summary protection with separate AAD.
+src/storage/saveGames.ts — index publication, safe invalidation, cancellable reads.
+src/storage/accountBackupJournal.ts — generation/ack-bound local token hints.
+src/services/accountRecovery.ts — summary discovery, targeted dirty loading.
+src/screens/SavedGamesScreen.tsx / MainMenuScreen.tsx — lightweight previews and
+  selected full verification, busy/identity/navigation guards.
+src/game/saveMeta.ts — safe label projection for optional legacy collections.
+
+The Cricket Legacy skill governed preservation of encryption/backups, exact-save
+commerce guards and source-only verification/handoff. Exact Expo 57 docs were read
+before implementation. No balance, pricing, age, entitlement-scope or provider
+policy change was made.

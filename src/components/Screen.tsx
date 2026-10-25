@@ -4,10 +4,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, useTheme } from '../theme';
 import { GlassBlurProvider } from './GlassSurface';
+import { CareerNavigation } from './CareerNavigation';
+import { CareerGuide, GuideScrollView, type CareerGuideConfig } from './CareerGuide';
 
 type GradientColors = readonly [string, string, ...string[]];
 
 type Props = {
+  guide?: CareerGuideConfig;
   children: React.ReactNode;
   scroll?: boolean;
   padded?: boolean;
@@ -15,6 +18,8 @@ type Props = {
   contentStyle?: ViewStyle;
   /** Sticky content pinned below the screen body, respecting the safe area. */
   footer?: React.ReactNode;
+  /** Opt-in section navigation on ordinary career screens; action footers take precedence. */
+  careerNavigation?: boolean;
   /** Scrolls a scrolling screen back to its top whenever this value changes. */
   scrollResetKey?: string | number;
   /** Optional handle for scrolling directly to a section reached from a deep link. */
@@ -28,15 +33,31 @@ type Props = {
  * gradient also acts as the Android blur target for descendant glass surfaces.
  */
 export function Screen({
+  guide,
   children,
   scroll = false,
   padded = true,
   gradient,
   contentStyle,
-  footer,
+  footer: actionFooter,
+  careerNavigation = false,
   scrollResetKey,
   scrollRef,
 }: Props) {
+  // Keep per-form guide progress across plain pages, without mounting the
+  // guide-aware scroller on those pages. Ordinary disabled overlays stay guided.
+  if (guide) return <CareerGuide {...guide}><ScreenBody {...{
+    children, scroll, padded, gradient, contentStyle, footer: actionFooter,
+    careerNavigation, scrollResetKey, scrollRef,
+  }} guided={guide.layout !== 'plain'} /></CareerGuide>;
+  return <ScreenBody {...{ children, scroll, padded, gradient, contentStyle,
+    footer: actionFooter, careerNavigation, scrollResetKey, scrollRef }} />;
+}
+
+function ScreenBody({ children, scroll = false, padded = true, gradient, contentStyle,
+  footer: actionFooter, careerNavigation = false, scrollResetKey, scrollRef, guided = false,
+}: Props & { guided?: boolean }) {
+  const footer = actionFooter ?? (careerNavigation ? <CareerNavigation /> : undefined);
   const insets = useSafeAreaInsets();
   const { gradients, colors } = useTheme();
   const { width } = useWindowDimensions();
@@ -45,9 +66,11 @@ export function Screen({
   const activeScrollRef = scrollRef ?? internalScrollRef;
 
   useEffect(() => {
-    if (!scroll || scrollResetKey == null) return;
+    // Guided pages remount their native scroller below. Do not race its coach's
+    // target reveal with a second imperative scroll-to-top command.
+    if (guided || !scroll || scrollResetKey == null) return;
     activeScrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [activeScrollRef, scroll, scrollResetKey]);
+  }, [activeScrollRef, guided, scroll, scrollResetKey]);
 
   // Leave breathing room even on compact devices and outside 12dp scene bleeds.
   const hPad = padded
@@ -89,9 +112,11 @@ export function Screen({
     [colors.bgElevated, colors.border, insets.bottom, insets.left, insets.right],
   );
 
+  const Scroller = guided ? GuideScrollView : ScrollView;
   const inner = scroll ? (
-    <ScrollView
-      ref={activeScrollRef}
+    <Scroller
+      key={guided ? scrollResetKey : undefined}
+      {...(guided ? { scrollRef: activeScrollRef } : { ref: activeScrollRef })}
       style={styles.fill}
       contentContainerStyle={[paddingStyle, { flexGrow: 1 }, contentWidthStyle, contentStyle]}
       keyboardShouldPersistTaps="handled"
@@ -99,7 +124,7 @@ export function Screen({
       overScrollMode="never"
     >
       {children}
-    </ScrollView>
+    </Scroller>
   ) : (
     <View style={[styles.fill, paddingStyle, contentWidthStyle, contentStyle]}>{children}</View>
   );

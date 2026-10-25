@@ -3,6 +3,24 @@ import { Entitlements, Fixture, Format, Wallet } from '../domain/types';
 
 const REGEN_MS = ECONOMY.energyRegenMinutes * 60 * 1000;
 
+/** Timed ad-free trials do not grant the permanent VIP energy capacity. */
+export function energyCapacity(entitlements?: Pick<Entitlements, 'removeAds'>): number {
+  return entitlements?.removeAds ? ECONOMY.vipEnergyMax : ECONOMY.energyMax;
+}
+
+/** One clock for display, foreground recovery and affordability decisions. */
+export function energyRecovery(wallet: Wallet, now = Date.now(), cap = ECONOMY.energyMax) {
+  const recovered = regenEnergy(wallet, now, cap);
+  const missing = Math.max(0, cap - recovered.energy);
+  const partialMs = Math.max(0, Math.min(REGEN_MS, now - recovered.energyUpdatedAt));
+  return {
+    wallet: recovered,
+    cap,
+    nextPointMs: missing > 0 ? REGEN_MS - partialMs : 0,
+    fullMs: missing > 0 ? missing * REGEN_MS - partialMs : 0,
+  };
+}
+
 export function startingWallet(now = Date.now()): Wallet {
   return {
     coins: ECONOMY.startingCoins,
@@ -22,7 +40,7 @@ export function regenEnergy(
   const gained = Math.floor((now - wallet.energyUpdatedAt) / REGEN_MS);
   if (gained <= 0) return wallet;
   const energy = Math.min(maxEnergy, wallet.energy + gained);
-  return { ...wallet, energy, energyUpdatedAt: wallet.energyUpdatedAt + gained * REGEN_MS };
+  return { ...wallet, energy, energyUpdatedAt: energy >= maxEnergy ? now : wallet.energyUpdatedAt + gained * REGEN_MS };
 }
 
 export function spendEnergy(wallet: Wallet, amount: number): Wallet {
@@ -94,13 +112,14 @@ export function convertPlayerGemsToCoins(wallet: Wallet, gems: number): Wallet |
 
 /** Refill energy to full (a gems sink). Returns null if unaffordable/at max. */
 export const ENERGY_REFILL_GEMS = 10;
-export function refillEnergyWithGems(wallet: Wallet, now = Date.now()): Wallet | null {
-  if (wallet.energy >= ECONOMY.energyMax) return null;
-  if (wallet.gems < ENERGY_REFILL_GEMS) return null;
+export function refillEnergyWithGems(wallet: Wallet, now = Date.now(), cap = ECONOMY.energyMax): Wallet | null {
+  const recovered = regenEnergy(wallet, now, cap);
+  if (recovered.energy >= cap) return null;
+  if (recovered.gems < ENERGY_REFILL_GEMS) return null;
   return {
-    ...wallet,
-    gems: wallet.gems - ENERGY_REFILL_GEMS,
-    energy: ECONOMY.energyMax,
+    ...recovered,
+    gems: recovered.gems - ENERGY_REFILL_GEMS,
+    energy: cap,
     energyUpdatedAt: now,
   };
 }

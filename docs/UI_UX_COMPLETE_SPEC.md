@@ -337,10 +337,36 @@ There is no Android elevation fallback in `GlassSurface`.
 - `HubTabBar` is a glass bottom bar with Ionicons. Active tabs use a filled icon,
   gold text and a 28x3 gold top indicator.
 - Hub tabs support 46dp horizontal swipe navigation as well as taps.
-- Player hub tabs: Home, Stats, Progress, Profile. Pending story decisions are
-  priority cards in Home rather than a hidden footer destination.
-- Manager hub tabs: Home, Club, Store, Academy, Standings. Standings opens
-  Records & Glory with the active competition table first.
+  Vertical/diagonal drags and cancelled touches do not change sections. A swipe
+  consumes its release once, whichever native callback arrives first.
+- October 15 navigation correction: Player tabs are Home, Stats, Progress and
+  More. More is a personal-actions menu, not the full player profile; the Home
+  portrait has an explicit View profile cue. Progress now renders Career Path,
+  story context and eligible U19/international detail links, rather than leaving
+  those on an unreachable hub page. Pending story decisions still own Home's
+  resolver-driven next action.
+- Manager navigation is Home, Team, Club, Store, Academy and Records. National
+  duty replaces Club with Calendar and hides the paused Academy destination.
+  Ordinary career detail screens opt into the same mode-aware footer. Records
+  opens the active competition table first; Achievements and Hall of Fame links
+  explicitly select their own tabs. Section switches reuse existing stack routes.
+  A retired Manager's footer permits only Home and Records; live club mutations
+  reject retired careers without spending balances or tokens. Navigation checks
+  the current save identity and restrictions again when a queued tap activates.
+- Required Save/Continue action footers take precedence over section switching;
+  active matches and checkout screens do not gain navigation that can bypass them.
+- Player Life keeps Portfolio at the top of Finances, with existing eligibility
+  gates unchanged. Player hub, Player Life and Records reset scrolling when their
+  selected tab changes. Club Office has top shortcuts to Medical Centre, Youth
+  Academy and Wage Ledger without removing its ground, finance or facility cards.
+
+Navigation regressions are covered by real React interaction tests for Records,
+Player Life, the shared footer and hub controls; installed-stack-router tests for
+return paths and repeated switches; and screen-wiring checks for reachable
+Progress content and opted-in detail screens. This closes the earlier gap where
+content-presence checks did not verify which tab a labelled button opened.
+Native rendering, physical-device behavior and real store checkout remain
+separate checks; unit test counts do not certify a bug-free release.
 
 ### 7.5 Progress, counters and loading
 
@@ -395,7 +421,12 @@ The wallet bar is one horizontal themed surface:
 - cash icon is gold;
 - gems icon is info blue;
 - energy icon is warning amber;
-- values animate with CountUp and energy shows current/maximum.
+- values animate with CountUp and energy shows current/maximum (36 / permanent VIP60).
+- Tapping energy opens the queued Match energy recovery dialog with next+1/full
+  countdowns, free waiting and optional completed-ad recovery (+8, limited to
+  remaining space). Full/no-fill/loading states are explicit. The visible
+  dialog owns its second ticker; a separate lightweight point-boundary clock
+  keeps the actual wallet current without ticking full career reconciliation.
 
 The league table is deliberately dense. It shows position, team, played, wins,
 losses, ties, no-results, points and NRR. The user's team gets a `surfaceAlt`
@@ -446,47 +477,43 @@ can still render independently in isolated tests when no queue provider exists.
 ### 9.1 Global onboarding
 
 - Trigger: first hydrated launch unless onboarding is complete.
-- Five slides: live match, player legend, manager detail, records, daily
-  rewards/season pass.
-- Accent sequence: `#31A85A`, `#E9B23B`, `#4C9AFF`, `#CD7F32`, `#E9B23B`.
-- Card: theme surface, 24px radius, 1px strong border, maximum width 400 and
-  maximum height 92%.
-- Header wash: slide accent at 13% opacity to transparent.
-- Icon: 64px circle with 2px accent border.
-- Motion: modal fade; slide 260ms; icon 300ms after 80ms; copy 320ms after
-  120ms.
-- Interaction: Next, Previous, Skip, dots and 48dp horizontal swipe.
+- Surface: scrollable safe-area welcome with "Guide me" / "Explore on my own".
+- No required slideshow, swipe gesture or timed advancement before New Game.
+- Eligibility and consent remain separate; skipping coaching does not skip them.
+- Settings Replay game guides restarts the welcome and resets guide progress.
 
 ### 9.2 Player and manager mode guide
 
-- Backdrop: `rgba(0,0,0,0.78)`.
-- Card: `bgElevated`, 16px radius, strong border, max width 480.
-- Gold icon: `#F7D06E`; close icon: `#A9B7AD`.
-- Each step slides from right in 220ms; backdrop fades in 180ms/out 140ms.
-- The "Your next action" box uses `surfaceAlt` and a 3px primary-green left rule.
-- Interaction: Previous, Next/Start Playing, dots, 54dp swipe and close.
-- Player guide has six steps: next action, Training → Development Centre,
-  match role, selection/progression, contextual free career-adviser moments,
-  and Profile → Player Life → Kit & media / Finances. It names the destinations
-  rather than only listing systems.
-- Manager guide has six steps: Continue flow, domestic year, XI preparation,
-  match plan, evidence-led recruitment and running the club.
+- Shared scene-local CareerGuide/GuideTarget replaces the standalone mode slides.
+- Measured gold outline/arrow, theme elevated card and non-intercepting dim areas.
+- Back, Next/Finish, Skip step, Skip guide; Show screen guide replays a chapter.
+- Actual-action steps wait for the real control, never auto-spend or invoke it.
+- Player: full creation (including real attribute +), Customise player, resources,
+  individual Stats/Progress/More tabs, next chapter, Player Training costs/options.
+- Manager: creation, individual Home tabs, actual team preparation/Training tile,
+  training focus/workload/Recovery/save/overrides with honest settlement rules.
+- Progress persists in existing dismissedTips; common/player/manager skip flags
+  are independent. Hydration and current-route focus gate automatic coaching.
 
 ### 9.3 First-match guide
 
-- Full-screen scrim: `rgba(0,0,0,0.48)`.
-- Themed glass card with `bgElevated` and `primaryDark` border.
-- Slides in from below over 200ms and fades out over 200ms.
-- Three six-second prompts: stance, chase reading and post-match review.
-- Can auto-advance, skip or move manually.
+- Setup chapter: pitch/weather, toss and Watch/Key/Instant choices.
+- Watch: actual Player bowling plan / batting approach or Manager Tactics, then
+  actual score-reading pointer. No six-second auto-advance or forced result.
+- Visible live coach pauses simulation; finish/skip/route exit releases it.
+- Role selection is not captaincy; short innings may prevent full participation.
 
 ### 9.4 Coach guidance placement
 
-- No Coach Tip is permanently or absolutely overlaid on the Career Hub,
-  Manager Hub or Matchday screen.
-- First-match instruction remains in the dismissible `FirstMatchGuide`.
-- Complex rules use inline info buttons and in-flow contextual guidance, so a
-  coaching message cannot cover a home card, scoreboard or match control.
+- No permanent Coach Tip on Home or Matchday. Optional interactive coach is
+  temporarily overlaid in the same native scene, not an intercepting Modal.
+- The actual highlighted control stays tappable; the card sits outside it and
+  scrolls when needed. Target reveal follows the nearest scroll container.
+- Keyboard bounds and dismissal on advance keep guide controls reachable.
+- A yieldable coach releases its queue slot for higher-priority dialogs; ordinary
+  native dialogs are never preempted. Background scenes do not show coaching.
+- The old FirstMatchGuide is not mounted. Full native evidence/limits are in
+  docs/CAREER_COACH_2026-10-24.txt; no iOS or exhaustive font-matrix pass implied.
 
 ### 9.5 Just-in-time mechanic guidance
 
@@ -692,6 +719,53 @@ purchase/ad failures.
 - Overturned result is full success green; upheld result is full danger red.
 - Result text is white with an 80%-white subtitle.
 - Result enters over 200ms and fades out over 300ms.
+
+### 9.19 Optional Play Store rating invitation
+
+Owner-approved on 21 October 2026: after five completed matches on the
+installation, Player and Manager hubs may show a neutral invitation once.
+It uses the existing lowest-priority modal queue, theme tokens and a
+safe-area-bounded scrollable card without another native blur layer. The card
+has an opaque theme-surface base so background labels cannot bleed into its copy.
+Guides, newspaper/offer/reward overlays, contracts, calendar simulation,
+background/unfocused routes and the Player hub-return ad defer it.
+
+Copy asks for an honest review, not a positive rating. Actions are "Rate on
+Google Play" and "Not now"; Android Back and outside taps dismiss. The CTA
+opens the actual Play listing with an HTTPS fallback, not the quota-limited
+native review API. A failed link leaves a dismissible inline error. An
+installation-local marker survives restart/update/settings reset, and previous
+native-review history suppresses another automatic ask. Settings also offers
+a voluntary rating link. No rewards, purchase grants or career/cloud fields
+are changed. Source/automated verification is recorded separately from APK QA
+in `docs/PLAY_RATING_BILLING_MEMORY_2026-10-21.txt`.
+
+### 9.20 Date-gated Sunlight other-games invitation
+
+Owner-approved on 25 October 2026. Android Player/Manager Home only, starting
+15 November 2026 at 00:00 India time (device clock). At least five completed
+matches, onboarding/hydration, foreground/focus and the existing hub-overlay
+eligibility are required. Respect permanent/timed ad removal and legacy premium.
+Use the lowest-priority modal queue, opaque theme surface and safe-area-bounded
+scrolling card; no new blur layer, asset, native dependency or forced install.
+
+Installation-wide maximum two appearances, at least 48 hours apart. Impressions
+are persisted before display and shared across modes/careers/restarts/updates.
+Not now, outside and Android Back dismiss. View on Google Play permanently stops
+automatic invitations before explicitly opening the owner's developer page:
+https://play.google.com/store/apps/developer?id=Sunlight+Pvt . No installed-app
+detection; existing installs do not receive extra appearances. Full local-data
+deletion/reinstallation clears local history; no cross-device tracking is added.
+
+The Android Home coordinator snapshots prior rating history before enabling the
+rating ask, preventing a first rating invitation and promotion in the same Home
+visit. iOS passes through to its original system-rating component unchanged.
+Malformed/unavailable history suppresses marketing. Failed links are dismissible
+and retryable in the current card, never an automatic future nag. No rewards,
+game/save schema changes, IAP grants, telemetry or passive attribution.
+
+Verified source/component/service evidence and limits (not a new native build):
+`docs/OTHER_GAMES_PROMOTION_2026-10-25.txt`.
 
 ## 10. Match UI and UX
 
@@ -1346,17 +1420,23 @@ Current gaps:
 
 ### 20.1 First launch
 
-Native splash -> Main Menu -> five-slide onboarding.
+Native splash -> required age/eligibility checks -> Main Menu -> optional
+interactive coaching choice. Ad privacy/consent gates remain intact.
 Guides can be replayed from Settings. Settings also opens the searchable Cricket
 Academy for on-demand rule lookup.
 
 ### 20.2 Player career
 
-New Game -> Player Creation -> country/future-club setup -> separate School XI -> Career Hub guide -> one
+New Game -> full four-step Player creation with manual country, club and
+attributes -> separate Grade A XI -> saved Career Hub with optional pointers -> one
 highlighted next action plus relevant persisted-once mechanic tip ->
 training/story/match -> result/rewards/progression -> contracts and pathway
 advancement -> international career -> retirement -> career remembrance/Hall
 of Fame.
+
+The rejected quick-start shortcut was reversed24October. Creation always lands
+at Home after confirmed saving. Contextual guidance is focus-gated so result
+feedback stays unobstructed. No guide automatically plays a fixture or forces a win.
 
 At senior international level the player keeps both the domestic club contract
 and format-specific national eligibility. September-November can contain an

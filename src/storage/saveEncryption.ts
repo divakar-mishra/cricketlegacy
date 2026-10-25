@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- load native modules only at the storage boundary */
 import type { SaveGame } from '../domain/types';
 import { serializeSaveEnvelope, unwrapSave } from './integrity';
+import { decodeSaveText } from './decodeSaveText';
 
 interface KeyRecord {
   key: string;
@@ -89,7 +90,7 @@ export async function openSave(raw: unknown, context: string): Promise<SaveGame 
       key,
       { additionalData: aad(context) },
     );
-    const save = unwrapSave(JSON.parse(new TextDecoder().decode(plaintext)));
+    const save = unwrapSave(JSON.parse(await decodeSaveText(plaintext)));
     if (!save) throw new Error('Invalid decrypted save.');
     rememberVerified(context, record.key, data, save.id);
     return save;
@@ -133,4 +134,29 @@ export async function deleteSaveKey(context: string): Promise<void> {
   }
   const store: typeof import('expo-secure-store') = require('expo-secure-store');
   await store.deleteItemAsync(keyName(context));
+}
+
+/** Small derived UI index, protected by the existing slot key and distinct AAD.
+ * Never accepts plaintext, creates a key, or authenticates a playable career. */
+export async function sealSaveSummary(value: unknown, context: string): Promise<EncryptedSave> {
+  const record = await readKey(context);
+  if (!record) throw new Error('Save key missing.');
+  const crypto: typeof import('expo-crypto') = require('expo-crypto');
+  const key = await crypto.AESEncryptionKey.import(record.key, 'hex');
+  const encrypted = await crypto.aesEncryptAsync(new TextEncoder().encode(JSON.stringify(value)), key,
+    { additionalData: aad(`${context}:summary:v1`), nonce: { length: 12 }, tagLength: 16 });
+  return { __env: 2, algorithm: 'AES-256-GCM', data: await encrypted.combined('base64') };
+}
+
+export async function openSaveSummary(raw: unknown, context: string): Promise<unknown> {
+  const envelope = raw as EncryptedSave | null;
+  if (!envelope || envelope.__env !== 2 || envelope.algorithm !== 'AES-256-GCM' ||
+    typeof envelope.data !== 'string' || envelope.data.length > 32_768) return null;
+  const record = await readKey(context);
+  if (!record) return null;
+  const crypto: typeof import('expo-crypto') = require('expo-crypto');
+  const key = await crypto.AESEncryptionKey.import(record.key, 'hex');
+  const plaintext = await crypto.aesDecryptAsync(crypto.AESSealedData.fromCombined(encryptedBytes(envelope.data)), key,
+    { additionalData: aad(`${context}:summary:v1`) });
+  return JSON.parse(new TextDecoder().decode(plaintext));
 }

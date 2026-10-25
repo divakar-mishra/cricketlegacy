@@ -48,3 +48,9 @@ __pycache__/
 /3NYU2EUM6J2ZX/
 /Reports/
 /marketing/
+
+# Local agent configuration and hosting caches are not application source.
+/.agents/
+/.codex/
+/.aws/
+.wrangler/

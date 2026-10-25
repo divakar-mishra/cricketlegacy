@@ -1,4 +1,4 @@
-import { ECONOMY } from '../data/gameConfig';
+import { energyCapacity } from '../game/economy';
 import type { SaveGame, StoredMoney } from '../domain/types';
 
 function count(value: unknown): number {
@@ -20,10 +20,19 @@ export function synchronizeSchema14State(save: SaveGame, now = Date.now()): void
   const inventory = save.inventory ?? {};
   const user = save.userPlayerId ? save.players?.[save.userPlayerId] : undefined;
 
+  const accountCoins = count(wallet.coins);
+  const gems = count(wallet.gems);
+  const previousWallet = save.premiumWallet;
+  // This clock describes the canonical wallet, not every save operation.
+  // Rewriting it for unchanged balances defeats semantic backup deduplication.
+  // Keep all paid fields in the fingerprint; fix the redundant mutation here.
+  const unchangedWallet = previousWallet?.version === 1 &&
+    previousWallet.accountCoins === accountCoins && previousWallet.gems === gems &&
+    Number.isFinite(previousWallet.updatedAt) && previousWallet.updatedAt >= 0;
   save.premiumWallet = {
-    accountCoins: count(wallet.coins),
-    gems: count(wallet.gems),
-    updatedAt: now,
+    accountCoins,
+    gems,
+    updatedAt: unchangedWallet ? previousWallet.updatedAt : now,
     version: 1,
   };
   save.premiumInventory = {
@@ -47,7 +56,7 @@ export function synchronizeSchema14State(save: SaveGame, now = Date.now()): void
     save.playerCareerResources = {
       ...existing,
       trainingFocus: count(wallet.energy),
-      trainingFocusCap: save.vipEnergyBonusActive ? ECONOMY.vipEnergyMax : ECONOMY.energyMax,
+      trainingFocusCap: energyCapacity(save.entitlements),
       playerCondition: count(
         user?.condition ?? existing?.playerCondition ?? user?.meta?.fitness ?? 100,
       ),

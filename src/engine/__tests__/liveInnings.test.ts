@@ -5,6 +5,7 @@ import { LiveInnings } from '../liveInnings';
 import { LiveMatch } from '../liveMatch';
 import { makeRng } from '../rng';
 import { makeTeams, NEUTRAL_CONDITIONS, seedFor } from './_helpers';
+import { canBowl } from '../rating';
 
 const { home, away } = makeTeams();
 
@@ -21,6 +22,21 @@ function inningsInput(): InningsInput {
 }
 
 describe('LiveInnings (stepwise controller)', () => {
+  it.each(['ALLROUNDER', 'BOWLER'] as const)('does not exclude an unallocated youth %s before the existing spell rule', role => {
+    const youth = { ...away.players[4], role, bowlingStyle: 'PACE' as const,
+      bowling: { paceOrSpin: 18, accuracy: 18, movement: 18, variations: 18, stamina: 18 } };
+    expect(canBowl(youth)).toBe(true);
+    expect(canBowl({ ...youth, role: 'BATTER' })).toBe(false);
+    expect(canBowl({ ...youth, bowlingStyle: undefined })).toBe(false);
+    const input = { ...inningsInput(), bowlingXI: away.players.map((p, i) => i === 4 ? youth : p),
+      preferredAllRounderId: youth.id };
+    const auto = simulateInnings(input, makeRng(seedFor(47)));
+    const live = new LiveInnings({ ...input, interactiveBowlerId: youth.id }, makeRng(seedFor(47))).runToEnd();
+    expect(auto.bowling.find(card => card.playerId === youth.id)?.balls).toBeGreaterThanOrEqual(12);
+    expect(live.bowling.find(card => card.playerId === youth.id)?.balls).toBeGreaterThanOrEqual(12);
+    expect(live).toEqual(auto);
+    expect(youth.bowling.accuracy).toBe(18); // Eligibility is not a skill/stat bonus.
+  });
   it('is a faithful refactor: AI-driven live innings == simulateInnings for the same seed', () => {
     for (let i = 1; i <= 40; i++) {
       const seed = seedFor(i);

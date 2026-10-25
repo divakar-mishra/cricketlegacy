@@ -1,0 +1,1 @@
+Rendered 90 frames at 30fps. Duration 3.0s. Video tracks: [(1080.0, 1920.0)]. Audio tracks: 1.

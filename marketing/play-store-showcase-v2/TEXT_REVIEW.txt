@@ -1,0 +1,232 @@
+OCR text audit — actual UI text is retained; no OCR rewriting.
+
+## 01-player-legend.png
+- PLAYER CAREER
+Your career.
+Make it legendary.
+Develop your cricketer. Build a record to remember.
+<
+Aarav Sen
+India | Batter | Age 39
+01
+BAT
+India
+99
+OVR
+99
+FORM
+CAREER STATISTICS
+1075
+MATCHES
+36640
+RUNS
+300
+HIGH SCORE
+36.7
+BAT AVG
+48
+WICKETS
+7/42
+BEST
+Core ratings
+Batting
+Bowling
+Mental
+99
+99
+99
+Cricket: Player and Manager
+
+## 02-manager-dream-xi.png
+- MANAGER CAREER
+Build your
+dream Xl.
+Pick your players. Set the order. Lead your team.
+<
+Squad & Tactics
+India National XI
+4
+Aakash Chauhan
+BAT
+• 100
+5
+Karthik Chauhan
+BAT
+• 100
+6
+Rohan Deshmukh
+WK
+• 70
+7
+Sanjay Bose
+BOWL
+•70
+8
+Aakash Grewal
+BOWL
+• 100
+Cricket: Player and Manager
+99
+98
+97
+99
+98
+02
+V
+V
+V
+
+## 03-live-match.png
+- LIVE MATCHDAY
+Own the
+big moments.
+Live match action. Ball-by-ball drama.
+Bengaluru Grade A XI
+WK
+BAT
+BWL
+4
+Boundary
+Short • Sweep
+Cricket: Player and Manager
+03
+LIVE
+
+## 04-tactics-and-field.png
+- TACTICS & FIELD
+Read the game.
+Set the plan.
+Choose your batting approach, bowling plan and field.
+04
+<
+Squad & Tactics
+India National XI
+BATTING APPROACH
+Defensive
+Balanced
+Aggressive
+BOWLING PLAN
+4 Attack
+• Contain
+x Mix it up
+FIELD SETTING
+All-Out Attack
+Attacking
+= Balanced
+Defensive
+3 outside • middle/death overs
+Powerplay • max 2 outside
+{} Boundary Protection
+Cricket: Player and Manager
+.....
+
+## 05-training-recovery.png
+- TRAINING & RECOVERY
+Train smarter.
+Come back ready.
+Plan squad training. Explore personal recovery support.
+MANAGER CAREER • SQUAD TRAINING
+05
+COACH'S BOARD
+TRAINING GROUND • LEVEL 3/5
+SESSION FOCUS
+Batting
+Bowling
+Fielding
+Fitness
+Balanced
+* Recovery
+PLAYER CAREER • PHYSIO SUPPORT
+Personal Physio
+Restores 25 condition, improves morale by 4, and shortens an
+active injury by one match. Up to three visits each season.
+OK
+Cricket: Player and Manager
+
+## 06-club-development.png
+- BUILD YOUR CLUB
+Find talent.
+Build the future.
+Scout recruits. Develop your academy and ground.
+SCOUTING
+India
+BWL
+72
+OVR
+68
+FORM
+Core ratings
+Batting
+Bowling
+Mental
+Scout report
+Assessed ~72 OVR • Certainty 100% • Recommended
+YOUTH ACADEMY
+HOME GROUND
+LEVEL 2 • Twin practice lanes
+Academy development
+Level 2/5
+Stands view • Upgrades shown separately
+YOUR STANDS TODAY
+East & west seating
+Level 2 . 12.000 seats
+Cricket: Player and Manager
+06
+47
+74
+69
+
+## 07-player-life.png
+— BEYOND MATCHDAY
+More than
+a cricketer.
+Player Life. Media moments. Your own cricket story.
+07
+<
+Aarav Sen
+Mumbai Sharks • Season 25 • Age 39
+• PLAYER CAREER
+FORM 99 | COND 100 | TRUST 100
+Specialist | Tactical Coach
+International | India | 99 OVR
+View Full Profile
+Player Life
+Media Scrapbook • 20
+Cosmetics
+Records & Hall of Fame
+Cricket: Player and Manager
+•••.
+
+## 08-trophies-and-story.png
+- TROPHIES & STORY
+Chase records.
+Fill the cabinet.
+Career milestones, trophies and press-room choices.
+FACE THE PRESS
+PRESS ROOM
+The Unveiling
+08
+Your first press conference at Chennai Arclight.
+Cameras flash. "Manager — what should the fans
+expect from you this season?"
+YOUR RESPONSE
+Promise silverware
+Raise expectations
+Preach patience
+Play the long game
+Credit the players
+Deflect to the squad
+YOUR TROPHY CABINET
+TROPHY CABINET
+Mumbai Sharks
+2036
+Mumbai Sharks
+(Continental)
+2035
+Mumbai Sharks
+2035
+Mumbai Sharks
+2034
+Cricket: Player and Manager
+
+Blocked phrase findings: None

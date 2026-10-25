@@ -1,0 +1,130 @@
+SHORT INTERACTIVE PLAYER CREATION WALKTHROUGH
+25 October 2026 | QA29 INSTALLED, after owner review of QA28
+
+FOLLOW-UP — OWNER-AUTHORIZED QA29 INSTALL,25 OCTOBER02:33IST
+==========================================================
+Standalone QA1.0.12/code29 built successfully in2m21s(wrapper142s).
+Fresh155tests/16focused suites, tsc/src quiet lint/diff PASS.18native consent
+tests pass with no failures/errors/skips.383runtime/config fingerprints stable
+during build;372bundled project source contents match disk. Only two runtime
+files differ from QA28, exactly the Player form and creation guide copy.
+Manager, loading optimisation and previous shared scroll fixes unchanged.
+
+Artifact:output/short-player-guide-qa-2026-10-25/
+cricket-player-manager-short-player-guide-qa-vc29.apk
+SHA256:28e18a97dab529956734cc9e793dfb03d3b21d00eede63d5a6e130a280fcd5b0
+Verified package com.coverdrive.cricket/code29, min24/target36,arm64-v8a,
+unchanged V2 debug certificate. Embedded JS8,234,020bytes; hash matches generated
+bundle. Known third-party R8/Gradle warnings retained; no suppression or upgrade.
+Only local QA version override; production AAB/config/store unchanged.
+
+Confirmed emulator-5554=Pixel_10_Pro_XL. IMPORTANT: before installation, pm path,
+pm list packages (including -u), and dumpsys reported NO installed game package.
+Reason unknown; do not infer a wipe/uninstall by this agent or claim that old
+local saves survived. No uninstall, package clear or AVD reset performed here.
+adb install -r Success. Installed APK SHA256 matches artifact. Both firstInstallTime
+and lastUpdateTime are2026-10-25 02:33:54, consistent with fresh registration.
+
+Opened game and inspected startup screenshot: initial 'Your age' setup, landscape.
+Left untouched for owner. No age, residence, consent or legal choice entered;
+no career/guide tap, new save, purchase, sign-in or restoration. Other devices,
+providers/backend/website/store untouched. Install/start confirmed, NOT native
+guided-flow, latency, old-save recovery or gameplay/IAP parity. Owner testing
+continues after initial setup. No promise of prior local data preservation.
+
+Evidence:build.log,build-result.json,source-before/after.json,
+bundled-source-check.json,install-verification.json,pixel10-handoff.png in the
+artifact folder. Source-only delivery status at the end is historical; the new
+short interactive guide is now packaged and installed in QA29.
+
+OWNER FEEDBACK AND IMPLEMENTATION
+=================================
+Owner says QA28's inline card is not the interactive walkthrough they wanted.
+Restore the earlier highlights/pointers, shortened to 2–3 popups on Player
+creation pages; Manager was OK. Current Manager guide is left unchanged.
+
+Player identity has THREE grouped popup stops:
+  1. Name + cricket country. Both must be valid before guide Next is enabled.
+  2. Appearance. Gender, skin tone AND portrait must all be explicitly chosen.
+     Scroll within the highlighted appearance group to reach all the faces.
+  3. Role + styles. Role must be explicitly chosen. The same highlight contains
+     career identity, optional Ironman, batting hand and applicable bowling
+     hand/style; these extra options may retain defaults.
+
+Player attributes has THREE popup stops:
+  1. Combined pathway/difficulty/points/rating overview at the TOP of the page.
+  2. Pointer to the actual first skill's +. A manual tap applies the normal
+     allocation and advances the guide. Skip step is allowed; no forced spend.
+  3. Remaining +/− skills, with scrolling inside the highlighted skill rows.
+     Points can remain unspent. Finish unlocks normal page controls.
+
+Club and Review each need just ONE short popup. Club guide Finish requires an
+actual club choice. Review explains checking/changing setup and Start Career.
+No guide action creates a save, advances a page, buys anything or picks a role.
+Guide Finish is not the form's Next/Start button. Identity/attribute popup copy
+stays at most 40 words per stop. Total8 stops instead of the old18 Player stops.
+
+Existing docked coach reserves its own area, dims unrelated controls, uses
+bounded scrolling for tall option groups and highlights the real target. New
+group anchors keep name/country together, all appearance choices together, and
+role/styles together. Attribute setup is separate from skill rows, so the tour
+starts at the top rather than revealing a + at the bottom first. Prior stable
+content-coordinate/coalesced-scroll fixes remain intact. Country selection
+temporarily yields the coach; returning resumes the same stop.
+
+Session-scoped progress starts each new form fresh despite old saved tip keys.
+Show screen guide replays the current page; Skip guide never bypasses form
+validation. No required name/country/gender/tone/portrait/role/club rule changed.
+
+UNCHANGED SCOPE / EVIDENCE
+===========================
+Only two runtime files changed for this follow-up:
+  src/screens/PlayerCreationScreen.tsx
+  src/content/careerGuides.ts (only the four Player creation chapters)
+
+Before/after byte-hash comparison confirms unchanged TeamSelectScreen,
+CreationOverview, saveGames, storage, CareerGuide, Screen and Stepper. Exact
+text comparison confirms ALL non-Player-creation guide chapters unchanged.
+Thus Manager remains QA28's inline overview, Home/training/match guides remain
+interactive as before, and the lightweight empty-slot/durable-save loading
+optimisation is retained. No engine, economy, schema, native config or dependency
+changes. Female fictional rosters and prior creation field/point rules retained.
+
+VERIFICATION
+============
+155 tests / 16 focused suites PASS, 0 snapshots. Fresh tsc --noEmit,
+src ESLint --quiet and git diff --check PASS. Not a full Jest/release gate.
+New mounted tests combine the REAL Player form, production guide definitions,
+real CareerGuide and real Stepper +/−; only native geometry/modal/peripheral
+UI and services are mocked. They verify exactly3 required identity stops,
+all grouped prerequisites, setup -> actual+ -> remaining skill flow, one manual
+attribute increase only, no forced spending, club/review completion without
+starting a career, old-tip immunity, country picker yield and skip/replay with
+form validation intact. Existing generic pointer-engine tests retain longer
+synthetic fixtures for scroll/keyboard/late-callback edge cases; they do not
+describe the shortened production popup count. Other coverage includes manual
+allocation, durable first save, duplicate-tap guards, save/backup protection,
+Manager form parity, modal queue, footer/safe area and portrait selection.
+
+Logs:
+  /private/tmp/cricket-short-walkthrough-tests.log
+  /private/tmp/cricket-short-walkthrough-types.log
+  /private/tmp/cricket-short-walkthrough-lint.log
+Native touch/scroll/keyboard smoothness is NOT established by host mocks.
+Expo57 versioned reference read before edits:
+  https://docs.expo.dev/versions/v57.0.0/
+
+SOURCE-PASS DELIVERY STATUS (BEFORE THE QA29 FOLLOW-UP ABOVE)
+============================================================
+No APK/AAB built or installed this follow-up; no emulator/phone interaction,
+career advancement/creation, save clear, purchase/account/provider/backend/
+website/store action. Last verified installed Pixel10 build remains QA28,
+which has the superseded INLINE Player cards. The shorter interactive Player
+walkthrough requires a separately authorized new standalone QA build/install.
+Then verify all three grouped identity stops, portrait scrolling/colour/gender,
+country picker, attribute entry/+ and list scrolling, Finish/Skip/Replay,
+club/review/Start behavior, compact screen/keyboard/large text and Manager parity.
+Do not treat the prior QA28 screenshot or installation as evidence of this change.
+
+Living record: three docs/how-to handbooks updated and mirrored to the owner's
+Desktop/HOW TO when permissions allow. Older entries remain historical evidence.

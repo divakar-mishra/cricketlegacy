@@ -11,6 +11,13 @@
  *   - AdMob ad-unit IDs: AdMob console -> your app -> Ad units.
  */
 const IS_DEV_BUILD = typeof __DEV__ !== 'undefined' && __DEV__;
+function isIOS(): boolean {
+  try {
+    // Preserve standalone config/engine checks where React Native is absent.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return (require('react-native') as typeof import('react-native')).Platform?.OS === 'ios';
+  } catch { return false; }
+}
 
 const ADMOB_ANDROID_REWARDED_UNIT = 'ca-app-pub-4249020515368291/1717736882';
 const ADMOB_ANDROID_INTERSTITIAL_UNIT = 'ca-app-pub-4249020515368291/6625581037';
@@ -18,7 +25,10 @@ const ADMOB_ANDROID_BANNER_UNIT = 'ca-app-pub-4249020515368291/6681421355';
 
 export const MONETIZATION = {
   revenueCat: {
-    ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '',
+    // EAS rejects empty env values. Simulator profiles explicitly disable the
+    // Apple client, including when a preview environment supplies a real key.
+    ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_DISABLED === 'true'
+      ? '' : process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '',
     android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '',
   },
   admob: {
@@ -26,8 +36,14 @@ export const MONETIZATION = {
      * Debug builds use the SDK's TestIds fallback unless explicitly overridden.
      * Release builds default to Cricket Legacy's Android ad units.
      */
-    rewarded: process.env.EXPO_PUBLIC_ADMOB_REWARDED_UNIT ?? (IS_DEV_BUILD ? '' : ADMOB_ANDROID_REWARDED_UNIT),
-    interstitial: process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT ?? (IS_DEV_BUILD ? '' : ADMOB_ANDROID_INTERSTITIAL_UNIT),
-    banner: process.env.EXPO_PUBLIC_ADMOB_BANNER_UNIT ?? (IS_DEV_BUILD ? '' : ADMOB_ANDROID_BANNER_UNIT),
+    get rewarded() { return isIOS()
+      ? process.env.EXPO_PUBLIC_ADMOB_IOS_REWARDED_UNIT ?? ''
+      : process.env.EXPO_PUBLIC_ADMOB_REWARDED_UNIT ?? (IS_DEV_BUILD ? '' : ADMOB_ANDROID_REWARDED_UNIT); },
+    get interstitial() { return isIOS()
+      ? process.env.EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_UNIT ?? ''
+      : process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT ?? (IS_DEV_BUILD ? '' : ADMOB_ANDROID_INTERSTITIAL_UNIT); },
+    get banner() { return isIOS()
+      ? process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_UNIT ?? ''
+      : process.env.EXPO_PUBLIC_ADMOB_BANNER_UNIT ?? (IS_DEV_BUILD ? '' : ADMOB_ANDROID_BANNER_UNIT); },
   },
 } as const;

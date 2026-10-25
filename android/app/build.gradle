@@ -92,8 +92,8 @@ android {
         applicationId 'com.coverdrive.cricket'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 16
-        versionName "1.0.11"
+        versionCode 17
+        versionName "1.0.13"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -159,9 +159,15 @@ def checkLegalReadinessForRelease = tasks.register("checkLegalReadinessForReleas
     commandLine "node", new File(rootDir.parentFile, "scripts/check-legal-readiness.mjs").absolutePath
 }
 
+def checkVersionForRelease = tasks.register("checkVersionForRelease", Exec) {
+    workingDir rootDir.parentFile
+    commandLine "node", new File(rootDir.parentFile, "scripts/checkAndroidReleaseVersion.cjs").absolutePath
+}
+
 tasks.configureEach { task ->
     if (task.name == "preReleaseBuild") {
         task.dependsOn checkLegalReadinessForRelease
+        task.dependsOn checkVersionForRelease
     }
 }
 
@@ -188,6 +194,12 @@ tasks.configureEach { task ->
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+
+    // Match the existing Google Mobile Ads 24.9.0 runtime. The adapter's POM
+    // does not include Unity itself. AdMob owns initialization and placements.
+    implementation("com.google.ads.mediation:unity:4.16.6.0")
+    implementation("com.unity3d.ads:unity-ads:4.16.6")
+    testImplementation("junit:junit:4.13.2")
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

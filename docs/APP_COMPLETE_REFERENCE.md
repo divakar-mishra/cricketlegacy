@@ -60,8 +60,9 @@ selected at career creation.
 6. An `APP_OPEN` analytics event is written to the local analytics buffer.
 7. The Splash route transitions to Main Menu without requiring a network check.
 8. The player reaches Main Menu.
-9. On first launch, a five-page onboarding sequence appears. It can later be
-   replayed from Settings.
+9. After required age checks, a cricket welcome offers "Guide me" or "Explore
+   on my own". Contextual screen guides can be replayed individually or reset
+   through Settings; there is no mandatory slideshow.
 
 The root stack hides native headers because every screen owns its own heading
 and safe-area treatment. Most routes use a horizontal slide transition;
@@ -314,48 +315,43 @@ offers the Hall of Fame path when eligible.
 
 ### 5.1 Global onboarding
 
-The first-run onboarding contains five pages:
-
-1. Live ball-by-ball cricket.
-2. Build a player from prospect to legend.
-3. Run a detailed manager career.
-4. Chase achievements and records.
-5. Use daily systems and the Season Pass.
-
-It supports horizontal swiping, Back, Next and Skip. A swipe must travel at
-least 48 dp. Dots show the current page.
+First launch offers "Guide me" or "Explore on my own" after the required
+eligibility checks. Coaching highlights real native controls at the current
+screen, with arrows, short explanations, Back, Next/Finish, Skip step and Skip
+guide. Actions such as the attribute + advance only when the actual control
+is used, not after a timer. No guide grants a reward or spends resources.
+Show screen guide replays a chapter; Settings Replay game guides resets all.
+Progress uses existing settings dismissedTips keys, separately for both modes.
 
 ### 5.2 Player guide
 
-The Player Career guide has five focused steps:
+The rejected quick-start shortcut was reversed on24October. Player creation
+retains all four steps: Identity & Avatar, Attributes, Club and Review. Country,
+club and attribute allocation are manual; successful saving opens Home, not a
+match. Write-failure/duplicate/occupied-slot guards remain.
 
-1. Follow the single highlighted next action.
-2. Train and develop attributes.
-3. Perform the selected batting/bowling role.
-4. Understand selection and progression.
-5. Review the whole career path and records.
+Creation pointers cover name, country, portrait, role, actual attribute +,
+remaining points, club and review. Home covers Customise player, resources,
+individual Stats/Progress/More tabs, next cricket chapter and Training. Player
+Training explains session limits, focus, real Coins cost, optional Train and
+Development Centre. It can finish without training or purchasing anything.
 
 ### 5.3 Manager guide
 
-The Manager guide has six steps:
-
-1. Use Continue to advance the canonical calendar.
-2. Read the phase and next fixture.
-3. Select a legal XI.
-4. Choose a tactical plan.
-5. Scout and recruit.
-6. Run facilities, staff and club resources.
+Manager creation points to difficulty, country, club and Start Managing. Home
+points to the current chapter, individual Team/Club/Academy/Records/Store tabs,
+preparation actions and actual Training tile. Manager Training explains focus,
+workload/Recovery, Save/Plan Saved and player overrides. Development still
+settles after fixtures; no Player-session purchase or immediate stat grant.
 
 ### 5.4 First career match
 
-When the user reaches the crease in the first career match, the live match
-pauses for three short prompts:
-
-1. Choose a batting stance.
-2. Read the chase and match situation.
-3. Understand the post-match reward/progression loop.
-
-Each prompt auto-advances after six seconds if untouched.
+Setup guides explain conditions, toss and Watch/Key/Instant. Watch points to
+the real bowling-plan or batting-approach control when the Player is involved;
+Manager Watch points to Tactics. A subsequent step highlights the actual score.
+Visible live coaching pauses play and releases on finish/skip/scene exit.
+There is no timed advancement, scripted win or direct-creation match jump.
+Real results, participation, selection and normal settlement remain authoritative.
 
 ### 5.5 Contextual help
 
@@ -370,11 +366,13 @@ The searchable Cricket Academy contains 17 current topics across four tabs:
 - Physicality & Injuries: First-Class workload, condition, morale, injuries
   and age development.
 
-Info buttons are attached to complex screens such as Squad, Transfers and the
-hubs. There is no permanent or absolutely positioned Coach Tip on Home,
-Matchday or the live match screen. First-match coaching remains in the
-dismissible guide, while mechanic explanations open on demand or render in
-normal document flow so they cannot cover cards or match controls.
+Info buttons remain on complex screens such as Squad, Transfers and the hubs.
+There is no permanent Coach Tip. Optional interactive coaching temporarily
+highlights a native control without intercepting its taps, scrolls targets into
+view and positions its scrollable card outside the highlighted area. It yields
+to higher-priority dialogs and only runs on the focused scene. Other mechanic
+explanations remain on demand or in normal document flow. Verification and
+remaining native coverage: docs/CAREER_COACH_2026-10-24.txt.
 
 ## 6. Player Career - Complete Game Flow
 
@@ -1386,9 +1384,12 @@ Starting wallet:
 
 - Standard cap: 36.
 - Permanent VIP cap: 60.
-- Regeneration: one energy every five real minutes.
-- Gem refill: ten gems restores energy to the standard cap of 36.
-- Store rewarded ad: `+4` energy, capped at the standard 36.
+- Regeneration: one energy every three real minutes (23 October owner approval).
+- Gem refill: ten gems restores energy to the actual cap: standard36 / permanent VIP60.
+- Optional completed rewarded ad: `+8` energy up to the actual cap; never reduces overflow.
+- Tap the energy meter for next-point/full countdowns and optional rewarded recovery.
+  Player energy-shortage actions open this same dialog. Foreground/point-boundary
+  reconciliation is lightweight; the visible dialog owns its second countdown.
 
 Match energy costs:
 
@@ -1879,7 +1880,7 @@ Player Career also offers a one-way Gem Exchange at `1 gem = 40 Wallet Coins`:
 
 The exchange is unavailable in Manager Career and cannot be reversed.
 
-- Energy refill to standard cap: 10 gems.
+- Energy refill to actual standard36 / permanent VIP60cap:10gems.
 - Injury fast recovery:
   `max(10, min(50, matches out x 8))` gems.
 
@@ -1981,7 +1982,8 @@ Only permanent VIP receives the 60-energy cap and +20% match coins.
 Two active rewards exist:
 
 - Post-match: double the just-completed match coin award once.
-- Store: add four energy up to the standard 36 cap.
+- Store or energy popup: add eight energy up to standard36 / permanent VIP60;
+  preserve overflow and bind completion to the original Player save.
 
 The reward is granted only after AdMob emits `EARNED_REWARD`. A 30-second
 safety timeout prevents a hanging promise. Requests are non-personalized.
@@ -2136,7 +2138,7 @@ Currently connected reminders are:
 
 | Notification   |                                       Default delay |
 | -------------- | --------------------------------------------------: |
-| Energy full    | Calculated from missing energy at five minutes each |
+| Energy full    | Actual36/60cap, three minutes per point, subtract partial interval |
 | Daily reward   |                                            24 hours |
 | Streak at risk |                                            20 hours |
 | Match ready    |                                             4 hours |
@@ -2173,9 +2175,22 @@ delivery is therefore inactive in the current project.
 
 ### 19.3 Store review
 
-The app may request the native store review after at least three wins, no more
-than once every seven days, and only in a production/native environment where
-the review API is available.
+Owner-approved update, 21 October 2026: after five completed matches across
+Player/Manager/daily-challenge play on this installation, a neutral, dismissible
+Play Store rating invitation is eligible at a quiet career hub. Wins/losses do
+not filter eligibility. It waits for guides, rewards, newspapers, offers and
+the Player hub-return ad/starter lookup; hidden/background hubs cannot show it.
+The prompt uses the shared lowest-priority modal queue and records its history
+before appearing. "Not now", Android Back and outside-tap dismissal end the
+installation's automatic invitation; it does not recur each week or on update.
+Existing `sr:lastPrompt` native-review history is respected to avoid re-asking
+previously prompted installations. Storage failures suppress the invitation.
+
+"Rate on Google Play" opens the exact `com.coverdrive.cricket` listing via its
+native market link, with an HTTPS fallback. A Settings entry permits a later
+voluntary review. No quota-limited native review API is invoked by a button,
+no star rating is requested, no reward is granted, and opening Play is never
+reported as proof of a submitted review. No career/cloud schema changes occur.
 
 ## 20. Records, Leaderboards And Integrity
 

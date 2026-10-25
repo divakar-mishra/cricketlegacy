@@ -16,6 +16,12 @@
     </intent>
   </queries>
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="false" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
+    <!-- Unity's library manifest otherwise starts context/orientation/Cronet
+         setup before our age/UMP gate. Defer only this initializer; preserve
+         other AndroidX startup components. The consent bridge starts it later. -->
+    <provider android:name="androidx.startup.InitializationProvider" android:authorities="${applicationId}.androidx-startup" tools:node="merge">
+      <meta-data android:name="com.unity3d.services.core.configuration.AdsSdkInitializer" tools:node="remove"/>
+    </provider>
     <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-4249020515368291~8405865949" tools:replace="android:value"/>
     <meta-data android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT" android:value="true" tools:replace="android:value"/>
     <meta-data android:name="com.google.android.gms.ads.flag.OPTIMIZE_AD_LOADING" android:value="true" tools:replace="android:value"/>

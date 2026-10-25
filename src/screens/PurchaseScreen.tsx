@@ -3,7 +3,7 @@
  * Custom SVG-style icons, countdown scarcity timer on starter pack,
  * social proof, gem sinks list, and full product hierarchy.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
@@ -23,7 +23,9 @@ import {
   WalletBar,
 } from '../components';
 import { ScreenProps } from '../navigation';
-import { accountPurchases, ads, purchases } from '../services';
+import { accountPurchases, purchases } from '../services';
+import { requestRewardedEnergy, useRewardedEnergyPending } from '../services/rewardedEnergy';
+import { useEnergyRecovery } from '../state/energyRecoveryStore';
 import { authorizeReviewerAccess } from '../services/reviewerAccess';
 import { readPendingCheckout } from '../services/purchaseRecovery';
 import { AccountBackupCard } from '../components/AccountBackupCard';
@@ -31,6 +33,7 @@ import { syncAccountCareers } from '../services/accountRecovery';
 import { ECONOMY } from '../data/gameConfig';
 import {
   areAdsRemoved,
+  energyCapacity,
   ENERGY_REFILL_GEMS,
   PLAYER_GEM_CONVERSION_PRESETS,
   PLAYER_GEM_TO_COIN_RATE,
@@ -352,7 +355,6 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
   const restorePurchases = useCareer((s) => s.restorePurchases);
   const claimReviewerAccess = useCareer((s) => s.claimReviewerAccess);
   const [reviewerAccess, setReviewerAccess] = useState(false);
-  const grantAdEnergy = useCareer((s) => s.grantAdEnergy);
   const refillEnergy = useCareer((s) => s.refillEnergy);
   const convertPlayerGems = useCareer((s) => s.convertPlayerGems);
   const { colors, gradients } = useTheme();
@@ -364,8 +366,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
   const [catalogAttempt, setCatalogAttempt] = useState(0);
   const [starterPackOwned, setStarterPackOwned] = useState(true);
   const [expandedFeatureCard, setExpandedFeatureCard] = useState<string | null>(null);
-  const rewardedEnergyPendingRef = useRef(false);
-  const rewardedEnergyAttemptRef = useRef(0);
+  const rewardedEnergyPending = useRewardedEnergyPending();
   const storeSetupPending = !purchases.MOCK_MODE && !purchases.isStoreReady();
   const unavailableLabel = storeSetupPending ? 'Store unavailable' : 'Unavailable';
   const storeName = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
@@ -862,31 +863,13 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
     save?.mode === 'manager' ? 'Build a Dynasty' : 'The Ultimate Player Edition';
 
   const onWatchEnergyAd = async () => {
-    if (rewardedEnergyPendingRef.current) return;
-    if (!rewardedEnergyAvailable) {
-      Alert.alert('Ad unavailable', 'Rewarded ads are not available right now.');
-      return;
-    }
-    rewardedEnergyPendingRef.current = true;
-    const transactionId = `store-energy:${save?.id ?? 'unknown'}:${Date.now()}:${++rewardedEnergyAttemptRef.current}`;
+    if (!save || rewardedEnergyPending) return;
     setBusy('rewarded_energy');
     try {
-      const res = await ads.showRewarded();
-      if (!res.completed) {
-        Alert.alert('Ad unavailable', 'Please try again in a moment.');
-        return;
-      }
-      const granted = grantAdEnergy(ECONOMY.energyPerMatch, transactionId);
-      if (!granted.ok) {
-        Alert.alert(
-          'Reward already applied',
-          granted.reason ?? 'This ad reward was already applied.',
-        );
-        return;
-      }
-      Alert.alert('Energy added', `+${ECONOMY.energyPerMatch} energy added to your wallet.`);
+      const result = await requestRewardedEnergy(save.id);
+      Alert.alert(result.ok ? 'Energy added' : 'Ad unavailable', result.ok
+        ? `+${result.energyAdded ?? 0} energy added to your wallet.` : result.reason);
     } finally {
-      rewardedEnergyPendingRef.current = false;
       setBusy(null);
     }
   };
@@ -896,7 +879,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
     Alert.alert(
       result.ok ? 'Energy refilled' : 'Cannot refill',
       result.ok
-        ? `Energy restored to ${ECONOMY.energyMax}.`
+        ? `Energy restored to ${energyCapacity(save?.entitlements)}.`
         : `You need ${ENERGY_REFILL_GEMS} gems and less than full energy.`,
     );
   };
@@ -1055,18 +1038,18 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
               <View style={styles.energyAlertHeading}>
                 <Text style={styles.energyAlertIcon}>⚡</Text>
                 <Text style={styles.energyAlertTitle}>
-                  Energy {save?.wallet.energy ?? 0}/{ECONOMY.energyMax}
+                  Energy {save?.wallet.energy ?? 0}/{energyCapacity(save?.entitlements)}
                 </Text>
               </View>
               <View style={styles.energyAlertActions}>
                 <Button
-                  label={rewardedEnergyAvailable ? 'Watch ad' : 'Ad unavailable'}
+                  label={rewardedEnergyAvailable ? `Watch ad · +${ECONOMY.rewardedAdEnergy} energy` : 'Ad unavailable'}
                   variant="secondary"
                   size="sm"
                   style={styles.energyAlertAction}
                   loading={busy === 'rewarded_energy'}
                   disabled={
-                    !rewardedEnergyAvailable || (busy != null && busy !== 'rewarded_energy')
+                    !rewardedEnergyAvailable || rewardedEnergyPending || (busy != null && busy !== 'rewarded_energy')
                   }
                   onPress={() => void onWatchEnergyAd()}
                 />
@@ -1079,6 +1062,7 @@ export function PurchaseScreen({ navigation, route }: ScreenProps<'Purchase'>) {
                   onPress={onRefillEnergy}
                 />
               </View>
+              <Button label="Recovery time" variant="ghost" size="sm" onPress={() => useEnergyRecovery.getState().open()} />
             </Animated.View>
           )}
 

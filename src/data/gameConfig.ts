@@ -121,8 +121,10 @@ export const ECONOMY = {
   startingCoins: 750,
   startingGems: 0,
   energyMax: 36,
-  energyRegenMinutes: 5,
+  energyRegenMinutes: 3,
   energyPerMatch: 4,
+  /** Optional completed rewarded ad; independent of unchanged match costs. */
+  rewardedAdEnergy: 8,
   /**
    * Base coins awarded for a match by result. Single source of truth consumed
    * by {@link matchReward} in game/economy.ts (previously these values were

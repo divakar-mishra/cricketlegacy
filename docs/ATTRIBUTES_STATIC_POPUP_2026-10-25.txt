@@ -1,0 +1,134 @@
+ATTRIBUTES: ONE STATIC POPUP, NORMAL SCROLLING
+25 October 2026 | QA30 INSTALLED on Pixel 10 at 03:06 IST
+
+BUILD / INSTALL FOLLOW-UP
+========================
+Owner requested installation before the production AAB. Fresh 163 tests across
+17 focused suites, tsc --noEmit, src ESLint --quiet and git diff --check PASS.
+Standalone QA build SUCCESS in 2m 13s (wrapper 135 seconds); 18 native consent
+tests executed with zero failures, errors or skips. Not the full release gate.
+384 runtime/config fingerprints stable throughout packaging. Exactly the five
+runtime changes listed below differ from QA29; all 373 bundled project sources
+match disk. Embedded JavaScript is 8,235,256 bytes and matches the generated
+bundle. Package 1.0.12 / local QA version code 30, min24 / target36, arm64-v8a;
+V2 debug signature verified, same certificate as QA29. No production config edit.
+
+Artifact:
+  output/attributes-popup-qa-2026-10-25/
+  cricket-player-manager-attributes-popup-qa-vc30.apk
+APK SHA256:
+  9e7e53dc6beac7d84c136eb5b620ad6d79366623fbe9e296e798340808f6f84a
+Embedded bundle SHA256:
+  5af94a26fdd0c73fa9b4103035065aa055fc7743fccd27009f907d075e7e8337
+Source map SHA256:
+  9ed7d251b81b769a7976bc3616fcb737f197a43152dad642f44f5fd8f0ba2b95
+
+Confirmed emulator-5554 = Pixel_10_Pro_XL and installed QA29 before updating.
+adb install -r returned Success; package now QA30 and installed APK hash matches.
+firstInstallTime 2026-10-25 02:33:54 retained; lastUpdateTime 03:06:44.
+Opened MainActivity; launch intent delivered to the running top-most instance.
+Read-only screenshot shows the portrait main menu with Choose your look popup.
+Left untouched: no theme/age/consent choice, guide/career/save action, sign-in,
+purchase/restore, uninstall, data clear, other emulator or external service change.
+Install-time retention is verified; actual save loading and native attribute
+smoothness are owner-pending, not proven by the package update or host tests.
+
+Evidence in the artifact folder: build.log, build-result.json, source-before.json,
+source-after.json, bundled-source-check.json, install-verification.json and
+pixel10-handoff.png. Fresh host logs: /private/tmp/cricket-attributes-install30-
+{tests,types,lint}.log. Existing third-party R8/Gradle warnings retained, not hidden.
+Production AAB is NOT built/uploaded in this pass; wait for the owner's QA check.
+Three repository handbooks updated; Desktop mirror synchronization checked below
+in the handoff process. The source-only boundaries at the end are historical.
+
+OWNER REQUEST / SCOPE
+=====================
+Owner reports heavy stuttering on entering/editing Player creation attributes.
+Requested one simple popup for that page, with the current interactive guide
+resuming from the next screen. This report is owner-observed; no native
+stutter trace or profiling reproduction was performed in this source pass.
+
+IMPLEMENTED
+===========
+Attributes now shows ONE static explanation with Got it. It covers pathway,
+difficulty, Points left, Active Grade A OVR, free starting +/− allocation and
+permission to continue with unspent points. No target arrows, + demonstration,
+step sequence, automatic spending or forced allocation. Got it, backdrop or
+Android Back dismisses it. Show screen guide reopens the same popup.
+
+The popup has no animation, blur, native target measurements or scroll-following
+behavior. Copy can scroll at large font sizes; Got it stays outside that copy.
+It respects route focus, safe-area insets and the existing global modal queue.
+Its dismissed/replay state lives in the Player form, so changing attribute values
+does not reopen it and returning from Club does not automatically replay it.
+
+Attributes uses CareerGuide's new explicit 'plain' layout: no pointer request,
+no GuideContext exposed to targets, no root layout observer, no guide-aware
+scroller or scroll constraints. Ordinary native ScrollView resets to the top on
+page entry only; edits on the same page do not trigger scroll resets.
+Attribute GuideTarget wrappers were replaced with ordinary collapsible Views,
+and Stepper guideIncreaseId is absent on this page. Shared Stepper/math unchanged.
+
+The session wrapper remains mounted through the plain page solely to retain
+completed Identity coaching. Switching back does not restart Identity. Club and
+Review use the same docked interactive pointers/copy as QA29. Identity's three
+grouped interactive stops are unchanged; Manager, Home, training and match
+guides are unchanged. All form prerequisites and durable first-save/loading
+optimisations remain in force. No new schema, native config or dependencies.
+
+SOURCE EVIDENCE
+===============
+Five runtime files changed:
+  src/components/AttributesGuidePopup.tsx (new static popup)
+  src/components/CareerGuide.tsx (explicit plain layout/context suspension)
+  src/components/Screen.tsx (ordinary scroller for plain pages)
+  src/screens/PlayerCreationScreen.tsx (popup state/replay, attributes page mode)
+  src/content/careerGuides.ts (only attributes chapter changes to one explanation)
+
+Before/after hashes confirm TeamSelectScreen, saveGames, storage and Stepper
+unchanged. Exact text comparison confirms all NON-attributes guide chapters
+unchanged. Comparison against the hash-verified QA29 source map confirms the
+Identity markup and Club-and-later markup unchanged. No balance, purchase,
+energy, world generation, roster or attribute allocation changes.
+
+VERIFICATION
+============
+163 tests / 17 focused suites PASS, 0 snapshots. Fresh tsc --noEmit,
+src ESLint --quiet and git diff --check PASS. Not the full Jest/release gate.
+
+Mounted real Player form + CareerGuide + Stepper tests verify: one popup;
+no highlight or attribute-plus anchor; no target measureInWindow calls while
+manually editing attributes; unrelated legacy guide events do nothing on this
+page; no automatic allocation; replay opens only the same popup; returning from
+Club retains points and popup dismissal; back to Identity retains completion;
+Club/Review pointers resume normally and do not automatically create a career.
+Screen tests verify native ScrollView instead of GuideScrollView on plain pages,
+one initial scroll reset, no reset on edits, and guided scrolling restored on Club.
+Popup tests cover one action, no animation/onLayout, all dismissal methods,
+background route and modal queue ownership. Existing field, portrait, manual
+allocation, modal/safe area/footer and encrypted save/backup tests also PASS.
+
+Logs:
+  /private/tmp/cricket-attributes-popup-tests.log
+  /private/tmp/cricket-attributes-popup-types.log
+  /private/tmp/cricket-attributes-popup-lint.log
+Expo57 versioned reference read before edits:
+  https://docs.expo.dev/versions/v57.0.0/
+
+These host tests prove that the live pointer/measurement/scroll-constraint path
+is absent on attributes. They do NOT establish actual emulator frame rates or
+eliminate every possible source of rendering latency. Native smoothness needs
+review after a new authorized QA build/install; no measured FPS claim is made.
+
+ORIGINAL SOURCE-PASS DELIVERY BOUNDARIES (HISTORICAL)
+====================================================
+No APK/AAB build/install, emulator/phone interaction, career/save action, reset,
+purchase/sign-in, provider/backend/website/store change in this source pass.
+Last verified installed Pixel10 build is QA29, which still has interactive
+attributes coaching. Do not mistake that APK for this source change.
+Next QA: dismiss/reopen popup, free scroll at portrait/landscape/large text,
+repeated +/− edits, point preservation, Back/Next and Club/Review walkthrough,
+plus regression check that Identity/Manager behavior and save creation remain.
+Historical QA29 installation report remains docs/SHORT_PLAYER_WALKTHROUGH_2026-10-25.txt.
+Three living handbooks updated; Desktop HOW TO mirror synchronized separately
+when permissions allow, preserving unrelated files.

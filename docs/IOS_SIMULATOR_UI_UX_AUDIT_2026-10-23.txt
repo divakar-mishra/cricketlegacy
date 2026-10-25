@@ -1,0 +1,240 @@
+IOS SIMULATOR UI / UX / RESPONSE AUDIT
+23 October 2026 | Asia/Kolkata | current-run evidence, not release certification
+
+FOLLOW-UP: The original F1/F2/F3 findings below have since been fixed and
+retested in docs/IOS_SIMULATOR_UI_FIXES_2026-10-23.txt. This document preserves
+the earlier audit observations; its unfixed wording is historical, not current.
+
+OUTCOME
+=======
+Installed the current standalone simulator app and completed a broad,
+non-destructive audit. Core career navigation works, including repeated tabs,
+back navigation, horizontal/vertical gesture discrimination and cold restart.
+There were no observed app crashes or persistent navigation freezes in the
+completed flows. Three visual/layout findings remain; no app fixes were made.
+This is NOT an all-screens, all-device, memory-leak or App Store readiness pass.
+
+Final selected automation results: 11 passed, 0 failed/skipped across five
+successful result bundles. Earlier failed attempts are retained separately;
+they are explained below and must not be silently counted as passing runs.
+  iPhone16Pro: 4 primary navigation/gesture tests +3 expanded flows +1 targeted.
+  iPadA16: 1 global/setup/settings flow.
+  iPhoneSE3: 1 stationary handbook tap +1 compact creation-form flow.
+Passing navigation assertions do not mean the screenshots are defect-free.
+
+SCOPE / SAFETY / BUILD
+======================
+Surface: Cricket: Player & Manager native iOS app, not a browser mockup.
+Tools: simctl installation/capture and native XCTest actions, assertions,
+screenshots and accessibility hierarchies. Images were opened and visually
+inspected in this run. Rejected/qualified captures are noted below.
+
+Version1.0.12/build1, Release/Hermes, local ad-hoc simulator signature verified.
+Installed bundle: com.coverdrive.cricket.simulator. Not the production bundle.
+App: output/ios-simulator/derived-data/Build/Products/Release-iphonesimulator/
+     CricketSimulator.app
+ZIP: output/ios-simulator/cricket-player-manager-1.0.12-ios-simulator-2026-10-23.zip
+SHA256: e6923c32c000336d4647afa201db968105a63deba1f4efd5ae7d186ad071e133
+
+Devices, all iOS26.5 /23F77, portrait:
+  Cricket QA iPhone16Pro: 6A85EC9A-070E-41D0-AC4B-D1C578B02886,402x874pt.
+  Cricket QA iPadA16: BD2DF2E3-48A6-43B0-BE4B-E4816CBAECAC,820x1180pt.
+  New isolated iPhoneSE3: 22A77244-958A-46A9-8E6A-B9C532B1C5D2,375x667pt.
+  The compact device was created only for this audit; existing devices were
+  not erased. Its age24 input is fictional QA data, not an owner age declaration.
+
+Existing phone/tablet app data was backed up before in-place installation to:
+  output/ios-simulator/evidence/ui-ux-audit-2026-10-23/baseline/
+No uninstall, save/account deletion, new committed career, match advancement,
+training session, recruitment, upgrade, purchase, restore, cloud login or
+provider setting change was performed. Original Player and Manager save cards
+were verified after the expanded phone pass. Appearance preferences preserved:
+phone Warm, iPad/compact Classic. QA audio is intentionally muted in the staged
+build; switches being visible does not certify audio playback or haptics.
+
+The simulator build intentionally disables Supabase/RevenueCat and uses Google
+test ad IDs. Test banners were observed. They do not verify live iOS ads, teen
+creatives, ATT/consent legality or store transactions. No live ad was clicked.
+Unconfigured Store messages are expected for this artifact, not evidence that
+the owner's real RevenueCat/App Store setup is broken.
+
+CONFIRMED FINDINGS / PROPOSED FOLLOW-UP, NOT IMPLEMENTED
+=======================================================
+F1 — P2, Wage Ledger initially clips the first player row.
+  Route: Saved Games > Manager > Play > Club > Wage Ledger.
+  Karthik Pillai's name/wage is above the list's visible top; only part of the
+  Renew button is visible. Reproduced across three visits, including a separate
+  capture after two seconds of settling. Scrolling works, but initial reading
+  of the most expensive player is impaired. A settled pull-down still shows
+  an anomalous blank first-row region; do not claim the row is unrecoverable.
+  Hierarchy in expanded pass: list viewport y421pt; first-row name y383.7pt;
+  content begins y352pt. This is an initial list-position/clipping issue, not
+  merely text ellipsis or an app crash. Exact native inset/virtualization cause
+  is not yet proven.
+  Source: src/screens/WageBreakdownScreen.tsx, summary outside FlashList,
+  FlashList at line167. Proposed: inspect iOS initial offsets/insets and use
+  one deliberately bounded list/header layout; assert first-row visibility.
+  Evidence: 04-phone-wage-initial.png,20-phone-wage-settled.png,
+  05-phone-wage-scrolled.png; raw nav-audit-57/58/59 and73/74.
+
+F2 — P3, Leadership status wraps in the middle of a word.
+  Route: Manager > Team > Leadership.
+  Disabled Selected button renders as Selecte / d on a402pt phone. Swap role
+  wraps at a word boundary and is readable; Selected is the concrete defect.
+  Source: src/screens/ManagerLeadershipScreen.tsx:193, appointButton width88
+  at line287. Proposed: reserve enough intrinsic button width or shorten the
+  selected-state label, preserving touch target and status semantics.
+  Evidence: 03-phone-leadership.png, raw nav-audit-52.
+
+F3 — P3, important player details are unnecessarily truncated.
+  Home identity line: RIGHT-HAND BAT · ALL-R...; readiness ends with ellipsis,
+  hiding trust. Full profile: Temperament becomes Temperam... despite being
+  a meaningful cricket attribute. Full name/profile and navigation still work.
+  Sources: CareerHubScreen.tsx:2168/2189 single-line masthead text;
+  PlayerProfileScreen.tsx:263 single-line attribute label, flexBasis82 at461.
+  Proposed: responsive label allocation/wrapping or concise complete labels;
+  retain accessible full descriptions and verify at375/402pt and larger text.
+  Evidence: 01-phone-player-home.png,02-phone-profile-labels.png.
+
+ADDITIONAL ENGINEERING / ACCESSIBILITY RISKS
+===========================================
+Runtime log contains repeated UIKit UIScene lifecycle migration warnings,
+CoreUI theme-id warnings and one high-logging-volume quarantine message.
+No matching CricketSimulator crash report was found in the inspected local
+DiagnosticReports listing, and no crash was observed during these tests.
+That is not proof that production is crash-free. Before device archiving,
+review the generated native lifecycle integration and logging volume against
+the current SDK/template. No deadline or automatic App Review rejection is
+inferred solely from these warning messages.
+Raw evidence: output/.../ui-ux-audit-2026-10-23/phone-runtime-faults.log.
+
+Screenshots suggest some muted text/info icons deserve a contrast check,
+particularly the Manager VIP information icon. No measured contrast ratio,
+VoiceOver traversal, Dynamic Type, Reduce Motion, Switch Control, color-vision
+or overall accessibility compliance pass was performed. Treat these as risks,
+not certified violations or passes.
+
+ORDERED COVERAGE / HEALTH
+=========================
+OK = exercised and no material problem seen in that observed state.
+ISSUE = confirmed finding above. LIMITED = behavior/configuration not certified.
+Numbers below are audit stages, not an invented count of unique app screens.
+
+ 01 OK       In-place install / current stable launch; existing saves retained.
+ 02 OK       Main menu, back buttons and app background/foreground return.
+ 03 OK       Saved Games Player/Manager switching; original careers persisted.
+ 04 OK       New Game mode selection.
+ 05 OK       Player identity/avatar empty-state validation; Next disabled.
+ 06 OK       Player name entry, return-key dismissal and country selection.
+ 07 OK       Pathway/attributes > club > review; stopped before Start Career.
+ 08 OK       Manager selection prerequisite; stopped before Start Managing.
+ 09 LIMITED  Account screen layout/back; no Apple/Google/email authentication.
+ 10 OK       Settings top/middle/bottom scrolling; version/build visible.
+ 11 LIMITED  Ad privacy feedback modal opened/dismissed; this device reported
+             no options form required. Actual regional privacy flows deferred.
+ 12 OK       In-app Privacy Policy and scrolling/back; no policy rewrite.
+ 13 OK       Handbook opening/search/clear/back; see timing qualifications.
+ 14 OK       Manager home > Club; Medical/Youth/Wage shortcuts visible.
+ 15 OK       Medical Centre > direct Team switch, no treatment/spending.
+ 16 OK       Squad/tactics > Leadership > Home, without appointment changes.
+ 17 ISSUE    Leadership Selected label: F2.
+ 18 ISSUE    Wage Ledger initial first-row clipping: F1; list still scrolls.
+ 19 OK       Youth Academy empty-state presentation; no paid upgrade.
+ 20 OK       Manager records > Hall of Fame > Home; selected tabs correct.
+ 21 OK       Squad Training; intentional action footer, Back works; no plan save.
+ 22 OK       Transfers closed-window state, Stadium and Staff entry/back;
+             no bid, scouting, recruitment or facility transaction attempted.
+ 23 LIMITED  Both mode stores top/bottom and restore explanations render;
+             unconfigured prices expected. No transaction/restore attempted.
+ 24 ISSUE    Player home identity/readiness and profile labels: F3.
+ 25 OK       Player Stats/Progress > Achievements and direct Hall of Fame.
+ 26 OK       Player Life Career/Kit & media/Finances/Legacy; locked portfolio
+             shown with reason. No deposit, export, import or media post.
+ 27 OK       Personal Academy entry and unaffordable state; no founding.
+ 28 OK       More > full Profile > direct Stats > Home.
+ 29 OK       Player Training entry and list scrolling; no session run.
+ 30 OK       Cosmetics entry/scroll and return; no appearance saved.
+ 31 OK       Five Home/Stats/Progress/More cycles, then restart/save-card checks.
+ 32 OK       Horizontal footer swipe selects Team once; mostly vertical gesture
+             keeps Home selected. Navigation assertions passed.
+ 33 OK       iPad global/settings/account/creation/review/back/restart layout.
+ 34 OK       Compact menu/settings/privacy rendering and stationary handbook tap.
+ 35 OK       Compact creation, country picker, review and manager prerequisites.
+ 36 LIMITED  Compact keyboard capture includes Apple's first-use bilingual
+             keyboard tutorial; not a normal-keyboard layout certification.
+
+EVIDENCE QUALITY / FAILED ATTEMPTS
+=================================
+Initial phone entry image01-phone-entry.png captured iOS launch animation and
+was rejected for visual findings. Stable main-menu capture was accepted.
+Horizontal-gesture capture also contains a transition edge; assertion result
+is retained, while the stable Team screen is used for layout assessment.
+iPad handbook keyboard capture includes Apple's system tutorial, not an app
+overlay defect. Ordinary phone and iPad creation keyboard captures were inspected.
+
+secondary-phone.xcresult: two initial failures. Handbook tap did not navigate
+after scripted scrolling; manager test incorrectly expected Home on the custom
+training action footer. Updated only the harness (scroll settling and Back),
+then all3 expanded phone flows passed in secondary-phone-retest.xcresult.
+
+Compact initial fast age24 typing entered an under13 value and the expected
+age-blocked screen appeared. Correct my answer + paced/verified24 input
+successfully recovered. Do not classify the age restriction as a broken launch.
+Compact global retest reached settings/privacy but stopped at the handbook
+after scripted scrolling. A separate test using ordinary XCTest quiescence on
+the stationary card opened it with one tap. Compact creation was independently
+completed. The full monolithic compact global flow is NOT counted as passed.
+
+One phone synthetic search input bat appeared as bt. Separate settled repeat
+trials: bat,bat,bat; paced input also bat. No repeatable typing defect was
+confirmed. Keep natural touch/typing and scroll-then-tap checks in iPhone QA.
+Evidence: typing-observations.txt and raw targeted-phone.xcresult.
+Fast audit tests disable XCTest animation-quiescence waits in the harness only;
+the app/animations are not modified. Assertions/screenshots validate resulting
+states, not raw touch latency or frame-time performance.
+
+EVIDENCE INDEX / REPRODUCTION
+============================
+Selected inspected screenshots: docs/evidence/ios-ui-ux-audit-2026-10-23/.
+All raw logs, attachments and manifests:
+  output/ios-simulator/evidence/ui-ux-audit-2026-10-23/
+Successful bundles: navigation-phone.xcresult,secondary-phone-retest.xcresult,
+  targeted-phone.xcresult,global-ipad.xcresult,compact-final.xcresult.
+Failed bundles retained: secondary-phone.xcresult,global-compact.xcresult,
+  global-compact-retest.xcresult.
+
+Generated harness: output/ios-simulator/uitests/SimulatorSmokeTests.swift.
+Compiled plan: output/ios-simulator/test-derived-data/Build/Products/
+  SimulatorSmoke_iphonesimulator26.5-arm64.xctestrun
+IMPORTANT: never run the entire old SimulatorSmoke suite without reviewing it.
+It contains historical destructive save/account lifecycle tests. This audit
+selected only the non-destructive NavigationDepthAudit tests listed in logs,
+plus testCompactHandbookStationaryTap. The generated harness is local QA output,
+not a production app change or a guaranteed artifact of a clean checkout.
+
+Read summary: xcrun xcresulttool get test-results summary --path RESULT.xcresult
+Export: xcrun xcresulttool export attachments --path RESULT.xcresult
+        --output-path NEW_EMPTY_DESTINATION
+Use unique result/log paths, preserve saves and inspect screenshots, not just
+green assertions. Do not reuse this report as evidence after an app change.
+
+WHAT WAS NOT DONE / NEXT ACTION
+===============================
+No gameplay/match/scorecard progression was executed against existing careers;
+no national/retired/endgame, populated-finance/academy or every modal variant
+is certified. No new iPad career was created, so deep iPad career layouts remain
+pending. Older supported iOS versions, landscape, every screen size, extended
+soak/memory profiling, Android/Oppo ANRs and physical-device performance remain
+unverified. Simulator responsiveness cannot close Android memory/crash risks.
+
+Real iPhone/TestFlight: Apple/Google callbacks, same-UUID cloud recovery/account
+isolation, sandbox purchase/delivery/owned restoration, live provider/consent
+behavior, deletion/revocation, audio/haptics, performance and accessibility.
+Owner chose to do these on the iPhone later; no credentials are requested here.
+
+Recommended next: approve fixing F1/F2/F3, rerun affected layouts/first-row
+visibility tests, then use the iPhone for the provider/device pass. Review the
+native startup warnings before the distribution archive. No signing/upload,
+website deployment, backend mutation or production submission occurred.
+Android AAB SHA256 rechecked unchanged:
+  0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4

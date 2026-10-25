@@ -151,6 +151,8 @@ a:focus-visible {
 
 nav {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.25rem;
@@ -198,6 +200,18 @@ h2,
 h3,
 p {
   text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+
+address,
+.button {
+  overflow-wrap: anywhere;
+}
+
+.product-overview > *,
+.product-card > *,
+.contact-summary > * {
+  min-width: 0;
 }
 
 h1 {
@@ -735,6 +749,7 @@ footer strong {
   nav {
     justify-content: flex-start;
     margin-left: -0.55rem;
+    width: 100%;
   }
 
   .page-shell {
@@ -755,7 +770,7 @@ footer strong {
   .section-intro,
   .contact-summary,
   .product-overview {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .product-card {
@@ -809,4 +824,9 @@ footer strong {
   height: auto;
   object-fit: contain;
 }
-.product-icon-panel { display: grid; justify-items: center; gap: 16px; padding: 24px; }
+.product-icon-panel { display: grid; min-width: 0; width: 100%; justify-items: center; gap: 16px; padding: clamp(8px, 3vw, 24px); }
+#ios-availability, #age-suitability { margin-top: 1.25rem; padding: clamp(1.2rem, 4vw, 2rem); border: 1px solid var(--line); border-radius: 1rem; }
+/* Error-only sign-in fallback; ordinary publisher visits keep the existing home. */
+.auth-return[hidden], .publisher-content[hidden] { display: none; }
+.auth-return { max-width: 48rem; margin: 2rem auto; }
+.auth-return .button { white-space: normal; text-align: center; }

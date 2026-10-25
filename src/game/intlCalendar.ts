@@ -23,6 +23,7 @@ import {
   WtcStanding,
 } from '../domain/types';
 import { COUNTRIES, getCountry } from '../data/countries';
+import { playerWorldSex } from './playerIdentity';
 import { generateManagerRoster } from '../generation/players';
 import { makeRng } from '../engine/rng';
 import { computeOverall } from '../engine/rating';
@@ -437,6 +438,7 @@ export function ensureNationalTeam(
       Math.max(nationalReplacementQuality(countryId), Math.ceil(minimumXiOverall + 3)),
     );
     const generated = generateManagerRoster({
+      sex: playerWorldSex(save),
       nationality: countryId,
       quality: requestedQuality,
       idPrefix: `national-refresh-${countryId}-${year}-${requestedQuality}`,

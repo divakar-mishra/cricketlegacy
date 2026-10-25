@@ -1,0 +1,167 @@
+SUPABASE RESOURCE AUDIT — 19 OCTOBER 2026
+========================================
+
+20 October follow-up: client request/write optimizations are now implemented
+and tested in the workspace. See SUPABASE_OPTIMIZATION_2026-10-20.txt. The live
+measurements below are the original audit, not post-release savings; no storage
+migration or production deployment has been performed.
+
+Scope and safety
+----------------
+Owner requested investigation of the pasted Free-plan usage report and
+optimization opportunities. Live measurements used the existing authenticated
+Supabase CLI connection to Cricket Legacy only. SELECT/catalog queries ran
+inside READ ONLY transactions with 10–15 second statement timeouts. Only
+aggregate sizes/counts, schema metadata and the deployed backup RPC definition
+were returned. No player names, account identities, tokens or save contents
+were exported. No remote data/schema/configuration change, cleanup, migration,
+deployment, runtime code change, app build or AAB was performed.
+
+What the pasted report actually measures
+----------------------------------------
+Database size: 0.075 / 0.5 GB (15%), detailed project view 71.18 MB.
+This is occupied database space, NOT CPU, RAM, concurrency or total capacity.
+Egress: 0.076 / 5 GB (2%). Monthly authenticated active users: 57 / 50,000.
+Edge functions: 7 / 500,000. Bucket storage and Realtime reported zero.
+Billing interval: 16 October–16 November 2026. These are different metrics and
+time windows; they do not establish 15% utilization per 1,000 game installs.
+
+Live read-only measurements (18:12 UTC / 23:42 IST)
+--------------------------------------------------
+All byte sizes below use decimal MB, not MiB. Dashboard data refreshes on a
+different schedule, so this snapshot should not be forced to match the paste.
+
+postgres database: 59,526,291 bytes (59.53 MB).
+template1 database: 7,594,511 bytes (7.59 MB).
+public.account_career_backups total: 45,572,096 bytes (45.57 MB).
+  Main heap: 32,768 bytes. Main indexes: 40,960 bytes.
+  TOAST including its overhead/index: 45,473,792 bytes.
+  202 rows: 184 active snapshots and 18 deletion tombstones.
+  95 owners with active backups; 95 owners in the whole table at this snapshot.
+  Active JSON logical bytes: 322,734,499 (322.73 MB).
+  Active stored column bytes: 39,080,829 (39.08 MB).
+  Mean logical snapshot: 1,753,992 bytes (1.75 MB).
+  Largest logical snapshot: 2,752,230 bytes (2.75 MB).
+  Largest stored column: 379,327 bytes.
+  All 184 active save columns already use PostgreSQL pglz compression.
+
+Other public tables are individually <=57,344 bytes. cloud_saves and both
+leaderboard tables are empty according to statistics; account backups, not
+leaderboards/analytics/old cloud_saves, dominate current application storage.
+Auth aggregate: 226 total users, 96 anonymous. This lifetime count is NOT the
+57-MAU billing-cycle figure and must not be equated with game install count.
+
+Update churn versus required current data
+-----------------------------------------
+Backup table statistics recorded 204 inserts and 3,896 updates. Statistics
+reset time was unavailable, so these counts have NO reliable per-day rate.
+The TOAST table recorded 471,743 inserts and 452,075 deletes of storage chunks;
+these are NOT numbers of player saves. TOAST autovacuum had run 384 times,
+most recently at 17:50:40 UTC. Dead-row/chunk counters are estimates, not an
+exact reclaimable-byte measurement.
+
+39.08 MB of current compressed values versus 45.57 MB of total table space
+means the table is not simply 45 MB of disposable old saves. Their difference
+includes page/index/TOAST overhead and free/dead space, not all removable bloat.
+Do not run VACUUM FULL or delete backups, anonymous accounts, transaction
+ledgers or deletion tombstones as an unmeasured optimization. VACUUM FULL locks
+the affected table, and ordinary vacuum already runs automatically.
+
+Bounded field profile
+----------------------
+Only the three largest stored snapshots were sampled, within PostgreSQL.
+Aggregate top-level field lengths after JSONB text rendering were:
+  players       6,304,626 bytes
+  managerClubs    932,685 bytes
+  fixtures        388,273 bytes
+  seasons         250,161 bytes
+  teams           109,149 bytes
+This is a non-random, large-save sample, NOT a whole-database distribution.
+Normalized field text lengths are NOT their separately compressed disk sizes.
+Player/world state dominates this sample; deleting it would change recovery
+semantics. Lossless representation should be benchmarked before pruning state.
+
+Source-backed optimization opportunities
+-----------------------------------------
+1. Merge overlapping synchronization requests. accountRecovery.ts serializes
+   each call on a promise queue but does not coalesce equivalent queued jobs.
+   App foreground, background, auth hydration, autosave and explicit backup
+   can schedule separate passes. Each pass verifies identity and reads slots;
+   recovery passes also list remote metadata even if a prior pass just ran.
+   Preserve recovery intent and writes arriving during in-flight work; never
+   let a manual Backup now resolve before its own target writes are confirmed.
+
+2. Avoid no-op full snapshot uploads. saveGames.writeSave always changes
+   updatedAt, then marks the account journal dirty. uploadAccountCareer sends
+   the complete JSON string and checksum. Therefore timestamp-only persistence
+   still makes a new JSON payload. Current 2-second trailing debounce merges
+   nearby writes but is not a global request-rate limit. Detect no-op changes
+   without excluding wallet, purchases, timers, flags or career history.
+   Keep immediate local durability and existing cloud confirmation semantics.
+
+3. Consider batch-scoped identity validation to reduce repeated auth.getUser
+   requests, not a long-lived authorization cache. The orchestrator validates
+   once, and list/read/write helpers currently validate again per operation.
+   Auth-switch/epoch checks and server authorization must remain authoritative;
+   paid-provider identity validation must not be weakened or globally bypassed.
+
+4. Storage reduction is separate from fewer requests. Existing compression is
+   already ~8.3x versus raw JSON, so adding gzip/base64 blindly is not a proven
+   win. Benchmark a lossless versioned representation using synthetic/local
+   fixtures first. A format change needs old-client/RPC compatibility, checksum
+   verification, CAS/conflict safety, interrupted-upload handling and rollback.
+   Object Storage with small database metadata is another architecture option,
+   not a quick relocation: uploads, authorization, CAS and deletion/cleanup
+   must remain consistent for both old and new clients.
+
+5. Measure after rollout. Coalescing reduces network/auth/serialization and
+   repeated writes, but it will not eliminate the required 39 MB of current
+   snapshots. Sample successive aggregate sizes and write-counter deltas over
+   a known interval before claiming a CPU or storage percentage improvement.
+
+Existing protections to preserve
+--------------------------------
+The deployed write RPC matches the inspected local migration: exact-payload
+retries are idempotent, revisions use compare-and-swap, and deleted backups
+cannot be revived. Current storage is one latest row per (owner, save_id), not
+an unbounded table of every historical revision. A fix must retain those rules,
+cross-account isolation, Player/Manager separation, all twelve slot mappings,
+unreadable-save protection, offline/local progress and paid-grant idempotency.
+
+Required regression cases for implementation
+--------------------------------------------
+- Concurrent autosave/foreground/manual calls coalesce but do not lose recovery.
+- New local writes during upload remain pending and trigger a follow-up pass.
+- Backup now waits for its target generation; pending/offline is never success.
+- Account switch/sign-out invalidates queued and in-flight work safely.
+- Timestamp-only writes skip redundant transfer; genuine state changes do not.
+- Lost-response retries keep revision/idempotency/conflict behavior intact.
+- Corrupt/future saves remain retained; recovery only fills valid empty slots.
+- Remaining wallet, IAP markers, consumables and original expiry survive intact.
+- Any new encoding round-trips exactly, accepts legacy payloads and rejects
+  truncation, corruption, excessive decompression and mismatched identities.
+
+Capacity interpretation
+------------------------
+At this snapshot, 45.57 MB / 95 backed-up accounts is roughly 0.48 MB of backup
+table allocation per account. A purely linear illustration at 1,000 similarly
+backed-up accounts is ~480 MB BEFORE the rest of the database. It is not a
+forecast: slot count, career age, compression, table free space and workload
+vary. It also does not mean the reported 1,000 game installs are 1,000 accounts
+already storing backups. Free-tier capacity should be planned using actual
+cloud-backed accounts/save growth, not install count alone.
+
+Primary references checked
+----------------------------
+https://supabase.com/docs/guides/platform/database-size
+  Database versus disk usage, baseline objects, TOAST/data/index storage,
+  automatic vacuuming, VACUUM FULL locks and Free-plan size constraints.
+
+Relevant local sources
+------------------------
+src/services/accountRecovery.ts
+src/services/accountCareerCloud.ts
+src/storage/accountBackupJournal.ts
+src/storage/saveGames.ts
+App.tsx
+supabase/migrations/202610110001_account_career_backups.sql

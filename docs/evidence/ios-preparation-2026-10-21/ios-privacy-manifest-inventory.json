@@ -1,0 +1,414 @@
+{
+  "inspectedAt": "2026-10-21T18:20:14.790Z",
+  "bundle": "/Users/divakarmishra/Desktop/APP/cricketlegacy/output/ios-simulator/derived-data/Build/Products/Release-iphonesimulator/CricketSimulator.app",
+  "identity": {
+    "bundleId": "com.coverdrive.cricket.simulator",
+    "version": "1.0.12",
+    "build": "1",
+    "platforms": [
+      "iPhoneSimulator"
+    ],
+    "hasTrackingUsageDescription": false,
+    "usesNonExemptEncryption": false,
+    "delayedAdMeasurement": true
+  },
+  "manifestCount": 17,
+  "manifests": [
+    {
+      "path": "ExpoApplication_privacy.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryFileTimestamp",
+          "reasons": [
+            "C617.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "ExpoConstants_privacy.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "reasons": [
+            "CA92.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "ExpoFileSystem_privacy.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryFileTimestamp",
+          "reasons": [
+            "0A2A.1",
+            "3B52.1"
+          ]
+        },
+        {
+          "category": "NSPrivacyAccessedAPICategoryDiskSpace",
+          "reasons": [
+            "E174.1",
+            "85F4.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "ExpoNotifications_privacy.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "reasons": [
+            "CA92.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Frameworks/ReactNativeDependencies.framework/ReactNativeDependencies_boost.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryFileTimestamp",
+          "reasons": [
+            "C617.1"
+          ]
+        },
+        {
+          "category": "NSPrivacyAccessedAPICategorySystemBootTime",
+          "reasons": [
+            "35F9.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Frameworks/ReactNativeDependencies.framework/ReactNativeDependencies_folly.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryFileTimestamp",
+          "reasons": [
+            "C617.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "Frameworks/ReactNativeDependencies.framework/ReactNativeDependencies_glog.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryFileTimestamp",
+          "reasons": [
+            "C617.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "GoogleMobileAdsResources.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": null,
+      "trackingDomains": [],
+      "collectedData": [
+        {
+          "type": "NSPrivacyCollectedDataTypeOtherDiagnosticData",
+          "linked": false,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising",
+            "NSPrivacyCollectedDataTypePurposeDeveloperAdvertising",
+            "NSPrivacyCollectedDataTypePurposeAnalytics"
+          ]
+        },
+        {
+          "type": "NSPrivacyCollectedDataTypeCoarseLocation",
+          "linked": true,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising",
+            "NSPrivacyCollectedDataTypePurposeAnalytics",
+            "NSPrivacyCollectedDataTypePurposeDeveloperAdvertising"
+          ]
+        },
+        {
+          "type": "NSPrivacyCollectedDataTypePerformanceData",
+          "linked": false,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising",
+            "NSPrivacyCollectedDataTypePurposeDeveloperAdvertising",
+            "NSPrivacyCollectedDataTypePurposeAnalytics"
+          ]
+        },
+        {
+          "type": "NSPrivacyCollectedDataTypeCrashData",
+          "linked": false,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeAnalytics"
+          ]
+        },
+        {
+          "type": "NSPrivacyCollectedDataTypeAdvertisingData",
+          "linked": true,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising",
+            "NSPrivacyCollectedDataTypePurposeDeveloperAdvertising",
+            "NSPrivacyCollectedDataTypePurposeAnalytics"
+          ]
+        },
+        {
+          "type": "NSPrivacyCollectedDataTypeProductInteraction",
+          "linked": true,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeAnalytics",
+            "NSPrivacyCollectedDataTypePurposeDeveloperAdvertising",
+            "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising"
+          ]
+        },
+        {
+          "type": "NSPrivacyCollectedDataTypeDeviceID",
+          "linked": true,
+          "tracking": true,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising",
+            "NSPrivacyCollectedDataTypePurposeAnalytics",
+            "NSPrivacyCollectedDataTypePurposeDeveloperAdvertising"
+          ]
+        }
+      ],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategorySystemBootTime",
+          "reasons": [
+            "35F9.1"
+          ]
+        },
+        {
+          "category": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "reasons": [
+            "CA92.1"
+          ]
+        },
+        {
+          "category": "NSPrivacyAccessedAPICategoryDiskSpace",
+          "reasons": [
+            "E174.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryFileTimestamp",
+          "reasons": [
+            "C617.1",
+            "0A2A.1",
+            "3B52.1"
+          ]
+        },
+        {
+          "category": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "reasons": [
+            "CA92.1"
+          ]
+        },
+        {
+          "category": "NSPrivacyAccessedAPICategoryDiskSpace",
+          "reasons": [
+            "E174.1",
+            "85F4.1"
+          ]
+        },
+        {
+          "category": "NSPrivacyAccessedAPICategorySystemBootTime",
+          "reasons": [
+            "35F9.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "PurchasesHybridCommon.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "reasons": [
+            "CA92.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "React-Core_privacy.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryFileTimestamp",
+          "reasons": [
+            "C617.1"
+          ]
+        },
+        {
+          "category": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "reasons": [
+            "CA92.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "React-cxxreact_privacy.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryFileTimestamp",
+          "reasons": [
+            "C617.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "React-timing_privacy.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategorySystemBootTime",
+          "reasons": [
+            "35F9.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "RevenueCat.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [
+        {
+          "type": "NSPrivacyCollectedDataTypePurchaseHistory",
+          "linked": false,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ]
+        }
+      ],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "reasons": [
+            "CA92.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "RNCAsyncStorage_resources.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": null,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryFileTimestamp",
+          "reasons": [
+            "C617.1"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "RNViewShotPrivacyInfo.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": false,
+      "trackingDomains": [],
+      "collectedData": [],
+      "requiredReasonApis": []
+    },
+    {
+      "path": "UserMessagingPlatformResources.bundle/PrivacyInfo.xcprivacy",
+      "trackingDeclared": null,
+      "trackingDomains": [],
+      "collectedData": [
+        {
+          "type": "NSPrivacyCollectedDataTypeCoarseLocation",
+          "linked": false,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ]
+        },
+        {
+          "type": "NSPrivacyCollectedDataTypePerformanceData",
+          "linked": false,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ]
+        },
+        {
+          "type": "NSPrivacyCollectedDataTypeProductInteraction",
+          "linked": false,
+          "tracking": false,
+          "purposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ]
+        }
+      ],
+      "requiredReasonApis": [
+        {
+          "category": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "reasons": [
+            "CA92.1"
+          ]
+        }
+      ]
+    }
+  ],
+  "reviewRequired": [
+    "GoogleMobileAdsResources.bundle/PrivacyInfo.xcprivacy"
+  ],
+  "limitations": [
+    "This is a static artifact inventory, not observed network collection or an App Privacy answer.",
+    "SDK tracking declarations require reconciliation with actual configuration and behavior; no ATT prompt does not prove no tracking.",
+    "Inspect the final signed device archive again. Simulator SDK slices and configuration may differ.",
+    "Missing encryption metadata is unresolved, not an automatic exemption. Required-reason declarations still need a valid use audit."
+  ]
+}

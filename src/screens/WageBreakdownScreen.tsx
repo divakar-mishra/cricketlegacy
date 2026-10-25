@@ -107,7 +107,7 @@ export function WageBreakdownScreen({ navigation }: ScreenProps<'WageBreakdown'>
     budgetUsePct > 0.9 ? colors.danger : budgetUsePct > 0.7 ? colors.warning : colors.success;
 
   return (
-    <Screen>
+    <Screen careerNavigation>
       <ScreenHeader title="Wage Ledger" subtitle={team.name} onBack={() => navigation.goBack()} />
 
       {/* Summary card */}
@@ -164,21 +164,28 @@ export function WageBreakdownScreen({ navigation }: ScreenProps<'WageBreakdown'>
       </View>
 
       {/* Player list */}
-      <FlashList
-        data={squad}
-        keyExtractor={(player) => player.id}
-        renderItem={({ item: player }) => (
-          <WageRow
-            player={player}
-            wageCap={wageCap}
-            userPlayerId={save.userPlayerId}
-            canRenew={isManager && !player.loanedFrom && player.id !== save.userPlayerId}
-            onRenew={onRenew}
-          />
-        )}
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }}
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={styles.playerList}>
+        <FlashList
+          data={squad}
+          keyExtractor={(player) => player.id}
+          renderItem={({ item: player }) => (
+            <WageRow
+              player={player}
+              wageCap={wageCap}
+              userPlayerId={save.userPlayerId}
+              canRenew={isManager && !player.loanedFrom && player.id !== save.userPlayerId}
+              onRenew={onRenew}
+            />
+          )}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }}
+          // Screen already owns the safe area. A second native inset/automatic
+          // anchor can start this non-chat ledger part-way through its first row.
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
+          maintainVisibleContentPosition={{ disabled: true }}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
     </Screen>
   );
 }
@@ -252,6 +259,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    playerList: { flex: 1, minHeight: 0 },
     msg: { color: colors.textMuted, fontSize: fontSize.md, margin: spacing.lg },
     summaryTitle: {
       color: colors.textFaint,

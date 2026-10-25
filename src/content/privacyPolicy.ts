@@ -5,7 +5,7 @@ export type PrivacyPolicySection = {
 };
 
 export const PRIVACY_POLICY_EFFECTIVE_DATE = '20 August 2026';
-export const PRIVACY_POLICY_UPDATE_DATE = '13 September 2026';
+export const PRIVACY_POLICY_UPDATE_DATE = '21 October 2026';
 export const PRIVACY_CONTACT_EMAIL = 'devsunlightpvt@gmail.com';
 
 /**
@@ -17,6 +17,7 @@ export const PRIVACY_POLICY_SECTIONS: readonly PrivacyPolicySection[] = [
     title: 'Scope of this policy',
     paragraphs: [
       'This policy applies specifically to Cricket: Player and Manager and its related support and web pages. It does not apply to other apps published by Sunlight; those apps have their own privacy policies.',
+      'An iOS version is in preparation, not announced here as publicly released. Sign-in, cloud backup, advertising and purchases depend on the platform, build and enabled services. Android availability does not establish iOS service availability.',
     ],
   },
   {
@@ -31,12 +32,14 @@ export const PRIVACY_POLICY_SECTIONS: readonly PrivacyPolicySection[] = [
     bullets: [
       'Local game data: careers, squads, match history, settings, rewards and other progress stored on your device.',
       'Account and cloud data: an anonymous or linked account identifier, authentication records and cloud saves when the online backend is enabled.',
+      'Google or Apple sign-in, where available, can supply a provider identifier, email address and permitted profile information. Apple may supply a private relay email; a name is not always supplied. The app does not receive your Google or Apple password.',
       'Purchases: product, entitlement, transaction status and pseudonymous verification identifiers supplied by Google Play, Apple or RevenueCat. Sunlight does not receive your full payment-card number.',
       'Online play and security: leaderboard entries you submit, server timestamps, app/build version, fraud checks, IP address and service logs.',
-      'Age preferences: your self-declared age band, India/outside-India choice and, where applicable, parent or guardian permission are stored on your device. The app does not ask for a date of birth or upload these answers.',
-      'Advertising: Google Mobile Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices. Ads are not initialized for unknown-age users, children under 13, teens in India, or teens without parent or guardian permission. Eligible teens outside India receive child-directed, G-rated, non-personalized ads. For adults, Google uses the consent choice to determine whether personalized, non-personalized, or eligible limited ads may be served. Both eligible groups wait for the Google consent flow to permit requests. Declining consent does not guarantee that a limited ad will be available.',
+      'Age preferences: your self-declared age band, India/outside-India choice and, where applicable, parent or guardian permission are stored on your device. The app does not ask for a date of birth or upload the raw answers; advertising SDKs receive age-treatment and consent flags.',
+      'Advertising: Google Mobile Ads and, in Android builds with mediation enabled, Unity Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices. Ads are not initialized for unknown-age users, children under 13, teens in India, or teens without parent or guardian permission. Eligible teens outside India are flagged as under the age of consent; the app requests G-rated, non-personalized treatment. For adults, Google uses the consent choice to determine whether personalized, non-personalized, or eligible limited ads may be served. Unity personalization requires a confirmed, supported vendor-and-purpose consent grant; otherwise Unity receives an opt-out signal, including for teens and unsupported regional consent signals. Both eligible groups wait for the Google consent flow to permit requests. Declining consent does not guarantee that a limited ad will be available. Non-personalized or limited ads may still involve technical processing.',
+      'Platform clarification: the adult consent-selected advertising treatment above describes Android. The current iOS implementation requests non-personalized ads and does not include the Unity Ads SDK or request App Tracking Transparency permission. This does not mean advertising is data-free.',
       'Support: your email address, message and attachments if you contact support.',
-      'Optional diagnostics: if enabled in Settings, Firebase Analytics may process app-instance identifiers, app/device information, sessions and limited gameplay or purchase events. Crashlytics may process installation identifiers, device diagnostics, session information and crash traces. Both choices are off by default and can be withdrawn in Settings. We do not attach account names, emails or save contents to Firebase reports. Turning these options off stops future reporting but does not automatically erase reports already received by Google.',
+      'Optional Android diagnostics: if enabled in Settings, Firebase Analytics may process app-instance identifiers, app/device information, sessions and limited gameplay or purchase events. Crashlytics may process installation identifiers, device diagnostics, session information and crash traces. Both choices are off by default and can be withdrawn in Settings. We do not attach account names, emails or save contents to Firebase reports. Turning these options off stops future reporting but does not automatically erase reports already received by Google. The current iOS build does not include Firebase Analytics or Crashlytics; advertising and store SDKs may still process their own technical data.',
       'Device features: notification permission and locally scheduled reminders. The current app does not upload a push-notification token.',
     ],
     paragraphs: [
@@ -58,7 +61,7 @@ export const PRIVACY_POLICY_SECTIONS: readonly PrivacyPolicySection[] = [
   {
     title: 'Service providers and disclosures',
     paragraphs: [
-      'Information may be processed for Sunlight by Supabase, RevenueCat, Google Play, Apple, Google Mobile Ads, Google Firebase Analytics and Crashlytics, and Cloudflare. Their handling is also governed by their own terms and privacy notices.',
+      'Depending on enabled services, information may be processed for Sunlight by Supabase, RevenueCat, Google and Apple (sign-in and their respective stores), Google Mobile Ads, Unity Ads (Android ad mediation only), Google Firebase Analytics and Crashlytics (optional Android diagnostics), and Cloudflare. Their handling is also governed by their own terms and privacy notices. Unity privacy information: https://unity.com/legal/privacy-policy.',
       'Information may be disclosed when required by law, to protect users or the service, or in connection with a business transfer. Sunlight does not sell personal data. Leaderboard information is public only when that feature is enabled and you submit an entry.',
     ],
   },

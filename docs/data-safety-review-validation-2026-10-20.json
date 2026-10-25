@@ -1,0 +1,156 @@
+{
+  "status": "REVIEW DRAFT - DO NOT IMPORT OR SUBMIT",
+  "reviewDate": "2026-10-20",
+  "app": "Cricket: Player & Manager",
+  "package": "com.coverdrive.cricket",
+  "original": {
+    "path": "/Users/divakarmishra/Downloads/data_safety_export (2).csv",
+    "sha256": "edc162ea9405c9001fb1a2265c786f3295352d44c286c341b48569905fbe4c92",
+    "modified": false
+  },
+  "draft": {
+    "path": "docs/data-safety-REVIEW-DRAFT-DO-NOT-IMPORT-2026-10-20.csv",
+    "sha256": "d384667996615746245b3a897e01e13ef30887e0447c2e763d9958b28b0396a0",
+    "responseRows": 782,
+    "columns": 5,
+    "selectedTypes": [
+      "PSL_NAME",
+      "PSL_EMAIL",
+      "PSL_USER_ACCOUNT",
+      "PSL_PURCHASE_HISTORY",
+      "PSL_APPROX_LOCATION",
+      "PSL_CRASH_LOGS",
+      "PSL_PERFORMANCE_DIAGNOSTICS",
+      "PSL_OTHER_PERFORMANCE",
+      "PSL_USER_INTERACTION",
+      "PSL_OTHER_APP_ACTIVITY",
+      "PSL_DEVICE_ID"
+    ],
+    "modifiedResponseValues": 15,
+    "lineEndings": "LF"
+  },
+  "preparationChecks": {
+    "csvRoundTrip": true,
+    "originalSchemaPreserved": true,
+    "onlyResponseValuesChanged": true,
+    "uniqueResponseKeys": 782,
+    "expectedChanges": 15
+  },
+  "readyForImport": false,
+  "intentionallyUnansweredRequiredQuestions": [
+    "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:DATA_USAGE_USER_CONTROL"
+  ],
+  "unresolved": [
+    "Unity Acquire Optimization/app-usage collection state is not established by supplied screenshots. Other actions Shared and required/optional handling must be finalized.",
+    "Blank Shared and sharing-purpose values mean unchecked in the CSV, NOT unknown or confirmed disabled.",
+    "Approximate location Personalization remains inherited from the original and is not verified; review before submission.",
+    "Other app performance data remains inherited; latest Google Mobile Ads SDK guidance is not exact-version proof for pinned 24.9.0."
+  ],
+  "changes": [
+    {
+      "questionId": "PSL_DATA_TYPES_APP_ACTIVITY",
+      "responseId": "PSL_OTHER_APP_ACTIVITY",
+      "before": "",
+      "after": "true",
+      "label": "App activity / Other actions"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:PSL_DATA_USAGE_COLLECTION_AND_SHARING",
+      "responseId": "PSL_DATA_USAGE_ONLY_COLLECTED",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (Other actions) / Is this data collected, shared, or both? / Collected"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:PSL_DATA_USAGE_EPHEMERAL",
+      "responseId": "",
+      "before": "",
+      "after": "false",
+      "label": "Data usage and handling (Other actions) / Is this data processed ephemerally?"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:DATA_USAGE_COLLECTION_PURPOSE",
+      "responseId": "PSL_APP_FUNCTIONALITY",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (Other actions) / Why is this user data collected? Select all that apply. / App functionality"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:DATA_USAGE_COLLECTION_PURPOSE",
+      "responseId": "PSL_ANALYTICS",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (Other actions) / Why is this user data collected? Select all that apply. / Analytics"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_USER_ACCOUNT:PSL_DATA_USAGE_COLLECTION_AND_SHARING",
+      "responseId": "PSL_DATA_USAGE_ONLY_SHARED",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (User IDs) / Is this data collected, shared, or both? / Shared"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_USER_ACCOUNT:DATA_USAGE_USER_CONTROL",
+      "responseId": "PSL_DATA_USAGE_USER_CONTROL_OPTIONAL",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (User IDs) / Is this data required for your app, or can users choose whether it's collected? / Users can choose whether this data is collected"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_USER_ACCOUNT:DATA_USAGE_USER_CONTROL",
+      "responseId": "PSL_DATA_USAGE_USER_CONTROL_REQUIRED",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (User IDs) / Is this data required for your app, or can users choose whether it's collected? / Data collection is required (users can't turn off this data collection)"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_USER_ACCOUNT:DATA_USAGE_SHARING_PURPOSE",
+      "responseId": "PSL_APP_FUNCTIONALITY",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (User IDs) / Why is this user data shared? Select all that apply. / App functionality"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_APPROX_LOCATION:DATA_USAGE_COLLECTION_PURPOSE",
+      "responseId": "PSL_APP_FUNCTIONALITY",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (Approximate location) / Why is this user data collected? Select all that apply. / App functionality"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_APPROX_LOCATION:DATA_USAGE_COLLECTION_PURPOSE",
+      "responseId": "PSL_FRAUD_PREVENTION_SECURITY",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (Approximate location) / Why is this user data collected? Select all that apply. / Fraud prevention, security, and compliance"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_PERFORMANCE_DIAGNOSTICS:DATA_USAGE_COLLECTION_PURPOSE",
+      "responseId": "PSL_APP_FUNCTIONALITY",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (Diagnostics) / Why is this user data collected? Select all that apply. / App functionality"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_APPROX_LOCATION:DATA_USAGE_SHARING_PURPOSE",
+      "responseId": "PSL_APP_FUNCTIONALITY",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (Approximate location) / Why is this user data shared? Select all that apply. / App functionality"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_APPROX_LOCATION:DATA_USAGE_SHARING_PURPOSE",
+      "responseId": "PSL_FRAUD_PREVENTION_SECURITY",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (Approximate location) / Why is this user data shared? Select all that apply. / Fraud prevention, security, and compliance"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_PERFORMANCE_DIAGNOSTICS:DATA_USAGE_SHARING_PURPOSE",
+      "responseId": "PSL_APP_FUNCTIONALITY",
+      "before": "",
+      "after": "true",
+      "label": "Data usage and handling (Diagnostics) / Why is this user data shared? Select all that apply. / App functionality"
+    }
+  ]
+}

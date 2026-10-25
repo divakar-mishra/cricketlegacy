@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Linking, Platform, StyleSheet, TextInput, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import { Button, Card, Emblem, Screen, ScreenHeader, AppText as Text } from '../components';
@@ -11,20 +11,37 @@ import { useSettings } from '../state/settingsStore';
 import { clearAllLocalData } from '../storage/storage';
 import { fontSize, fontWeight, spacing, ThemeColors, useThemedStyles } from '../theme';
 import { AccountBackupCard } from '../components/AccountBackupCard';
+import { AppleAccountButton } from '../components/AppleAccountButton';
 
 export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   const user = useAuth((s) => s.user);
   const styles = useThemedStyles(makeStyles);
   const [busy, setBusy] = useState(false);
+  const actionPending = useRef(false);
+  const [googlePending, setGooglePending] = useState(false);
+  const [applePending, setApplePending] = useState(false);
+  const [googleRetry, setGoogleRetry] = useState<{ existingAccount: boolean; message: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [emailForm, setEmailForm] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const onEmail = async () => {
-    if (busy) return;
+  const beginAction = () => {
+    // State alone does not guard two callbacks delivered before the next render.
+    if (actionPending.current) return false;
+    actionPending.current = true;
     setBusy(true);
     setFlash(null);
+    setGoogleRetry(null);
+    return true;
+  };
+  const finishAction = () => {
+    actionPending.current = false;
+    setBusy(false);
+  };
+
+  const onEmail = async () => {
+    if (!beginAction()) return;
     try {
       await auth.signInEmail(email, password);
       setEmail('');
@@ -34,33 +51,34 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
       Alert.alert('Email sign-in unavailable', error instanceof Error ? error.message : 'Please try again.');
     } finally {
       setPassword('');
-      setBusy(false);
+      finishAction();
     }
   };
 
   const onGuest = async () => {
+    if (!beginAction()) return;
     setPassword('');
     setEmailForm(false);
-    setBusy(true);
     try {
       await auth.signInGuest();
-      setBusy(false);
       setFlash('Signed in as guest - progress is saved on this device.');
     } catch (error) {
-      setBusy(false);
       Alert.alert(
         'Guest profile unavailable',
         error instanceof Error
           ? error.message
           : 'The device could not save the guest profile. Check available storage and try again.',
       );
+    } finally {
+      finishAction();
     }
   };
 
   const onGoogle = async (existingAccount = true) => {
+    if (!beginAction()) return;
     setPassword('');
     setEmailForm(false);
-    setBusy(true);
+    setGooglePending(true);
     try {
       const googleUser = existingAccount ? await auth.signInGoogle({ existingAccount: true }) : await auth.signInGoogle();
       setFlash(
@@ -69,7 +87,10 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
           : 'Signed in with Google.',
       );
     } catch (error) {
-      if (!auth.isGoogleSignInCancelled(error)) {
+      const retryMessage = auth.googleSignInRetryMessage(error);
+      if (retryMessage) {
+        setGoogleRetry({ existingAccount, message: retryMessage });
+      } else {
         Alert.alert(
           'Google sign-in unavailable',
           error instanceof Error
@@ -78,16 +99,36 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
         );
       }
     } finally {
-      setBusy(false);
+      setGooglePending(false);
+      finishAction();
+    }
+  };
+
+  const onApple = async () => {
+    if (!beginAction()) return;
+    setPassword('');
+    setEmailForm(false);
+    setApplePending(true);
+    try {
+      await auth.signInApple({ existingAccount: true });
+      setFlash('Signed in with Apple.');
+    } catch (error) {
+      Alert.alert('Apple sign-in unavailable', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setApplePending(false);
+      finishAction();
     }
   };
 
   const onSignOut = async () => {
+    if (!beginAction()) return;
     try {
       await auth.signOut();
       setFlash('Signed out. Your local saves are untouched.');
     } catch {
       Alert.alert('Sign-out incomplete', 'The device could not clear the local account marker.');
+    } finally {
+      finishAction();
     }
   };
 
@@ -103,7 +144,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   };
 
   const onDeleteConfirmed = async () => {
-    setBusy(true);
+    if (!beginAction()) return;
     try {
       const hasRemoteAccount = Boolean(user?.remoteId);
       if (hasRemoteAccount) {
@@ -131,7 +172,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
         'Deletion was not fully confirmed. Please reopen Account to check your status before trying again.',
       );
     } finally {
-      setBusy(false);
+      finishAction();
     }
   };
 
@@ -146,6 +187,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   };
 
   const onDelete = () => {
+    if (actionPending.current) return;
     const hasRemoteAccount = Boolean(user?.remoteId);
     Alert.alert(
       hasRemoteAccount ? 'Delete account & data' : 'Delete local account & data',
@@ -178,15 +220,40 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
         </Card>
       ) : null}
 
+      {googlePending ? (
+        <Card style={styles.flash}>
+          <Text style={styles.noteText}>
+            Finish Google sign-in in the browser. If it expires or opens Sunlight, close that tab and retry here.
+          </Text>
+        </Card>
+      ) : null}
+
+      {googleRetry ? (
+        <Card style={styles.flash}>
+          <View accessibilityLiveRegion="polite" style={styles.retry}>
+            <Text style={styles.noteTitle}>Google sign-in not completed</Text>
+            <Text style={styles.noteText}>{googleRetry.message}</Text>
+            <Button
+              label="Try Google sign-in again"
+              variant="secondary"
+              disabled={busy}
+              onPress={() => void onGoogle(googleRetry.existingAccount)}
+            />
+          </View>
+        </Card>
+      ) : null}
+
       {user ? (
         <>
           <Card style={styles.account}>
             <Text style={styles.accountLabel}>Signed in</Text>
             <Text style={styles.accountId} numberOfLines={1}>
-              {user.provider === 'guest' ? 'Guest profile' : (user.displayName ?? (user.provider === 'email' ? 'Email account' : 'Google account'))}
+              {user.provider === 'guest' ? 'Guest profile' : (user.displayName ?? (user.provider === 'email' ? 'Email account' : user.provider === 'apple' ? 'Apple account' : 'Google account'))}
             </Text>
           </Card>
           <View style={styles.buttons}>
+            {Platform.OS === 'ios' && user.provider === 'guest' ?
+              <AppleAccountButton disabled={busy} loading={applePending} onPress={() => void onApple()} /> : null}
             {user.provider === 'guest' ? (
               <Button
                 label={user.remoteId ? 'Link Google account' : 'Continue with Google'}
@@ -201,7 +268,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
               disabled={busy}
               onPress={() => void onGoogle(true)}
             /> : null}
-            <Button label="Sign out" variant="secondary" onPress={onSignOut} />
+            <Button label="Sign out" variant="secondary" disabled={busy} onPress={onSignOut} />
             <Button
               label={user.remoteId ? 'Delete account & data' : 'Delete local account & data'}
               variant="danger"
@@ -213,6 +280,8 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
         </>
       ) : (
         <View style={styles.buttons}>
+          {Platform.OS === 'ios' ?
+            <AppleAccountButton disabled={busy} loading={applePending} onPress={() => void onApple()} /> : null}
           <Button
             label="Continue with Google"
             variant="secondary"
@@ -288,6 +357,7 @@ const makeStyles = (colors: ThemeColors) =>
       paddingHorizontal: spacing.md,
     },
     buttons: { gap: spacing.md },
+    retry: { gap: spacing.sm },
     input: { color: colors.text, borderColor: colors.borderStrong, borderWidth: 1, borderRadius: 8, padding: spacing.md, marginVertical: spacing.sm, fontSize: fontSize.md },
     flash: { marginBottom: spacing.md, borderColor: colors.borderStrong },
     flashText: { color: colors.accent, fontSize: fontSize.sm, fontWeight: fontWeight.semibold },

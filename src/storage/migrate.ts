@@ -32,6 +32,7 @@ import { synchronizeSchema42Portfolio } from './schema42';
 import { synchronizeSchema43InternationalRankingPeaks } from './schema43';
 import { ensureVipState } from '../game/vip';
 import { ensureRecoveryClock } from '../game/squadRecovery';
+import { synchronizePlayerIdentities } from '../game/playerIdentity';
 
 type AnySave = Record<string, unknown> & { schemaVersion?: number };
 type Migration = (save: AnySave) => AnySave;
@@ -59,6 +60,12 @@ function recomputePlayerOveralls(save: AnySave): void {
  * When bumping SAVE_SCHEMA_VERSION, add MIGRATIONS[oldVersion] here.
  */
 const MIGRATIONS: Record<number, Migration> = {
+  // v45 -> v46: retain cricket-world sex and repair old female NPC identities.
+  // Player IDs, attributes, history, purchases and all balances are preserved.
+  45: (save) => {
+    synchronizePlayerIdentities(save as unknown as SaveGame);
+    return save;
+  },
   44: (save) => {
     ensureRecoveryClock(save as unknown as SaveGame);
     return save;

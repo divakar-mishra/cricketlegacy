@@ -1,0 +1,2967 @@
+
+> app@1.0.12 check
+> npm run typecheck && npm run lint -- --quiet && npm test -- --runInBand
+
+
+> app@1.0.12 pretypecheck
+> npm run generate-build-info
+
+
+> app@1.0.12 generate-build-info
+> node scripts/writeBuildInfo.js
+
+Wrote src/config/buildInfo.generated.ts
+
+> app@1.0.12 typecheck
+> tsc --noEmit
+
+
+> app@1.0.12 prelint
+> npm run generate-build-info
+
+
+> app@1.0.12 generate-build-info
+> node scripts/writeBuildInfo.js
+
+Wrote src/config/buildInfo.generated.ts
+
+> app@1.0.12 lint
+> eslint . --quiet
+
+
+> app@1.0.12 pretest
+> npm run generate-build-info
+
+
+> app@1.0.12 generate-build-info
+> node scripts/writeBuildInfo.js
+
+Wrote src/config/buildInfo.generated.ts
+
+> app@1.0.12 test
+> jest --runInBand
+
+PASS src/state/__tests__/commerceRecovery.test.ts (24.157 s)
+  ● Console
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 73,
+        backupWriteMs: 0,
+        primaryWriteMs: 3,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 83,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 83
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+PASS src/game/__tests__/managerCalendar.test.ts (7.903 s)
+PASS src/engine/__tests__/managerDifficulty.test.ts (7.72 s)
+PASS src/game/__tests__/game.test.ts (5.648 s)
+PASS src/engine/__tests__/monteCarlo.test.ts (5.659 s)
+  ● Console
+
+    console.log
+      T20 Monte Carlo: {
+        meanRuns: 158.12366666666668,
+        meanWkts: 6.923333333333333,
+        boundaryPct: 0.18644894472390813,
+        dotPct: 0.36192232544581915
+      }
+
+      at Object.log (src/engine/__tests__/monteCarlo.test.ts:57:13)
+
+    console.log
+      ODI Monte Carlo: {
+        meanRuns: 294.1275,
+        meanWkts: 7.345,
+        boundaryPct: 0.11535492247676643,
+        dotPct: 0.46928606102432435
+      }
+
+      at Object.log (src/engine/__tests__/monteCarlo.test.ts:70:13)
+
+    console.log
+      Test draws: 14/40, decisive: 26
+
+      at Object.log (src/engine/__tests__/monteCarlo.test.ts:96:13)
+
+PASS src/game/__tests__/managerCalendarSponsorship.test.ts
+PASS src/services/__tests__/accountRecovery.test.ts
+PASS src/state/__tests__/careerStoreRewards.test.ts
+  ● Console
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 4, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 4,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 8,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 8
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 2,
+        vipArchiveMs: 0,
+        totalMs: 6
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 3
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 5, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 5,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 5
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 4 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 1 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 8,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 8
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 4, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 16,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 21,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 21
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 3
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 5, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 5,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 5
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 3
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 9 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save queue] { snapshotMs: 5, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 13,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 13
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 6,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 6
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 5, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 5, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 5,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 6
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 3
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 4, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 4, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 2 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 5,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 6
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 5, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 5,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 5
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 4, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 6, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 6,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 6
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 2,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 6
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 4 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 7,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 8
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 35,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 39,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 39
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 4, waitMs: 16 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 11 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 20,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 20
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 25,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 33 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 2,
+        queuedWriteMs: 40,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 41
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 29 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 36,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 36
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 15,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 41 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 48,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 48
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save timing] {
+        critical: false,
+        prepareMs: 0,
+        queuedWriteMs: 44,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 44
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 4, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 3,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 4, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+    console.info
+      [save queue] { snapshotMs: 3, waitMs: 0 }
+
+      at info (src/storage/saveGames.ts:181:24)
+
+    console.info
+      [save stages] {
+        verifyPreviousMs: 0,
+        sealMs: 0,
+        backupWriteMs: 0,
+        primaryWriteMs: 0,
+        sealMarkerMs: 0
+      }
+
+      at info (src/storage/saveGames.ts:146:22)
+
+    console.info
+      [save timing] {
+        critical: true,
+        prepareMs: 0,
+        queuedWriteMs: 4,
+        lastPlayedMs: 0,
+        vipArchiveMs: 0,
+        totalMs: 4
+      }
+
+      at info (src/state/careerStore.ts:1149:13)
+
+PASS src/state/__tests__/careerStoreOffSeason.test.ts
+PASS src/engine/__tests__/difficulty.test.ts
+PASS src/engine/__tests__/resolveBall.test.ts
+PASS src/screens/__tests__/navigationDestinations.test.ts
+PASS src/components/avatar/__tests__/layeredPortrait.test.ts
+PASS src/game/__tests__/intlCalendar.test.ts
+PASS src/game/__tests__/managerMarketingCapture.test.ts
+PASS src/engine/__tests__/liveInnings.test.ts
+PASS src/game/__tests__/careerDepth.test.ts
+PASS src/engine/__tests__/liveMatch.test.ts
+PASS src/game/__tests__/careerProgression.test.ts
+PASS src/state/__tests__/careerStoreU19WorldCupFlow.test.ts
+  ● Console
+
+    console.error
+      [crash] exception Jest encountered an unexpected token
+      
+      Jest failed to parse a file. This happens e.g. when your code or its dependencies use non-standard JavaScript syntax, or when Jest is not configured to support such syntax.
+      
+      Out of the box Jest supports Babel, which will be used to transform your files into valid JS based on your Babel configuration.
+      
+      By default "node_modules" folder is ignored by transformers.
+      
+      Here's what you can do:
+       • If you are trying to use ECMAScript Modules, see https://jestjs.io/docs/ecmascript-modules for how to enable it.
+       • If you are trying to use TypeScript, see https://jestjs.io/docs/getting-started#using-typescript
+       • To have some of your "node_modules" files transformed, you can specify a custom "transformIgnorePatterns" in your config.
+       • If you need a custom transformation specify a "transform" option in your config.
+       • If you simply want to mock your non-JS modules (e.g. binary assets) you can stub them out with the "moduleNameMapper" config option.
+      
+      You'll find more details and examples of these config options in the docs:
+      https://jestjs.io/docs/configuration
+      For information about custom transformations, see:
+      https://jestjs.io/docs/code-transformation
+      
+      Details:
+      
+      /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/expo-secure-store/build/SecureStore.js:1
+      ({"Object.<anonymous>":function(module,exports,require,__dirname,__filename,jest){import ExpoSecureStore from './ExpoSecureStore';
+                                                                                        ^^^^^^
+      
+      SyntaxError: Cannot use import statement outside a module
+          at new Script (node:vm:117:7)
+          at Runtime.createScriptFromCode (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1505:14)
+          at Runtime._execModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1399:25)
+          at Runtime._loadModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1022:12)
+          at Runtime.requireModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:882:12)
+          at Runtime.requireModuleOrMock (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1048:21)
+          at require (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/services/vipArchive.ts:43:56)
+          at Generator.next (<anonymous>)
+          at asyncGeneratorStep (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+          at _next (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+          at new Promise (<anonymous>)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12 { context: 'vip.archive.load' }
+
+      31 | export function captureException(error: unknown, context?: Record<string, unknown>): void {
+      32 |   if (IS_DEV) {
+    > 33 |     console.error('[crash] exception', error, context ?? {});
+         |             ^
+      34 |   }
+      35 |   if (!canSendCrashes()) return;
+      36 |   try {
+
+      at Object.error [as captureException] (src/services/crash.ts:33:13)
+      at captureException (src/state/careerStore.ts:1501:33)
+
+    console.error
+      [crash] exception Jest encountered an unexpected token
+      
+      Jest failed to parse a file. This happens e.g. when your code or its dependencies use non-standard JavaScript syntax, or when Jest is not configured to support such syntax.
+      
+      Out of the box Jest supports Babel, which will be used to transform your files into valid JS based on your Babel configuration.
+      
+      By default "node_modules" folder is ignored by transformers.
+      
+      Here's what you can do:
+       • If you are trying to use ECMAScript Modules, see https://jestjs.io/docs/ecmascript-modules for how to enable it.
+       • If you are trying to use TypeScript, see https://jestjs.io/docs/getting-started#using-typescript
+       • To have some of your "node_modules" files transformed, you can specify a custom "transformIgnorePatterns" in your config.
+       • If you need a custom transformation specify a "transform" option in your config.
+       • If you simply want to mock your non-JS modules (e.g. binary assets) you can stub them out with the "moduleNameMapper" config option.
+      
+      You'll find more details and examples of these config options in the docs:
+      https://jestjs.io/docs/configuration
+      For information about custom transformations, see:
+      https://jestjs.io/docs/code-transformation
+      
+      Details:
+      
+      /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/expo-secure-store/build/SecureStore.js:1
+      ({"Object.<anonymous>":function(module,exports,require,__dirname,__filename,jest){import ExpoSecureStore from './ExpoSecureStore';
+                                                                                        ^^^^^^
+      
+      SyntaxError: Cannot use import statement outside a module
+          at new Script (node:vm:117:7)
+          at Runtime.createScriptFromCode (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1505:14)
+          at Runtime._execModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1399:25)
+          at Runtime._loadModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1022:12)
+          at Runtime.requireModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:882:12)
+          at Runtime.requireModuleOrMock (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1048:21)
+          at require (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/services/vipArchive.ts:43:56)
+          at Generator.next (<anonymous>)
+          at asyncGeneratorStep (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+          at _next (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+          at new Promise (<anonymous>)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12 { context: 'vip.archive.load' }
+
+      31 | export function captureException(error: unknown, context?: Record<string, unknown>): void {
+      32 |   if (IS_DEV) {
+    > 33 |     console.error('[crash] exception', error, context ?? {});
+         |             ^
+      34 |   }
+      35 |   if (!canSendCrashes()) return;
+      36 |   try {
+
+      at Object.error [as captureException] (src/services/crash.ts:33:13)
+      at captureException (src/state/careerStore.ts:1501:33)
+
+    console.error
+      [crash] exception Jest encountered an unexpected token
+      
+      Jest failed to parse a file. This happens e.g. when your code or its dependencies use non-standard JavaScript syntax, or when Jest is not configured to support such syntax.
+      
+      Out of the box Jest supports Babel, which will be used to transform your files into valid JS based on your Babel configuration.
+      
+      By default "node_modules" folder is ignored by transformers.
+      
+      Here's what you can do:
+       • If you are trying to use ECMAScript Modules, see https://jestjs.io/docs/ecmascript-modules for how to enable it.
+       • If you are trying to use TypeScript, see https://jestjs.io/docs/getting-started#using-typescript
+       • To have some of your "node_modules" files transformed, you can specify a custom "transformIgnorePatterns" in your config.
+       • If you need a custom transformation specify a "transform" option in your config.
+       • If you simply want to mock your non-JS modules (e.g. binary assets) you can stub them out with the "moduleNameMapper" config option.
+      
+      You'll find more details and examples of these config options in the docs:
+      https://jestjs.io/docs/configuration
+      For information about custom transformations, see:
+      https://jestjs.io/docs/code-transformation
+      
+      Details:
+      
+      /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/expo-secure-store/build/SecureStore.js:1
+      ({"Object.<anonymous>":function(module,exports,require,__dirname,__filename,jest){import ExpoSecureStore from './ExpoSecureStore';
+                                                                                        ^^^^^^
+      
+      SyntaxError: Cannot use import statement outside a module
+          at new Script (node:vm:117:7)
+          at Runtime.createScriptFromCode (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1505:14)
+          at Runtime._execModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1399:25)
+          at Runtime._loadModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1022:12)
+          at Runtime.requireModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:882:12)
+          at Runtime.requireModuleOrMock (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1048:21)
+          at require (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/services/vipArchive.ts:43:56)
+          at Generator.next (<anonymous>)
+          at asyncGeneratorStep (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+          at _next (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+          at new Promise (<anonymous>)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12 { context: 'vip.archive.load' }
+
+      31 | export function captureException(error: unknown, context?: Record<string, unknown>): void {
+      32 |   if (IS_DEV) {
+    > 33 |     console.error('[crash] exception', error, context ?? {});
+         |             ^
+      34 |   }
+      35 |   if (!canSendCrashes()) return;
+      36 |   try {
+
+      at Object.error [as captureException] (src/services/crash.ts:33:13)
+      at captureException (src/state/careerStore.ts:1501:33)
+
+PASS src/game/__tests__/productDepth.test.ts
+PASS src/screens/__tests__/playerProfileOwnership.test.ts
+PASS src/game/__tests__/sponsorship.test.ts
+PASS src/state/__tests__/careerStoreYouthFlow.test.ts
+PASS src/game/__tests__/vip.test.ts
+PASS src/state/__tests__/modeVipFulfilment.test.ts
+PASS src/screens/__tests__/u19WorldCupUI.test.ts
+PASS src/storage/__tests__/migrate.test.ts
+PASS src/state/__tests__/careerEnergy.test.ts
+PASS src/game/__tests__/manager.test.ts
+PASS src/game/__tests__/narrative.test.ts
+PASS src/game/__tests__/careerLaunchRegression.test.ts
+PASS src/game/__tests__/stadiumManagement.test.ts
+PASS src/services/__tests__/vipArchive.test.ts
+PASS src/config/__tests__/artifactIsolation.test.ts
+PASS src/storage/__tests__/saveGames.test.ts
+PASS src/state/__tests__/careerStoreInternationalStart.test.ts
+PASS src/components/__tests__/fieldViewRendering.test.ts
+PASS src/state/__tests__/careerStoreNationalClubGuards.test.ts
+PASS src/storage/__tests__/integrity.test.ts
+PASS src/state/__tests__/careerStoreManagerNationalRollover.test.ts
+  ● Console
+
+    console.error
+      [crash] exception Jest encountered an unexpected token
+      
+      Jest failed to parse a file. This happens e.g. when your code or its dependencies use non-standard JavaScript syntax, or when Jest is not configured to support such syntax.
+      
+      Out of the box Jest supports Babel, which will be used to transform your files into valid JS based on your Babel configuration.
+      
+      By default "node_modules" folder is ignored by transformers.
+      
+      Here's what you can do:
+       • If you are trying to use ECMAScript Modules, see https://jestjs.io/docs/ecmascript-modules for how to enable it.
+       • If you are trying to use TypeScript, see https://jestjs.io/docs/getting-started#using-typescript
+       • To have some of your "node_modules" files transformed, you can specify a custom "transformIgnorePatterns" in your config.
+       • If you need a custom transformation specify a "transform" option in your config.
+       • If you simply want to mock your non-JS modules (e.g. binary assets) you can stub them out with the "moduleNameMapper" config option.
+      
+      You'll find more details and examples of these config options in the docs:
+      https://jestjs.io/docs/configuration
+      For information about custom transformations, see:
+      https://jestjs.io/docs/code-transformation
+      
+      Details:
+      
+      /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/expo-secure-store/build/SecureStore.js:1
+      ({"Object.<anonymous>":function(module,exports,require,__dirname,__filename,jest){import ExpoSecureStore from './ExpoSecureStore';
+                                                                                        ^^^^^^
+      
+      SyntaxError: Cannot use import statement outside a module
+          at new Script (node:vm:117:7)
+          at Runtime.createScriptFromCode (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1505:14)
+          at Runtime._execModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1399:25)
+          at Runtime._loadModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1022:12)
+          at Runtime.requireModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:882:12)
+          at Runtime.requireModuleOrMock (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1048:21)
+          at require (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/services/vipArchive.ts:43:56)
+          at Generator.next (<anonymous>)
+          at asyncGeneratorStep (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+          at _next (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+          at new Promise (<anonymous>)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12 { context: 'vip.archive.load' }
+
+      31 | export function captureException(error: unknown, context?: Record<string, unknown>): void {
+      32 |   if (IS_DEV) {
+    > 33 |     console.error('[crash] exception', error, context ?? {});
+         |             ^
+      34 |   }
+      35 |   if (!canSendCrashes()) return;
+      36 |   try {
+
+      at Object.error [as captureException] (src/services/crash.ts:33:13)
+      at captureException (src/state/careerStore.ts:1501:33)
+
+    console.error
+      [crash] exception Jest encountered an unexpected token
+      
+      Jest failed to parse a file. This happens e.g. when your code or its dependencies use non-standard JavaScript syntax, or when Jest is not configured to support such syntax.
+      
+      Out of the box Jest supports Babel, which will be used to transform your files into valid JS based on your Babel configuration.
+      
+      By default "node_modules" folder is ignored by transformers.
+      
+      Here's what you can do:
+       • If you are trying to use ECMAScript Modules, see https://jestjs.io/docs/ecmascript-modules for how to enable it.
+       • If you are trying to use TypeScript, see https://jestjs.io/docs/getting-started#using-typescript
+       • To have some of your "node_modules" files transformed, you can specify a custom "transformIgnorePatterns" in your config.
+       • If you need a custom transformation specify a "transform" option in your config.
+       • If you simply want to mock your non-JS modules (e.g. binary assets) you can stub them out with the "moduleNameMapper" config option.
+      
+      You'll find more details and examples of these config options in the docs:
+      https://jestjs.io/docs/configuration
+      For information about custom transformations, see:
+      https://jestjs.io/docs/code-transformation
+      
+      Details:
+      
+      /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/expo-secure-store/build/SecureStore.js:1
+      ({"Object.<anonymous>":function(module,exports,require,__dirname,__filename,jest){import ExpoSecureStore from './ExpoSecureStore';
+                                                                                        ^^^^^^
+      
+      SyntaxError: Cannot use import statement outside a module
+          at new Script (node:vm:117:7)
+          at Runtime.createScriptFromCode (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1505:14)
+          at Runtime._execModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1399:25)
+          at Runtime._loadModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1022:12)
+          at Runtime.requireModule (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:882:12)
+          at Runtime.requireModuleOrMock (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/jest-runtime/build/index.js:1048:21)
+          at require (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/services/vipArchive.ts:43:56)
+          at Generator.next (<anonymous>)
+          at asyncGeneratorStep (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+          at _next (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+          at new Promise (<anonymous>)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12 { context: 'vip.archive.load' }
+
+      31 | export function captureException(error: unknown, context?: Record<string, unknown>): void {
+      32 |   if (IS_DEV) {
+    > 33 |     console.error('[crash] exception', error, context ?? {});
+         |             ^
+      34 |   }
+      35 |   if (!canSendCrashes()) return;
+      36 |   try {
+
+      at Object.error [as captureException] (src/services/crash.ts:33:13)
+      at captureException (src/state/careerStore.ts:1501:33)
+
+PASS src/game/__tests__/career.test.ts
+PASS src/game/__tests__/playerArchitecture.test.ts
+PASS src/game/__tests__/careerStep.test.ts
+PASS src/game/__tests__/seasonPass.test.ts
+PASS src/game/__tests__/playerCalendar.test.ts
+PASS src/game/__tests__/u19WorldCupIntegration.test.ts
+PASS src/engine/__tests__/invariants.test.ts
+PASS src/game/__tests__/newspaper.test.ts
+PASS src/screens/__tests__/vipCollectionsScreen.test.ts
+PASS src/game/__tests__/u19WorldCup.test.ts
+PASS src/game/__tests__/careerStart.test.ts
+PASS src/game/__tests__/transferMarket.test.ts
+PASS src/game/__tests__/internationalMultiSeason.test.ts
+PASS src/storage/__tests__/encryptedSaves.test.ts
+  ● Console
+
+    console.warn
+      storage.setJSON failed for sg:career:1 Error: disk full
+          at Object.<anonymous> (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/storage/__tests__/encryptedSaves.test.ts:15:36)
+          at Generator.next (<anonymous>)
+          at asyncGeneratorStep (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+          at _next (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+          at new Promise (<anonymous>)
+          at Object.<anonymous> (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+          at Object.apply [as setItem] (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/storage/__tests__/encryptedSaves.test.ts:14:10)
+          at setItem (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/storage/storage.ts:155:26)
+          at Generator.next (<anonymous>)
+          at asyncGeneratorStep (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+          at _next (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      187 |     }
+      188 |   } catch (err) {
+    > 189 |     console.warn(`storage.setJSON failed for ${key}`, err);
+          |             ^
+      190 |     throw err;
+      191 |   }
+      192 | }
+
+      at warn (src/storage/storage.ts:189:13)
+          at Generator.throw (<anonymous>)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _throw (node_modules/@babel/runtime/helpers/asyncToGenerator.js:20:9)
+
+    console.warn
+      storage.setJSON failed for sg:career:1 Error: disk full
+          at Object.<anonymous> (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/storage/__tests__/encryptedSaves.test.ts:15:36)
+          at Generator.next (<anonymous>)
+          at asyncGeneratorStep (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+          at _next (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+          at /Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+          at new Promise (<anonymous>)
+          at Object.<anonymous> (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+          at Object.apply [as setItem] (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/storage/__tests__/encryptedSaves.test.ts:14:10)
+          at setItem (/Users/divakarmishra/Desktop/APP/cricketlegacy/src/storage/storage.ts:155:26)
+          at Generator.next (<anonymous>)
+          at asyncGeneratorStep (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+          at _next (/Users/divakarmishra/Desktop/APP/cricketlegacy/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      187 |     }
+      188 |   } catch (err) {
+    > 189 |     console.warn(`storage.setJSON failed for ${key}`, err);
+          |             ^
+      190 |     throw err;
+      191 |   }
+      192 | }
+
+      at warn (src/storage/storage.ts:189:13)
+          at Generator.throw (<anonymous>)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _throw (node_modules/@babel/runtime/helpers/asyncToGenerator.js:20:9)
+
+PASS src/game/__tests__/squadRecovery.test.ts
+PASS src/game/__tests__/playerLife.test.ts
+PASS src/game/__tests__/managerTraining.test.ts
+PASS src/engine/__tests__/seasonDistribution.test.ts
+PASS src/storage/__tests__/schema38.test.ts
+PASS src/storage/__tests__/schema37.test.ts
+PASS src/components/__tests__/energyRecoveryModal.test.ts
+  ● Console
+
+    console.error
+      An update to EnergyRecoveryModal inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      16 |       if (typeof message === 'string' && message.startsWith('react-test-renderer is deprecated.'))
+      17 |         return;
+    > 18 |       original(message, ...args);
+         |       ^
+      19 |     });
+      20 |   });
+      21 |   afterEach(() => errors.mockRestore());
+
+      at console.original (src/test/reactRenderEnvironment.ts:18:7)
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:14402:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:2315:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:14401:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:12086:9)
+      at forceStoreRerender (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5432:24)
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:5417:11
+      at node_modules/zustand/vanilla.js:11:39
+          at Set.forEach (<anonymous>)
+      at Function.setState (node_modules/zustand/vanilla.js:11:17)
+      at Object.setState (src/components/__tests__/energyRecoveryModal.test.ts:172:23)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS src/game/__tests__/managerResources.test.ts
+PASS src/game/__tests__/managerMatchModifiers.test.ts
+PASS src/game/__tests__/cup.test.ts
+PASS src/game/__tests__/progressionSafety.test.ts
+PASS src/game/__tests__/hallOfFame.test.ts
+PASS src/game/__tests__/playerAdvisor.test.ts
+PASS src/content/__tests__/storyEvents.test.ts
+PASS src/game/__tests__/leadership.test.ts
+PASS src/game/__tests__/morale.test.ts
+PASS src/game/__tests__/youthCompetition.test.ts
+PASS src/engine/__tests__/rng.test.ts
+PASS src/game/__tests__/careerContract.test.ts
+PASS src/screens/__tests__/transfersRoleGuard.test.ts
+PASS src/screens/__tests__/iosLayoutRegression.test.ts
+PASS src/game/__tests__/loan.test.ts
+PASS src/game/__tests__/managerCareer.test.ts
+PASS src/game/__tests__/shortageOffers.test.ts
+PASS src/game/__tests__/managerJobs.test.ts
+PASS src/game/__tests__/finance.test.ts
+PASS src/storage/__tests__/schema36.test.ts
+PASS src/game/__tests__/seasonDepth.test.ts
+PASS src/game/__tests__/careerExperience.test.ts
+PASS src/game/__tests__/leaderboard.test.ts
+PASS src/game/__tests__/managerEvents.test.ts
+PASS src/game/__tests__/auction.test.ts
+PASS src/game/__tests__/divisions.test.ts
+PASS src/storage/__tests__/schema41.test.ts
+PASS src/storage/__tests__/schema39.test.ts
+PASS src/game/__tests__/firstSession.test.ts
+PASS src/game/__tests__/continental.test.ts
+PASS src/game/__tests__/competitionTable.test.ts
+PASS src/content/__tests__/newspaperTemplates.test.ts
+PASS src/game/__tests__/managerClubState.test.ts
+PASS src/game/__tests__/internationalRankings.test.ts
+PASS src/game/__tests__/managerStartingSquadBalance.test.ts
+PASS src/avatar/__tests__/avatarCatalog.test.ts
+PASS src/storage/__tests__/schema33.test.ts
+PASS src/game/__tests__/oppositionAnalysis.test.ts
+PASS src/services/__tests__/premiumSponsorSaveDeletion.test.ts
+PASS src/game/__tests__/statsScope.test.ts
+PASS src/game/__tests__/monthlyPassStories.test.ts
+PASS src/game/__tests__/divisionRollover.test.ts
+PASS src/game/__tests__/sponsorBrands.test.ts
+PASS src/game/__tests__/achievementModes.test.ts
+PASS src/storage/__tests__/schema43.test.ts
+PASS src/game/__tests__/stockMarket.test.ts
+PASS src/storage/__tests__/schema42.test.ts
+PASS src/game/__tests__/readiness.test.ts
+PASS src/services/__tests__/adsConsent.test.ts
+PASS src/generation/__tests__/players.test.ts
+PASS src/game/__tests__/matchSkip.test.ts
+PASS src/config/__tests__/legal.test.ts
+PASS src/components/__tests__/playRatingPrompt.test.ts
+PASS src/services/__tests__/publisherAuthReturn.test.ts
+PASS src/components/__tests__/fieldSequence.test.ts
+PASS src/game/__tests__/trophyParticipation.test.ts
+PASS src/game/__tests__/managerRecords.test.ts
+PASS src/game/__tests__/injuries.test.ts
+PASS src/components/__tests__/venueScenes.test.ts
+PASS src/storage/__tests__/storageWrites.test.ts
+PASS src/hooks/__tests__/useEnergyClock.test.ts
+PASS src/game/__tests__/seasonResult.test.ts
+PASS src/game/__tests__/teamTalk.test.ts
+PASS src/services/__tests__/googleRecoveryLogin.test.ts
+PASS src/screens/__tests__/savedGamesModeRace.test.ts
+PASS src/storage/__tests__/schema34.test.ts
+PASS src/services/__tests__/accountCareerCloud.test.ts
+PASS src/config/__tests__/unityMediationConfig.test.ts
+PASS src/screens/__tests__/loginRetryBehavior.test.ts
+PASS src/navigation/__tests__/careerNavigation.test.ts
+PASS src/config/__tests__/legalSite.test.ts
+PASS src/game/__tests__/qaEmitPlayerSave.test.ts
+PASS src/components/__tests__/playerLifeAssetCard.test.ts
+PASS src/services/__tests__/adDiagnostics.test.ts
+PASS src/services/__tests__/cancelledCheckout.test.ts
+PASS src/screens/__tests__/managerAnalysisLocation.test.ts
+PASS src/game/__tests__/progression.test.ts
+PASS src/components/__tests__/venueVisuals.test.ts
+PASS src/components/__tests__/hubTabNavigation.test.ts
+PASS src/components/__tests__/bannerAdLifecycle.test.ts
+PASS src/audio/__tests__/matchAudio.test.ts
+PASS src/game/__tests__/attributeDisplay.test.ts
+PASS src/components/__tests__/buttonPalette.test.ts
+PASS src/services/__tests__/guestPurchases.test.ts
+PASS src/screens/__tests__/matchPresentation.test.ts
+PASS src/game/__tests__/squad.test.ts
+PASS src/engine/__tests__/determinism.test.ts
+PASS src/components/__tests__/screenSafeArea.test.ts
+PASS src/components/__tests__/ageEligibilityGate.test.ts
+  ● Console
+
+    console.error
+      react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+      42 |   const mount = async () => {
+      43 |     await act(async () => {
+    > 44 |       tree = create(
+         |                    ^
+      45 |         createElement(AgeEligibilityGate, { onAccepted: accepted }, createElement(GameContent)),
+      46 |       );
+      47 |     });
+
+      at Object.<anonymous>.process.env.NODE_ENV.exports.create (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:17337:17)
+      at src/components/__tests__/ageEligibilityGate.test.ts:44:20
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:814:22)
+      at src/components/__tests__/ageEligibilityGate.test.ts:43:14
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (src/components/__tests__/ageEligibilityGate.test.ts:42:14)
+      at Object.mount (src/components/__tests__/ageEligibilityGate.test.ts:50:11)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+    console.error
+      react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+      42 |   const mount = async () => {
+      43 |     await act(async () => {
+    > 44 |       tree = create(
+         |                    ^
+      45 |         createElement(AgeEligibilityGate, { onAccepted: accepted }, createElement(GameContent)),
+      46 |       );
+      47 |     });
+
+      at Object.<anonymous>.process.env.NODE_ENV.exports.create (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:17337:17)
+      at src/components/__tests__/ageEligibilityGate.test.ts:44:20
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:814:22)
+      at src/components/__tests__/ageEligibilityGate.test.ts:43:14
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (src/components/__tests__/ageEligibilityGate.test.ts:42:14)
+      at Object.mount (src/components/__tests__/ageEligibilityGate.test.ts:62:11)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+    console.error
+      react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+      42 |   const mount = async () => {
+      43 |     await act(async () => {
+    > 44 |       tree = create(
+         |                    ^
+      45 |         createElement(AgeEligibilityGate, { onAccepted: accepted }, createElement(GameContent)),
+      46 |       );
+      47 |     });
+
+      at Object.<anonymous>.process.env.NODE_ENV.exports.create (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:17337:17)
+      at src/components/__tests__/ageEligibilityGate.test.ts:44:20
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:814:22)
+      at src/components/__tests__/ageEligibilityGate.test.ts:43:14
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (src/components/__tests__/ageEligibilityGate.test.ts:42:14)
+      at Object.mount (src/components/__tests__/ageEligibilityGate.test.ts:72:11)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+    console.error
+      react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+      42 |   const mount = async () => {
+      43 |     await act(async () => {
+    > 44 |       tree = create(
+         |                    ^
+      45 |         createElement(AgeEligibilityGate, { onAccepted: accepted }, createElement(GameContent)),
+      46 |       );
+      47 |     });
+
+      at Object.<anonymous>.process.env.NODE_ENV.exports.create (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:17337:17)
+      at src/components/__tests__/ageEligibilityGate.test.ts:44:20
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:814:22)
+      at src/components/__tests__/ageEligibilityGate.test.ts:43:14
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12
+      at apply (src/components/__tests__/ageEligibilityGate.test.ts:42:14)
+      at Object.mount (src/components/__tests__/ageEligibilityGate.test.ts:79:11)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS src/storage/__tests__/accountBackupJournal.test.ts
+PASS src/content/__tests__/pressScenarioExpansion.test.ts
+PASS src/components/__tests__/glassAlertLayout.test.ts
+PASS src/services/__tests__/emailAuth.test.ts
+PASS src/services/__tests__/ageEligibility.test.ts
+PASS src/screens/__tests__/seasonPassScreen.test.ts
+PASS src/components/__tests__/celebrationOverlay.test.ts
+PASS src/components/__tests__/careerNavigation.test.ts
+PASS src/services/__tests__/purchases.test.ts
+PASS src/services/__tests__/premiumSponsorBackend.test.ts
+PASS src/services/__tests__/ads.test.ts
+PASS src/screens/__tests__/sponsorDeepLink.test.ts
+PASS src/screens/__tests__/purchaseCopy.test.ts
+PASS src/screens/__tests__/mainMenuResume.test.ts
+PASS src/components/__tests__/rewardShowcase.test.ts
+PASS src/components/__tests__/appearancePrompt.test.ts
+  ● Console
+
+    console.error
+      react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+      28 | test('counts foreground time across backgrounding, defers during gameplay and dismisses once', async () => {
+      29 |   let tree!: ReactTestRenderer;
+    > 30 |   act(() => { tree = create(React.createElement(AppearancePrompt, { eligible: true, route: 'Match' })); });
+         |                            ^
+      31 |   act(() => jest.advanceTimersByTime(10 * 60000));
+      32 |   act(() => { AppState.currentState = 'background'; mockChange('background'); });
+      33 |   act(() => jest.advanceTimersByTime(60 * 60000));
+
+      at Object.<anonymous>.process.env.NODE_ENV.exports.create (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:17337:17)
+      at src/components/__tests__/appearancePrompt.test.ts:30:28
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:814:22)
+      at Object.<anonymous> (src/components/__tests__/appearancePrompt.test.ts:30:6)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+    console.error
+      react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+
+      47 |   useSettings.setState({ hasHydrated: false, hasOnboarded: false });
+      48 |   let tree!: ReactTestRenderer;
+    > 49 |   act(() => { tree = create(React.createElement(AppearancePrompt, { eligible: true, route: 'MainMenu' })); });
+         |                            ^
+      50 |   act(() => jest.advanceTimersByTime(APPEARANCE_PROMPT_MS));
+      51 |   expect(useSettings.getState().appearancePlayMs).toBe(0);
+      52 |   expect(tree.toJSON()).toBeNull();
+
+      at Object.<anonymous>.process.env.NODE_ENV.exports.create (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:17337:17)
+      at src/components/__tests__/appearancePrompt.test.ts:49:28
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:814:22)
+      at Object.<anonymous> (src/components/__tests__/appearancePrompt.test.ts:49:6)
+
+PASS src/services/__tests__/sessionGate.test.ts
+PASS src/services/__tests__/antiCheat.test.ts
+PASS src/screens/__tests__/qaTools.test.ts
+PASS src/security/__tests__/playIntegrityVerdict.test.ts
+PASS src/components/__tests__/buttonLayout.test.ts
+PASS src/services/__tests__/telemetry.test.ts
+PASS src/services/__tests__/modeVipProducts.test.ts
+PASS src/services/__tests__/iosPlatform.test.ts
+PASS src/screens/__tests__/navigationReachability.test.ts
+PASS src/guidance/__tests__/mechanics.test.ts
+PASS src/config/__tests__/appVersion.test.ts
+PASS src/components/__tests__/startupWithoutAgeGate.test.ts
+PASS src/components/__tests__/screenNavigationBehavior.test.ts
+PASS src/components/__tests__/fieldGeometry.test.ts
+PASS src/components/__tests__/cricketBallLoader.test.ts
+PASS src/audio/__tests__/audioPlaybackRate.test.ts
+PASS src/audio/__tests__/audioPlayback.test.ts
+PASS src/services/__tests__/reanimatedAndroidPatch.test.ts
+PASS src/screens/__tests__/sponsorBrandingSurfaces.test.ts
+PASS src/screens/__tests__/playerLifeSurface.test.ts
+PASS src/screens/__tests__/careerHubCricketHome.test.ts
+PASS src/hooks/__tests__/useManagedTimers.test.ts
+PASS src/game/__tests__/liveops.test.ts
+PASS src/engine/__tests__/toss.test.ts
+PASS src/components/__tests__/sponsorAvatarLayout.test.ts
+PASS src/components/__tests__/awardPresentation.test.ts
+PASS src/services/__tests__/unityConsent.test.ts
+PASS src/services/__tests__/supabaseClient.test.ts
+PASS src/services/__tests__/storeReview.test.ts
+PASS src/services/__tests__/rewardedEnergy.test.ts
+PASS src/services/__tests__/appIntegrity.test.ts
+PASS src/services/__tests__/accountDeletion.test.ts
+PASS src/screens/__tests__/transferCopy.test.ts
+PASS src/screens/__tests__/recordsLeagueTable.test.ts
+PASS src/screens/__tests__/playerCreationCopy.test.ts
+PASS src/screens/__tests__/playerLifeHierarchy.test.ts
+PASS src/screens/__tests__/managerHubCopy.test.ts
+PASS src/screens/__tests__/managerCopyReduction.test.ts
+PASS src/screens/__tests__/careerHubCopy.test.ts
+PASS src/game/__tests__/matchAuthority.test.ts
+PASS src/game/__tests__/energyRecovery.test.ts
+PASS src/game/__tests__/deliveryPlayback.test.ts
+PASS src/data/__tests__/cosmeticsOwnership.test.ts
+PASS src/components/__tests__/playerAvatar.test.ts
+PASS src/components/__tests__/newspaperPresentation.test.ts
+PASS src/components/__tests__/newspaperModal.test.ts
+PASS src/components/__tests__/firstMatchGuide.test.ts
+PASS src/components/__tests__/careerSpotlight.test.ts
+PASS src/components/avatar/__tests__/portraitPickerLayout.test.ts
+PASS src/storage/__tests__/schema14WalletClock.test.ts
+PASS src/services/__tests__/androidStabilityGate.test.ts
+PASS src/services/__tests__/adAgeChoice.test.ts
+PASS src/screens/__tests__/trainingCopy.test.ts
+PASS src/screens/__tests__/matchStanceControls.test.ts
+PASS src/screens/__tests__/matchSettlementDurability.test.ts
+PASS src/screens/__tests__/dailyChallengeCopy.test.ts
+PASS src/screens/__tests__/clubStadiumScreen.test.ts
+PASS src/screens/__tests__/academyGuidance.test.ts
+PASS src/state/__tests__/contractPresentationStore.test.ts
+PASS src/security/__tests__/protectedWallet.test.ts
+PASS src/hooks/__tests__/useResponsive.test.ts
+PASS src/game/__tests__/tactics.test.ts
+PASS src/game/__tests__/drs.test.ts
+PASS src/engine/__tests__/fieldRestrictions.test.ts
+PASS src/components/__tests__/squadPlayerIdentity.test.ts
+PASS src/components/__tests__/screenFooterLayout.test.ts
+PASS src/components/__tests__/popupContrast.test.ts
+PASS src/components/__tests__/onboarding.test.ts
+PASS src/components/__tests__/leagueTableNames.test.ts
+PASS src/components/__tests__/fieldPresentation.test.ts
+PASS src/components/__tests__/fieldMotion.test.ts
+PASS src/services/__tests__/reviewerAccess.test.ts
+PASS src/services/__tests__/notifications.test.ts
+PASS src/services/__tests__/accountPurchases.test.ts
+PASS src/screens/__tests__/storeResponsiveness.test.ts
+PASS src/screens/__tests__/premiumSponsorUi.test.ts
+PASS src/screens/__tests__/nationalManagerClubGuards.test.ts
+PASS src/screens/__tests__/medicalCentreScreen.test.ts
+PASS src/screens/__tests__/matchBackGuard.test.ts
+PASS src/screens/__tests__/investmentPortfolioUi.test.ts
+PASS src/screens/__tests__/concisePurchaseCopy.test.ts
+PASS src/state/__tests__/appearanceSettings.test.ts
+PASS src/game/__tests__/reviewerAccess.test.ts
+PASS src/game/__tests__/newspaperContent.test.ts
+PASS src/game/__tests__/creationAllocation.test.ts
+PASS src/engine/__tests__/dls.test.ts
+PASS src/config/__tests__/monetization.test.ts
+PASS src/components/__tests__/celebrationPresentation.test.ts
+PASS src/components/__tests__/calmPalette.test.ts
+PASS src/storage/__tests__/backupFingerprint.test.ts
+PASS src/services/__tests__/supabaseVerifiedSession.test.ts
+PASS src/services/__tests__/cloud.test.ts
+PASS src/services/__tests__/androidSplashLifecycle.test.ts
+PASS src/screens/__tests__/matchCommentaryOrder.test.ts
+PASS src/screens/__tests__/managerTrainingPresentation.test.ts
+PASS src/screens/__tests__/loginGateCopy.test.ts
+PASS src/screens/__tests__/cosmeticsPresentation.test.ts
+PASS src/screens/__tests__/internationalRankingsPresentation.test.ts
+PASS src/screens/__tests__/iapCosmeticVisibility.test.ts
+PASS src/screens/__tests__/hubGuideCopy.test.ts
+PASS src/screens/__tests__/facilityUpgradePaymentChoice.test.ts
+PASS src/screens/__tests__/contractBoostCopy.test.ts
+PASS src/screens/__tests__/clubOfficeInfrastructure.test.ts
+PASS src/screens/__tests__/clubOfficeContracts.test.ts
+PASS src/screens/__tests__/closedTestReportEnhancements.test.ts
+PASS src/screens/__tests__/careerCreationPresentation.test.ts
+PASS src/state/__tests__/seasonPassAppClock.test.ts
+PASS src/game/__tests__/matchTiming.test.ts
+PASS src/game/__tests__/kitIdentity.test.ts
+PASS src/engine/__tests__/playerOfMatch.test.ts
+PASS src/data/__tests__/cosmeticsPresentation.test.ts
+PASS src/config/__tests__/supabaseConfig.test.ts
+PASS src/components/__tests__/svgNumericProps.test.ts
+PASS src/components/__tests__/sponsorBranding.test.ts
+PASS src/components/__tests__/countryFlag.test.ts
+PASS src/components/__tests__/commentaryArchive.test.ts
+PASS src/storage/__tests__/androidStorageLimit.test.ts
+PASS src/screens/__tests__/matchRewardedAds.test.ts
+PASS src/game/__tests__/youthBalance.test.ts
+PASS src/components/__tests__/franchiseOfferModal.test.ts
+
+Test Suites: 287 passed, 287 total
+Tests:       2167 passed, 2167 total
+Snapshots:   2 passed, 2 total
+Time:        80.212 s, estimated 85 s
+Ran all test suites.

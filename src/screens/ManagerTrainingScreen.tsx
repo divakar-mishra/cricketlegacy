@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { GuideTarget, GuideReplayButton } from '../components/CareerGuide';
+import { guideAction } from '../game/coachGuide';
 import { FacilityScene } from '../components/FacilityScene';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
@@ -150,6 +152,7 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
   const chooseFocus = (focus: ManagerTrainingFocus) => {
     setDraftFocus(focus);
     setSaveMessage(null);
+    guideAction('manager-training-focus');
   };
 
   const chooseIntensity = (intensity: ManagerTrainingIntensity) => {
@@ -165,18 +168,19 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
   return (
     <Screen
       scroll
+      guide={{ chapter: 'manager.training' }}
       gradient={gradients.pitch}
       footer={
         <View style={styles.footer}>
           <Text style={[styles.footerStatus, saveMessage && styles.footerStatusSaved]}>
             {saveMessage ?? (planChanged ? 'Unsaved changes' : 'Automatic after fixtures')}
           </Text>
-          <Button
+          <GuideTarget id="training-save"><Button
             label={planChanged ? 'SAVE TRAINING PLAN' : 'PLAN SAVED'}
             variant={planChanged ? 'gold' : 'secondary'}
             disabled={!planChanged}
             onPress={saveTrainingPlan}
-          />
+          /></GuideTarget>
         </View>
       }
     >
@@ -185,6 +189,7 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
         subtitle={team.name}
         onBack={() => navigation.goBack()}
       />
+      <GuideReplayButton chapter="manager.training" />
 
       <View style={styles.coachBoard}>
         <View style={[styles.tape, styles.tapeLeft]} />
@@ -208,7 +213,7 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
         />
 
         <Text style={styles.boardSectionLabel}>SESSION FOCUS</Text>
-        <View style={styles.focusGrid}>
+        <GuideTarget id="training-focus"><View style={styles.focusGrid}>
           {FOCUSES.map((option) => {
             const selected = selectedFocus === option.id;
             return (
@@ -236,7 +241,7 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
               </Pressable>
             );
           })}
-        </View>
+        </View></GuideTarget>
 
         <View style={styles.selectionSummary}>
           <Text style={styles.selectionKicker}>SELECTED · {focusLabel(selectedFocus)}</Text>
@@ -244,7 +249,7 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
         </View>
       </View>
 
-      {selectedFocus !== 'RECOVERY' ? (
+      <GuideTarget id="training-workload" focusHeight={150}>{selectedFocus !== 'RECOVERY' ? (
         <View style={styles.workloadSection}>
           <Text style={styles.sectionTitle}>WORKLOAD</Text>
           <View style={styles.intensityRow}>
@@ -286,9 +291,9 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
             <Text style={styles.recoveryTitle}>Recovery session</Text>
           </View>
         </View>
-      )}
+      )}</GuideTarget>
 
-      <View style={styles.overridesSheet}>
+      <GuideTarget id="training-overrides" focusHeight={80}><View style={styles.overridesSheet}>
         <Pressable
           onPress={() => setOverridesOpen((current) => !current)}
           accessibilityRole="button"
@@ -374,7 +379,7 @@ export function ManagerTrainingScreen({ navigation }: Pick<ScreenProps<'Training
             })}
           </View>
         ) : null}
-      </View>
+      </View></GuideTarget>
     </Screen>
   );
 }

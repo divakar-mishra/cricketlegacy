@@ -1,0 +1,172 @@
+IOS SIMULATOR UI FIXES AND IPHONE COVERAGE
+23 October 2026 | Asia/Kolkata | supersedes F1/F2/F3 of the earlier UI audit
+
+RESULT
+======
+Implemented and visually verified the three owner-approved audit fixes:
+  F1 Wage Ledger: bounded flex viewport, no duplicate native content inset,
+     and automatic visible-position anchoring disabled for this static ledger.
+     The initial first player/name/wage is now visible, including on375pt.
+     On the original402pt phone the list still begins at y421pt; the first
+     name is now at y452.7pt instead of y383.7pt above the clip rectangle.
+     Insets/anchoring changed together: do not claim one isolated root cause.
+  F2 Leadership: replace the88pt fixed action width with108pt minimum intrinsic
+     width and no flex shrink. Selected and Swap role no longer break words.
+     Disabled selected state and appointment behavior are preserved.
+  F3 Player: role/pathway/readiness can wrap without ellipsis; attribute labels
+     can wrap and get110pt basis instead of82pt. Temperament is fully readable.
+No wage formula, contract term/cost, appointment rule, progression, commerce,
+save schema, provider setting, age policy or game balance changed in this work.
+The separate Android energy review has not been implemented by this UI task.
+
+SOURCE / TESTS
+==============
+Changed runtime files:
+  src/screens/WageBreakdownScreen.tsx
+  src/screens/ManagerLeadershipScreen.tsx
+  src/screens/CareerHubScreen.tsx
+  src/screens/PlayerProfileScreen.tsx
+New regression file: src/screens/__tests__/iosLayoutRegression.test.ts.
+Additional generic resize contract: src/components/__tests__/screenSafeArea.test.ts.
+The latter re-renders one mounted Screen through375/820/440/375pt windows,
+checking recomputed gutters and footer safe areas. It is a mocked window API
+test, NOT a native iPhone Duo fold or hardware simulation.
+
+PASS: six focused Jest suites,45tests; npm run typecheck; npm run lint -- --quiet;
+git diff --check. Full game suite was not run for these targeted layout changes.
+Logs are under output/ios-simulator/evidence/ui-fixes-2026-10-23/.
+
+NATIVE COVERAGE — OBSERVED, NOT ASSUMED
+=====================================
+Xcode26.6(17F113), iOS26.5 simulator runtime. Standalone Release/Hermes app.
+  QA iPhone16Pro:402x874pt /1206x2622px, existing Warm appearance and two careers.
+  QA iPhoneSE3:375x667pt /750x1334px, Classic appearance.
+  iPhone17ProMax:440x956pt /1320x2868px, Classic appearance.
+
+Six normal-size screen flows passed: two per device, Manager and Player.
+Two more passed on17ProMax at extra-extra-large text; original large text size
+was restored and queried afterward. This is not an all-Dynamic-Type audit.
+One additional compact Player flow passed after improving settled screenshot
+geometry. Total final successful screen-flow executions:9. Two separate setup
+tests created missing local QA fixture careers; do not count these as extra
+screen-quality certifications. Existing phone careers were not replaced.
+
+Each Manager flow visits Club > Wage Ledger, asserts first-row text inside the
+viewport, scrolls, visits Team > Leadership, checks full Selected action width
+and disabled state, returns Home and verifies a saved Manager card after restart.
+Each Player flow checks the hub, More > full Profile/Temperament, Home/back and
+the saved Player card after restart. Screenshot review supplements assertions.
+
+Successful result bundles:
+  phone-retest.xcresult          2 screen flows
+  compact.xcresult               2 screen flows
+  max.xcresult                   2 screen flows
+  max-larger-text.xcresult       2 screen flows
+  compact-settled-profile.xcresult 1 screen flow
+  compact-fixtures.xcresult, max-fixtures.xcresult:1setup test each.
+
+INITIAL ATTEMPTS / LIMITS
+========================
+phone.xcresult:1of2 failed only at an immediate saved-card count after restart.
+The screen-layout assertions had passed; the harness omitted waiting for
+encrypted saved cards to load. Added an explicit Play wait; both flows passed
+on rerun. Retain the failed bundle rather than silently report all runs passed.
+The initial compact profile screenshot scrolled past Temperament even though
+accessibility reported it hittable. Reject that image as proof of that label.
+Added settled frame containment and small corrective drags; the dedicated
+compact retest passed and its replacement screenshot was visually inspected.
+
+QA fixtures on the previously empty compact/ProMax devices: one Player named
+Layout QA and one Chennai Arclight Manager. No prior careers were deleted.
+Phone/compact containers backed up before updating. No purchases, renewals,
+appointments, matches, training sessions, cloud login or account deletion.
+No observed app crash in these completed flows; this is not a memory soak,
+Oppo ANR, all-screen, live-ad, authentication, restore or TestFlight/device pass.
+The prior UIKit lifecycle/logging warnings remain separate follow-up work.
+
+DEVICE COVERAGE / WHY NOT REPEAT IDENTICAL PHONES
+================================================
+Verified local simulator profiles for16Pro and17Pro have identical1206x2622px,
+scale3, framebuffer mask, sensor-bar asset and chrome identifier. Reuse the
+16Pro layout test for17Pro on this installed runtime; no redundant17Pro run.
+The440pt ProMax is different, so it was actually installed and exercised.
+
+Apple's current18Pro specifications list2622x1206px and18ProMax2868x1320px.
+These match the two tested Pro display resolutions. This is representative
+layout-size coverage only, NOT a claim that18Pro/18ProMax hardware, iOS27,
+safe-area behavior, performance or native providers were tested. Neither18Pro
+nor Duo device types/runtime are installed on this Mac. No Xcode upgrade or
+large SDK download was made during this task.
+Source checked23Oct2026: https://www.apple.com/iphone-18-pro/specs/
+
+IPHONE DUO — CAN WE TEST WITHOUT THE PHONE?
+==========================================
+Yes, via Apple's simulator after installing the required toolchain. API-only
+backend/unit tests do not exercise folding, window geometry, safe areas, system
+bars or state retention during a native resize. The generic resize test above
+is useful baseline evidence only; never label it a Duo compatibility pass.
+
+Official Apple instructions checked23Oct2026:
+  https://developer.apple.com/news/?id=kkphp5qo
+  https://developer.apple.com/iphone-duo/prepare/
+Apple specifies Xcode27.1 for Duo development support and a Duo simulator;
+Device Hub also provides resizable testing. Builds using the26SDK can run on
+Duo in compatibility layouts, but that is not full edge-to-edge adaptation.
+
+Next Duo procedure, not executed:
+  1. Install a current Xcode27.1-or-later version compatible with this Mac,
+     retaining the working26.6 installation and existing simulator data.
+     Recheck exact Expo57/RN/native dependency compatibility before rebuilding.
+  2. Install the matching iOS27.1 runtime/Duo simulator in Xcode components.
+     Use the selected Xcode's simulator/Device Hub; do not merely rename16Pro.
+  3. Build the same isolated QA target with test ads and backend/commerce off.
+     Do not enable real purchase/provider credentials just to change device size.
+  4. Test closed/open and intermediate poses plus portrait/landscape, repeatedly
+     during an active career: Home, long lists, Leadership, keyboard, modal,
+     navigation/footer, ad slots, return/background and save reload.
+  5. Assert current window/safe-area sizing and retained state. Inspect rendered
+     screens, not only API responses; collect actual Duo screenshots/results.
+  6. Keep physical iPhone provider/purchase/consent checks as separate gates.
+
+Apple's generic resizability review looks for main-screen sizing, orientation
+and device-identity assumptions. Current Screen uses useWindowDimensions and
+safe-area hooks; app orientation is default, not portrait-only. A repository
+search also found Dimensions.get('window') in CelebrationOverlay; it has not
+been certified through a mid-celebration fold. No speculative Duo runtime fix
+or deployment-target bump was made without the actual SDK/runtime.
+
+ARTIFACT / SAFETY / REPRODUCTION
+===============================
+App: output/ios-simulator/derived-data/Build/Products/Release-iphonesimulator/
+     CricketSimulator.app
+Version1.0.12/build1; bundle com.coverdrive.cricket.simulator; minimum iOS16.4.
+ZIP: output/ios-simulator/cricket-player-manager-1.0.12-ios-ui-fixes-2026-10-23.zip
+Bytes:66262088
+SHA256:1cfc46203b4e839fb4130a7f484ed2d4fb7ce2e63a646c662470e5ab67229026
+JS bundle SHA256:d969f48159fc2b6307739f7ceb69cfcf68e324da847ce735a929c5e07792abc3
+Code signature and ZIP integrity checked. Fresh bytecode confirms QA tools,
+mock purchases and simulated ad fulfillment are compiled false. The isolated
+build disables Supabase/RevenueCat and uses Google's marked test ad units.
+This ZIP is simulator-only, not an IPA or App Store submission artifact.
+The older simulator ZIPs and Android production AAB were preserved.
+Android AAB SHA256 remains:
+0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4
+
+Build: CRICKET_IOS_BUILD_LABEL=ui-fixes-2026-10-23 bash scripts/buildIosSimulator.sh
+Use a NEW label for future builds; evidence helper rejects existing log labels.
+Install in-place with xcrun simctl install DEVICE_UUID APP_PATH, never uninstall
+or erase data to resolve an ordinary layout issue. Resolve/back up containers
+before installation, and select one explicit device rather than ambiguous booted.
+Native harness: output/ios-simulator/uitests/SimulatorSmokeTests.swift.
+Select ONLY testNavigationDepthAuditFixedManagerLayouts and
+testNavigationDepthAuditFixedPlayerLayouts. The older full harness includes
+destructive lifecycle tests: NEVER run it as a whole for a UI regression.
+Use unique xcodebuild result paths and export/inspect screenshots afterward.
+The legacy verifyIosSimulator.cjs uses a pinned old ZIP/bytecode report: do not
+treat it alone as new-artifact verification. This run checked the new signature,
+ZIP and freshly disassembled bundle separately; historical ZIP hashes retained.
+
+Raw native evidence: output/ios-simulator/evidence/ui-fixes-2026-10-23/.
+Selected inspected evidence: docs/evidence/ios-ui-fixes-2026-10-23/.
+No signing/distribution archive, upload, website/backend deployment or provider
+configuration change was performed. Real iPhone release gates remain separate.

@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: missing tracking declarations stay unknown rather than being certified false
+ok 1 - missing tracking declarations stay unknown rather than being certified false
+  ---
+  duration_ms: 0.811334
+  type: 'test'
+  ...
+# Subtest: retains per-type linking, tracking, purposes and API reasons for review
+ok 2 - retains per-type linking, tracking, purposes and API reasons for review
+  ---
+  duration_ms: 0.11375
+  type: 'test'
+  ...
+# Subtest: only GETs the public settings endpoint and reports no key or user data
+ok 3 - only GETs the public settings endpoint and reports no key or user data
+  ---
+  duration_ms: 1.61475
+  type: 'test'
+  ...
+# Subtest: unknown enabled flags stay unknown, not assumed configured
+ok 4 - unknown enabled flags stay unknown, not assumed configured
+  ---
+  duration_ms: 0.247375
+  type: 'test'
+  ...
+# Subtest: refuses server keys and non-origin URLs before making any network request
+ok 5 - refuses server keys and non-origin URLs before making any network request
+  ---
+  duration_ms: 0.323042
+  type: 'test'
+  ...
+# Subtest: fails on provider/network errors without treating them as enabled flags
+ok 6 - fails on provider/network errors without treating them as enabled flags
+  ---
+  duration_ms: 0.118833
+  type: 'test'
+  ...
+# Subtest: simulator uses an isolated identity and Google test app, preserves Android config
+ok 7 - simulator uses an isolated identity and Google test app, preserves Android config
+  ---
+  duration_ms: 0.564084
+  type: 'test'
+  ...
+# Subtest: distribution fails on absent, placeholder or Google test app identity
+ok 8 - distribution fails on absent, placeholder or Google test app identity
+  ---
+  duration_ms: 0.243583
+  type: 'test'
+  ...
+# Subtest: distribution preserves production bundle identity with owner app configuration
+ok 9 - distribution preserves production bundle identity with owner app configuration
+  ---
+  duration_ms: 0.052041
+  type: 'test'
+  ...
+# Subtest: iOS submit profile targets the existing owner-created record without changing Android submission
+ok 10 - iOS submit profile targets the existing owner-created record without changing Android submission
+  ---
+  duration_ms: 0.36275
+  type: 'test'
+  ...
+# Subtest: iOS production uses the owner-supplied AdMob IDs in the matching formats
+ok 11 - iOS production uses the owner-supplied AdMob IDs in the matching formats
+  ---
+  duration_ms: 0.832125
+  type: 'test'
+  ...
+# Subtest: supplied iOS ad IDs do not bypass the missing Apple RevenueCat SDK key
+ok 12 - supplied iOS ad IDs do not bypass the missing Apple RevenueCat SDK key
+  ---
+  duration_ms: 24.381
+  type: 'test'
+  ...
+# Subtest: owner public Apple SDK key is iOS-only and all five client values pass the format gate
+ok 13 - owner public Apple SDK key is iOS-only and all five client values pass the format gate
+  ---
+  duration_ms: 23.449834
+  type: 'test'
+  ...
+# Subtest: iOS release uses the existing shared Cricket backend without changing Android/simulator
+ok 14 - iOS release uses the existing shared Cricket backend without changing Android/simulator
+  ---
+  duration_ms: 0.197416
+  type: 'test'
+  ...
+# Subtest: distribution cannot pass with missing/disabled backend or a server-only key
+ok 15 - distribution cannot pass with missing/disabled backend or a server-only key
+  ---
+  duration_ms: 177.502792
+  type: 'test'
+  ...
+# Subtest: simulator config leaves production Android configuration and input untouched
+ok 16 - simulator config leaves production Android configuration and input untouched
+  ---
+  duration_ms: 0.579417
+  type: 'test'
+  ...
+# Subtest: simulator uses a provider-owned iOS test app ID and no invented Firebase credentials
+ok 17 - simulator uses a provider-owned iOS test app ID and no invented Firebase credentials
+  ---
+  duration_ms: 0.093125
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 266.007209

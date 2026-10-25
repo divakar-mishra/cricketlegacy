@@ -1,0 +1,27 @@
+Timestamp               Ty Process[PID:TID]
+2026-10-23 16:24:31.957 F  CricketSimulator[30274:1636048] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:25:42.539 F  CricketSimulator[30424:1636952] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:25:51.625 F  CricketSimulator[30424:1636954] [com.apple.coreui:framework] CoreUI: CUIThemeStore: No theme registered with id=0
+2026-10-23 16:25:55.593 F  CricketSimulator[30458:1636bc6] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:26:08.684 F  CricketSimulator[30491:1636e17] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:26:26.041 F  CricketSimulator[30491:1636f82] [com.apple.coreui:framework] CoreUI: CUIThemeStore: No theme registered with id=0
+2026-10-23 16:26:52.213 F  CricketSimulator[30557:1637397] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:27:05.310 F  CricketSimulator[30589:16375a0] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:27:11.577 F  CricketSimulator[30589:16375b3] [com.apple.coreui:framework] CoreUI: CUIThemeStore: No theme registered with id=0
+2026-10-23 16:27:53.007 F  CricketSimulator[30655:1637ac3] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:33:22.303 F  CricketSimulator[31401:1639c51] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:34:15.120 F  CricketSimulator[31529:163a463] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:34:33.411 F  CricketSimulator[31529:163a475] [com.apple.coreui:framework] CoreUI: CUIThemeStore: No theme registered with id=0
+2026-10-23 16:37:25.022 F  CricketSimulator[32043:163d355] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:38:31.288 F  CricketSimulator[32043:163d900] [com.apple.coreui:framework] CoreUI: CUIThemeStore: No theme registered with id=0
+2026-10-23 16:38:50.615 F  CricketSimulator[32198:163dc33] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:39:00.803 F  CricketSimulator[32224:163ddeb] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:39:07.790 F  CricketSimulator[32238:163df2a] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:39:26.804 F  CricketSimulator[32238:163df31] [com.apple.coreui:framework] CoreUI: CUIThemeStore: No theme registered with id=0
+2026-10-23 16:40:03.146 F  CricketSimulator[32363:163e5ea] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:40:11.399 F  CricketSimulator[32363:163e608] [com.apple.coreui:framework] CoreUI: CUIThemeStore: No theme registered with id=0
+2026-10-23 16:41:25.110 F  CricketSimulator[32504:163eeb0] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:41:26.137 F  CricketSimulator[32504:163eeb0] (libsystem_trace.dylib) QUARANTINED DUE TO HIGH LOGGING VOLUME
+2026-10-23 16:47:31.667 F  CricketSimulator[34051:1644d7f] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:47:51.424 F  CricketSimulator[34156:164523b] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+2026-10-23 16:48:16.106 F  CricketSimulator[34228:1645729] [com.apple.runtime-issues:UIKit App Config] `UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.

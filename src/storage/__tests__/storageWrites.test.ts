@@ -29,7 +29,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { clearAllLocalData, getJSON, getJSONStrict, removeKey, setJSON } from '../storage';
+import { clearAllLocalData, getJSON, getJSONStrict, hasStoredValue, removeKey, setJSON } from '../storage';
 
 describe('critical storage writes', () => {
   beforeEach(() => {
@@ -43,6 +43,19 @@ describe('critical storage writes', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('checks occupancy without parsing damaged rows or reconstructing a chunked career', async () => {
+    await expect(hasStoredValue('save')).resolves.toBe(false);
+    for (const value of ['null', 'bad-json', '']) {
+      mockStorage.set('save', value);
+      await expect(hasStoredValue('save')).resolves.toBe(true);
+    }
+    mockStorage.delete('save');
+    mockStorage.set('save:__chunk_manifest', 'damaged-manifest');
+    await expect(hasStoredValue('save')).resolves.toBe(true);
+    expect(AsyncStorage.multiGet).not.toHaveBeenCalled();
+    expect(AsyncStorage.multiSet).not.toHaveBeenCalled();
   });
 
   it('confirms successful writes and removals', async () => {
@@ -84,6 +97,7 @@ describe('critical storage writes', () => {
     await expect(setJSON('save', { payload: 'y'.repeat(700_000) })).rejects.toThrow('interrupted batch');
     expect(mockStorage.get('save:__chunk_manifest')).toBe(manifest);
     await expect(getJSONStrict('save')).resolves.toEqual(previous);
+    expect([...mockStorage.keys()].filter(key => key.startsWith('save:__chunk:'))).toHaveLength(3);
   });
 
   it('orders batch reads by chunk key and rejects a missing chunk', async () => {
@@ -102,6 +116,64 @@ describe('critical storage writes', () => {
     await setJSON('save', previous);
     jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('manifest failed'));
     await expect(setJSON('save', { payload: 'y'.repeat(700_000) })).rejects.toThrow('manifest failed');
+    await expect(getJSONStrict('save')).resolves.toEqual(previous);
+    expect([...mockStorage.keys()].filter(key => key.startsWith('save:__chunk:'))).toHaveLength(3);
+  });
+
+  it.each([false, true])('reclaims every uncommitted chunk across repeated disk-full retries (old chunked=%s)', async oldChunked => {
+    const previous = { payload: oldChunked ? 'x'.repeat(700_000) : 'last good progress' };
+    await setJSON('save', previous);
+    await setJSON('unrelated-save', { payload: 'z'.repeat(700_000) });
+    const committedKeys = [...mockStorage.keys()].sort();
+    const setItem = jest.mocked(AsyncStorage.setItem).getMockImplementation()!;
+    jest.mocked(AsyncStorage.setItem).mockImplementation(async (key, value) => {
+      if (key === 'save:__chunk_manifest') throw new Error('SQLITE_FULL at commit');
+      return setItem(key, value);
+    });
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await expect(setJSON('save', { payload: 'y'.repeat(700_000) })).rejects.toThrow('SQLITE_FULL');
+        await expect(getJSONStrict('save')).resolves.toEqual(previous);
+        expect([...mockStorage.keys()].sort()).toEqual(committedKeys);
+      }
+    } finally {
+      jest.mocked(AsyncStorage.setItem).mockImplementation(setItem);
+    }
+    const next = { payload: 'successful retry'.repeat(60_000) };
+    await setJSON('save', next);
+    await expect(getJSONStrict('save')).resolves.toEqual(next);
+  });
+
+  it('preserves a published generation when the adapter rejects after committing the manifest', async () => {
+    await setJSON('save', { marker: 'old progress' });
+    const next = { payload: 'y'.repeat(700_000) };
+    jest.mocked(AsyncStorage.setItem).mockImplementationOnce(async (key, value) => {
+      mockStorage.set(key, value);
+      throw new Error('bridge failed after commit');
+    });
+    await expect(setJSON('save', next)).rejects.toThrow('bridge failed after commit');
+    await expect(getJSONStrict('save')).resolves.toEqual(next);
+    expect([...mockStorage.keys()].filter(key => key.startsWith('save:__chunk:'))).toHaveLength(3);
+  });
+
+  it('does not delete potentially committed chunks if checking publication fails', async () => {
+    await setJSON('save', { marker: 'old progress' });
+    const next = { payload: 'y'.repeat(700_000) };
+    jest.mocked(AsyncStorage.setItem).mockImplementationOnce(async (key, value) => {
+      mockStorage.set(key, value);
+      jest.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('storage temporarily unavailable'));
+      throw new Error('unconfirmed commit');
+    });
+    await expect(setJSON('save', next)).rejects.toThrow('unconfirmed commit');
+    await expect(getJSONStrict('save')).resolves.toEqual(next);
+  });
+
+  it('reports the original write failure even if staged chunk cleanup also fails', async () => {
+    const previous = { marker: 'old progress' };
+    await setJSON('save', previous);
+    jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('original manifest failure'));
+    jest.mocked(AsyncStorage.multiRemove).mockRejectedValueOnce(new Error('cleanup failure'));
+    await expect(setJSON('save', { payload: 'y'.repeat(700_000) })).rejects.toThrow('original manifest failure');
     await expect(getJSONStrict('save')).resolves.toEqual(previous);
   });
 

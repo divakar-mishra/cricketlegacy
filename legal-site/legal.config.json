@@ -24,7 +24,7 @@
       "name": "Cricket: Player and Manager",
       "kind": "Cricket career game",
       "status": "Available on Google Play",
-      "platforms": ["Android"],
+      "platforms": ["Android", "iOS in preparation"],
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.coverdrive.cricket",
       "summary": "Build a complete cricket life as a player or lead a club as a manager in a deep, fictional career simulation.",
       "headline": "Two careers. One cricket world.",

@@ -1,0 +1,234 @@
+CRICKET: PLAYER & MANAGER — iOS PORT
+21 October 2026, Asia/Kolkata
+
+Owner request: continue the iOS app, use placeholders for owner-owned settings
+and complete the implementation/testing possible with the available simulator.
+This file records source work and verification; it does not imply App Review
+submission, Apple signing access or a completed provider setup.
+
+IMPLEMENTED SOURCE
+===================
+1. Explicit iOS native config through app.config.js / scripts/ios-app.config.cjs.
+   Android keeps the existing static configuration. Distribution keeps
+   com.coverdrive.cricket; simulator uses com.coverdrive.cricket.simulator.
+   Google's provider-owned test App ID is used only in simulator configuration.
+   A missing/placeholder distribution App ID raises a clear configuration error.
+
+2. Separate EXPO_PUBLIC_ADMOB_IOS_* variables. iOS never receives the hard-coded
+   Android live unit defaults or the generic Android override values. Missing
+   iOS unit configuration leaves its ads unavailable before UMP/initialization.
+   Initial iOS requests are contextual; no ATT prompt/IDFA tracking is added.
+   There is no Unity native iOS adapter/bridge in this port. Android Unity
+   configuration and its published Play AAB are not modified by this work.
+
+3. Apple sign-in via Supabase browser OAuth with the existing exact mobile
+   callback, provider verification, single-flight guard and persisted identity.
+   iOS Account offers a black/white Apple-branded button alongside Google.
+   Apple sessions rehydrate as Apple, not mislabeled Google. Canceled/expired/
+   foreign callbacks cannot grant local auth success or purchase fulfillment.
+   This is the browser/Services-ID route, not native Apple ID-token login.
+   No Apple private keys or client secrets belong in the mobile app.
+
+4. Apple's system review request after the existing five-completed-match
+   eligibility and safe-screen/modal-queue checks. Installation-local durable
+   history prevents duplicate calls across hubs. No custom iOS rating pre-prompt.
+   Apple's quota decides whether a dialog appears; request completion is not
+   evidence of a displayed/submitted review.
+
+5. Account backup copy now supports provider-neutral sign-in. Existing owner/
+   epoch/revision/financial preservation checks remain the recovery authority.
+   Firebase native packages/plugins are excluded on iOS while its platform
+   service setup is missing, and inactive diagnostic toggles are hidden there.
+   Android retains its existing optional Firebase implementation. This is an
+   intentional unavailable integration, not fake Firebase configuration.
+
+6. EAS ios-simulator and ios-production profiles, explicit iOS target for the
+   local ios command, a distribution configuration gate, and .env.ios.example.
+   The store build gate now applies legal checks to ios-production as well.
+   All owner placeholders stay out of actual simulator service identities.
+
+7. Reproducible, allowlisted staging script:
+     npm run ios:prepare:simulator
+   It refreshes output/ios-simulator/workspace from current source, excludes
+   private environment files and preserves the previously requested mute in
+   staged audio only. Generated ios/ is excluded from source archives, so
+   source config must reproduce native configuration during future builds.
+
+OWNER CONFIGURATION — PLACEHOLDERS TO COMPLETE
+=============================================
+Start with .env.ios.example. A .env.ios.local file is an ignored storage choice;
+Expo does not automatically load that custom filename. Export its reviewed
+values in your shell or put them into the intended EAS environment explicitly.
+Never paste secret credentials into chat or into EXPO_PUBLIC variables.
+
+Apple account / store:
+  Apple Developer team: 25PTZT5DNC (OWNER-REPORTED, 21 October 2026)
+  App Store Connect numeric app ID: 6825412889 (OBSERVED in owner's screenshot)
+  Owner-created record shows version 1.0 Prepare for Submission; align with the
+  intended signed build version (current source 1.0.12) before upload/submission.
+  Bundle ID to register/confirm: com.coverdrive.cricket
+  Apple agreements/tax/banking and signing/provisioning: OWNER_TO_COMPLETE
+  Use existing correct app records if already created; do not create duplicates.
+
+Sign in with Apple:
+  Apple Services ID: OWNER_TO_CREATE_OR_SUPPLY (browser OAuth client identity)
+  Enable Sign in with Apple for the associated Apple App ID as required.
+  Configure the Services ID website domain and HTTPS callback for the actual
+  Supabase project. Apple redirect is https://PROJECT_REF.supabase.co/auth/v1/callback.
+  Supabase Auth -> Providers -> Apple: enable and configure the Services ID and
+  generated client secret securely. Rotate the Apple OAuth secret before expiry.
+  Put the Services ID first in Supabase client IDs for the browser OAuth flow.
+  Allow the exact app callback coverdrive://auth/callback in Supabase redirects.
+  Verify the real generated callback for the chosen app build.
+  Native Apple profile-name collection is not implemented by browser OAuth;
+  generic Apple account display remains valid when no display name is returned.
+
+AdMob iOS:
+  ADMOB_IOS_APP_ID: OWNER_TO_SUPPLY, tilde-form ID
+  EXPO_PUBLIC_ADMOB_IOS_REWARDED_UNIT: OWNER_TO_SUPPLY, slash-form ID
+  EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_UNIT: OWNER_TO_SUPPLY
+  EXPO_PUBLIC_ADMOB_IOS_BANNER_UNIT: OWNER_TO_SUPPLY
+  Configure consent messages for the iOS app, content controls and test devices.
+  All simulator ad IDs are Google-owned test inventory, not invented live IDs.
+  Unity bidding on iOS needs separate future native integration and verification;
+  copying Android placement names/Game ID is not an implementation.
+
+RevenueCat / App Store purchases:
+  EXPO_PUBLIC_REVENUECAT_IOS_KEY: OWNER_TO_SUPPLY, appl_ PUBLIC SDK key
+  Configure Apple's store connection, matching product IDs, entitlements,
+  offerings and purchase events/verification in RevenueCat/App Store Connect.
+  Preserve existing mode/account/exact-save fulfillment semantics. Product type,
+  price and restore rules must match the actual catalogue. Do not grant consumed
+  currency twice. Keys blank in simulator; mock purchases remain off.
+
+Firebase:
+  iOS service file/project registration: OWNER_TO_SUPPLY if this feature is desired.
+  Requires another native integration/QA pass; merely providing a plist is not
+  enough to turn the current Android-only telemetry facade into an iOS service.
+
+PUBLIC URLS ALREADY KNOWN
+=========================
+Site: https://sunlight-publisher-site.pages.dev/
+Privacy /privacy/; Terms /terms/; Support /support/; Deletion /delete-account/.
+Reconcile policy and Apple App Privacy with the final iOS service inventory.
+The Android Data safety CSV is not an Apple App Privacy import.
+
+BUILD AND TEST WORKFLOW
+=======================
+Exact Expo57 docs were consulted before native/config/source changes:
+https://docs.expo.dev/versions/v57.0.0/
+Apple OAuth reference:
+https://supabase.com/docs/guides/auth/social-login/auth-apple
+Native review API:
+https://docs.expo.dev/versions/v57.0.0/sdk/storereview/
+
+Local toolchain: Xcode26.6, iOS26.5 simulator; prior local CocoaPods1.16.2
+tooling retained under output/ios-simulator/tooling. System Ruby2.6 causes
+precompiled-module compatibility warnings; source builds use the existing
+supported prebuilt React/Hermes dependencies with EXPO_USE_PRECOMPILED_MODULES=0.
+Normal sandbox dependency resolution initially failed; scoped network access
+allowed CocoaPods to resolve/install 113 dependencies /116 pods. Warnings remain.
+
+Prebuild, pod installation and Xcode build run only in the staged workspace.
+The standalone simulator build uses Release, local simulator signing, embedded
+Hermes, QA tools false, cloud backend disabled, purchase keys blank and Google
+iOS test ad units. Prior Android production AAB remains the reviewed artifact.
+
+Evidence directory: output/ios-simulator/evidence/
+  ios-port-pods-2026-10-21.log — initial sandbox failure, retained
+  ios-port-pods-network-2026-10-21.log — successful dependency installation
+  ios-port-xcode-2026-10-21.log — native build
+  ios-port-jest-2026-10-21.log — first run, pure-engine native-import issue
+  ios-port-jest-final-2026-10-21.log — final regression run after correction
+That initial test run was not counted as a pass. The platform lookup in the ads
+facade is now lazy/guarded, preserving the pure-engine test boundary.
+
+Distribution readiness is checked with npm run check:ios-release. Missing
+owner values intentionally fail. Real account/provider configuration, signed
+device/TestFlight testing, purchases, native privacy review and App Store
+submission cannot be replaced by placeholder strings or simulator results.
+
+FINAL VERIFICATION
+==================
+PASS: 280 Jest suites /2082 tests /2 snapshots on the final source, zero failed.
+  Log: ios-port-jest-complete-2026-10-21.log. Earlier failed runs are retained;
+  eager React Native mock initialization was corrected using lazy config getters.
+PASS: TypeScript and quiet ESLint; git diff --check.
+PASS: five Node configuration checks (old simulator isolation + new iOS gate).
+PASS: final Xcode Release simulator build; embedded Hermes main.jsbundle.
+PASS: signature verification, ZIP integrity, iOS test App ID and deferred ad
+  measurement checked from actual native Info.plist. Compiled QA, purchase mock
+  and ad simulation flags are checked with scripts/verifyIosSimulator.cjs.
+
+Simulator artifact (NOT an iPhone/App Store IPA):
+  output/ios-simulator/cricket-player-manager-1.0.12-ios-simulator.zip
+  Bytes: 66253831
+  SHA256: 2ad2244b2599c5966de51221e97f93f068764b15e2da57691226c624b33a218b
+  App: output/ios-simulator/derived-data/Build/Products/Release-iphonesimulator/CricketSimulator.app
+  Version1.0.12/build1; minimum iOS16.4; local simulator signing only.
+
+Native iPhone tests: two tests passed, zero failures/skips, 213.136 seconds.
+  ios-port-smoke-2026-10-21.xcresult / matching log.
+  - New Apple entry, safe not-configured alert, dismissal and account return.
+  - Main menu, Saved Games mode switching, Account, Player creation form,
+    Manager creation prerequisites, navigation and cold restart.
+  A final ad-withdrawal invalidation guard was then source-tested/rebuilt.
+  The FINAL artifact repeated the native navigation/restart test on BOTH devices:
+  - Cricket QA iPhone16Pro: 55.067 seconds, passed.
+  - Cricket QA iPad A16: 42.239 seconds, passed.
+  Evidence: ios-port-phone-ipad-final-2026-10-21.xcresult / matching log.
+
+Devices:
+  Existing QA iPhone: 6A85EC9A-070E-41D0-AC4B-D1C578B02886, updated in place.
+  New isolated QA iPad: BD2DF2E3-48A6-43B0-BE4B-E4816CBAECAC, created this pass.
+No simulator erase/uninstall, remote account access, cloud mutation, actual
+purchase, Apple sign-in credentials or store submission was performed.
+This pass does not certify fresh career creation/financial recovery, Apple
+OAuth against real provider settings, sandbox owned-item restore, test-ad
+rendering/consent, physical-device performance or a full-match iPad playthrough.
+
+Final iPhone/iPad screenshots were visually inspected. Tablet main-menu layout
+is readable; the Account screenshot shows the new Apple button and expected
+unconfigured-provider alert. Earlier 11 October local career-save QA is recorded
+in IOS_SIMULATOR_QA_2026-10-11.md and is not relabeled as a new deep save test.
+
+Pinned iOS pods include Google Mobile Ads12.14.0, UMP3.1.0, RevenueCat5.83.0,
+PurchasesHybridCommon18.29.0. Firebase and Unity iOS native SDKs are excluded.
+The Android1.0.12/code20 AAB hash was rechecked unchanged:
+0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4
+
+Next owner steps are concrete placeholders above. After filling them, build a
+signed iOS DEVICE archive, verify real services and run TestFlight/device tests.
+Metadata worksheet: docs/IOS_APP_STORE_METADATA_DRAFT.txt.
+
+FOLLOW-UP — 21–22 OCTOBER: WEBSITE / SUBMISSION PREPARATION
+=========================================================
+The owner requested completion of locally possible preparation and detailed
+ongoing handbook/questionnaire records. This is not authorization to fabricate
+provider credentials or attest to unverified legal/Apple account facts.
+Dynamic distribution config now sets Apple's supplied team 25PTZT5DNC. EAS
+submit profile ios-production targets existing Apple app 6825412889. Simulator
+and Android submission/configuration behavior are preserved by config tests.
+.env.ios.example now includes existing real legal URLs and explicit QA/simulator
+flags; live AdMob/RevenueCat values remain placeholders until owner setup.
+Public website privacy/support/product/terms/deletion copy was clarified for
+iOS preparation, Apple relay sign-in, platform-specific SDKs and restore limits.
+OAuth error fallback is provider-neutral without forwarding URL credentials.
+Website deployment dd05cd1a was authorized by the owner's update request; all 20
+public files matched production and redirect/security checks passed. Seven
+live Chrome viewport/anchor checks passed. Evidence is under
+docs/evidence/ios-preparation-2026-10-21/. Auction XI HTML and seller file were
+preserved; shared CSS sizing was hardened for compact screens.
+Offline policy source was updated as well. The simulator ZIP hash above is
+UNCHANGED and predates that new copy/config revision. No new native artifact was
+built in this follow-up; do not describe the old artifact as current-source QA.
+Read-only privacy audit script inspects actual .app bundles; existing simulator
+contains 17 manifests. GMA marks DeviceID linked/tracking=true in its declaration;
+the report requires reconciliation, not a claim of observed tracking/no tracking.
+Explicit Apple token revocation was not found in the deletion function; verify
+Supabase handling and implement/retest the required revocation path if needed.
+The current-environment iOS distribution check intentionally remains blocked on
+the five real provider values. This does not imply those remote accounts do not
+exist; it means this invocation did not have validated client configuration.
+No Apple account agreement, secret upload, signing, TestFlight upload, purchase,
+backend deployment, age override or App Review submission occurred.

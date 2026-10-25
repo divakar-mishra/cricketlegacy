@@ -12,8 +12,9 @@ describe('MatchScreen batting controls', () => {
   });
 
   it('shows the first-match stance guide only after the controlled player reaches the crease', () => {
-    expect(source).toContain('controlledPlayerAtCrease &&');
-    expect(source).toContain('<FirstMatchGuide');
+    expect(source).toContain('awaitingPlan || controlledPlayerAtCrease');
+    expect(source).toContain("'player.match.batting'");
+    expect(source).not.toContain('<FirstMatchGuide');
   });
 
   it('does not keep the match paused for a stale stance picker when no intent is needed', () => {

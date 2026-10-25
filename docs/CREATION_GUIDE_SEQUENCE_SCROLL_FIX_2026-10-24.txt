@@ -1,0 +1,130 @@
+CREATION GUIDE — FRESH PROGRESS, COLOUR CHOICES AND SCROLL BOUNDS
+==============================================================
+24 October 2026, Asia/Kolkata. Follow-up to internal Android QA25.
+Originally source-only; owner subsequently authorized the QA26 install below.
+
+NEW SOURCE FOLLOW-UP AFTER QA26 OWNER REVIEW
+--------------------------------------------
+Owner reports lag/jump-to-bottom on attributes. The subsequent source fix,
+delayed-event regressions and native verification limits are recorded in
+docs/ATTRIBUTES_GUIDE_LAG_FIX_2026-10-24.txt. That follow-up is NOT in QA26.
+
+LATER OWNER-AUTHORIZED BUILD / INSTALL — 24 OCTOBER,23:39IST
+-----------------------------------------------------------
+Built standalone internal QA1.0.12/code26 with the existing JDK17/Gradle setup,
+NODE_ENV=production, EXPO_PUBLIC_QA_TOOLS=true, arm64 and existing four approved
+legal URLs. Local QA init-script version override only; production config kept
+at its existing values. :app:assembleQa + :app:testQaUnitTest SUCCESS3m20s;
+wrapper201seconds. Native UnityConsentPolicy18tests/0failures/errors/skips.
+Fresh focused69tests/7suites PASS0.599seconds; fresh tsc/src quiet ESLint/diff
+PASS. Full Jest suite not rerun. Existing third-party R8/Gradle warnings remain;
+no suppression, dependency upgrade or intended Crashlytics mapping upload.
+382fingerprinted source/config files unchanged across build; only the six guide
+runtime files differ from the QA25 snapshot. Final source map370project files
+matches source exactly, including all six guide files. No stale bundle assumed.
+
+Artifact:
+output/guide-sequence-qa-2026-10-24/
+cricket-player-manager-guide-sequence-qa-vc26.apk
+SHA256:eecde2ed394cef6951b2538d605bbe5672a9e0b940d1d1a81904cce3861e7bd3
+Verified packagecom.coverdrive.cricket,version1.0.12/code26,min24/target36,
+arm64-v8a,embedded assets/index.android.bundle8,227,388bytes. V2 debug-signed
+with the existing certificate SHA256:
+8027990eb28a934f33052c41c617c6278494238b58e5c0390837d8c09ee4d290.
+It is an internal QA APK, not a Play production release. No Metro needed.
+
+No emulator was initially connected. Started the existing Pixel_10_Pro_XL AVD
+without data wipe; it now uses emulator-5554 (5556 was its prior session).
+Confirmed AVD identity and installedcode25 before adb install -r returned
+Success. Verified installedcode26,lastUpdateTime2026-10-24 23:39:47,
+original firstInstallTime2026-10-16 02:13:57 retained. Installed base.apk SHA256
+matches the artifact exactly. Opened/foregrounded normal MainActivity; inspected
+output/guide-sequence-qa-2026-10-24/pixel10-handoff.png: main menu, retained
+Manager/Mumbai Sharks Resume card, no pre-mode coach. Left this screen for owner.
+No career entered/created/advanced, guide reset, field choice, purchase, sign-in,
+uninstall or data clear. Native guide/touch/keyboard/large-text flow NOT tested
+during this install; owner manual review remains. No claim of full save/VIP parity.
+No other emulator/iPhone control, backend/provider/website mutation or production
+AAB/store operation. Build/test/source metadata is in the same output folder.
+Fresh local test/type/lint logs use /private/tmp/cricket-guide-install26-*.log.
+The original source-only delivery notes below are historical and superseded by
+this install entry. Automation stopped after the menu handoff.
+
+OWNER-REPORTED
+--------------
+The new Player guide starts at Male/Female, skipping name and country; the
+screen can scroll past the guided area; colour choices are not explained.
+Colour choices interpreted as the existing eight skin tone range swatches.
+No claim of independently reproducing the native report during this pass.
+
+SOURCE-CONFIRMED CAUSES
+----------------------
+- CareerGuide starts from the first key absent from global dismissedTips.
+  Previously completed name/country keys can therefore skip fresh blank fields.
+- Creation used the same unconstrained ScrollView as ordinary career guides.
+  Dim regions passed all touches through; unrelated fields could be reached.
+- Coach text AND its Back/Next/Skip controls shared one scrolling card.
+- Skin tone swatches had no GuideTarget or guide step and preview selection
+  did not distinguish the default range from an explicit creation choice.
+
+IMPLEMENTED IN SHARED SOURCE
+----------------------------
+1. Player/Manager creation opts into session-local coach progress. A new form
+   starts at its first step regardless of previous completion/skip keys. Back
+   between Player's form pages retains progress within that setup. Skip guide
+   opts out for this setup, replay works, and existing persistent Home/training
+   guides retain their prior behavior. No global settings/save wipe or migration.
+2. Player order: Name -> Country -> Gender -> Skin tone -> Portrait -> Role ->
+   Career identity/styles -> Next/attributes. Name/country/gender/skin tone/
+   portrait/role remain guarded by current field readiness, not historical keys.
+3. Eight tone swatches have their own live target and explicit-choice state.
+   Tone filtering precedes face choice. Changing tone invalidates the previous
+   portrait choice; changing gender invalidates tone and portrait. Manual
+   portrait, Randomize and Reset still work outside the strict spotlight;
+   Randomize/Reset explicitly select both tone and portrait. Ordinary cosmetic
+   editing is unchanged and does not acquire required creation gates.
+4. Docked creation locks short-field scrolling. Tall portrait/club/style lists
+   can scroll only within the current target; dimmed unrelated areas consume
+   touches. Skip guide releases the restriction. Standard overlay career guides
+   remain non-blocking. Native anchor callbacks read current step state to avoid
+   a stale unlocked reveal while changing steps; out-of-date measurements are
+   rejected. Highlight clipping accounts for partially scrolled targets.
+5. Coach Back/Next/Skip remain outside the scrolling text area. Overflowing copy
+   can still scroll for accessibility. Keyboard-shrunken coach height is not
+   saved as its preferred height after keyboard dismissal.
+6. Styles have a real target containing career identity, Ironman and batting/
+   bowling hand/style controls. The follow-up attribute target includes level,
+   difficulty, budget and every actual allocation control. Creation club/review
+   targets no longer use short focusHeight crops that could mask real choices.
+   No allocation, cricket result, economy, purchase or career choice is automatic.
+
+VERIFIED (SOURCE / MOCKED INTERACTIONS, NOT NATIVE QA)
+----------------------------------------------------
+69 tests in 7 focused suites PASS, 0 snapshots (0.852 seconds):
+- careerGuideInteractions: previous completed/skip keys plus missing new name;
+  correct country/gender/tone order; session Back/replay/skip and Manager start;
+  preserved saved career-guide behavior; fixed coach actions; short/tall bounded
+  scrolling and unlock on skip; keyboard shrink/restore; existing priority/focus.
+- portraitCreationChoices: all eight swatches; no implicit default confirmation;
+  face selection and Randomize/Reset callbacks.
+- guidedCreationFlow: actual form guards and invalidation; style/attribute
+  controls inside their real targets; country-modal yielding; previous save/write
+  safety checks. No write/purchase was made on a device.
+- coachGuide, guideModalQueue, screenSafeArea and playerAvatar regressions.
+TypeScript (npx tsc --noEmit), src quiet ESLint and git diff --check PASS.
+These are source checks, not native touch/scroll/keyboard certification. Logs:
+/private/tmp/cricket-guide-sequence-targeted.log
+/private/tmp/cricket-guide-sequence-types.log
+/private/tmp/cricket-guide-sequence-lint.log
+
+DELIVERY / PENDING
+------------------
+This report does NOT certify a new APK. Pixel10 still has QA1.0.12/code25 from
+the previous authorized install. No APK/AAB, install, full Jest suite, simulator
+control, save advance, provider/backend/website change or store action this pass.
+After owner review/authorization, build a fresh standalone QA and update in place
+with adb install -r. Check first-time and repeat new creation, country dropdown,
+gender/tone/face choices (including lower rows), Back/replay/skip, keyboard,
+compact/large text, styles and all attribute controls on Android. Shared-source
+iOS native layout remains pending too. Previous female-roster/schema46 changes
+are preserved; no additional schema or native dependency/config changes here.

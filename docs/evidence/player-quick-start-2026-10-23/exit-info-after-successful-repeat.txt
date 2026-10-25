@@ -1,0 +1,41 @@
+ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)
+Last Timestamp of Persistence Into Persistent Storage: 2026-10-24 00:28:59.983
+  package: com.coverdrive.cricket
+    Historical Process Exit for uid=10190
+        ApplicationExitInfo #0:
+          timestamp=2026-10-24 00:33:44.212 pid=13752 realUid=10190 packageUid=10190 definingUid=10190 user=0
+          process=com.coverdrive.cricket reason=13 (OTHER KILLS BY SYSTEM) subreason=3 (TOO MANY EMPTY PROCS) status=0
+          importance=400 pss=23MB rss=104MB description=too many empty state=empty trace=null
+        ApplicationExitInfo #1:
+          timestamp=2026-10-24 00:31:56.036 pid=6883 realUid=99001 packageUid=10190 definingUid=10139 user=0
+          process=com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0 reason=13 (OTHER KILLS BY SYSTEM) subreason=17 (ISOLATED NOT NEEDED) status=0
+          importance=300 pss=10MB rss=46MB description=isolated not needed state=empty trace=null
+        ApplicationExitInfo #2:
+          timestamp=2026-10-24 00:31:55.866 pid=6662 realUid=10190 packageUid=10190 definingUid=10190 user=0
+          process=com.coverdrive.cricket reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=400 pss=135MB rss=66MB description=stop com.coverdrive.cricket due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #3:
+          timestamp=2026-10-24 00:19:57.973 pid=5350 realUid=99000 packageUid=10190 definingUid=10139 user=0
+          process=com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0 reason=13 (OTHER KILLS BY SYSTEM) subreason=17 (ISOLATED NOT NEEDED) status=0
+          importance=300 pss=40MB rss=130MB description=isolated not needed state=empty trace=null
+        ApplicationExitInfo #4:
+          timestamp=2026-10-24 00:19:57.958 pid=4920 realUid=10190 packageUid=10190 definingUid=10190 user=0
+          process=com.coverdrive.cricket reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=100 pss=350MB rss=505MB description=stop com.coverdrive.cricket due to installPackageLI state=empty trace=null
+    Historical Process Exit for uid=1010190
+        ApplicationExitInfo #0:
+          timestamp=2026-10-24 00:35:16.767 pid=13797 realUid=1010190 packageUid=1010190 definingUid=1010190 user=10
+          process=com.coverdrive.cricket reason=2 (SIGNALED) subreason=0 (UNKNOWN) status=9
+          importance=100 pss=229MB rss=216MB description=null state=36 bytes trace=null
+        ApplicationExitInfo #1:
+          timestamp=2026-10-24 00:35:16.734 pid=14288 realUid=1099003 packageUid=1010190 definingUid=1010139 user=10
+          process=com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0 reason=13 (OTHER KILLS BY SYSTEM) subreason=17 (ISOLATED NOT NEEDED) status=0
+          importance=300 pss=40MB rss=113MB description=isolated not needed state=empty trace=null
+        ApplicationExitInfo #2:
+          timestamp=2026-10-24 00:31:56.721 pid=12122 realUid=1099002 packageUid=1010190 definingUid=1010139 user=10
+          process=com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0 reason=1 (EXIT_SELF) subreason=17 (ISOLATED NOT NEEDED) status=0
+          importance=300 pss=37MB rss=109MB description=isolated not needed state=empty trace=null
+        ApplicationExitInfo #3:
+          timestamp=2026-10-24 00:31:56.440 pid=8010 realUid=1010190 packageUid=1010190 definingUid=1010190 user=10
+          process=com.coverdrive.cricket reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=100 pss=248MB rss=313MB description=stop com.coverdrive.cricket due to installPackageLI state=empty trace=null

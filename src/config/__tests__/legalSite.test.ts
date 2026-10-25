@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { PRIVACY_POLICY_SECTIONS, PRIVACY_POLICY_UPDATE_DATE } from '../../content/privacyPolicy';
 
 const {
   AGE_POLICIES,
@@ -54,6 +55,49 @@ const approvedFacts = {
 };
 
 describe('Cloudflare legal and support site', () => {
+  it('clearly marks iOS as preparation rather than a released App Store app', () => {
+    const config = JSON.parse(fs.readFileSync(path.join(root, 'legal-site/legal.config.json'), 'utf8'));
+    const pages = renderLegalSite(config);
+    expect(pages['index.html']).toContain('iOS in preparation');
+    const product = pages['products/cricket-player-manager/index.html'];
+    expect(product).toContain('id="ios-availability"');
+    expect(product).toContain('No public App Store release');
+    expect(product).not.toMatch(/href="https:\/\/apps\.apple\.com\/[^\"]*\/id/);
+    expect(product).not.toContain('25PTZT5DNC');
+    expect(product).not.toContain('6825412889');
+  });
+
+  it('publishes age suitability without changing regional eligibility or asserting Apple clearance', () => {
+    const pages = renderLegalSite({ ...approvedFacts, agePolicy: 'india_18_elsewhere_13' });
+    const product = pages['products/cricket-player-manager/index.html'];
+    expect(product).toContain('id="age-suitability"');
+    expect(product).toContain('at least 18 years old if you live in India');
+    expect(product).toContain('at least 13 years old elsewhere');
+    expect(product).toContain('does not claim a final Apple rating');
+  });
+
+  it('scopes Firebase and Unity to Android in both hosted and offline privacy copy', () => {
+    const pages = renderLegalSite({ ...approvedFacts, agePolicy: 'india_18_elsewhere_13' });
+    const offline = JSON.stringify(PRIVACY_POLICY_SECTIONS);
+    expect(PRIVACY_POLICY_UPDATE_DATE).toBe('21 October 2026');
+    for (const copy of [pages['privacy/index.html'], pages['products/cricket-legacy/privacy/index.html'], offline]) {
+      expect(copy).toContain('private relay email');
+      expect(copy).toContain('current iOS implementation requests non-personalized ads');
+      expect(copy).toContain('current iOS build does not include Firebase Analytics or Crashlytics');
+      expect(copy).toContain('Android ad mediation only');
+      expect(copy).not.toMatch(/does not collect (any )?data/i);
+    }
+  });
+
+  it('keeps Apple purchase help separate from consumable or cross-store restoration promises', () => {
+    const pages = renderLegalSite({ ...approvedFacts, agePolicy: 'india_18_elsewhere_13' });
+    expect(pages['support/index.html']).toContain('https://reportaproblem.apple.com/');
+    expect(pages['support/index.html']).toContain('Restore does not regrant spent currency');
+    expect(pages['terms/index.html']).toContain('does not automatically become an App Store purchase');
+    expect(pages['delete-account/index.html']).toContain('disconnecting it in the provider');
+    expect(pages['delete-account/index.html']).toContain('does not delete your Apple or Google account');
+  });
+
   it('uses the new public name while preserving established URLs', () => {
     const config = JSON.parse(fs.readFileSync(path.join(root, 'legal-site', 'legal.config.json'), 'utf8'));
     const pages = renderLegalSite(config);

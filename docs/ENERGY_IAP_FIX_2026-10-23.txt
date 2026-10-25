@@ -1,0 +1,112 @@
+ENERGY RECOVERY + PURCHASE BENEFIT AUDIT — 23 OCTOBER 2026
+=======================================================
+Owner approval: implement the discussed recovery changes, add regression tests,
+audit other IAP benefits and fix concrete issues. Existing dirty-worktree edits
+are retained. No store/provider changes, real purchases, build/install, remote
+deployment, save deletion or publication are part of this pass.
+
+IMPLEMENTED
+1. Optional completed rewarded ad gives8energy instead of4. Recovery is1point
+   every3real minutes instead of5. Standard capacity36/VIP60 and all fixture
+   costs are unchanged. Empty-to-full now108minutes free/180minutes VIP.
+2. energyCapacity and energyRecovery are shared source-backed helpers. Normal
+   load, refresh, Gem refill, ad grants, meter labels, canonical resource view
+   and energy-full reminder calculation use the actual permanent entitlement.
+   Timed Starter ad removal does not silently become permanent VIP capacity.
+3. Tapping WalletBar energy opens the queued Match energy popup: current/cap,
+   next-point and full-meter countdowns, optional Watch ad and Close. Reward
+   label shows the actual remaining space (e.g.+2atVIP58), full disables ads,
+   and unavailable ads explicitly retain free recovery. User-triggered energy
+   shortages in Player Home/other competitions/U19 open the same dialog instead
+   of pushing straight to a paid product. Mental Coaching remains in the Store.
+4. One lightweight foreground timer is scheduled at the next energy boundary;
+   it does not rerun the heavy career/calendar reconciler every second. The
+   popup's local second countdown runs only while visible/foreground. App return
+   catches up elapsed time. Match affordability reads recovered energy without
+   mutating state just to render; match spending also reconciles first.
+5. Store and popup share a single in-flight rewarded-energy action. No grant
+   before completed ads; no fill/errors/cancellation produce no ad grant.
+   Duplicate completions are guarded by the existing reward ledger, completion
+   is bound to the original save and Manager/wrong-save grants are rejected.
+   Natural partial-interval recovery is preserved; capped/overflow energy never
+   falls because a reward was added. Gem refills never charge an already-full
+   meter after accounting for elapsed recovery.
+6. Additional paid-benefit defect: Store advertises VIP day7Gems/day30frame,
+   but tickVipStreak had no callers. Existing10Gem/Legend VIP frame benefits
+   now settle on career load, verified purchase/ownership/restore and eligible
+   foreground visits. Repeat same-day/reload/backward-clock calls grant nothing;
+   missed days reset the streak, with no invented historical catch-up. Reward
+   amounts/prices/collections remain unchanged.
+
+WHY THE ENERGY BUGS EXISTED
+Normal refresh/load and Gem refills implicitly defaulted to36. A separate
+VIP-aware refresh helper was orphaned. Ad reward used the match base4 and
+Math.min(36,current+reward), capable of reducing VIP overflow. Wallet text and
+canonical resource-view capacity used separate hard-coded/cached indicators.
+Focus-only UI refresh lacked foreground/point-boundary handling. Earlier pacing
+tests assumed8minute matches and/or flat4cost, missing rapid/high-stage pain.
+The historical diagnostic was captured before this fix; its defect assertions
+are not desired acceptance criteria. Current source regression tests cover the
+correct behavior instead. No schema shape or version change/reset is required.
+
+LAUNCH IAP BENEFIT CONTRACTS — LOCAL PROVIDER-MOCKED CHECKOUT
+Each row now exercises actual purchaseProduct fulfilment, real save queues and
+AES-GCM through mocked device I/O, disk reload and same-receipt replay. Prices
+are not redefined; no real provider transaction was made.
+  player_vip: permanent matching Player VIP, no automatic currency grant.
+  manager_vip: permanent matching Manager VIP, no cross-mode access.
+  bundle_legend: Player VIP,40000Coins,1200Gems, standard kits/Legend frame.
+  manager_legend_pack: Manager VIP,1000000Club Balance, board>=82, rep+3,
+   2scout+1facility+1conditioning token and Legend office; no Wallet Coin cash.
+  starter_pack:3000Coins,50Gems,7timed ad-free days, eligibility/ownership guard.
+  coins_medium/coins_large:10000/20000Wallet Coins, not Manager Club Balance.
+  gems_medium/gems_large:300/1200base; first eligible pack per save600/2400.
+  form_recovery: form/confidence>=99 and full36/60Focus; higher values retained.
+  transfer_budget_sm:1000000Club Balance with transfer-budget synchronization;
+    once per season, no national-duty purchase, no wage-ceiling increase.
+  scout_full_reveal:1stored full-scout token; targeted consumption/reveal tests.
+  facility_upgrade_token:1stored facility token; level increases without cash
+    deduction when token selected; ordinary cash/upkeep path remains.
+  recovery_pack:1stored conditioning token, not automatic squad modification;
+    consumption, injury exclusions, no-benefit rejection and cooldown tests.
+Existing suites additionally cover correct mode/save identity, cancellation,
+pending/unverified/malformed/mismatched receipts, failure before checkout,
+disk/journal failure/restart, delayed original-save delivery, provider account
+changes, revoked ownership, applicable permanent restore, no restored bundle
+cash/toolkit, first-Gem exclusions, free/legacy/VIP collections and cosmetics.
+New sales of legacy shared/subscription and postponed products remain blocked.
+No additional missing advertised grants were reproduced in these launch paths
+beyond the energy/VIP capacity and orphaned VIP-streak defects fixed here.
+
+VERIFICATION
+Focused new energy UI/service/store/clock tests passed; all14launch delivery
+contracts passed; VIP visit/load and recovered affordability tests passed.
+Typecheck and quiet lint passed during implementation.
+PASS final npm run check: typecheck, quiet lint,287Jest suites /2167tests /
+2snapshots, zero failures. Final Jest duration80.212seconds; command exited0.
+PASS17Node tests: iOS app/simulator config, privacy inventory, provider inputs.
+PASS24isolated PostgreSQL backup/access/deletion checks using the existing
+temporary PGlite installation; no live backend was contacted.
+First full attempt had286passing suites and one old U19 source assertion still
+expecting navigation to Purchase. Updated it to require the approved recovery
+popup and forbid that paid-store redirect. Added clock-correction re-arming
+coverage and reran the complete gate successfully. Initial new-test fixture
+failures (stale object references, absent inventory vs empty object, React's
+own fake timers) were corrected without weakening the runtime invariants.
+Default optional SQL test invocation initially lacked PGlite; rerunning with
+its documented existing temporary-module argument passed all24checks. No
+project dependency was installed or changed for that optional check.
+Evidence: docs/evidence/energy-iap-fix-2026-10-23/jest-full.log.
+Additional evidence: node-checks.log, sql-backup-checks.log and
+verification-summary.json in that directory. The failed full attempt is kept
+as jest-full-attempt1.log. git diff --check passed after implementation.
+
+LIMITS / NEXT RELEASE GATES
+No new native build or physical/emulator interactive QA for these changes yet.
+Native popup/ad presentation, real completed/no-fill ads and real store sandbox
+checkout/restore still require a correctly configured Play/TestFlight device.
+Local mocked receipt tests cannot certify provider configuration, live refund
+events, fulfilment of arbitrary historical missing orders, charge success, or
+the reviewer's save. Do not promise an update date or publish automatically.
+Preserve current production AAB and iOS simulator artifacts; they do not contain
+this change. Broader unrelated iOS signing/privacy/deletion gates remain open.

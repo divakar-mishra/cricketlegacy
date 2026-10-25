@@ -1,0 +1,264 @@
+SAVED CAREER LOADING — CAUSE, CROSS-APP IMPACT AND SAFE NEXT WORK
+25 October 2026 | Diagnosis only; no new runtime fix or install in this pass
+
+FOLLOW-UP: owner subsequently authorized implementation. The source fix and
+new host work-count evidence are in docs/SAVE_LOADING_FIX_2026-10-25.txt.
+This audit below is the historical pre-fix diagnosis, not current source behavior.
+No new installed-device performance result is implied by the follow-up.
+
+BOTTOM LINE
+===========
+The remaining Saved Games wait is expected from the current implementation,
+not evidence that the earlier UTF-8 fix was absent. That fix bounded individual
+decoding work and yielded to input; it did NOT remove full-world reads, decoding,
+checksum verification, migrations or per-save VIP archive work. The list still
+does all of that repeatedly just to display a few labels.
+
+Evidence is deliberately separated:
+  VERIFIED SOURCE: current repository and frozen Input QA 4 orchestration.
+  REPRODUCED HOST WORK COUNTS: actual orchestration, synthetic fixtures/mocked
+    persistence/crypto/provider boundaries; no device speed claims.
+  HISTORICAL PHYSICAL DATA: existing 24 October phone traces, not a new run.
+  OWNER REPORT TODAY: saved careers still take a long time to load.
+  INFERRED RISKS: CPU/memory/battery/input impact and unmeasured other routes.
+
+No user careers, private keys, credentials, receipts or raw app storage were
+read/copied in this pass. No UI automation, purchase, account action, backend
+request/deployment, app build/install or production submission. Runtime files
+were inspected, not edited. Existing other-task edits were preserved.
+
+WHY THE LIST IS SLOW
+===================
+1. Full careers are opened for summary labels.
+   SavedGamesScreen.refresh awaits listSlots(mode). SlotView carries a whole
+   mutable SaveGame; rendering only needs a name, team, season, date and state.
+   listSlots loops over all six slots sequentially, awaiting loadSave each time.
+   No result array is delivered until the last slot finishes. One expensive
+   career or unreadable copy delays the entire first list.
+
+2. Every ordinary load reads BOTH primary and rolling backup.
+   loadSave unconditionally awaits readCopy(primary), then readCopy(backup),
+   even when primary is healthy. Each nonempty modern copy goes through storage
+   reassembly/JSON, key lookup, AES opening, UTF-8, JSON and integrity checking.
+   Both readable legacy copies are migrated before sealing the legacy gate.
+   It then checks the sealed marker, runs migrations and awaits local VIP sync.
+   Thus six occupied Player slots with two copies mean twelve full opens.
+   Encryption itself is required; unnecessary repetition is the target.
+
+3. The screen and background backup duplicate the same work.
+   Account recovery opens both modes using listSlots, even in a normal backup
+   pass with no missing careers. It may reload pending careers again for upload.
+   MainMenu getLastPlayed simultaneously opens the selected complete career.
+   loadSave serializes by slot for safety, but does NOT share identical requests:
+   the next consumer repeats the open after the previous consumer finishes.
+   Background reads can therefore delay foreground reads AND queued writes.
+
+4. Focus, tab changes and backup completion reload again.
+   Saved Games' focus callback depends on backupRefresh. Successful OR failed
+   backup completion increments refresh, causing another focused list load.
+   MainMenu also reopens getLastPlayed on focus/backup refresh.
+   Switching Player -> Manager -> Player reads Player again; there is no
+   independent retained per-mode verified listing cache.
+   refreshRequest/selectedMode correctly reject stale results/actions, but do
+   NOT stop the underlying listSlots loop or an already-running loadSave.
+   Back/tab switching can leave unused work executing after the screen changes.
+
+5. A running backup can acquire a second full pass.
+   queuedJob is cleared when runBackup starts. A request during that active pass
+   queues a follow-up; further queued requests share that follow-up. This is
+   not an infinite loop, and a follow-up can be necessary for new writes or a
+   recover=true request. It nevertheless multiplies work when no new data exists.
+
+6. Large-save synchronous work remains outside the yielding UTF-8 helper.
+   Checksums/stringification, base64 transport conversion, JSON parse, migrations
+   and activation still run on JavaScript. Backup compares/checksums every
+   loaded save and prepares pending snapshots/content hashes. writeSave clones
+   via JSON.stringify/parse BEFORE entering the queued operation, then serializes
+   the protected envelope. Async functions do not move these portions off JS.
+   checksumOf(JSON.stringify(save)) also stringifies the string internally;
+   this existing cloud checksum contract must NOT be casually changed.
+
+REPRODUCIBLE OPERATION-COUNT CHECK
+================================
+Run:
+  node qa/ios-device/audit-save-load-work.cjs
+
+The harness evaluates the real saveGames/accountRecovery/integrity source in
+isolated VM contexts, with a strict dependency allowlist. All storage/provider
+operations are synthetic; attempted writes reject. Synthetic fixtures: six
+Player and four Manager careers, each with healthy primary and backup copies.
+The harness runs the same scenarios on current source AND frozen Input QA 4,
+checks assertions and rejects source changes during its own run.
+
+Scenario                                    Protected-copy opens
+Player list only                             12
+Two concurrent identical Player lists         24 (not one shared 12)
+One backup + Player list + Continue read      34
+Request during active backup                 40 across two full backup passes
+
+In the combined case there are 38 storage-copy reads, 34 nonempty opens,
+17 marker checks and 17 VIP archive calls, with one backup refresh. Empty
+Manager slots account for the extra storage reads without encrypted opens.
+A gated final slot proves the result remains unpublished after ten copy opens
+have already completed for the first five slots.
+
+These are architecture/work counts, NOT measured AES calls on a real phone,
+milliseconds, a speedup percentage or a census of the owner's stored copies.
+Some real saves have no backup yet, so actual copy counts vary. Dirty saves,
+additional refreshes or follow-up jobs can add more work. The combined case
+does not yet include the extra UI refresh induced by backup completion.
+
+Initial harness attempt rejected the frozen snapshot's diagnostic import;
+added an explicit no-op timing adapter and reran successfully. This was a test
+adapter omission, not an app error. Focused helper ESLint passes.
+
+HISTORICAL IPHONE MEASUREMENTS — RECHECKED, NOT NEW PROFILING
+=========================================================
+Raw evidence remains local/ignored under output/ios-device/.
+Before yielding decode (Input QA 3): one UTF-8 decode 5,347.16 ms; 30 calls
+total 25,807.72 ms; maximum captured heartbeat excess delay 6,209.33 ms.
+Input QA 4's captured window: four whole-list spans, longest 8,110.64 ms;
+27 yielding-decode elapsed spans total 22,941.11 ms, max 1,715.55 ms;
+one recorded heartbeat excess delay 890.3 ms. Whole-decode elapsed spans now
+include scheduled yields and concurrent work: they are NOT synchronous blocks.
+Do not add overlapping async stages or compare these windows as a controlled
+benchmark. The phone's automated Player-list observation also took 12.080 s
+including XCTest overhead; a successful destination check was never an
+instant-load or manual-responsiveness pass.
+
+This confirms that reducing a long individual freeze did not make listing
+cheap. It does not establish that every current delay has the identical cause.
+No new physical-device or Android performance timing was collected today.
+
+WHERE ELSE THIS CAN HAPPEN
+=========================
+Area / trigger                    Source finding and scope of impact
+Saved Games / both tabs / Retry    Direct full-mode read; verified main path.
+Main menu / Continue card          getLastPlayed reads full primary/backup on
+                                  focus and backup refresh. The card can appear
+                                  late/change layout. Once loaded, onContinue
+                                  uses the in-memory save, not another list.
+Login, foreground, backup button   Account recovery scans both modes, may open
+                                  pending saves again, then refresh visible UI.
+After autosave / paid delivery     Dirty journal starts backup after 2 s trailing
+                                  debounce; bulk work can run while using any UI.
+Match-result saving               persistCritical waits for durable storage;
+                                  same-slot reads can be ahead in its queue.
+                                  Own clone/encryption/write costs are separate.
+                                  Potential delay; not device-timed here.
+Pending payment / gem exchange     An inactive original save is opened by slot;
+                                  active correct save is reused when possible.
+                                  Can wait on the same queue. No payment tested.
+Restore Purchases                 Does NOT scan both lists directly. Provider
+                                  restore, explicit VIP cloud refresh and active
+                                  durable write have separate waits; same-slot
+                                  contention can contribute. Never label it the
+                                  same bulk-list cause without measurement.
+Player Life export/import          Full-world serialize/parse and protected
+                                  replacement write; not a six-slot listing.
+Creation (current source)          Ordinary base-slot selection now checks
+                                  occupancy, not full worlds. This audit gets
+                                  0 opens / 2 occupancy checks for a requested
+                                  empty standard slot. Slot-six eligibility can
+                                  still scan a mode. World generation/first
+                                  encryption/write/activation remain genuine
+                                  costs, not measured in this pass.
+Creation (frozen Input QA 4)        Predates that occupancy optimization; old
+                                  creation handlers still do full-mode listing.
+QA bulk coins / capture import     Explicit QA-only listAllSaves/listSlots reads;
+                                  not a normal live-store or user gameplay path.
+Settings / Records / other pages   No evidence each navigation loads all saves.
+                                  They can still be delayed by global JS work
+                                  or autosaves, but no per-screen timed freeze
+                                  is claimed. Ads are not established as cause.
+
+Normal Play/Continue activation also normalizes career/fixture/entitlement
+state; that is another potential cost, not proof of bulk listing at every tap.
+Source-only exposure is not a new device reproduction of each row above.
+
+IMPACTS AND NON-FINDINGS
+=======================
+User experience: blank/loading lists, late Continue card, repeated waits on tab
+changes, input/animation pauses and a misleading impression that careers vanished.
+Existing race guards hide old-mode Play/Delete actions while new mode loads;
+this safety is correct and must not be removed merely to reveal buttons sooner.
+
+Resource pressure: a list retains full SaveGame objects; backup retains both
+modes; MainMenu retains its resume save. During reads there are ciphertext,
+base64/bytes, plaintext, chunk strings, parsed primary/backup objects and
+checksum strings. More careers/larger worlds multiply work and temporary
+allocations. This is a confirmed allocation pattern, NOT measured RAM growth,
+a proven leak, OOM, ANR, memory-warning kill or battery-drain measurement.
+No history pruning/deletion is proposed; old records must be preserved.
+
+Data/purchases: no new corruption, lost career, duplicate reward, charge or
+wrong-account grant was reproduced by this audit. Per-slot serialization,
+backup fallback, tamper checks, ownership and payment-idempotency guards remain
+necessary. A long critical-write spinner is not permission to dismiss the
+screen, clear data or announce success before durability.
+
+Network: local listing is already expensive even without a cloud round trip.
+Backup does validate identity/network and has its own timeout; ordinary load's
+VIP sync awaits local/session archive work while optional remote merge is not
+awaited (explicit restore is different). Not simply an internet/Unity ads issue.
+An unchanged confirmed backup still scans local worlds; avoiding uploads via
+content hashes does not avoid those reads.
+
+Platform: shared JavaScript/storage architecture exposes both Android and iOS.
+The quoted timings are historical iPhone only. Current Android QA28 creation
+improvement is recorded separately in COMPACT_CREATION_AND_LOADING_2026-10-25.txt;
+do not claim frozen iPhone QA4 contains later root changes or Android timings.
+
+RECOMMENDED FIX ORDER — NOT IMPLEMENTED BY THIS AUDIT
+===================================================
+1. Separate a small derived list/Continue summary from full-world opening.
+   Populate/update it only after confirmed saves/recovery. Show summaries fast;
+   verify the selected actual career/slot before Play or destructive actions.
+   Missing/corrupt/stale metadata must never mean empty, grant VIP, override an
+   owner, or hide intact primary/backup data. Legacy fallback is required.
+2. Coordinate foreground reads and backup; share immutable verified work or
+   generation-aware snapshots, not a mutable SaveGame object across consumers.
+   Avoid redundant same-generation rereads and completion refreshes when local
+   slot content did not change. Never delay durable dirty-journal recording or
+   discard a follow-up needed for new writes, recover=true or an account change.
+3. Stop unused list work between slots after Back/tab change; retain the current
+   stale-result/mode guards. Optionally present verified rows incrementally.
+4. Profile checksum/serialization/critical-write/activation separately, then
+   reduce traversals or schedule bounded work while preserving EXACT existing
+   checksum bytes, AES/AAD, format, migrations and transaction ordering.
+5. Retest cold/warm lists with 0/1/6 careers per mode, many-season large saves,
+   primary/backup failures, rapid tabs/Back, active backup, account switching,
+   offline retry and foreground transitions. Measure first useful row and all
+   rows separately from input latency; include peak memory and critical writes.
+   Purchases/restore need explicit sandbox authority, not a real-charge test.
+
+Do not solve this by removing backups/encryption/checksums, marking read errors
+as empty, dropping history, launching every full-world load concurrently, or
+returning cached mutable/foreign-account saves. More parallel full loads can
+increase peak memory and input pressure despite improving one wall-clock span.
+
+VERIFICATION / SOURCE MAP
+=========================
+90 existing focused tests / 5 suites PASS (3.585 s): Saved Games mode race,
+encrypted saves, account recovery, yielding decoder and backup fingerprint.
+These confirm safety behavior, not device speed. No new full-suite gate claimed.
+Operation-count harness assertions PASS for current source and frozen QA4.
+Source hash register and test/evidence limits:
+  docs/evidence/save-load-audit-2026-10-25/verification.json
+
+Key implementation:
+  src/screens/SavedGamesScreen.tsx: refresh/focus/selected-mode guards
+  src/screens/MainMenuScreen.tsx: focus/getLastPlayed/onContinue
+  src/storage/saveGames.ts: loadSave/listSlots/queues/findCreationSlot/writeSave
+  src/storage/saveEncryption.ts, decodeSaveText.ts, integrity.ts, storage.ts
+  src/services/accountRecovery.ts: runBackup/queuedJob/refresh lifecycle
+  src/services/accountCareerCloud.ts, vipArchive.ts, storage/backupFingerprint.ts
+  App.tsx: foreground/background recovery
+  src/state/careerStore.ts: persistence, checkout/exchange, restore, QA/import
+  src/screens/MatchScreen.tsx: durable result-save boundary
+  src/screens/PlayerLifeScreen.tsx: export/import
+
+Exact Expo 57 versioned documentation reviewed before helper creation:
+  https://docs.expo.dev/versions/v57.0.0/
+The performance findings come from this source and recorded evidence, not from
+a generic SDK recommendation. No SDK upgrade or provider change proposed.

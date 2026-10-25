@@ -24,11 +24,12 @@ type QueueItem = {
   id: string;
   priority: ModalPriority;
   sequence: number;
+  yieldable?: boolean;
 };
 
 type ModalQueueValue = {
   activeId: string | null;
-  request: (id: string, priority: ModalPriority) => void;
+  request: (id: string, priority: ModalPriority, yieldable?: boolean) => void;
   release: (id: string) => void;
 };
 
@@ -37,6 +38,7 @@ const ModalQueueContext = createContext<ModalQueueValue | null>(null);
 export function ModalQueueProvider({ children }: { children: React.ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeRef = useRef<string | null>(null);
+  const activeItemRef = useRef<QueueItem | null>(null);
   const queueRef = useRef<QueueItem[]>([]);
   const sequenceRef = useRef(0);
   const lastClosedAtRef = useRef(0);
@@ -60,16 +62,26 @@ export function ModalQueueProvider({ children }: { children: React.ReactNode }) 
     const next = queueRef.current.shift();
     if (!next) return;
     activeRef.current = next.id;
+    activeItemRef.current = next;
     setActiveId(next.id);
   }, []);
 
   pumpRef.current = pump;
 
-  const request = useCallback((id: string, priority: ModalPriority) => {
+  const request = useCallback((id: string, priority: ModalPriority, yieldable = false) => {
     if (activeRef.current === id || queueRef.current.some((item) => item.id === id)) {
       return;
     }
-    queueRef.current.push({ id, priority, sequence: sequenceRef.current++ });
+    queueRef.current.push({ id, priority, sequence: sequenceRef.current++, yieldable });
+    // A scene-local coach can safely yield. Never preempt a native purchase,
+    // consent, reward or other ordinary modal that already owns the slot.
+    const active = activeItemRef.current;
+    if (active?.yieldable && priority < active.priority) {
+      queueRef.current.push(active);
+      activeRef.current = null;
+      activeItemRef.current = null;
+      setActiveId(null);
+    }
     pumpRef.current();
   }, []);
 
@@ -78,6 +90,7 @@ export function ModalQueueProvider({ children }: { children: React.ReactNode }) 
     if (activeRef.current !== id) return;
 
     activeRef.current = null;
+    activeItemRef.current = null;
     lastClosedAtRef.current = Date.now();
     setActiveId(null);
     pumpRef.current();
@@ -103,6 +116,7 @@ export function useModalQueue(
   wantsToShow: boolean,
   priority: ModalPriority,
   label = 'modal',
+  yieldToHigherPriority = false,
 ): boolean {
   const queue = useContext(ModalQueueContext);
   const reactId = useId();
@@ -112,10 +126,13 @@ export function useModalQueue(
 
   useEffect(() => {
     if (!request || !release) return undefined;
-    if (wantsToShow) request(id, priority);
+    if (wantsToShow) {
+      if (yieldToHigherPriority) request(id, priority, true);
+      else request(id, priority);
+    }
     else release(id);
     return () => release(id);
-  }, [id, priority, release, request, wantsToShow]);
+  }, [id, priority, release, request, wantsToShow, yieldToHigherPriority]);
 
   if (!wantsToShow) return false;
   return queue ? queue.activeId === id : true;

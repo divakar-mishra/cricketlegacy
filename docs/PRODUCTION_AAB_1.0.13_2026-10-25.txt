@@ -1,0 +1,97 @@
+CRICKET: PLAYER & MANAGER — VERSION1.0.13 CORRECTION
+25 October 2026, Asia/Kolkata
+=================================================
+
+STATUS: VERSION1.0.13 / CODE23 AAB BUILT, DOWNLOADED AND VERIFIED
+Owner explicitly requested rebuilding as1.0.13 and a permanent prevention rule.
+Earlier code22 had the fixes but wrongly retained public1.0.12. Agent error:
+treated remote code auto-increment as enough and omitted public-version bump.
+Code22 is preserved with superseded warnings, never renamed or overwritten.
+
+CHANGES THIS PASS
+-----------------
+app.json/version, native Android versionName, package.json and both root lockfile
+version fields now1.0.13. Dependency versions/provider settings/gameplay unchanged.
+EAS remote versionCode authority/autoIncrement retained; next code must be>=23.
+android-release.json records target1.0.13,previous public1.0.12,minimumcode23,
+package and matching release title. Owner/store evidence must advance this record
+at the next public release; rebuilding the same approved candidate may retain
+its public version with a fresh internal code.
+scripts/checkAndroidReleaseVersion.cjs validates all version sources/target,
+previous-version advance, remote code policy,bundle type and QA-off. Optional
+actual-manifest validation rejects wrong version/package/code. Nine Node tests
+cover the original high-code/old-version failure, individual source mismatches,
+no public bump,wrong title/tag/owner target,release safety and artifact mismatch.
+Regular npm run check/tagged release CI includes these checks. EAS production
+Android pre-install and direct Gradle preReleaseBuild enforce the same guard;
+iOS/preview/QA EAS lifecycle remains excluded from this Android-only gate.
+AGENTS.md now mandates explicit public-version advance BEFORE packaging and
+actual signed manifest/signature/production-flags verification BEFORE handoff.
+An artifact filename or Play release label is never accepted as version evidence.
+
+VERIFICATION / BUILD
+--------------------
+Focused version tests9/9PASS. Fresh npm run check passes types,quiet lint,
+302suites/2,347tests/2snapshots (Jest91.738s). Extended5suites/83testsPASS216.964s;
+Node config12/12,native guard12/12,public legal/Publisher content checksPASS.
+Actual oldcode22 manifest rejected by new manifest gate,not only a fake fixture.
+All1,203captured inputs match EAS archive. Compared with code22: only4existing
+build/version files differ and3new release guard/target files added. Runtime
+gameplay/engine/provider inputs unchanged. Source rechecked unchanged.
+EAS build79b934d9-46f1-4dda-aa1d-4ba670d5e94e accepted version1.0.13/code23,
+production STORE,frozen existing upload credentials,noauto-submit:
+https://expo.dev/accounts/sunlightpvt/projects/cricket-legacy/builds/79b934d9-46f1-4dda-aa1d-4ba670d5e94e
+Cloud FINISHED25October2026 16:38:06IST (started16:19:59IST;18m06.878s).
+Downloaded16:39:33IST;actual artifact verification16:39:56IST. One build started,
+no duplicate initiation. No auto-submit/store upload/rollout/device action.
+
+CORRECTED VERIFIED ARTIFACT — USE THIS,NOT CODE22
+------------------------------------------------
+/Users/divakarmishra/Desktop/APP/cricketlegacy/output/production-1.0.13/cricket-player-manager-1.0.13-vc23.aab
+Version1.0.13 / actual versionCode23 / com.coverdrive.cricket.
+Bytes111,422,774 (~106.3MiB). SHA256:
+  b0d02649330772e3e290ab3096f8a7c783b5141a05584af1393550e8e623c34a
+Source/build inputs aggregate SHA256:
+  61e1704d5c8fa8059cd48b4f4b3b065ebdf731149a8554c6b61a4de5038d26e8
+All1,203inputs rechecked unchanged after upload/download/verification.
+ZIP,bundletool validation,actual manifest and signature checksPASS. Existing
+upload certificate SHA256 unchanged:
+  DA:68:BA:1D:9A:56:DB:FE:70:92:18:AB:68:E8:78:19:D6:8E:08:F2:EC:37:ED:3D:92:29:64:22:2D:C6:84:20
+Actual manifest public1.0.13/code23 matches release target/minimum; new CLI
+manifest gate also passes on this file. Compiled generated fallback contains
+1.0.13; app reads installed native version first. minSdk24/targetSdk36,
+nondebuggable,allowBackup=false,no microphone/broad storage permissions.
+Actual Hermes QA_TOOLS_ENABLED=false,purchase MOCK_MODE=false,ad simulation=false;
+known QA negative control correctly rejected. QA native diagnostics absent.
+R8 mapping/native purchase recovery present;Unity consent gate retained and
+automatic SDK initializer absent. All52checked64-bit native libraries have
+ELF LOAD alignment>=16KB. Production ad/legal/backend/purchase public config
+retained;backend/public purchase key sets match the previous intended release.
+Deep-audit fix markers and November15/48hour/max2promo policy retained in compiled
+bundle. No provider/key change is inferred from the public-version correction.
+Oldcode22 rehashed unchanged;preserved and marked superseded rather than renamed.
+Logs/evidence:output/production-android-1.0.13-2026-10-25/.
+No Play submission, device install,save reset,provider/backend/website change.
+Saved-career list performance diagnosis remains separate/unimplemented.
+The shared Expo version follows Android1.0.13; future iOS submission must
+explicitly match its App Store Connect version,not silently reuse its1.0draft.
+
+RELEASE PAGE TEXT
+-----------------
+Release name:1.0.13 – Energy Recovery & Career Improvements
+Release notes:output/production-android-1.0.13-2026-10-25/release-notes.txt
+Use corrected verified AAB only,confirm version1.0.13/code23 in Play,review rollout
+and all pending changes before owner submits. Packaging does not authorize
+publish. Full owner steps:output/production-1.0.13/PLAY_RELEASE_STEPS.txt.
+
+EVIDENCE / LIMITS
+-----------------
+output/production-android-1.0.13-2026-10-25/ contains fresh quality/extended/
+config/native/legal logs,source/archive hashes,build request/latest state,
+download.json,artifact-summary.json,manifest.xml,signature/bundletool checks,
+compiled flag/promotion proofs and verification.log. No new phone/emulator,
+live purchase/ad creative/account-switch testing or store-console certification.
+Prior native memory/Oppo/SIGKILL and saved-list performance limits remain in
+their focused reports; this is a version/build-safety correction,not those fixes.
+Handbook source updated in docs/how-to/ and mirrored to owner Desktop/HOW TO
+after this verification;compare bytes before final handoff.

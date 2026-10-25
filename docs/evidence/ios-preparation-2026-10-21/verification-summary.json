@@ -1,0 +1,49 @@
+{
+  "completedAt": "2026-10-22 (Asia/Kolkata)",
+  "scope": "iOS preparation, public website update, detailed delivery handbook",
+  "website": {
+    "project": "sunlight-publisher-site",
+    "branch": "main",
+    "deployment": "dd05cd1a",
+    "origin": "https://sunlight-publisher-site.pages.dev",
+    "filesMatched": 20,
+    "redirectAndHeadersPassed": true,
+    "layoutCasesPassed": 7
+  },
+  "checks": {
+    "jestSuites": 7,
+    "jestTests": 128,
+    "nodeTests": 13,
+    "typecheck": "passed",
+    "lint": "passed",
+    "legalUrls": "passed with explicit production public URLs",
+    "iosDistribution": "expected blocked: five real provider client values unavailable to the check"
+  },
+  "mirror": {
+    "directory": "/Users/divakarmishra/Desktop/HOW TO",
+    "byteEqualityPassed": true,
+    "sha256": {
+      "START_HERE.txt": "2526dce14dab4dcfcbba02a31731ea62138b37d979c7ab3565d937011a13b934",
+      "CRICKET_CONFIGURATION.txt": "3d2b0f1c984d88546add377b6d2c17c603bb69f6dd9635526824c970d4167102",
+      "RELEASE_LOG_AND_CHECKLIST.txt": "7fd1d4d16fbc02745671b4d113e33abeba87f06278c9d30654957d504ec89439"
+    }
+  },
+  "unchangedArtifacts": {
+    "androidAab": "0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4",
+    "iosSimulatorZip": "2ad2244b2599c5966de51221e97f93f068764b15e2da57691226c624b33a218b",
+    "note": "Both artifacts predate current policy/config source edits; no new native build in this pass."
+  },
+  "notPerformed": [
+    "Apple credential/secret upload",
+    "provider or backend deployment",
+    "purchase",
+    "Apple signing",
+    "device/TestFlight upload",
+    "App Review submission",
+    "global age override"
+  ],
+  "limitations": [
+    "Static SDK tracking declarations are not a final behavior verdict.",
+    "Provider setup, Apple regional-age clarification, final privacy/export/rights/DSA decisions, revocation verification and signed device QA remain pending."
+  ]
+}

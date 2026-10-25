@@ -1,0 +1,227 @@
+CRICKET: PLAYER & MANAGER — RELEASE QA FOLLOW-UP
+20 October 2026 (Asia/Kolkata)
+================================================
+
+Later owner-requested recovery/privacy/memory work and updated enabled-format
+status are in docs/RELEASE_FOLLOWUP_2026-10-20.txt. This report below preserves
+the evidence and dashboard state from the earlier pass.
+
+Scope and release boundary
+--------------------------
+Owner requested in-app verification of the Supabase optimizations, consent
+configuration and the reported Android stability issues. Owner subsequently
+explicitly authorized the existing nine-career QA account's backup revisions,
+offline/retry and sign-out/sign-in tests, and the discovered wallet-clock fix.
+No AAB, store submission, production backend deployment, migration, direct SQL
+mutation, save/account deletion, purchase or Git push is part of this pass.
+Normal in-app QA backups may advance only the authorized QA account's rows.
+Pixel 8 was not started or updated.
+
+Devices and artifacts
+---------------------
+Pixel_10_Pro_XL / emulator-5556: existing muted QA installation updated with
+adb install -r. First installation remains 16 October 2026. Five Player and
+four Manager careers are retained; no uninstall/clear-data operation was used.
+Android API 37 emulator success is not an Oppo hardware certification.
+
+Cricket_Recovery_QA_34 / emulator-5580: fresh, muted Android 14/API 34 emulator
+using the already installed Play system image and separate temporary AVD data.
+No Pixel 8 or Pixel 10 user data/credentials were copied to this emulator.
+An empty Player save list and signed-out Account were verified before recovery.
+Its Chrome first-run / Google sign-in requires the owner's interaction.
+
+Initial pre-wallet-fix internal APK SHA256:
+dc81de481521584e0af7917587fdd1fcf8b2be2ab86bad739f85a77a163e9cce
+Corrected internal APK, version 1.0.12/code 19, SHA256:
+9f5645f675be9f7e92b3f61715e2fdf03a35a6b66cb743f8adb750c27e21c550
+Retained at output/final-qa-2026-10-20/cricket-player-manager-final-qa-vc19.apk.
+Standalone embedded JavaScript verified, including fingerprint cache and no-op
+guard strings. Debug-signed INTERNAL QA artifact, not a release AAB.
+Corrected APK's native DEX files match the preceding internal APK. NativeProxy
+disassembly confirms getViewExists guard, concise error logging and absence of
+the full-Throwable warning. No native/SDK upgrade was made in this follow-up.
+
+Important defect found by actual device testing
+----------------------------------------------
+The original optimization tests normalized only the root updatedAt. They did
+not run a realistic save through synchronizeSchema14State before each backup.
+Device testing exposed that this existing canonicalizer unconditionally set
+premiumWallet.updatedAt to the save time even when coins/gems were unchanged.
+This defeated the intentionally strict fingerprint's no-op detection.
+
+Observed before fix: Manager slot 1 revisions advanced 15 -> 16 during initial
+save, then through 20 during repeated save/backup actions. Remaining economic
+benefits, flags/transaction markers and entitlements stayed unchanged; the
+canonical premium-wallet clock alone changed within the paid-state evidence.
+Do not describe those initial UI confirmations as successful deduplication.
+
+After owner approval, schema14.ts now preserves a valid version1 wallet clock
+when normalized coin/gem balances are identical. Missing/invalid canonical
+state or actual balance changes update the clock. Inventory/focus and other
+save changes still synchronize. The fingerprint still includes ALL nested
+financial fields, timestamps, entitlements and purchase markers. No financial
+data was removed from hashing and no save schema/server protocol changed.
+
+Regression evidence: the new Player and Manager real-save/canonicalizer/sync
+tests failed on the old implementation (four uploads instead of one). With
+the new clock unit cases, the negative-control run had 10 failing assertions.
+All pass after the fix. Real coin/gem changes must still upload; token and
+purchase markers remain checked. Invalid timestamps, legacy initialization,
+normalization, backwards clocks and unrelated resource changes are covered.
+
+Executed automated gates after the final runtime edit
+----------------------------------------------------
+16 additional tests: 14 wallet-clock cases and 2 real-career normalization to
+backup pipeline cases, using the real Player/Manager save constructors.
+Focused persistence/recovery/migration gate: 6 suites / 116 tests PASS.
+Typecheck PASS; quiet lint PASS; git diff --check PASS.
+Full Jest: 277 suites / 2,022 tests / 2 snapshots PASS, 74.501 seconds.
+Native UnityConsentPolicy: 18 JVM tests PASS.
+Native Reanimated actual-method harness: 12 patched cases PASS; vulnerable
+control 5 pass / 7 expected failures. Host API doubles are not Android GPU tests.
+
+In-app account and network checks
+--------------------------------
+Existing Google account backup confirms through the actual app/server path.
+Sign-out removed Backup now access without deleting careers. Offline guest
+sign-in created a local-only guest, not another remote anonymous account; no
+cloud backup action was offered. Existing Google sign-in then returned to the
+original account and confirmed backup. This is Google -> signed-out -> local
+guest -> original Google coverage, not two distinct recoverable Google owners.
+The automated suite separately covers different owners and in-flight epochs.
+
+On the corrected APK, offline radios were explicitly verified as airplane=1,
+Wi-Fi=0, mobile-data=0. Backup not confirmed appeared; no false success was
+accepted. The original airplane=0/Wi-Fi=1/mobile-data=1 state was restored in
+a finally block. Explicit retry completed confirmed without another sign-in.
+The offline error's generic wording says "Sign in again to confirm the backup
+account" even though online retry works; do not confuse wording with forced
+sign-out or a successful offline backup. No wording fix was made here.
+
+Read-only cloud evidence is restricted to the same nine previously authorized
+QA career IDs. All 9 retain original remaining balances, inventory, ownership,
+ad-free expiry and purchase/flag hashes. Only premiumWallet.updatedAt is removed
+from the additional old-baseline remaining-benefits comparison; full paid-state
+and complete-snapshot hashes are also retained so differences are not hidden.
+
+Consent, website and dashboard evidence
+--------------------------------------
+Owner supplied the current AdMob row:
+CricketPM – US privacy choices / Cricket: Player & Manager / English (en-US) /
+modified 19 October 2026 / Published. Correct app, not Auction 2027. Publication
+is confirmed by owner-supplied console evidence, not an independently logged-in
+console session or an on-device US-region CMP acceptance/opt-out test.
+
+All 20 public website files, root app-ads.txt MIME/hash, security headers and
+legacy redirect matched the deployed origin in this pass. This is hosting
+verification, not AdMob/Unity crawler approval.
+
+Still need owner screenshots/current answers for Unity project Ad controls ->
+Category Filters / Age Settings, and Play Console -> Policy and programs ->
+App content -> Data safety -> Manage. No declaration/category/audience settings
+were changed. Source/native tests preserve default opt-out, teen restrictions,
+unsupported US/GPP handling and consent withdrawal. Console correctness cannot
+be inferred from these unit tests.
+
+Unity Rewarded test serving passed 19 October on the registered Pixel 10 test
+device. Banner/interstitial Unity groups remain paused; this follow-up does
+not claim actual Unity serving for those formats or production revenue.
+
+Android stability and qualifications
+------------------------------------
+On the corrected APK on Pixel 10, all 30 checked Manager navigation transitions
+passed (Team -> Home -> Club -> Home -> Records -> Home, five rounds). Each
+destination was verified; five further background/resume cycles preserved the
+Records destination. Five cold-launch/background/resume cycles then all reached
+the main menu (20 October 01:07:46 -> 01:08:15 IST).
+
+Final per-process log checks found no current-lifetime fatal, stale-view warning,
+mounting exception, ANR or splash SurfaceControl failure. The system event log
+contained zero app am_crash/am_anr events. Exit history for the controlled cold
+cycles shows the intentional force stops and normal isolated-WebView cleanup,
+not application crashes. This is scoped emulator evidence, not an all-device
+stability guarantee.
+
+Memory measurements remain a qualification: PSS rose from 295,333 KB before
+route warm-up to 428,450 KB after navigation, then 440,055 KB after background
+tests. View/WebView counts went from 423/1 to 1,387/5 and then 997/4; Activities
+remained 1 and AppContexts 27. A single warm-up sequence does not establish a
+leak or a stable plateau. No retained-object/heap investigation has cleared
+memory retention; do not label this pass leak-free or an Oppo GPU fix.
+
+Five cold-launch/background/resume attempts on fresh Android 14 reached the
+menu and passed per-process fatal/stale-view/ANR/splash checks. These used the
+first internal APK; its native DEX matches the corrected APK. They do not
+replace final-artifact testing or clean-account recovery on that fresh device.
+
+The first fresh-AVD process ended because Google Play Services FontsProvider
+restarted: Android ApplicationExitInfo reason 12 DEPENDENCY DIED. No app crash
+or ANR event accompanied it; all five subsequent startup runs passed. Retained
+separately, not silently counted as a clean uninterrupted first startup.
+
+Some Pixel 10 raw --pid logs included a fatal entry because a much older
+android.hardware process had reused the same PID number in the crash buffer.
+The retained Zygote line proves the current game process started later. Raw
+logs are preserved; scoped logs start at that explicit process birth. No app
+fatal in the current lifetime was discarded. Do not blindly count historical
+other-process crash-buffer entries as failures in the current app run.
+
+Owner confirmed no affected Oppo A18/A79/splash-crash phone is available.
+Oppo GPU stalls, Chromium/Binder ANR and platform SurfaceControl splash NPE
+therefore remain UNVERIFIED, not fixed by passing Pixel/API 34 emulator runs.
+Reanimated backport is present and regression-tested; banner lifecycle is a
+mitigation for hidden WebView exposure, not a fix to Android/Chromium itself.
+
+Evidence
+--------
+output/final-qa-2026-10-20/: APKs, source hashes, full-regression.json, native
+inspection, UI XML/PNG captures, radio-state/result JSON, raw/scoped process
+logs, startup results and system exit/event evidence. Treat raw files as local
+QA evidence, not a public export of account UI or session logs.
+output/production-1.0.12/evidence/release18-cloud-final-qa-*.json: bounded
+read-only snapshot/revision/benefits evidence; no complete save JSON or tokens
+are exported by that evidence helper.
+
+Settled native deduplication result
+----------------------------------
+After the first corrected-build load/save normalized the active Manager save,
+its revision advanced 21 -> 22 once. Do not count that warm-up as a no-op pass.
+Then a separate settled baseline and a fresh three-action Backup now round
+were compared (20 October 01:00:53 -> 01:03:11 IST). All three UI actions
+finished confirmed and generated real local save writes. All nine server
+revisions, complete snapshot hashes and full paid-state hashes were identical
+before/after. Manager slot 1 remained revision 22. Thus ZERO additional full
+cloud uploads occurred during this settled three-action round.
+Evidence: settled-backup-deduplication.json, post-fix-settled-repeat-backup-
+results.json and the corresponding UI/process/cloud evidence. This is a scoped
+live QA result, not a production-wide savings percentage or a storage-size drop.
+
+Final preservation and remaining release checks
+---------------------------------------------
+The read-only post-stress check at 01:08:18 IST still found all nine careers,
+with all nine full paid-state hashes identical to the settled post-backup
+baseline. All original October 11 balances, inventory, entitlement expiry and
+purchase/flag hashes remain preserved. Eight complete snapshots/revisions were
+unchanged; the active Manager snapshot advanced 22 -> 23 after navigation and
+background saves. The settled no-op claim above does not extend to that later
+route sequence or imply that all resource clocks are ignored by the hash.
+The bounded final clock check shows Manager energy at its configured cap of
+36 and energyUpdatedAt at 01:04:59.387 IST, during the tab round; premiumWallet
+updatedAt remains 00:48:56.201 IST. Manager Home/Club focus calls refreshEnergy,
+and the existing regenEnergy updates the energy clock when already at cap.
+That is consistent with the later changed snapshot. The earlier full snapshot
+was retained only as a hash, so this is not a complete field-by-field diff.
+Energy semantics were not changed and nested resource clocks remain hashed.
+
+Fresh-device recovery is still awaiting the owner's Chrome/Google interaction
+on Cricket_Recovery_QA_34. Its pre-recovery empty local state is documented,
+but the nine-career clean recovery is NOT completed or certified in this pass.
+Two different Google owners have automated coverage, not a completed two-owner
+device test. Unity content controls and Play Data safety answers still require
+the owner's console evidence. US message publication alone does not close them.
+Unity banner/interstitial serving, real-money UPI, OEM-specific failures and
+memory retention are not certified by this run. Pixel 10 logs report billing
+unavailable; it was not used for purchases or a new billing clearance.
+
+No AAB was created and no production backend change was made. The approved
+wallet-clock fix and its QA retest are complete; full release clearance is not.

@@ -13,6 +13,22 @@ export interface BackupBinding {
   deleted: boolean;
   checksum?: string;
   confirmedAt?: number;
+  /** Optional v1-compatible cache, populated only after a remote acknowledgement. */
+  contentHash?: string;
+  contentHashBinding?: string;
+  localChecksum?: string;
+  /** Authenticated local sidecar token checked against this exact generation. */
+  localSaveToken?: string;
+  localSaveTokenBinding?: string;
+}
+const tokenBinding = (entry: BackupBinding) => JSON.stringify([entry.ownerId, entry.mode, entry.slot, entry.saveId,
+  entry.generation, entry.revision, entry.checksum ?? null, entry.localChecksum ?? null]);
+export function hasCheckedLocalSnapshot(binding: BackupBinding, token: string): boolean {
+  return Boolean(token && !binding.pending && binding.localSaveToken === token && binding.localSaveTokenBinding === tokenBinding(binding));
+}
+export function hasConfirmedContentHash(binding: BackupBinding): boolean {
+  return Boolean(binding.revision > 0 && binding.contentHash && /^[a-f0-9]{64}$/.test(binding.contentHash) &&
+    binding.contentHashBinding === `${binding.revision}:${binding.checksum}`);
 }
 const KEY = 'account-career-backups:v1';
 let owner: string | null = null;
@@ -56,6 +72,18 @@ function serial<T>(operation: () => Promise<T>): Promise<T> {
 }
 export function backupBindings(): Promise<BackupBinding[]> { return serial(read); }
 
+export function noteBackupSnapshot(binding: BackupBinding, token: string): Promise<void> {
+  return serial(async () => {
+    const entries = await read();
+    const current = entries.find(entry => entry.saveId === binding.saveId && entry.ownerId === binding.ownerId);
+    if (!current || current.deleted || current.mode !== binding.mode || current.slot !== binding.slot ||
+      current.generation !== binding.generation) return;
+    current.localSaveToken = token;
+    current.localSaveTokenBinding = tokenBinding(current);
+    await setJSON(KEY, { version: 1, entries });
+  });
+}
+
 export function markBackupDirty(saveId: string, mode: GameMode, slot: number, capturedOwner: string | null): Promise<void> {
   writeVersion += 1;
   return serial(async () => {
@@ -79,15 +107,38 @@ export function markBackupDirty(saveId: string, mode: GameMode, slot: number, ca
 }
 
 /** A newer local write remains pending even if an older upload finishes late. */
-export function confirmBackup(binding: BackupBinding, revision: number, checksum: string): Promise<void> {
+export function confirmBackup(binding: BackupBinding, revision: number, checksum: string, contentHash?: string): Promise<void> {
   return serial(async () => {
     const entries = await read();
     const current = entries.find((item) => item.saveId === binding.saveId && item.ownerId === binding.ownerId);
     if (!current || current.deleted || revision < current.revision) return;
     current.revision = revision;
     current.checksum = checksum;
+    current.localChecksum = checksum;
+    // Clear any older hash when its acknowledged payload was replaced without
+    // hashing support; never pair an old content hash with a new remote row.
+    current.contentHash = contentHash && /^[a-f0-9]{64}$/.test(contentHash) ? contentHash : undefined;
+    current.contentHashBinding = current.contentHash ? `${revision}:${checksum}` : undefined;
     current.confirmedAt = Date.now();
     if (current.generation === binding.generation) current.pending = false;
+    await setJSON(KEY, { version: 1, entries });
+  });
+}
+
+/** Caller has just verified the same remote revision/checksum still exists. */
+export function confirmUnchangedBackup(binding: BackupBinding, contentHash: string, localChecksum: string): Promise<void> {
+  return serial(async () => {
+    const entries = await read();
+    const current = entries.find((item) => item.saveId === binding.saveId && item.ownerId === binding.ownerId);
+    if (!current || current.deleted || current.mode !== binding.mode || current.slot !== binding.slot ||
+      current.revision !== binding.revision || current.checksum !== binding.checksum ||
+      !hasConfirmedContentHash(current) || current.contentHash !== contentHash || !/^[a-f0-9]{64}$/.test(contentHash)) {
+      throw new Error('The backup changed while checking unchanged progress. Retry Backup now.');
+    }
+    current.localChecksum = localChecksum;
+    if (current.generation === binding.generation) current.pending = false;
+    // Keep the time/checksum of the actual remote snapshot, not a fabricated
+    // new upload acknowledgement. Newer local writes remain pending as usual.
     await setJSON(KEY, { version: 1, entries });
   });
 }
@@ -103,7 +154,9 @@ export function bindRecoveredSave(binding: BackupBinding): Promise<void> {
     if (existing && (existing.pending || existing.revision > binding.revision)) {
       throw new Error('This device has an unfinished or newer backup for that career. Nothing was overwritten.');
     }
-    if (existing) Object.assign(existing, binding, { pending: false });
+    if (existing) Object.assign(existing, binding, { pending: false,
+      contentHash: binding.contentHash, contentHashBinding: binding.contentHashBinding, localChecksum: binding.localChecksum,
+      localSaveToken: undefined, localSaveTokenBinding: undefined });
     else entries.push({ ...binding, pending: false, generation: 0 });
     await setJSON(KEY, { version: 1, entries });
   });

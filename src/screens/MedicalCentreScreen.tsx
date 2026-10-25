@@ -125,7 +125,7 @@ export function MedicalCentreScreen({ navigation }: ScreenProps<'MedicalCentre'>
   };
 
   return (
-    <Screen scroll gradient={gradients.pitch}>
+    <Screen scroll careerNavigation gradient={gradients.pitch}>
       <ScreenHeader
         title="Medical Centre"
         subtitle={team.name}

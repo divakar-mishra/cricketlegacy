@@ -1,0 +1,76 @@
+{
+  "date": "2026-10-23",
+  "scope": "Three approved iOS UI fixes; not submission certification",
+  "runtime": {
+    "xcode": "26.6 (17F113)",
+    "iosSimulator": "26.5",
+    "bundleIdentifier": "com.coverdrive.cricket.simulator",
+    "version": "1.0.12",
+    "build": "1",
+    "minimumOS": "16.4"
+  },
+  "fixedFindings": [
+    "F1: initial Wage Ledger first row visible inside bounded list",
+    "F2: full Leadership Selected action label",
+    "F3: complete Player identity/readiness and profile attribute labels"
+  ],
+  "checks": {
+    "focusedJestSuitesPassed": 6,
+    "focusedJestTestsPassed": 45,
+    "typecheckPassed": true,
+    "lintQuietPassed": true,
+    "nativeScreenFlowExecutionsInFinalSuccessfulBundles": 9,
+    "separateNativeFixtureSetupTestsPassed": 2,
+    "initialPhoneManagerTestFailedAtAsyncSaveCount": true,
+    "initialPhoneFailureCorrectedAndRetested": true,
+    "compactProfileOverscrolledCaptureRejectedAndReplaced": true,
+    "fullGameSuiteRun": false,
+    "physicalDeviceTested": false,
+    "realProvidersTested": false,
+    "duoNativeFoldTested": false,
+    "iphone18NativeRuntimeTested": false,
+    "mockedMountedWindowResizeContractPassed": true
+  },
+  "actualDevices": [
+    { "model": "iPhone 16 Pro", "points": [402, 874], "appearance": "Warm" },
+    { "model": "iPhone SE (3rd generation)", "points": [375, 667], "appearance": "Classic" },
+    { "model": "iPhone 17 Pro Max", "points": [440, 956], "appearance": "Classic", "largerText": "extra-extra-large", "textSizeRestoredTo": "large" }
+  ],
+  "coverageQualifications": {
+    "iphone17Pro": "Skipped duplicate run: local profile geometry, scale, mask, chrome and sensor-bar asset match 16 Pro",
+    "iphone18ProAndMax": "Apple published pixel resolutions match tested Pro sizes; representative size coverage only",
+    "iphoneDuo": "Native simulator/Device Hub test requires Xcode 27.1 and runtime absent from this Mac",
+    "resizeUnitTest": "Generic mocked Screen hook/safe-area contract, not a native fold simulation"
+  },
+  "artifact": {
+    "path": "output/ios-simulator/cricket-player-manager-1.0.12-ios-ui-fixes-2026-10-23.zip",
+    "bytes": 66262088,
+    "sha256": "1cfc46203b4e839fb4130a7f484ed2d4fb7ce2e63a646c662470e5ab67229026",
+    "bundleSha256": "d969f48159fc2b6307739f7ceb69cfcf68e324da847ce735a929c5e07792abc3",
+    "signatureVerified": true,
+    "zipIntegrityVerified": true,
+    "freshBytecodeQaToolsFalse": true,
+    "freshBytecodeMockPurchasesFalse": true,
+    "freshBytecodeSimulatedAdsFalse": true,
+    "storeDistributionArtifact": false
+  },
+  "safety": {
+    "existingPhoneCareersPreserved": true,
+    "appDataBackedUpBeforeInstall": true,
+    "newLocalQaCareers": { "compact": 2, "proMax": 2 },
+    "deletions": false,
+    "transactions": false,
+    "matchesAdvanced": false,
+    "providerSettingsChanged": false,
+    "productionArtifactChanged": false,
+    "productionAndroidAabSha256": "0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4",
+    "uploadedOrDeployed": false
+  },
+  "rawEvidenceDirectory": "output/ios-simulator/evidence/ui-fixes-2026-10-23/",
+  "report": "docs/IOS_SIMULATOR_UI_FIXES_2026-10-23.txt",
+  "officialReferences": [
+    "https://developer.apple.com/iphone-duo/prepare/",
+    "https://developer.apple.com/news/?id=kkphp5qo",
+    "https://www.apple.com/iphone-18-pro/specs/"
+  ]
+}

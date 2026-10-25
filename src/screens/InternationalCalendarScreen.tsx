@@ -105,7 +105,7 @@ export function InternationalCalendarScreen({ navigation }: ScreenProps<'Interna
   const controlsInternationalTeam = save.capped || isNationalManager;
 
   return (
-    <Screen scroll>
+    <Screen scroll careerNavigation>
       <ScreenHeader title="International Calendar" onBack={() => navigation.goBack()} />
 
       <Card style={styles.windowCard}>

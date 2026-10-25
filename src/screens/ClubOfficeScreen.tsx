@@ -107,13 +107,15 @@ export function ClubOfficeScreen({ navigation, route }: ScreenProps<'ClubOffice'
     );
   }
 
-  if (save.managerCareerLevel === 'NATIONAL') {
+  if (save.managerRetired || save.managerCareerLevel === 'NATIONAL') {
     return (
       <Screen gradient={gradients.pitch}>
         <ScreenHeader title="Club Office" onBack={() => navigation.goBack()} />
         <Card style={styles.nationalPauseCard}>
           <Icon name="flag-outline" size={24} color={colors.primaryLight} />
-          <Text style={styles.nationalPauseTitle}>Club operations paused</Text>
+          <Text style={styles.nationalPauseTitle}>
+            {save.managerRetired ? 'Manager career complete' : 'Club operations paused'}
+          </Text>
         </Card>
       </Screen>
     );
@@ -133,7 +135,8 @@ export function ClubOfficeScreen({ navigation, route }: ScreenProps<'ClubOffice'
   const clubRating = calculateClubRating(save);
   const selectedOffice = save.seasonPassExperience?.selectedOfficeTheme ?? 'office_classic';
   // A purchased default must never override an explicitly equipped collection.
-  const managerLegendOffice = selectedOffice === 'office_classic' && Boolean(save.inventory?.manager_legend_office_theme);
+  const managerLegendOffice =
+    selectedOffice === 'office_classic' && Boolean(save.inventory?.manager_legend_office_theme);
   const monthlyOffice = MONTHLY_PASS_CONTENT.find(
     (content) => content.office.themeId === selectedOffice,
   );
@@ -171,7 +174,8 @@ export function ClubOfficeScreen({ navigation, route }: ScreenProps<'ClubOffice'
             { text: 'Later', style: 'cancel' },
             {
               text: 'View facility token',
-              onPress: () => navigation.navigate('Purchase', { productId: 'facility_upgrade_token' }),
+              onPress: () =>
+                navigation.navigate('Purchase', { productId: 'facility_upgrade_token' }),
             },
           ],
         );
@@ -184,8 +188,13 @@ export function ClubOfficeScreen({ navigation, route }: ScreenProps<'ClubOffice'
   const doUpgrade = (kind: keyof Facilities, facilityLabel: string) => {
     const currentLevel = facilities[kind];
     if (currentLevel >= MAX_FACILITY) return;
-    if (team.budget < facilityUpgradeCost(currentLevel + 1) &&
-        showShortageOffer(save, 'facility', (productId) => navigation.navigate('Purchase', { productId }))) return;
+    if (
+      team.budget < facilityUpgradeCost(currentLevel + 1) &&
+      showShortageOffer(save, 'facility', (productId) =>
+        navigation.navigate('Purchase', { productId }),
+      )
+    )
+      return;
     confirmFacilityUpgrade(
       {
         facilityLabel,
@@ -239,8 +248,32 @@ export function ClubOfficeScreen({ navigation, route }: ScreenProps<'ClubOffice'
   };
 
   return (
-    <Screen scroll scrollRef={sponsorScrollRef} gradient={gradients.pitch}>
+    <Screen scroll careerNavigation scrollRef={sponsorScrollRef} gradient={gradients.pitch}>
       <ScreenHeader title="Club Office" subtitle={team.name} onBack={() => navigation.goBack()} />
+
+      <View style={styles.quickLinks}>
+        <Button
+          label="Medical Centre"
+          variant="secondary"
+          fullWidth={false}
+          style={styles.quickLink}
+          onPress={() => navigation.navigate('MedicalCentre')}
+        />
+        <Button
+          label="Youth Academy"
+          variant="secondary"
+          fullWidth={false}
+          style={styles.quickLink}
+          onPress={() => navigation.navigate('Academy')}
+        />
+        <Button
+          label="Wage Ledger"
+          variant="secondary"
+          fullWidth={false}
+          style={styles.quickLink}
+          onPress={() => navigation.navigate('WageBreakdown')}
+        />
+      </View>
 
       {stadiumClub && groundSummary ? (
         <>
@@ -361,11 +394,13 @@ export function ClubOfficeScreen({ navigation, route }: ScreenProps<'ClubOffice'
         </ImageBackground>
       )}
 
-      <View onLayout={(event) => {
-        if (route.params?.focusSponsor) {
-          sponsorScrollRef.current?.scrollTo({ y: event.nativeEvent.layout.y, animated: false });
-        }
-      }}>
+      <View
+        onLayout={(event) => {
+          if (route.params?.focusSponsor) {
+            sponsorScrollRef.current?.scrollTo({ y: event.nativeEvent.layout.y, animated: false });
+          }
+        }}
+      >
         <Text style={styles.section}>Kit Partnership</Text>
       </View>
       <Card style={styles.sponsorCard}>
@@ -674,6 +709,13 @@ export function ClubOfficeScreen({ navigation, route }: ScreenProps<'ClubOffice'
 
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    quickLinks: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    quickLink: { flexGrow: 1, flexBasis: 140 },
     officeHero: {
       minHeight: 64,
       marginTop: spacing.sm,

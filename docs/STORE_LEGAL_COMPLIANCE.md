@@ -8,6 +8,9 @@ Status date: 2026-08-20
 > about Firebase being absent, hosting pending and Console setup pending are
 > superseded there. Legacy subscription/product notes also require the current
 > approved product rules; this historical audit is not today's release checklist.
+> For the 21–22 October iOS port, website clarification and complete Apple form
+> worksheet, use `IOS_PORT_2026-10-21.txt` and `how-to/CRICKET_CONFIGURATION.txt`.
+> iOS provider, tracking/deletion, signing and device gates remain explicit there.
 
 This is an engineering compliance audit, not legal advice. Final policy wording
 must be approved by the developer's legal adviser and must match the production
@@ -136,6 +139,37 @@ Families answers, AdMob Privacy & messaging, Data safety and on-device SDK
 behavior against the actual release bundle before production. In particular,
 verify teen rewarded/interstitial creative closeability and content against
 Google Play Families ad-format requirements before releasing this path.
+
+### Android Unity bidding integration (19 October 2026, verification incomplete)
+
+Android now pins Unity SDK 4.16.6 and Google adapter 4.16.6.0 to the existing
+Google Ads 24.9.0 runtime. Unity automatic startup is deferred behind the age/UMP
+gate; native privacy metadata is applied before mediated initialization and
+after privacy changes. Unknown/unsupported vendor permission remains opted out
+of Unity personalization. Existing age eligibility, rewarded payouts, purchase
+benefits and ad-frequency rules are not changed.
+
+Offline/web policies and the root seller file were updated. The owner then
+approved website deployment: Cloudflare deployment `eb5da5bb`, verified against
+all 20 live public files on 19 October 2026. This does not certify provider
+crawler approval or activate production mediation. EU and US screenshots confirm
+Unity in both partner lists. On 20 October the owner supplied the correct app's
+row: "CricketPM – US privacy choices", Cricket: Player & Manager, English
+(en-US), modified 19 October 2026, Published. This confirms the supplied console
+publication state, not an on-device US-region CMP test. Unity teen-content
+controls, provider crawler status and store declarations still require
+verification. The owner later approved reusing existing units and supplied console
+screenshots confirming only CricketPM_Android_Rewarded enabled, with AdMob
+Network retained and Unity Ads enabled/partnership Active. Separate QA ad units
+are an isolation option, not mandatory. Existing-unit Google test ads have
+loaded/shown/earned once/closed without game grants. After configuration refresh,
+the same QA APK reported UnityMediationAdapter READY; Unity-only REWARDED
+testing loaded/showed a Unity test creative, earned once and closed with no
+game grants. An automatic Play sign-in detour was backed out of without
+sign-in/Install; it is documented in the report. Banner/interstitial serving,
+teen creative behavior and production revenue are not certified by this pass.
+Other groups/apps remain unchanged; no new AAB is authorized.
+See `docs/UNITY_ADMOB_INTEGRATION_2026-10-19.txt` for exact tests and gates.
 
 ## Release blockers
 

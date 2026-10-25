@@ -1,0 +1,127 @@
+CRICKET: PLAYER & MANAGER — ANDROID PRODUCTION AAB
+25 October 2026, Asia/Kolkata | BUILT AND LOCALLY VERIFIED, not submitted
+======================================================================
+
+SUPERSEDED BY LATER SOURCE FIXES — DO NOT UPLOAD THIS CODE21
+==========================================================
+The subsequent owner-authorized deep audit fixed storage-pressure cleanup,
+career creation partial failure and asynchronous ad/reward edge cases.
+Code21 below does NOT contain those fixes. Its verification remains historical;
+no replacement AAB or upload was authorized/performed during that audit.
+See docs/DEEP_AUDIT_2026-10-25.txt for current source status and verification.
+All original build facts below are preserved; "AAB TO USE" is historical now.
+
+AAB TO USE
+==========
+/Users/divakarmishra/Desktop/APP/cricketlegacy/output/production-1.0.12/cricket-player-manager-1.0.12-vc21.aab
+Bytes: 111,415,776 (approximately 106.3 MiB)
+SHA256: dc92efde0a0460539956a1db1130328046be06ea126cc520e841df3c721cb648
+EAS FINISHED at 2026-10-24 22:32:30 UTC / 25 October 04:02:30 IST.
+Downloaded file locally verified at 25 October 11:13–11:14 IST. Earlier transfer
+timed out; successful resumable IPv4 HTTP/1.1 retry used the SAME build/artifact.
+No duplicate build was started. ZIP integrity check PASS. Old code20 retained
+unchanged (SHA256 0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4).
+
+ACTUAL ARTIFACT VERIFICATION
+============================
+PASS jarsigner signature and established production upload certificate:
+  DA:68:BA:1D:9A:56:DB:FE:70:92:18:AB:68:E8:78:19:D6:8E:08:F2:EC:37:ED:3D:92:29:64:22:2D:C6:84:20
+PASS bundletool validate; com.coverdrive.cricket, version 1.0.12 / code21,
+  min24 / target36, not debuggable, allowBackup=false, no broad external-storage
+  or microphone permission. Standalone Hermes bundle 8,238,768 bytes; R8 map
+  and native payment-recovery module included.
+PASS all 52 arm64-v8a/x86_64 libraries have 16KB-compatible ELF load alignment.
+  Included ABIs: arm64-v8a, armeabi-v7a, x86, x86_64.
+PASS compiled QA_TOOLS_ENABLED=false, purchase MOCK_MODE=false, ad simulation
+  false. QA native diagnostics absent. Negative control correctly rejects QA30.
+PASS production ad IDs, public service configuration and four legal URLs
+  embedded; no provider secrets/keys printed by verification. Unity consent gate
+  retained, automatic initializer absent. Rating/recovery markers retained.
+PASS actual bundle contains new attributes-popup/title/replay and Match energy
+  markers. Full compiled gameplay correctness is not inferred from string checks.
+PASS final 1,190-input source comparison after download: no drift.
+  Source aggregate SHA256:
+  9f95c23a14ade53cc5c64742563f8626028c9e9acbb216e4483cf955cb4434e9
+
+Release notes are output/production-android-2026-10-25/release-notes.txt. They do
+not mention mediation. Play upload/submission/rollout remains the owner's next
+action, not performed here. Install/test the Play-delivered update before a
+public rollout; existing coverage limits below remain, not relabeled as passes.
+
+AUTHORIZATION AND SCOPE
+Owner reported QA30 was good and requested the production AAB. That is owner
+approval of the emulator iteration, not an independent full device test claim.
+Package only: no Play upload/submission/rollout, website/backend/provider change,
+purchase, save operation or emulator/phone interaction in this pass.
+
+BUILD IDENTITY
+EAS build: 5ca837ef-2403-406b-a0da-33b30037ccd9
+https://expo.dev/accounts/sunlightpvt/projects/cricket-legacy/builds/5ca837ef-2403-406b-a0da-33b30037ccd9
+Android package: com.coverdrive.cricket
+Existing user-facing version retained: 1.0.12
+EAS remote production counter advanced from 20 to 21, verified in build output.
+Profile production, distribution STORE, channel production, app-bundle output.
+Existing remote credentials reused with --freeze-credentials; no key rotation.
+QA tools false; NODE_ENV=production for compilation. No auto-submit flag.
+Code30 is the local debug-signed QA APK counter, not a production version code.
+Older AABs and QA APKs preserved; do not upload the old code20 by mistake.
+
+VERIFIED QUALITY AND INPUTS
+Final npm run check:release exited 0 with NODE_ENV=test: public distinct legal
+URLs reachable/content-verified, TypeScript PASS, quiet lint PASS, 299 Jest
+suites / 2,267 tests / 2 snapshots PASS. Final Jest duration 89.469 seconds.
+Separate platform-key regression: 2 suites / 8 tests PASS. Node EAS/iOS config:
+10 tests PASS. git diff --check PASS. These are host results, not physical QA.
+Earlier pre-fix full gate also passed 298 suites / 2,263 tests; final run above
+supersedes it. QA30's 18 native consent tests are historical, not rerun here.
+
+Prepared archive via EAS build:inspect --stage archive --profile production.
+All 1,190 captured source/asset/native/build inputs match the prepared archive.
+No actual files from .env/.env.local/.env.production, credentials.json, agent
+configuration, signing keystores, output, test-artifacts or native build output
+were included. Empty excluded directories are not treated as private files.
+Input comparison after production initiation: no source drift. Compare again
+at handoff. Source/asset evidence captures app.config.js and .easignore too.
+
+BUILD CONFIGURATION CORRECTION
+EAS initially rejected ALL commands because ios-simulator.env contained an
+empty EXPO_PUBLIC_REVENUECAT_IOS_KEY. Replaced the empty value with explicit
+EXPO_PUBLIC_REVENUECAT_IOS_DISABLED=true. The Apple-key selector returns empty
+when this flag is true, including if preview env supplies a real Apple key.
+Otherwise existing Apple-key selection is unchanged. Android-key expression,
+Android production profile, iOS production profile and real keys unchanged.
+Tests cover all three flag states, missing keys, no Android effect, no flag
+leak into production profiles, and non-empty env strings in every EAS profile.
+Only src/config/monetization.ts differs among runtime inputs since approved
+QA30, solely for this Apple-specific disabled flag; no gameplay/guide changes.
+The old read-only version lookup stalled and was stopped after the real build
+successfully recorded code21. No duplicate production build was started.
+
+LOCAL EVIDENCE
+output/production-android-2026-10-25/
+  archive/; archive-verification.json; prior-builds.json
+  quality.log; quality-summary.json
+  source-inputs.json; source-comparison.json
+  release.cjs; build-request.json; build-start.log; build-latest.json
+Fresh focused config logs: /private/tmp/cricket-production-2026-10-25-
+{config-tests,eas-tests}.log. Final host log mirrored into quality.log above.
+  download.json; artifact-summary.json; bundletool-validation.txt; manifest.xml
+  index.android.bundle; mapping.txt; production-flags.json
+  compiled-qa-tools-disabled.txt; compiled-purchases-mock-disabled.txt
+  compiled-ad-simulation-disabled.txt; qa-flag-negative-control.json
+  approved-content-check.json; release-notes.txt
+Signature/bundle/manifest/alignment/compiled-flag checks completed above. These
+are local artifact checks, not a final Play-signed install or native device pass.
+
+RELEASE BOUNDARY
+A generated/validated AAB is not proof of current private Play declarations or
+every provider outcome. Existing real test-card checkout and owned VIP restore
+passed on the documented same-install QA (docs/PLAY_VIP_CHECKOUT_RESTORE_2026-10-24.txt).
+Fresh owned-purchase/device/account restoration, two distinct Google accounts,
+teen Unity creative fill/content, affected Oppo devices and long-duration memory
+certification remain separate; do not silently turn earlier limits into passes.
+Data safety CSV/provider reconciliation not changed: the chosen full-Unity
+collection scenario still relies on the owner's enabled assumption, not an
+observed account flag. No new declaration import/save/submission is claimed.
+Use a Play test track for final Play-signed delivery/upgrade/service checks before
+public rollout. This packaging request does not authorize publishing the app.

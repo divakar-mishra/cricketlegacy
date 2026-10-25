@@ -1,0 +1,120 @@
+CRICKET: PLAYER & MANAGER - DATA SAFETY FOLLOW-UP
+21 October 2026 | com.coverdrive.cricket | production 1.0.12 / versionCode 20
+
+RESULT
+
+The two inherited answers have been corrected. The only remaining provider-
+configuration question is Unity Acquire Optimization. The owner cannot find
+that setting. No supplied screen, existing log or available integration proves
+its current state. Neither Developer Data nor a missing purchase key establishes
+it. No provider settings, consent choices or terms were changed.
+
+There is still NO unconditionally approved final import CSV. Both complete
+variants below are conditional review artifacts, not alternative guesses to
+submit. Import neither until the applicable condition is verified. The
+unconfirmed file intentionally retains the unanswered Required/Optional item.
+
+FILES
+
+Corrected review, with the one unknown left explicit:
+  docs/data-safety-UNITY-UNCONFIRMED-DO-NOT-IMPORT-2026-10-21.csv
+Complete follow-ups only if Acquire is verified OFF and the optional cloud/
+telemetry baseline uses service-provider handling without another sharing path:
+  docs/data-safety-CONDITIONAL-ACQUIRE-OFF-2026-10-21.csv
+Complete follow-ups only if Acquire is verified ON without a universal opt-out:
+  docs/data-safety-CONDITIONAL-ACQUIRE-ON-2026-10-21.csv
+Hashes, exact changes, assumptions and validation:
+  docs/data-safety-review-validation-2026-10-21.json
+
+The original Downloads/data_safety_export (2).csv and October 20 draft are
+unchanged. This note supersedes their unresolved inherited-answer discussion;
+it does not erase the historical evidence or certify unrelated inherited fields.
+
+WHAT CHANGED
+
+1. Approximate location: removed Personalization for collection and sharing.
+   There is no identified use of real location to customize the game's content.
+   Advertising purposes remain; ad targeting is not this separate purpose.
+2. Other app performance data: deselected the catch-all category and cleared all
+   its follow-ups. Retained Crash logs and Diagnostics. The identified technical
+   metrics map to Diagnostics, not a second undifferentiated performance bucket.
+
+These are 13 response-value changes from the October 20 draft. The conditional
+OFF file adds one answer; ON adds seven. Compared with the untouched original,
+the total changes are respectively 28, 29 and 35. All have 10 selected types.
+
+CURRENT-BUILD EVIDENCE AND LIMITS
+
+Current telemetry.ts/crash.ts/analytics.ts were inspected: separate opt-ins,
+fixed event fields and sanitized errors, rather than an assumed historical
+Firebase configuration. No active Firebase Performance import/initialization
+was found. The actual production R8 map has 0 com.google.firebase.perf classes,
+12 analytics classes, 224 crashlytics classes and 1093 com.unity3d.ads classes.
+The generic Firebase package's transitive web-performance dependency is not
+evidence of an initialized performance service in this Android app.
+
+Unity's disclosure identifies Diagnostics but not Other app performance data.
+RevenueCat does not identify a performance-data stream. Google's listed ad-SDK
+technical metrics fit Play's Diagnostics definition. This last category mapping
+is an engineering inference from the identified streams, not a network capture
+proving absence of every possible SDK field. The Google guide currently covers
+25.5.0, whereas this build uses 24.9.0; it is NOT exact-version certification.
+No extra reporting feature was enabled to resolve that difference.
+
+THE ONE REMAINING UNITY QUESTION
+
+Unity describes app-usage retention collection as conditional on Acquire
+Optimization. With it OFF, the reviewed optional gameplay backup/telemetry path
+supports optional collection. With it ON, the prepared variant includes required
+collection/sharing and the applicable ad-related purposes. A complete CSV is
+not proof that either scenario describes this account.
+
+Do not revisit Developer Data, accept a DPA, grant Ads access, change Families/
+child-directed designation, or enable extra processing to answer this question.
+If no current UI exposes the flag, send Unity support this read-only request:
+
+  For Android Game ID 800404108, package com.coverdrive.cricket, project
+  91b6305d-eb92-4481-a41e-12b20c71ea33, is the app-usage/retention collection
+  described as Acquire Optimization in your Google Play Data safety guide
+  currently enabled? We use Unity Ads SDK 4.16.6 through AdMob bidding, not
+  the Unity engine. Please confirm the current state and where to inspect it
+  without changing Developer Data or accepting new terms.
+
+After that confirmation, verify the applicable variant's assumptions, save a
+separately named final copy, back up the current Console declaration, import,
+inspect Preview and have the owner approve submission. Re-export to confirm
+the saved answers. This pass does not submit or alter any Console declaration.
+
+REPRODUCIBLE CHECKS
+
+  node --test scripts/testPlayDataSafety.cjs
+  node scripts/preparePlayDataSafetyReview.cjs --check
+  node scripts/checkPlayDataSafety.cjs <CSV path>
+
+PASS: 10 offline tests, including malformed CSV/contradiction negative controls;
+782 response rows, five columns, unique keys, quoted/multiline round-trip,
+unchanged question IDs/response IDs/labels/order/requirements, and clearing of
+inactive follow-ups. Independent Ruby CSV parsing also verified all three
+saved files against the original export. Both variants have complete selected-type
+follow-ups; all readiness flags deliberately remain false. Focused helper lint
+and git diff --check pass. No game-wide tests or new device tests were claimed.
+Only a provider's evidence can close the configuration question, not this tool.
+
+Production AAB is unchanged (no rebuild needed for CSV-only work):
+  output/production-1.0.12/cricket-player-manager-1.0.12-vc20.aab
+  SHA256 0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4
+Original export SHA256 is unchanged:
+  edc162ea9405c9001fb1a2265c786f3295352d44c286c341b48569905fbe4c92
+
+PRIMARY REFERENCES RECHECKED
+
+Google Play types, purposes and CSV definitions:
+https://support.google.com/googleplay/android-developer/answer/10787469?hl=en
+Unity Ads disclosures and Acquire condition:
+https://docs.unity.com/en-us/grow/ads/privacy/google-data-safety
+Google Mobile Ads disclosure (version limitation noted above):
+https://developers.google.com/admob/android/privacy/play-data-disclosure
+RevenueCat disclosure:
+https://www.revenuecat.com/docs/platform-resources/google-platform-resources/google-plays-data-safety
+Firebase SDK disclosure:
+https://firebase.google.com/docs/android/play-data-disclosure

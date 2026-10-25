@@ -18,10 +18,8 @@ import {
   Button,
   Card,
   CupCard,
-  HubTabBar,
   Icon,
   MechanicInfoButton,
-  ModeGuideModal,
   NewspaperModal,
   RewardModal,
   RewardModalData,
@@ -32,6 +30,7 @@ import {
 } from '../components';
 import { AppText as Text } from '../components/AppText';
 import { ManagerAppointmentPaper } from '../components/ManagerAppointmentPaper';
+import { HubEngagementPrompts } from '../components/HubEngagementPrompts';
 import { getAchievement } from '../game/achievements';
 import { ManagerStepType, resolveNextCareerStep } from '../game/careerStep';
 import { activeCompetitionTable } from '../game/competitionTable';
@@ -49,10 +48,10 @@ import { activeSponsorBranding, sponsorshipOffers } from '../game/sponsorship';
 import { isDeadlineDay } from '../game/transferMarket';
 import { useIsCompact } from '../hooks/useResponsive';
 import { useManagedTimers } from '../hooks/useManagedTimers';
-import { useT } from '../i18n';
 import { ScreenProps } from '../navigation';
 import { persistenceErrorMessage, useCareer } from '../state/careerStore';
-import { useSettings } from '../state/settingsStore';
+import { GuideTarget, GuideReplayButton, useGuidePending } from '../components/CareerGuide';
+import { guideAction } from '../game/coachGuide';
 import {
   fonts,
   fontSize,
@@ -79,39 +78,6 @@ const MANAGER_HOME_MATERIALS = {
   pitchSuccess: '#54B63F',
 } as const;
 
-const MANAGER_GUIDE_STEPS = [
-  {
-    icon: 'home' as const,
-    title: 'Use Continue',
-    body: 'Your next step.',
-  },
-  {
-    icon: 'calendar' as const,
-    title: 'Follow the domestic year',
-    body: 'Competition blocks.',
-  },
-  {
-    icon: 'people' as const,
-    title: 'Prepare the XI',
-    body: 'Set your XI and batting order.',
-  },
-  {
-    icon: 'analytics' as const,
-    title: 'Build a match plan',
-    body: 'Set and adapt tactics.',
-  },
-  {
-    icon: 'swap-horizontal' as const,
-    title: 'Recruit with evidence',
-    body: 'Scout before signing.',
-  },
-  {
-    icon: 'business' as const,
-    title: 'Run the club',
-    body: 'Facilities, staff and academy.',
-  },
-] as const;
-
 const ordinal = (n: number): string => {
   const s = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
@@ -135,7 +101,6 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   const pendingAchievementIds = useCareer((s) => s.pendingAchievementIds);
   const markNewspaperSeen = useCareer((s) => s.markNewspaperSeen);
   const clearPendingAchievements = useCareer((s) => s.clearPendingAchievements);
-  const t = useT();
   const { gradients, colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const compact = useIsCompact();
@@ -148,9 +113,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
   const timers = useManagedTimers();
   const [toastIdx, setToastIdx] = useState(0);
   const prevPendingLenRef = useRef(-1);
-  const dismissedTips = useSettings((s) => s.dismissedTips);
-  const dismissTip = useSettings((s) => s.dismissTip);
-  const showManagerGuide = !dismissedTips.includes('manager_hub_guide');
+  const showManagerGuide = useGuidePending('manager.home');
 
   useFocusEffect(
     useCallback(() => {
@@ -514,44 +477,10 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
       )}
       <Screen
         scroll
+        guide={{ chapter: 'manager.home', enabled: !sacked && !isNationalManager && !save.managerAppointmentPending &&
+          !rewardModal && !selectedNewspaper && !calendarSimulation && !save.experience?.pendingNewspaperId && pendingAchievementIds.length === 0 }}
         gradient={gradients.pitch}
-        footer={
-          <HubTabBar
-            tabs={[
-              {
-                key: 'home',
-                icon: 'home',
-                label: t('hub.tabHome'),
-                active: true,
-                onPress: () => {},
-              },
-              {
-                key: 'club',
-                icon: 'briefcase',
-                label: 'Club',
-                onPress: () => navigation.navigate('ClubOffice'),
-              },
-              {
-                key: 'store',
-                icon: 'cart',
-                label: t('hub.tabStore'),
-                onPress: () => navigation.navigate('Purchase'),
-              },
-              {
-                key: 'academy',
-                icon: 'school',
-                label: 'Academy',
-                onPress: () => navigation.navigate('Academy'),
-              },
-              {
-                key: 'records',
-                icon: 'trophy',
-                label: 'Standings',
-                onPress: () => navigation.navigate('Records'),
-              },
-            ]}
-          />
-        }
+        careerNavigation
       >
         <ScreenHeader
           title="Manager Career"
@@ -616,7 +545,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
           </Card>
         ) : null}
 
-        <View
+        <GuideTarget id="next-step" focusHeight={140}><View
           style={[styles.fixtureTicket, !showFixtureTicket && styles.deskTicket]}
           accessible
           accessibilityLabel={
@@ -714,7 +643,7 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
             </View>
           )}
           <View style={styles.ticketBottomRule} />
-        </View>
+        </View></GuideTarget>
 
         {nextStep.action === 'OPEN_JOB_SEARCH' ? (
           <Card style={styles.sackedCard}>
@@ -741,11 +670,12 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
           </View>
         )}
 
+        <GuideReplayButton chapter="manager.home" />
         <SeasonPassHomeCard />
 
         {/* Dressing-room actions preserve every existing destination. */}
         {!sacked ? (
-          <View style={styles.navGrid}>
+          <GuideTarget id="manager-actions" focusHeight={100}><View style={styles.navGrid}>
             {(
               [
                 { key: 'squad', icon: 'people', label: 'Team Sheet', to: 'Squad' },
@@ -797,20 +727,21 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
                   | 'TransferDeadlineDay';
               }[]
             ).map((tile) => (
-              <Pressable
+              <GuideTarget key={tile.key} id={tile.key === 'training' ? 'training' : `manager-${tile.key}`}
+                style={[styles.navTile, compact && styles.navTileCompact]}><Pressable
                 key={tile.key}
-                style={[styles.navTile, compact && styles.navTileCompact]}
+                style={{ alignItems: 'center', gap: spacing.xs, width: '100%' }}
                 accessibilityRole="button"
                 accessibilityLabel={tile.label}
-                onPress={() => navigation.navigate(tile.to)}
+                onPress={() => { if (tile.key === 'training') guideAction('open-manager-training'); navigation.navigate(tile.to); }}
               >
                 <Icon name={tile.icon} size={24} color={colors.accentLight} />
                 <Text style={styles.navTileLabel} numberOfLines={1}>
                   {tile.label}
                 </Text>
-              </Pressable>
+              </Pressable></GuideTarget>
             ))}
-          </View>
+          </View></GuideTarget>
         ) : null}
 
         {leadershipNeedsReview ? (
@@ -983,13 +914,11 @@ export function ManagerHubScreen({ navigation }: ScreenProps<'ManagerHub'>) {
         </View>
       </Modal>
       <AchievementToast achievement={currentToast} onDismiss={onDismissToast} />
-      <ModeGuideModal
-        visible={showManagerGuide}
-        modeLabel="Manager Career"
-        steps={MANAGER_GUIDE_STEPS}
-        onComplete={() => dismissTip('manager_hub_guide')}
-      />
       <RewardModal data={rewardModal} onClose={() => setRewardModal(null)} />
+      <HubEngagementPrompts
+        eligible={!showManagerGuide && !rewardModal && !selectedNewspaper &&
+          !save.experience?.pendingNewspaperId && !calendarSimulation && pendingAchievementIds.length === 0}
+      />
     </>
   );
 }

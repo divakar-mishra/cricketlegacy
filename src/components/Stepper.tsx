@@ -10,8 +10,11 @@ import {
 } from '../theme';
 import { AppText as Text } from './AppText';
 import { ProgressBar } from './ProgressBar';
+import { GuideTarget } from './CareerGuide';
+import { guideAction } from '../game/coachGuide';
 
 type Props = {
+  guideIncreaseId?: string;
   label: string;
   description?: string;
   value: number;
@@ -26,6 +29,7 @@ type Props = {
 };
 
 export function Stepper({
+  guideIncreaseId,
   label,
   description,
   value,
@@ -58,13 +62,19 @@ export function Stepper({
       <View style={styles.controls}>
         <StepButton symbol="-" label={`Decrease ${label}`} onPress={onDec} enabled={canDec} />
         <Text style={styles.value}>{displayValue ?? value}</Text>
-        <StepButton
+        {guideIncreaseId ? <GuideTarget id={guideIncreaseId}><StepButton
           symbol="+"
           label={`Increase ${label}`}
-          onPress={onInc}
+          onPress={() => { if (!canInc) return; onInc(); if (guideIncreaseId) guideAction('attribute-increased'); }}
           enabled={canInc}
           highlight
-        />
+        /></GuideTarget> : <StepButton
+          symbol="+"
+          label={`Increase ${label}`}
+          onPress={() => { if (canInc) onInc(); }}
+          enabled={canInc}
+          highlight
+        />}
       </View>
     </View>
   );

@@ -1,0 +1,4 @@
+Fast XCTest input trial 1: bat
+Fast XCTest input trial 2: bat
+Fast XCTest input trial 3: bat
+Paced XCTest input: bat

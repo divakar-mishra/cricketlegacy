@@ -1,0 +1,248 @@
+CRICKET: PLAYER & MANAGER — DEEP SOURCE / EDGE-CASE AUDIT
+25 October 2026, Asia/Kolkata
+========================================================
+
+OUTCOME
+-------
+Owner requested a broad game audit after repeated patches, then explicitly
+authorized fixing confirmed defects with regression tests. Source fixes are
+complete and the automated gates below PASS. No production build, APK install,
+purchase, account action, backend/provider/website deployment or store submission
+was performed. Existing user/iOS work was preserved.
+
+IMPORTANT: production AAB 1.0.12/code21 predates these fixes. DO NOT UPLOAD it as
+the fixed candidate. Its bytes/signature remain unchanged; a replacement AAB
+requires owner approval and a fresh artifact/upgrade verification.
+
+This is substantial host/source coverage, not a claim that every line, every
+random seed, every live provider response or every device screen is bug-free.
+
+CONFIRMED DEFECTS AND FIXES
+--------------------------
+1. Storage-pressure retry leak — persistence reliability risk
+   src/storage/storage.ts:setJSON
+   Large saves stage a new chunk generation before atomically publishing its
+   manifest. Failed publication previously left those uncommitted chunks behind.
+   Three 600k-character retries reproduced nine orphan rows (about 1.8M retained
+   characters). The last good value remained readable; no corruption is claimed.
+   Repeated retries could consume more capacity exactly when storage was full.
+   FIX: reclaim only the failing write's staged generation. Preserve committed
+   chunks when a bridge rejection occurs after commit, or commit cannot safely
+   be checked. Cleanup failure must not mask the original write error.
+   Tests cover small/large previous values, partial batch failure, three retries,
+   unrelated saves, successful later retry, ambiguous committed writes and
+   cleanup/read failures. No broad garbage collection or save migration added.
+   Limits: cannot guarantee cleanup after OS process death or a native cleanup
+   failure; existing orphan generations are not blindly swept from user data.
+
+2. False failed-creation message / duplicate-career retry — both modes
+   src/screens/PlayerCreationScreen.tsx:create
+   src/screens/TeamSelectScreen.tsx:create
+   The first career write could succeed, followed by failure of the optional
+   last-played pointer. The UI then incorrectly said the career was not created.
+   Retrying reproduced a second save in another slot in Player and Manager.
+   FIX: a confirmed career write remains successful even if resume metadata
+   fails; activate it and open its Home. Actual first-write failure still blocks
+   activation and retains a retry. Same-frame duplicate guards are preserved.
+   This is a fix for the demonstrated optional-pointer failure, not a blanket
+   guarantee that every possible native storage failure is unambiguous.
+
+3. Delayed match-ad reward could credit another career
+   src/screens/MatchScreen.tsx:result reward callback
+   src/state/careerStore.ts:grantAdReward
+   Start result-screen rewarded loading in Player A, leave and open Manager B,
+   complete the old ad: B incorrectly received A's 100-coin bonus in the repro.
+   FIX: capture the requesting save ID before awaiting the provider and reject
+   delivery if a different career is active. Reject non-finite amounts before
+   consuming a transaction. Same-save duplicate delivery remains idempotent.
+   An interrupted request cannot spend another save's claim. A rejected call
+   does not mark either save's transaction as claimed; automatic delivery to an
+   inactive career is not promised. This matches the existing energy-ad cross-save
+   safety policy. Native ad errors now show a retry message
+   and always release the button's busy guard rather than reject unhandled.
+
+4. Concurrent Home interstitials bypassed the loading-time frequency check
+   src/services/ads.ts:maybeShowInterstitial
+   Two concurrent requests read identical old history and both created native
+   ads. The new test failed with two creations where one was expected.
+   FIX: synchronously reserve the Home request before any storage/consent/network
+   await; release in finally, including no-fill/error and skipped/capped paths.
+
+5. Failed interstitial-history persistence bypassed the in-memory spacing limit
+   src/services/ads.ts:maybeShowInterstitial
+   With a 20-minute-old stored timestamp, an ad was shown but history writing
+   failed. The next call preferred the stale stored timestamp over the newer
+   in-memory value and created another ad immediately. Reproduced by test.
+   FIX: use the newer of in-memory and stored timestamps. The approved four/hour
+   and 15-minute policy is unchanged; invalid non-array history is ignored safely.
+   A process restart cannot recover an ad timestamp the device never persisted.
+
+6. Loading interstitial had no navigation/current-VIP revalidation
+   src/screens/CareerHubScreen.tsx:focus effect
+   src/services/ads.ts:showInterstitial/showRealInterstitial
+   Source inspection confirmed that eligibility was captured only at request
+   time, while actual presentation happened later. Leaving Home or obtaining
+   ad removal during loading did not invalidate that request.
+   FIX/HARDENING: revalidate focus, exact career identity and current ad-removal
+   entitlement before loading/presentation. Discard a stale loaded ad without
+   showing it or consuming the frequency cap. Controlled provider tests cover
+   all three eligibility changes; existing age/privacy revision guards remain.
+
+No changes to match odds, training/energy values, prices, product benefits,
+selection rules, fixtures, saved-state schema, native code, provider credentials,
+store metadata, Android/iOS build profiles or iOS-specific configuration.
+
+WHY THE PREVIOUS GREEN SUITE WAS NOT ENOUGH
+-----------------------------------------
+The pre-fix 299-suite / 2,267-test baseline passed. It did not assert these
+specific cross-await and partial-failure invariants. The new diagnostics first
+failed on the original code: four creation assertions, one wrong-save reward
+assertion, one chunk-leak assertion and two interstitial assertions.
+Those reproductions now pass. Twenty-two additional assertions/test cases are
+in the regular src test suite so the fixes are checked on normal future runs.
+Three diagnostic scripts are also retained outside the default match for the
+specific original failures; source-text UI checks are not described as device QA.
+
+VERIFIED TEST RESULTS
+---------------------
+Final complete standard suite, after all runtime fixes:
+  299 suites / 2,289 tests / 2 snapshots PASS, 127.696 seconds.
+  Core coverage (game/engine/state/storage/services .ts only):
+    Lines       83.59% (12,098/14,473)
+    Statements  79.67% (13,634/17,112)
+    Functions   85.68% (2,418/2,822)
+    Branches    69.87% (11,254/16,105)
+  These figures exclude most UI .tsx/hooks and do not mean whole-app coverage.
+
+Final extended resolver/storage/diagnostic run:
+  5 suites / 83 tests PASS, 226.351 seconds. Separate from default suite.
+Focused changed-system gate: 6 suites / 163 tests PASS (overlaps full suite).
+Fresh npm run typecheck; npm run lint -- --quiet; git diff --check PASS.
+
+Full-career stress simulation:
+  Eight Player careers: two seeds each Batter, Bowler, All-Rounder, Keeper-Batter.
+  Two Manager careers. Normal difficulty, earned currency spending, no IAP/ads.
+  All reached retirement: Player age37 after21 seasons; Manager age60 after25.
+  218 total seasons; 9,691 career results; zero report errors or warnings.
+  Uses canonical Instant Sim completion with controlled/mocked I/O, not a native
+  Watch/Key Moments/UI run. Completed before source fixes; all game/engine files
+  remained byte-identical to the candidate, and these fixes do not change that
+  simulation's engine/progression paths. No ten-device/ten-account claim.
+
+Native Reanimated stale-view harness:
+  Patched implementation 12/12 PASS; vulnerable negative control fails7/12 as
+  intended. Host JVM/fixture evidence, not proof an Oppo ANR/SIGKILL is resolved.
+
+Asset audit PASS: 382 files, 27.54MB; 366 images, 23.88MB compressed.
+  The all-PNG decoded upper bound is170.52MB IF simultaneously resident. This
+  is not measured resident memory, a leak diagnosis or proof of optimization.
+
+Public production legal URLs and Publisher page: reachable/content-verified PASS.
+  Initial bare check lacked production URL env; sandboxed retry could not reach
+  the network. Read-only retry using existing production public URLs outside
+  that sandbox passed. No policy/site publication or declaration was changed.
+
+AUDIT MAP — WHAT WAS EXERCISED
+-----------------------------
+Creation / guides / UI navigation:
+  Mandatory name/country/appearance/role choices; gender/portrait reset;
+  attributes static popup and point retention; Manager country/club selection;
+  duplicate taps; durable first save; unavailable/corrupt/full slots; navigation
+  destinations, guide/modal queue, safe-area/footer and source layout regressions.
+  These are component/router/source tests, not a fresh native visual walkthrough.
+
+Player progression / matches:
+  Country and role variants; all four difficulties in the resolver audit;
+  zero-wallet training alternatives; injured/low-form seniors; youth/U19 and
+  domestic/international calendars; selected/benched authority; duplicate/stale
+  finalization; caps/stats/tables/reward/sponsor exactly-once guards; retirement.
+  Standard tests also cover live innings, toss, formats, replay, match authority,
+  selection, rankings/records, contract and youth/gender roster behavior.
+
+Manager progression / club systems:
+  Club/State/Elite/National; ten-year resolver flow; minimum/injured XI, stale XI,
+  expired loans/loan-only squads; press/story orphan state; sacking/reappointment;
+  club switching/retained infrastructure; finances, upgrades, contracts,
+  sponsorship, training, academy, stadium/tickets and leadership regressions.
+
+Energy / wallet / off-field economy:
+  Real production-mode regen and match prices; free/VIP caps; eight-point ad
+  reward; partial countdown/boundary and backward clock; no automatic world
+  mutation on each second; paid zero-gain training blocked; stocks/holdings,
+  loans and money/mode isolation. Values were not rebalanced during this audit.
+
+Purchases / restore / paid benefits:
+  All14 currently sold product IDs covered by interrupted-delivery tests,
+  including currency, both VIPs/bundles, coaching/focus, transfer funds and
+  Manager action tokens. Reload/recovery grants once after save-write failure;
+  late purchases stay bound to the original save; uncertain checkouts retain
+  their journal; restores do not replay consumable rewards; mode/expiry and
+  permanent-vs-timed ad removal remain separate. No missing paid grant found
+  in these exercised cases. Store/RevenueCat/native billing use controlled
+  fixtures; no actual purchase/charge/restore was attempted this turn.
+
+Persistence / recovery / lifecycle:
+  Authenticated encryption, key loss/tamper/legacy migration, rolling backup,
+  queued writes, corruption/occupied slots, Unicode/chunk ordering/partial writes,
+  deletion not resurrected, import/account switch during awaits, offline retry,
+  newer-local-vs-remote and pending purchase/import guards. Auth/cloud tests use
+  controlled provider responses; no new real two-account verification occurred.
+
+Ads / privacy:
+  Consent unavailable/withdrawn; adult/teen restrictive treatment; stale audience
+  revision; async native show rejection; duplicate loaded/earned/closed events;
+  no-fill and timeout cleanup; VIP removal, Home-only presentation and the new
+  cross-save/loading/frequency guards. Native creatives/fill are NOT certified.
+
+REMAINING HONEST LIMITS / NEXT RELEASE GATE
+------------------------------------------
+No fresh native build/install or on-device soak of these fixes has occurred.
+The owner's previously approved QA30 and historical Play checkout evidence stay
+historical; code21 still has the audit defects. Build/test the fixed candidate,
+then verify a Play-delivered upgrade and service paths before public rollout.
+
+Physical Oppo-specific splash/ANR and unexplained SIGKILL cannot be ruled out
+by source or host tests. Native memory-growth characterization remains open;
+no speculative asset rewrite or unrelated performance change was made.
+Real two-Google-account switching, provider-specific teen creatives/no-fill,
+fresh-install owned-VIP restoration and actual iOS device/TestFlight behavior
+are not newly verified here. No assertion that a provider console is configured
+correctly merely because local code tests pass.
+
+The branch total has untested paths. Low-coverage service boundaries include
+legacy cloud, connectivity, notifications, online leaderboard and Supabase;
+live network/device behavior needs environment-appropriate tests, not fabricated
+host coverage. No outstanding confirmed source defect from this audit is left
+unfixed, but this is not a universal zero-bug guarantee.
+
+EVIDENCE / REPRODUCTION
+-----------------------
+Generated evidence: output/deep-audit-2026-10-25/
+  logs/                 Before/after failures and final verification logs
+  full-careers.json     Full simulated career report
+  coverage-final/       Final core coverage summary
+  evidence-index.json   Captured input hashes, scope and unchanged old AAB hash
+Refresh mechanical evidence with:
+  node scripts/deep-audit-evidence-2026-10-25.cjs
+
+Repeat normal gates:
+  npm run typecheck
+  npm run lint -- --quiet
+  npm test -- --runInBand
+Repeat extended failures/resolver coverage:
+  NODE_ENV=test npx jest --runInBand --testMatch \
+    '<rootDir>/scripts/progression-resolver-audit.test.ts' \
+    '<rootDir>/scripts/storage-commerce-audit.test.ts' \
+    '<rootDir>/scripts/deep-*-audit-2026-10-25.test.ts'
+Repeat full careers (long-running):
+  NODE_ENV=test CAREER_AUDIT_FULL=1 CAREER_AUDIT_PLAYER_RUNS_PER_ROLE=2 \
+    CAREER_AUDIT_MANAGER_RUNS=2 npm run audit:full-careers
+
+Captured1,190-input comparison: exactly seven existing runtime files and six
+existing test files changed from code21; no captured file missing. New audit
+scripts/docs are additional. Android/native, iOS config, engine/game, assets,
+dependencies and build profiles match the historical candidate inputs.
+Old AAB hash remains:
+  dc92efde0a0460539956a1db1130328046be06ea126cc520e841df3c721cb648
+Production pointer and historical build report now explicitly warn not to use
+that superseded artifact for these fixes. No replacement binary was generated.

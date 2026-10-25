@@ -1,0 +1,358 @@
+{
+  "validatedAt": "2026-09-28T20:25:17.758Z",
+  "allPassed": true,
+  "checks": [
+    {
+      "name": "eight panels",
+      "passed": true,
+      "detail": 8
+    },
+    {
+      "name": "ordered filenames",
+      "passed": true,
+      "detail": [
+        "01-live-match.png",
+        "02-player-career.png",
+        "03-manager-career.png",
+        "04-tactics-and-field.png",
+        "05-training-recovery.png",
+        "06-club-development.png",
+        "07-player-life.png",
+        "08-records-and-story.png"
+      ]
+    },
+    {
+      "name": "screenshots/01-live-match.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2,
+        "bytes": 1524133
+      }
+    },
+    {
+      "name": "safe source 01-live-match.png",
+      "passed": true,
+      "detail": [
+        "sources/fresh/player-live-field.png"
+      ]
+    },
+    {
+      "name": "caption boundaries 01-live-match.png",
+      "passed": true,
+      "detail": [
+        [
+          48,
+          374,
+          984,
+          1450
+        ]
+      ]
+    },
+    {
+      "name": "screenshots/02-player-career.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2,
+        "bytes": 1003939
+      }
+    },
+    {
+      "name": "safe source 02-player-career.png",
+      "passed": true,
+      "detail": [
+        "sources/fresh/player-home.png"
+      ]
+    },
+    {
+      "name": "caption boundaries 02-player-career.png",
+      "passed": true,
+      "detail": [
+        [
+          48,
+          374,
+          984,
+          1445
+        ]
+      ]
+    },
+    {
+      "name": "screenshots/03-manager-career.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2,
+        "bytes": 828279
+      }
+    },
+    {
+      "name": "safe source 03-manager-career.png",
+      "passed": true,
+      "detail": [
+        "sources/reference/03-manager-playing-xi.png"
+      ]
+    },
+    {
+      "name": "caption boundaries 03-manager-career.png",
+      "passed": true,
+      "detail": [
+        [
+          48,
+          362,
+          984,
+          1475
+        ]
+      ]
+    },
+    {
+      "name": "screenshots/04-tactics-and-field.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2,
+        "bytes": 869740
+      }
+    },
+    {
+      "name": "safe source 04-tactics-and-field.png",
+      "passed": true,
+      "detail": [
+        "sources/reference/02-manager-tactics.png"
+      ]
+    },
+    {
+      "name": "caption boundaries 04-tactics-and-field.png",
+      "passed": true,
+      "detail": [
+        [
+          48,
+          374,
+          984,
+          1450
+        ]
+      ]
+    },
+    {
+      "name": "screenshots/05-training-recovery.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2,
+        "bytes": 1650761
+      }
+    },
+    {
+      "name": "safe source 05-training-recovery.png",
+      "passed": true,
+      "detail": [
+        "sources/reference/04-manager-training.png",
+        "sources/fresh/player-physio-info.png"
+      ]
+    },
+    {
+      "name": "caption boundaries 05-training-recovery.png",
+      "passed": true,
+      "detail": [
+        [
+          48,
+          396,
+          984,
+          944
+        ],
+        [
+          48,
+          1393,
+          984,
+          441
+        ]
+      ]
+    },
+    {
+      "name": "screenshots/06-club-development.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2,
+        "bytes": 1162521
+      }
+    },
+    {
+      "name": "safe source 06-club-development.png",
+      "passed": true,
+      "detail": [
+        "sources/reference/06-manager-scout-report.png",
+        "sources/reference/09-manager-youth-academy.png",
+        "sources/reference/08-manager-home-ground.png"
+      ]
+    },
+    {
+      "name": "caption boundaries 06-club-development.png",
+      "passed": true,
+      "detail": [
+        [
+          48,
+          396,
+          984,
+          922
+        ],
+        [
+          48,
+          1408,
+          480,
+          410
+        ],
+        [
+          552,
+          1408,
+          480,
+          432
+        ]
+      ]
+    },
+    {
+      "name": "screenshots/07-player-life.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2,
+        "bytes": 833166
+      }
+    },
+    {
+      "name": "safe source 07-player-life.png",
+      "passed": true,
+      "detail": [
+        "sources/fresh/player-life-overview.png",
+        "sources/fresh/player-life-overview.png",
+        "sources/fresh/player-life-overview.png"
+      ]
+    },
+    {
+      "name": "caption boundaries 07-player-life.png",
+      "passed": true,
+      "detail": [
+        [
+          48,
+          374,
+          984,
+          410
+        ],
+        [
+          48,
+          818,
+          984,
+          676
+        ],
+        [
+          48,
+          1530,
+          984,
+          270
+        ]
+      ]
+    },
+    {
+      "name": "screenshots/08-records-and-story.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2,
+        "bytes": 969961
+      }
+    },
+    {
+      "name": "safe source 08-records-and-story.png",
+      "passed": true,
+      "detail": [
+        "sources/reference/manager-first-press-conference.png",
+        "sources/fresh/player-records.png"
+      ]
+    },
+    {
+      "name": "caption boundaries 08-records-and-story.png",
+      "passed": true,
+      "detail": [
+        [
+          48,
+          396,
+          984,
+          812
+        ],
+        [
+          48,
+          1247,
+          984,
+          587
+        ]
+      ]
+    },
+    {
+      "name": "store-assets/feature-graphic-1024x500.png",
+      "passed": true,
+      "detail": {
+        "width": 1024,
+        "height": 500,
+        "bitDepth": 8,
+        "colorType": 2,
+        "bytes": 673644
+      }
+    },
+    {
+      "name": "CONTACT_SHEET.png",
+      "passed": true,
+      "detail": {
+        "width": 1440,
+        "height": 1380,
+        "bitDepth": 8,
+        "colorType": 2,
+        "bytes": 995997
+      }
+    },
+    {
+      "name": "title exact",
+      "passed": true,
+      "detail": "Cricket: Player and Manager"
+    },
+    {
+      "name": "title length",
+      "passed": true,
+      "detail": {
+        "characters": 27,
+        "max": 30
+      }
+    },
+    {
+      "name": "short description length",
+      "passed": true,
+      "detail": {
+        "characters": 80,
+        "max": 80
+      }
+    },
+    {
+      "name": "full description length",
+      "passed": true,
+      "detail": {
+        "characters": 2214,
+        "max": 4000
+      }
+    }
+  ]
+}

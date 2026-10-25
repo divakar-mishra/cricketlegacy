@@ -5,6 +5,7 @@
  * finances, and end-of-season settlement. Pure/mutating helpers, unit-tested.
  */
 import { namePoolFor } from '../data/names';
+import { playerWorldSex } from './playerIdentity';
 import {
   Facilities,
   ManagerCareerLevel,
@@ -210,7 +211,11 @@ export function renewContract(save: SaveGame, playerId: string, years = 2): Rene
   if (!p || !team.playerIds.includes(playerId))
     return { ok: false, cost: 0, reason: 'Not in your squad.' };
   if (p.loanedFrom)
-    return { ok: false, cost: 0, reason: 'A borrowed player cannot sign a club renewal. Their loan must end first.' };
+    return {
+      ok: false,
+      cost: 0,
+      reason: 'A borrowed player cannot sign a club renewal. Their loan must end first.',
+    };
   const fee = Math.round(computeValue(p) * 0.1);
   const budgetBlock = optionalClubSpendBlockReason(save, fee);
   if (budgetBlock) return { ok: false, cost: fee, reason: budgetBlock };
@@ -229,7 +234,10 @@ export function expiringContracts(save: SaveGame): Player[] {
     .map((id) => save.players[id])
     .filter(
       (p): p is Player =>
-        Boolean(p) && !p.loanedFrom && (p.contract?.yearsLeft ?? 2) <= 1 && p.id !== save.userPlayerId,
+        Boolean(p) &&
+        !p.loanedFrom &&
+        (p.contract?.yearsLeft ?? 2) <= 1 &&
+        p.id !== save.userPlayerId,
     );
 }
 
@@ -457,6 +465,9 @@ export function upgradeFacility(
   kind: keyof Facilities,
   paymentMethod: FacilityUpgradePaymentMethod,
 ): FacilityOutcome {
+  if (save.mode === 'manager' && save.managerRetired) {
+    return { ok: false, cost: 0, reason: 'This Manager career is retired.' };
+  }
   if (!save.userTeamId || !save.facilities) return { ok: false, cost: 0, reason: 'No club.' };
   const team = save.teams[save.userTeamId];
   if (!team) return { ok: false, cost: 0, reason: 'No club.' };
@@ -608,6 +619,7 @@ export function runYouthIntake(save: SaveGame, rng: Rng): string[] {
     if (save.players[id]) continue;
     const role = YOUTH_ROLES[i % YOUTH_ROLES.length];
     const p = generateYouth({
+      sex: playerWorldSex(save),
       id,
       nationality: team.country,
       role,
@@ -728,7 +740,7 @@ export function recallLoan(save: SaveGame, playerId: string, atSeasonEnd = false
   const team = save.teams[save.userTeamId];
   const p = save.players[playerId];
   if (!team || !p?.loanedFrom || !team.playerIds.includes(playerId)) return false;
-  const roster = [...new Set(team.playerIds)].filter(id => Boolean(save.players[id]));
+  const roster = [...new Set(team.playerIds)].filter((id) => Boolean(save.players[id]));
   if (!atSeasonEnd && roster.length <= XI_SIZE) return false;
 
   // Remove from user squad.

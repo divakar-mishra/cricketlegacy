@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { GuideTarget } from '../components/CareerGuide';
+import { CreationOverview } from '../components/CreationOverview';
+import { guideAction } from '../game/coachGuide';
 import { StyleSheet, View } from 'react-native';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import {
@@ -17,7 +20,7 @@ import { managerDomesticBlueprints } from '../game/domesticBranding';
 import { ScreenProps } from '../navigation';
 import { analytics } from '../services';
 import { useCareer } from '../state/careerStore';
-import { firstFreeSlot, listSlots, setLastPlayed, writeSave } from '../storage/saveGames';
+import { findCreationSlot, setLastPlayed, writeSave } from '../storage/saveGames';
 import { fontSize, fontWeight, radius, spacing, ThemeColors, useThemedStyles } from '../theme';
 
 const DIFFICULTIES: { value: Difficulty; label: string }[] = [
@@ -30,18 +33,19 @@ const DIFFICULTIES: { value: Difficulty; label: string }[] = [
 export function TeamSelectScreen({ navigation, route }: ScreenProps<'TeamSelect'>) {
   const setActive = useCareer((state) => state.setActive);
   const styles = useThemedStyles(makeStyles);
-  const [countryId, setCountryId] = useState('india');
+  const [countryId, setCountryId] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty>('NORMAL');
   const [creating, setCreating] = useState(false);
-  const teams = managerDomesticBlueprints(countryId).filter((team) => team.tier === 3);
+  const creatingRef = useRef(false);
+  const teams = countryId ? managerDomesticBlueprints(countryId).filter((team) => team.tier === 3) : [];
 
   const create = async () => {
-    if (!teamId || creating) return;
+    if (!countryId || !teamId || creatingRef.current) return;
+    creatingRef.current = true;
     setCreating(true);
     try {
-      const slots = await listSlots('manager');
-      const slot = route?.params?.slot ?? firstFreeSlot(slots);
+      const slot = await findCreationSlot('manager', route?.params?.slot);
       if (!slot) {
         Alert.alert('All slots full', 'Delete a manager save from Saved Games first.', [
           { text: 'OK', onPress: () => navigation.navigate('SavedGames') },
@@ -55,10 +59,16 @@ export function TeamSelectScreen({ navigation, route }: ScreenProps<'TeamSelect'
         format: 'T20',
       });
       await writeSave('manager', slot, save);
-      await setLastPlayed('manager', slot);
+      // A failed resume pointer does not undo a confirmed first save.
+      try {
+        await setLastPlayed('manager', slot);
+      } catch {
+        console.warn('Manager career created; last-played metadata could not be updated.');
+      }
       setActive(save, 'manager', slot);
       analytics.setUserProperty('mode', 'manager');
       analytics.logEvent(analytics.EVT.CAREER_START, { mode: 'manager', difficulty });
+      guideAction('manager-created');
       navigation.reset({ index: 1, routes: [{ name: 'MainMenu' }, { name: 'ManagerHub' }] });
     } catch {
       Alert.alert(
@@ -66,6 +76,7 @@ export function TeamSelectScreen({ navigation, route }: ScreenProps<'TeamSelect'
         'The device did not confirm the first save. Check available storage and try again.',
       );
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   };
@@ -75,54 +86,56 @@ export function TeamSelectScreen({ navigation, route }: ScreenProps<'TeamSelect'
       scroll
       footer={
         <View>
-          {!teamId ? (
-            <Text style={styles.footerHint}>Select a Tier 3 club above to start managing.</Text>
+          {creating ? <Text accessibilityLiveRegion="polite" style={styles.footerHint}>Creating and saving your career…</Text> : null}
+          {!countryId || !teamId ? (
+            <Text style={styles.footerHint}>{!countryId ? 'Choose your country, then a Tier 3 club.' : 'Select a Tier 3 club above to start managing.'}</Text>
           ) : null}
-          <Button
+          <GuideTarget id="create-manager"><Button
             label="Start Managing"
             variant="gold"
-            disabled={!teamId || creating}
+            disabled={!countryId || !teamId || creating}
             loading={creating}
-            onPress={() => void create()}
-          />
+            onPress={create}
+          /></GuideTarget>
         </View>
       }
     >
-      <ScreenHeader title="Choose your club" onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Choose your club" onBack={() => { if (!creatingRef.current) navigation.goBack(); }} />
+      <CreationOverview chapter="manager.creation" />
 
       <Text style={styles.label}>Difficulty</Text>
-      <SegmentedControl
+      <GuideTarget id="difficulty"><SegmentedControl
         value={difficulty}
         options={DIFFICULTIES}
         onChange={setDifficulty}
         accessibilityLabel="Manager career difficulty"
-      />
+      /></GuideTarget>
 
       <View style={styles.progressNote}>
         <Text style={styles.progressNoteTitle}>Tier 3 · T20</Text>
       </View>
 
       <Text style={[styles.label, styles.sectionGap]}>Country</Text>
-      <CountrySelect
+      <GuideTarget id="country" ready={Boolean(countryId)}><CountrySelect
         value={countryId}
         onChange={(nextCountryId) => {
           setCountryId(nextCountryId);
           setTeamId(null);
         }}
         testID="manager-country-select"
-      />
+      /></GuideTarget>
 
       <Text style={[styles.label, styles.sectionGap]}>Tier 3 clubs</Text>
-      {teams.map((team) => (
+      <GuideTarget id="clubs" ready={Boolean(teamId)}>{teams.map((team) => (
         <SelectableCard
           key={team.id}
           title={team.name}
           subtitle={`${getCountry(team.country)?.name ?? ''} | Squad strength ${team.strength}`}
           selected={teamId === team.id}
-          onPress={() => setTeamId(team.id)}
+          onPress={() => { setTeamId(team.id); guideAction('manager-club'); }}
           style={styles.clubCard}
         />
-      ))}
+      ))}</GuideTarget>
     </Screen>
   );
 }

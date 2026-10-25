@@ -1,0 +1,16 @@
+
+> app@1.0.12 pretypecheck
+> npm run generate-build-info
+
+
+> app@1.0.12 generate-build-info
+> node scripts/writeBuildInfo.js
+
+Wrote src/config/buildInfo.generated.ts
+
+> app@1.0.12 typecheck
+> tsc --noEmit
+
+src/screens/PlayerCreationScreen.tsx(312,63): error TS2322: Type '{ name: string; }' is not assignable to type 'NavigationRoute<RootStackParamList, keyof RootStackParamList> | PartialRoute<Route<keyof RootStackParamList, object | undefined>>'.
+  Types of property 'name' are incompatible.
+    Type 'string' is not assignable to type 'keyof RootStackParamList'.

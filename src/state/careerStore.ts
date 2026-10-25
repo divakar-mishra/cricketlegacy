@@ -75,6 +75,8 @@ import {
   addCoins,
   addGems,
   convertPlayerGemsToCoins,
+  energyCapacity,
+  energyRecovery,
   fixtureEnergyCost,
   matchEnergyCost,
   matchReward,
@@ -314,7 +316,6 @@ import {
   purchaseLedger,
   purchases,
 } from '../services';
-import { maybeRequestReview } from '../services/storeReview';
 import { listAllSaves, listSlots, loadSave, replaceSave, SaveDeletedError, setLastPlayed, writeSave } from '../storage/saveGames';
 import { runMigrations } from '../storage/migrate';
 import { synchronizeSchema14State } from '../storage/schema14';
@@ -355,6 +356,7 @@ import {
   claimVipCollection,
   ensureVipState,
   grantModeVip,
+  settleVipVisit,
   grantRetirementCollections,
   hasModeVip,
   settleVipSeason,
@@ -655,12 +657,12 @@ function finalizePlayerRetirement(save: SaveGame, year: number): { epitaph: stri
 }
 
 /** Schedule an "energy full" reminder (no-op without permission/native module). */
-function scheduleEnergyNotif(wallet: Wallet): void {
+function scheduleEnergyNotif(save: SaveGame): void {
   try {
     if (!useSettings.getState().notifications) return;
-    const missing = ECONOMY.energyMax - wallet.energy;
-    if (missing <= 0) return;
-    void notifications.scheduleEnergyFull(missing * ECONOMY.energyRegenMinutes * 60);
+    const { fullMs } = energyRecovery(save.wallet, Date.now(), visibleEnergyCap(save));
+    if (fullMs <= 0 || save.mode !== 'career') return;
+    void notifications.scheduleEnergyFull(Math.ceil(fullMs / 1000));
   } catch {
     /* notifications are best-effort */
   }
@@ -671,7 +673,7 @@ function qaUnlimitedEnergyEnabled(): boolean {
 }
 
 function visibleEnergyCap(save: SaveGame): number {
-  return save.entitlements.removeAds ? ECONOMY.vipEnergyMax : ECONOMY.energyMax;
+  return energyCapacity(save.entitlements);
 }
 
 function refillQaEnergy(save: SaveGame): boolean {
@@ -683,7 +685,9 @@ function refillQaEnergy(save: SaveGame): boolean {
 }
 
 function spendSaveEnergy(save: SaveGame, amount: number): Wallet {
-  if (!qaUnlimitedEnergyEnabled()) return spendEnergy(save.wallet, amount);
+  if (!qaUnlimitedEnergyEnabled()) {
+    return spendEnergy(regenEnergy(save.wallet, Date.now(), visibleEnergyCap(save)), amount);
+  }
   return {
     ...save.wallet,
     energy: visibleEnergyCap(save),
@@ -846,6 +850,8 @@ interface CareerState {
   setActive: (save: SaveGame, mode: GameMode, slot: number) => void;
   playCupTie: () => boolean;
   refreshEnergy: () => void;
+  /** Lightweight elapsed-time reconciliation: never advances career/calendar state. */
+  synchronizeEnergyClock: (now?: number) => boolean;
   /** Reconcile a UTC pass boundary or premium expiry and persist once. */
   synchronizeSeasonPassClock: (now?: number) => Promise<boolean>;
   /** Best-effort autosave. Failures are captured in state instead of becoming unhandled rejections. */
@@ -934,8 +940,8 @@ interface CareerState {
   resolvePress: (eventId: string, choiceId: string, expectedSaveId?: string, expectedSequence?: number) => MgrChoiceResult;
   claimQuestReward: (id: string) => { ok: boolean; coins: number; gems: number };
   claimWeeklyReward: (id: string) => { ok: boolean; coins: number; gems: number };
-  grantAdReward: (coins: number, transactionId: string) => { ok: boolean; reason?: string };
-  grantAdEnergy: (energy: number, transactionId: string) => { ok: boolean; reason?: string };
+  grantAdReward: (coins: number, transactionId: string, expectedSaveId?: string) => { ok: boolean; reason?: string };
+  grantAdEnergy: (energy: number, transactionId: string, expectedSaveId?: string) => { ok: boolean; reason?: string; energyAdded?: number };
   qaGrantWhaleCoins: () => Promise<{
     ok: boolean;
     balance?: number;
@@ -1362,6 +1368,7 @@ function applyPurchaseGrant(save: SaveGame, res: purchases.PurchaseResult, inten
       save.flags = { ...(save.flags ?? {}), 'promo:first_gem_pack_bonus': true };
     }
   }
+  settleVipVisit(save);
   return { ok: true };
 }
 
@@ -1382,7 +1389,7 @@ export const useCareer = create<CareerState>(
       const loadedPassCycleId = save.pass?.seasonId;
       const loadedCalendarPassCycle = /^pass-\d{4}-\d{2}$/.test(loadedPassCycleId ?? '');
       validateSeasonState(save);
-      save.wallet = regenEnergy(save.wallet);
+      save.wallet = regenEnergy(save.wallet, Date.now(), visibleEnergyCap(save));
       refillQaEnergy(save);
       synchronizeSchema14State(save, save.updatedAt);
       synchronizeSchema15State(save);
@@ -1435,7 +1442,9 @@ export const useCareer = create<CareerState>(
       ) {
         queueManagerEvent(save, 'PRE_SEASON', storyRng(save, 1));
       }
+      const vipVisit = settleVipVisit(save);
       set({ save, ref: { mode, slot }, targetFixtureId: undefined, persistenceError: null });
+      if (vipVisit.updated) void get().persist();
       void get().recoverPendingPurchases();
       void get().recoverPendingExchange();
       const loadedSaveId = save.id;
@@ -1448,6 +1457,9 @@ export const useCareer = create<CareerState>(
           value.vipEnergyBonusActive,
           value.vipCollections,
           value.inventory,
+          value.vipStreakLastDay,
+          value.vipStreakDays,
+          value.wallet.gems,
         ]);
       const beforeLocalArchive = vipState(save);
       void syncVipArchive(save)
@@ -1473,6 +1485,7 @@ export const useCareer = create<CareerState>(
                     : undefined;
           if (source) {
             grantModeVip(current, source, snapshot.accountId);
+            settleVipVisit(current);
           }
           await syncVipArchive(current, {
             accountId: snapshot.accountId,
@@ -1548,7 +1561,7 @@ export const useCareer = create<CareerState>(
     refreshEnergy: () => {
       const save = get().save;
       if (!save) return;
-      save.wallet = regenEnergy(save.wallet);
+      save.wallet = regenEnergy(save.wallet, Date.now(), visibleEnergyCap(save));
       refillQaEnergy(save);
       ensureLiveops(save);
       if (save.mode === 'career') {
@@ -1562,6 +1575,17 @@ export const useCareer = create<CareerState>(
       }
       reconcilePlayedCompetitionRounds(save);
       set({ save: { ...save } });
+    },
+
+    synchronizeEnergyClock: (now = Date.now()) => {
+      const save = get().save;
+      if (!save || save.mode !== 'career') return false;
+      const next = regenEnergy(save.wallet, now, visibleEnergyCap(save));
+      if (next.energy === save.wallet.energy) return false;
+      save.wallet = next;
+      set({ save: { ...save } });
+      void get().persist();
+      return true;
     },
 
     synchronizeSeasonPassClock: async (now = Date.now()) => {
@@ -2219,9 +2243,8 @@ export const useCareer = create<CareerState>(
         tie,
         mode: ref?.mode ?? 'career',
       });
-      scheduleEnergyNotif(save.wallet);
+      scheduleEnergyNotif(save);
       ingestHallOfFame(save);
-      if (userWon) void maybeRequestReview(save.careerWins ?? 0);
       const experience = ensureCareerExperience(save);
       if (experience.starterPackUnlockedAt == null) {
         experience.starterPackUnlockedAt = Date.now();
@@ -2409,7 +2432,7 @@ export const useCareer = create<CareerState>(
         updateRecords(save, match, year);
       }
       save.nationalRep = Math.min(100, (save.nationalRep ?? 0) + 5);
-      scheduleEnergyNotif(save.wallet);
+      scheduleEnergyNotif(save);
       ingestHallOfFame(save);
       const experience = ensureCareerExperience(save);
       experience.starterPackUnlockedAt ??= Date.now();
@@ -2619,6 +2642,7 @@ export const useCareer = create<CareerState>(
     investStaff: (role) => {
       const save = get().save;
       if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, cost: 0, reason: 'This Manager career is retired.' };
       if (managerClubOperationsPaused(save)) {
         return { ok: false, cost: 0, reason: 'Club staff are paused during national duty.' };
       }
@@ -2633,6 +2657,7 @@ export const useCareer = create<CareerState>(
     hireStaff: (candidateId) => {
       const save = get().save;
       if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, cost: 0, reason: 'This Manager career is retired.' };
       if (managerClubOperationsPaused(save)) {
         return { ok: false, cost: 0, reason: 'Club staff are paused during national duty.' };
       }
@@ -2654,6 +2679,9 @@ export const useCareer = create<CareerState>(
           cost: 0,
           reason: 'No active save.',
         };
+      }
+      if (save.mode === 'manager' && save.managerRetired) {
+        return { ok: false, action, currency: action === 'ELITE_STAFF_SEARCH' ? 'gems' : 'coins', cost: 0, reason: 'This Manager career is retired.' };
       }
       const result = executeManagerResourceAction(save, action, targetPlayerId);
       if (result.ok) {
@@ -2683,6 +2711,7 @@ export const useCareer = create<CareerState>(
 
     setTicketPreset: (format, preset) => {
       const save = get().save;
+      if (save?.mode === 'manager' && save.managerRetired) return false;
       if (!save || !setClubTicketPreset(save, format, preset)) return false;
       set({ save: { ...save } });
       void get().persist();
@@ -2692,6 +2721,7 @@ export const useCareer = create<CareerState>(
     upgradeStadium: () => {
       const save = get().save;
       if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, cost: 0, reason: 'This Manager career is retired.' };
       const result = upgradeStadiumCapacity(save);
       if (result.ok) {
         set({ save: { ...save } });
@@ -2703,6 +2733,7 @@ export const useCareer = create<CareerState>(
     upgradeMatchday: () => {
       const save = get().save;
       if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, cost: 0, reason: 'This Manager career is retired.' };
       const result = upgradeMatchdayExperience(save);
       if (result.ok) {
         set({ save: { ...save } });
@@ -2714,6 +2745,7 @@ export const useCareer = create<CareerState>(
     scout: (playerId) => {
       const save = get().save;
       if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, cost: 0, reason: 'This Manager career is retired.' };
       if (managerClubOperationsPaused(save)) {
         return { ok: false, cost: 0, reason: 'Club scouting is paused during national duty.' };
       }
@@ -2730,6 +2762,7 @@ export const useCareer = create<CareerState>(
     promoteYouth: (playerId) => {
       const save = get().save;
       if (!save) return { ok: false, reason: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, reason: 'This Manager career is retired.' };
       if (managerClubOperationsPaused(save)) {
         return { ok: false, reason: 'Club academy operations are paused during national duty.' };
       }
@@ -2744,6 +2777,7 @@ export const useCareer = create<CareerState>(
     releaseYouth: (playerId) => {
       const save = get().save;
       if (!save) return { ok: false, reason: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, reason: 'This Manager career is retired.' };
       if (managerClubOperationsPaused(save)) {
         return { ok: false, reason: 'Club academy operations are paused during national duty.' };
       }
@@ -2758,6 +2792,7 @@ export const useCareer = create<CareerState>(
     renewDeal: (playerId, years) => {
       const save = get().save;
       if (!save) return { ok: false, cost: 0, reason: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, cost: 0, reason: 'This Manager career is retired.' };
       if (managerClubOperationsPaused(save)) {
         return { ok: false, cost: 0, reason: 'Club contracts are paused during national duty.' };
       }
@@ -2772,6 +2807,7 @@ export const useCareer = create<CareerState>(
     setTrainFocus: (playerId, group) => {
       const save = get().save;
       if (!save) return;
+      if (save.mode === 'manager' && save.managerRetired) return;
       if (managerClubOperationsPaused(save)) return;
       setTrainingFocus(save, playerId, group);
       set({ save: { ...save } });
@@ -2780,6 +2816,7 @@ export const useCareer = create<CareerState>(
 
     setManagerTrainingPlan: (update) => {
       const save = get().save;
+      if (save?.mode === 'manager' && save.managerRetired) return false;
       if (!save || !setManagerTeamTraining(save, update)) return false;
       set({ save: { ...save } });
       void get().persist();
@@ -2788,6 +2825,7 @@ export const useCareer = create<CareerState>(
 
     setManagerTrainingOverride: (playerId, focus) => {
       const save = get().save;
+      if (save?.mode === 'manager' && save.managerRetired) return false;
       if (!save || !setManagerPlayerTrainingOverride(save, playerId, focus)) return false;
       set({ save: { ...save } });
       void get().persist();
@@ -2797,6 +2835,7 @@ export const useCareer = create<CareerState>(
     appointManagerLeader: (role, playerId) => {
       const save = get().save;
       if (!save) return { ok: false, reason: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, reason: 'This Manager career is retired.' };
       const result = appointManagerLeaderPure(save, role, playerId);
       if (result.ok) {
         set({ save: { ...save } });
@@ -2808,6 +2847,7 @@ export const useCareer = create<CareerState>(
     talkToPlayer: (playerId, kind) => {
       const save = get().save;
       if (!save) return { ok: false, text: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, text: 'This Manager career is retired.' };
       const res = talkToPlayerPure(save, playerId, kind);
       if (res.ok) {
         set({ save: { ...save } });
@@ -3339,9 +3379,12 @@ export const useCareer = create<CareerState>(
       return { ok: true, coins: def.rewardCoins, gems: def.rewardGems ?? 0 };
     },
 
-    grantAdReward: (coins, transactionId) => {
+    grantAdReward: (coins, transactionId, expectedSaveId) => {
       const save = get().save;
-      if (!save || coins <= 0) return { ok: false, reason: 'Invalid ad reward.' };
+      if (!save || !Number.isFinite(coins) || coins <= 0) return { ok: false, reason: 'Invalid ad reward.' };
+      if (expectedSaveId && expectedSaveId !== save.id) {
+        return { ok: false, reason: 'The active career changed. No reward was applied to another save.' };
+      }
       if (!claimRewardTransaction(save, transactionId)) {
         return { ok: false, reason: 'Ad reward transaction already applied.' };
       }
@@ -3353,21 +3396,28 @@ export const useCareer = create<CareerState>(
       return { ok: true };
     },
 
-    grantAdEnergy: (energy, transactionId) => {
+    grantAdEnergy: (energy, transactionId, expectedSaveId) => {
       const save = get().save;
-      if (!save || energy <= 0) return { ok: false, reason: 'Invalid ad energy reward.' };
+      if (!save || save.mode !== 'career' || !Number.isFinite(energy) || Math.floor(energy) <= 0) {
+        return { ok: false, reason: 'Invalid ad energy reward.' };
+      }
+      if (expectedSaveId && expectedSaveId !== save.id) {
+        return { ok: false, reason: 'The active career changed. No reward was applied to another save.' };
+      }
       if (!claimRewardTransaction(save, transactionId)) {
         return { ok: false, reason: 'Ad energy transaction already applied.' };
       }
-      save.wallet = {
-        ...save.wallet,
-        energy: Math.min(ECONOMY.energyMax, save.wallet.energy + energy),
-        energyUpdatedAt: Date.now(),
-      };
-      analytics.logEvent(analytics.EVT.AD_WATCHED, { energy });
+      const now = Date.now();
+      const cap = visibleEnergyCap(save);
+      const recovered = regenEnergy(save.wallet, now, cap);
+      const nextEnergy = Math.max(recovered.energy, Math.min(cap, recovered.energy + Math.floor(energy)));
+      const energyAdded = nextEnergy - recovered.energy;
+      save.wallet = { ...recovered, energy: nextEnergy,
+        energyUpdatedAt: nextEnergy >= cap ? now : recovered.energyUpdatedAt };
+      analytics.logEvent(analytics.EVT.AD_WATCHED, { energy: energyAdded });
       set({ save: { ...save } });
       void get().persist();
-      return { ok: true };
+      return { ok: true, energyAdded };
     },
 
     qaGrantWhaleCoins: async () => {
@@ -3672,8 +3722,8 @@ export const useCareer = create<CareerState>(
 
     refillEnergy: () => {
       const save = get().save;
-      if (!save) return { ok: false };
-      const next = refillEnergyWithGems(save.wallet);
+      if (!save || save.mode !== 'career') return { ok: false };
+      const next = refillEnergyWithGems(save.wallet, Date.now(), visibleEnergyCap(save));
       if (!next) return { ok: false };
       save.wallet = next;
       set({ save: { ...save } });
@@ -3740,6 +3790,7 @@ export const useCareer = create<CareerState>(
     applySquadRecovery: (payment, transactionId) => {
       const save = get().save;
       if (!save || save.mode !== 'manager') return { ok: false, reason: 'No active manager squad.' };
+      if (save.managerRetired) return { ok: false, reason: 'This Manager career is retired.' };
       if (managerClubOperationsPaused(save)) {
         return { ok: false, reason: 'Club recovery is paused during national duty.' };
       }
@@ -3823,6 +3874,7 @@ export const useCareer = create<CareerState>(
       const save = get().save;
       if (!save || !save.userTeamId)
         return { ok: false, cost: 0, reason: 'No active manager club.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, cost: 0, reason: 'This Manager career is retired.' };
       if (managerClubOperationsPaused(save)) {
         return { ok: false, cost: 0, reason: 'Club scouting is paused during national duty.' };
       }
@@ -4254,6 +4306,7 @@ export const useCareer = create<CareerState>(
       if (productIds.length === 0) {
         return { status: 'NOTHING_APPLICABLE', count: 0, productIds: [] };
       }
+      settleVipVisit(save);
       set({ save: { ...save } });
       try {
         await syncVipArchive(save, undefined, true);
@@ -4411,7 +4464,7 @@ export const useCareer = create<CareerState>(
       const isVip = save.entitlements.removeAds;
       // VIP (permanent removeAds) holders regenerate up to the higher 60 cap;
       // everyone else to the standard 36. Regen never reduces existing energy.
-      const cap = isVip ? ECONOMY.vipEnergyMax : ECONOMY.energyMax;
+      const cap = visibleEnergyCap(save);
       save.wallet = regenEnergy(save.wallet, Date.now(), cap);
       refillQaEnergy(save);
       save.vipEnergyBonusActive = isVip;
@@ -4421,24 +4474,12 @@ export const useCareer = create<CareerState>(
     // ── VIP Streak mechanic ──────────────────────────────────────────────────
     tickVipStreak: () => {
       const save = get().save;
-      if (!save || !save.entitlements.removeAds) return { days: 0, reward: null };
-      const today = dayIndex();
-      const lastDay = save.vipStreakLastDay ?? 0;
-      if (lastDay === today) return { days: save.vipStreakDays ?? 0, reward: null };
-      const days = lastDay === today - 1 ? (save.vipStreakDays ?? 0) + 1 : 1;
-      save.vipStreakDays = days;
-      save.vipStreakLastDay = today;
-      let reward: { gems?: number; title?: string } | null = null;
-      if (days === 7) {
-        save.wallet = addGems(save.wallet, 10);
-        reward = { gems: 10, title: '7-Day VIP Streak!' };
-      } else if (days === 30) {
-        // Grant exclusive avatar frame flag
-        save.inventory = { ...(save.inventory ?? {}), avatar_legend_vip: 1 };
-        reward = { title: 'VIP Legend Frame unlocked!' };
+      if (!save) return { days: 0, reward: null };
+      const { updated, days, reward } = settleVipVisit(save);
+      if (updated) {
+        set({ save: { ...save } });
+        void get().persist();
       }
-      set({ save: { ...save } });
-      void get().persist();
       return { days, reward };
     },
 
@@ -4648,6 +4689,7 @@ export const useCareer = create<CareerState>(
     acceptEarnedSponsorOffer: (offerId) => {
       const save = get().save;
       if (!save) return { ok: false, reason: 'No active save.' };
+      if (save.mode === 'manager' && save.managerRetired) return { ok: false, reason: 'This Manager career is retired.' };
       if (managerClubOperationsPaused(save)) {
         return { ok: false, reason: 'Club sponsorship is paused during national duty.' };
       }

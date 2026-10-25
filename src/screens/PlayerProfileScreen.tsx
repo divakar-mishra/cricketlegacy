@@ -17,6 +17,7 @@ import { battingMean, bowlingMean, computeOverall, metaMean } from '../engine/ra
 import { baseAttributeProgress, baseAttributeValue } from '../game/attributeDisplay';
 import { formatClubCurrency } from '../game/finance';
 import { injuryLabel } from '../game/injuries';
+import { managerControlledTeamId } from '../game/managerCalendar';
 import { activeSponsorBranding } from '../game/sponsorship';
 import { emptyStats } from '../game/stats';
 import { ScreenProps } from '../navigation';
@@ -71,8 +72,10 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
   const career = player.careerStats ?? emptyStats();
   const season = player.seasonStats ?? emptyStats();
   const isUser = Boolean(player.isUserPlayer) && save.mode === 'career';
+  const controlledTeamId =
+    save.mode === 'manager' ? managerControlledTeamId(save) : save.userTeamId;
   const inSquad = Boolean(
-    save.userTeamId && save.teams[save.userTeamId]?.playerIds.includes(player.id),
+    controlledTeamId && save.teams[controlledTeamId]?.playerIds.includes(player.id),
   );
   const scoutRep = save.scoutReports?.find((r) => r.playerId === player.id);
   const isExternalManagerPlayer = save.mode === 'manager' && !inSquad;
@@ -84,15 +87,15 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
   const visibleAttributeGroups = isUser
     ? ATTR_GROUPS.filter((group) => group.id !== 'fielding')
     : ATTR_GROUPS;
-  const team = Object.values(save.teams).find((candidate) =>
-    candidate.playerIds.includes(player.id),
-  );
+  const team =
+    (inSquad && controlledTeamId ? save.teams[controlledTeamId] : undefined) ??
+    Object.values(save.teams).find((candidate) => candidate.playerIds.includes(player.id));
   const sponsorBranding = isUser
     ? activeSponsorBranding(save)
     : { earned: undefined, premium: undefined };
 
   return (
-    <Screen scroll>
+    <Screen scroll careerNavigation scrollResetKey={player.id}>
       <ScreenHeader
         title={player.name}
         subtitle={`${country?.name ?? player.nationality} | ${ROLE_LABEL[player.role] ?? player.role} | Age ${player.age}`}
@@ -102,6 +105,7 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
       <Card style={styles.hero}>
         <PlayerAvatar
           name={player.name}
+          sex={player.sex}
           role={player.role}
           primaryColor={team?.primaryColor}
           secondaryColor={team?.secondaryColor}
@@ -127,9 +131,7 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
           ) : null}
           <View style={styles.heroRatings}>
             <Badge
-              value={
-                showPrivateRatings ? overall : scoutRep ? `~${scoutRep.knownOverall}` : '?'
-              }
+              value={showPrivateRatings ? overall : scoutRep ? `~${scoutRep.knownOverall}` : '?'}
               label="OVR"
               big
             />
@@ -248,32 +250,31 @@ export function PlayerProfileScreen({ navigation, route }: ScreenProps<'PlayerPr
         </View>
       ) : null}
 
-      {showPrivateRatings && visibleAttributeGroups.map((group) => {
-        const obj = player[group.id] as unknown as Record<string, number>;
-        return (
-          <View key={group.id} style={{ marginTop: spacing.lg }}>
-            <Text style={styles.groupTitle}>{group.label}</Text>
-            <Card>
-              {ATTR_META[group.id].map(([key, label]) => {
-                const v = baseAttributeValue(obj[key as string]);
-                return (
-                  <View key={key} style={styles.attrRow}>
-                    <Text style={styles.attrLabel} numberOfLines={1}>
-                      {label}
-                    </Text>
-                    <ProgressBar
-                      value={baseAttributeProgress(v)}
-                      color={colors.primary}
-                      style={styles.attrBar}
-                    />
-                    <Text style={styles.attrVal}>{v}</Text>
-                  </View>
-                );
-              })}
-            </Card>
-          </View>
-        );
-      })}
+      {showPrivateRatings &&
+        visibleAttributeGroups.map((group) => {
+          const obj = player[group.id] as unknown as Record<string, number>;
+          return (
+            <View key={group.id} style={{ marginTop: spacing.lg }}>
+              <Text style={styles.groupTitle}>{group.label}</Text>
+              <Card>
+                {ATTR_META[group.id].map(([key, label]) => {
+                  const v = baseAttributeValue(obj[key as string]);
+                  return (
+                    <View key={key} style={styles.attrRow}>
+                      <Text style={styles.attrLabel}>{label}</Text>
+                      <ProgressBar
+                        value={baseAttributeProgress(v)}
+                        color={colors.primary}
+                        style={styles.attrBar}
+                      />
+                      <Text style={styles.attrVal}>{v}</Text>
+                    </View>
+                  );
+                })}
+              </Card>
+            </View>
+          );
+        })}
 
       <Text style={styles.groupTitle}>
         {isExternalManagerPlayer ? 'Public career record' : 'Career'}
@@ -456,7 +457,7 @@ const makeStyles = (colors: ThemeColors) =>
       marginBottom: spacing.sm,
     },
     attrRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, gap: spacing.sm },
-    attrLabel: { color: colors.textMuted, fontSize: fontSize.sm, flexBasis: 82, flexShrink: 1 },
+    attrLabel: { color: colors.textMuted, fontSize: fontSize.sm, flexBasis: 110, flexShrink: 1 },
     attrBar: { flex: 1, minWidth: 72 },
     attrVal: {
       color: colors.text,

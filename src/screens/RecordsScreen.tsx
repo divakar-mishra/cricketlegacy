@@ -45,7 +45,8 @@ import {
 } from '../game/managerCareer';
 import { activeCompetitionTable } from '../game/competitionTable';
 import { CAREER_COMPETITION_STAT_LABELS, emptyStats } from '../game/stats';
-import { ScreenProps } from '../navigation';
+import { ScreenProps, type RecordsTab } from '../navigation';
+import { recordsTab } from '../navigation/careerNavigation';
 import { useCareer } from '../state/careerStore';
 import { useHallOfFame } from '../state/hofStore';
 import {
@@ -60,7 +61,6 @@ import {
 } from '../theme';
 
 type HofTab = 'players' | 'managers';
-type MainTab = 'records' | 'achievements' | 'hof';
 type StatView = 'all' | CareerCompetitionStatScope;
 type AchievementFilter = 'all' | 'earned' | 'locked';
 
@@ -89,7 +89,7 @@ const TIER_COLOR: Record<string, string> = {
   platinum: '#B4E4FF',
 };
 
-export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
+export function RecordsScreen({ navigation, route }: ScreenProps<'Records'>) {
   const save = useCareer((s) => s.save);
   const hof = useHallOfFame((s) => s.board);
   const loadHof = useHallOfFame((s) => s.load);
@@ -97,7 +97,8 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
   const { colors } = useTheme();
   const [statView, setStatView] = useState<StatView>('all');
   const [hofTab, setHofTab] = useState<HofTab>(save?.mode === 'manager' ? 'managers' : 'players');
-  const [mainTab, setMainTab] = useState<MainTab>('records');
+  const mainTab = recordsTab(route.params?.initialTab);
+  const setMainTab = (initialTab: RecordsTab) => navigation.setParams({ initialTab });
   const [achFilter, setAchFilter] = useState<AchievementFilter>('all');
   const [managerStatKind, setManagerStatKind] = useState<ManagerLeaderboardKind>('runs');
 
@@ -145,14 +146,14 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
   const achList: AchievementDef[] =
     achFilter === 'earned' ? earned : achFilter === 'locked' ? pending : achievementCatalog;
 
-  const tabCfg: { value: MainTab; label: string }[] = [
+  const tabCfg: { value: RecordsTab; label: string }[] = [
     { value: 'records', label: 'Records' },
     { value: 'achievements', label: `Achievements (${earnedCount})` },
     { value: 'hof', label: 'Hall of Fame' },
   ];
 
   return (
-    <Screen scroll>
+    <Screen scroll careerNavigation scrollResetKey={`${save.id}:${mainTab}`}>
       <ScreenHeader title="Records & Glory" onBack={() => navigation.goBack()} />
 
       <SegmentedControl
@@ -519,7 +520,7 @@ export function RecordsScreen({ navigation }: ScreenProps<'Records'>) {
                   if (pct >= 0.9) return '🏆 Legendary completionist';
                   if (pct >= 0.6) return '🥇 Elite collector';
                   if (pct >= 0.3) return '🥈 Rising achiever';
-                  return 'No achievements yet';
+                  return earnedCount > 0 ? 'Building your collection' : 'No achievements yet';
                 })()}
               </Text>
             </Card>

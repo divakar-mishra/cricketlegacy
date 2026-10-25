@@ -1,0 +1,80 @@
+{
+  "date": "2026-10-23",
+  "timeZone": "Asia/Kolkata",
+  "status": "Audit complete; visual findings unfixed; not submission certification",
+  "simulatorBundleId": "com.coverdrive.cricket.simulator",
+  "appVersion": "1.0.12",
+  "appBuild": "1",
+  "successfulSelectedRuns": [
+    {
+      "bundle": "navigation-phone.xcresult",
+      "result": "Passed",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "device": "Cricket QA iPhone 16 Pro",
+      "startUTC": "2026-10-23T10:55:37.566Z",
+      "finishUTC": "2026-10-23T10:58:02.996Z"
+    },
+    {
+      "bundle": "secondary-phone-retest.xcresult",
+      "result": "Passed",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "device": "Cricket QA iPhone 16 Pro",
+      "startUTC": "2026-10-23T11:07:21.032Z",
+      "finishUTC": "2026-10-23T11:11:34.982Z"
+    },
+    {
+      "bundle": "targeted-phone.xcresult",
+      "result": "Passed",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "device": "Cricket QA iPhone 16 Pro",
+      "startUTC": "2026-10-23T11:17:28.287Z",
+      "finishUTC": "2026-10-23T11:18:19.039Z"
+    },
+    {
+      "bundle": "global-ipad.xcresult",
+      "result": "Passed",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "device": "Cricket QA iPad A16",
+      "startUTC": "2026-10-23T11:03:22.337Z",
+      "finishUTC": "2026-10-23T11:05:03.066Z"
+    },
+    {
+      "bundle": "compact-final.xcresult",
+      "result": "Passed",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "device": "Cricket UI Audit Compact 2026-10-23",
+      "startUTC": "2026-10-23T11:22:43.622Z",
+      "finishUTC": "2026-10-23T11:23:28.674Z"
+    }
+  ],
+  "totals": {
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0
+  },
+  "earlierUnsuccessfulRunsRetained": [
+    "secondary-phone.xcresult",
+    "global-compact.xcresult",
+    "global-compact-retest.xcresult"
+  ],
+  "visualFindings": [
+    "Wage Ledger first row initially clipped",
+    "Leadership Selected wraps mid-word",
+    "Player identity/readiness and profile attribute labels truncated"
+  ],
+  "providerTestsDeferred": true,
+  "runtimeSourceChanged": false,
+  "desktopHandbookMirror": "All three files compared equal after copying",
+  "simulatorZipSHA256": "e6923c32c000336d4647afa201db968105a63deba1f4efd5ae7d186ad071e133",
+  "androidAabSHA256": "0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4"
+}

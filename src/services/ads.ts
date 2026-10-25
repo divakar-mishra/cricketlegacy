@@ -2,6 +2,8 @@
 
 import { isOnline } from './connectivity';
 import { getJSON, setJSON } from '../storage/storage';
+import { synchronizeUnityConsent } from './unityConsent';
+import { QA_TOOLS_ENABLED } from '../config/qa';
 
 export type AdKind = 'rewarded' | 'interstitial';
 
@@ -19,10 +21,58 @@ let _admob: AdMobModule | null | undefined;
 let _adsConfigured = false;
 export type AdAudience = 'none' | 'teen' | 'adult';
 let _audience: AdAudience = 'none';
+// Also advances when privacy editing starts, invalidating already-loading ads.
+let _audienceRevision = 0;
 let _configuration: Promise<void> | undefined;
 let _privacyBusy = false;
 let _unitIds: { rewarded?: string; interstitial?: string; banner?: string } = {};
 const _adsStateListeners = new Set<() => void>();
+// Ephemeral QA-only overrides. Never persist or rewrite the declared-age answer.
+let _qaDebugGeography: number | undefined;
+let _qaOriginalAudience: 'adult' | undefined;
+let _qaSessionBusy = false;
+
+function consentOptions(audience: AdAudience) {
+  return {
+    tagForUnderAgeOfConsent: audience === 'teen',
+    ...(QA_TOOLS_ENABLED && _qaDebugGeography !== undefined
+      ? { debugGeography: _qaDebugGeography } : {}),
+  };
+}
+
+/** Called only after the native QA/test-device guard, never by normal startup. */
+export async function configureQaAdSession(profile: 'us-adult' | 'teen' | 'normal'): Promise<boolean> {
+  if (!QA_TOOLS_ENABLED || _audience === 'none' || _privacyBusy || _configuration || _qaSessionBusy) {
+    throw new Error('An eligible, idle Android QA ad session is required');
+  }
+  if (!['us-adult', 'teen', 'normal'].includes(profile)) throw new Error('Unknown QA profile');
+  const M = loadAdMob();
+  if (typeof M?.AdsConsent?.reset !== 'function') throw new Error('QA consent reset unavailable');
+  if (!_qaOriginalAudience) {
+    if (_audience !== 'adult') throw new Error('QA overrides require an existing adult test session');
+    _qaOriginalAudience = 'adult';
+  }
+  const audience = profile === 'teen' ? 'teen' : _qaOriginalAudience;
+  const revision = ++_audienceRevision;
+  _qaSessionBusy = true;
+  _adsConfigured = false;
+  notifyAdsStateChanged();
+  try {
+    await synchronizeUnityConsent(_audience, false);
+    await M.AdsConsent.reset();
+    // Never resurrect eligibility withdrawn while the native reset was pending.
+    if (_audienceRevision !== revision) throw new Error('QA audience changed; restart the QA session');
+    _qaDebugGeography = profile === 'us-adult' ? 3 : profile === 'teen' ? 4 : undefined;
+    // The pinned native SDK wrapper creates a fresh RequestConfiguration.Builder,
+    // so the normal adult call clears the QA teen rating by omitting that field.
+    await configureAds(_unitIds, audience);
+    if (profile === 'normal') _qaOriginalAudience = undefined;
+  } finally {
+    _qaSessionBusy = false;
+    notifyAdsStateChanged();
+  }
+  return isAdsReady();
+}
 
 function notifyAdsStateChanged(): void {
   _adsStateListeners.forEach((listener) => listener());
@@ -54,18 +104,40 @@ export async function configureAds(
   unitIds: { rewarded?: string; interstitial?: string; banner?: string } = {},
   audience: AdAudience = 'none',
 ): Promise<void> {
+  const audienceChanged = _audience !== audience;
+  if (audienceChanged) _audienceRevision += 1;
   _audience = audience;
   if (audience === 'none') {
     _adsConfigured = false;
     notifyAdsStateChanged();
+    if (audienceChanged) void synchronizeUnityConsent('none', false).catch(() => undefined);
     return;
   }
-  if (MOCK_MODE || _adsConfigured) return;
-  if (_configuration) return _configuration;
+  // Invalidate any older pending load as well as readiness when iOS identities
+  // disappear. Audience withdrawal above must always retain its normal handling.
+  if (isIosRuntime() && (!unitIds.rewarded || !unitIds.interstitial || !unitIds.banner)) {
+    _audienceRevision += 1;
+    _unitIds = {};
+    _adsConfigured = false;
+    notifyAdsStateChanged();
+    return;
+  }
+  if (MOCK_MODE || _privacyBusy) return;
+  if (_configuration) {
+    await _configuration;
+    if (audienceChanged && _audience === audience) await configureAds(unitIds, audience);
+    return;
+  }
+  if (_adsConfigured && !audienceChanged) return;
+  _adsConfigured = false;
+  notifyAdsStateChanged();
+  const revision = _audienceRevision;
+  const isCurrent = () => _audience === audience && _audienceRevision === revision;
   const M = loadAdMob();
   if (!M) return;
   _unitIds = unitIds;
   _configuration = (async () => {
+    let stage = 'request_configuration';
     try {
       // Configure treatment before consent or initialization. For eligible
       // teens use the most restrictive flags available in GMA 24.x.
@@ -82,19 +154,28 @@ export async function configureAds(
       // On a transient form/update error, only use UMP's own current/previous
       // session permission; never infer permission from the age choice alone.
       let consent: { canRequestAds?: boolean } | undefined;
+      stage = 'ump';
       try {
-        consent = await M.AdsConsent?.gatherConsent({ tagForUnderAgeOfConsent: audience === 'teen' });
+        consent = await M.AdsConsent?.gatherConsent(consentOptions(audience));
       } catch {
         consent = await M.AdsConsent?.getConsentInfo();
       }
-      if (_audience !== audience || consent?.canRequestAds !== true) {
+      if (!isCurrent()) return;
+      // The pinned Unity adapter does not forward Additional Consent itself.
+      // Apply native vendor/purpose choices before any mediated SDK initializes.
+      stage = 'unity_privacy';
+      await synchronizeUnityConsent(audience, consent?.canRequestAds === true);
+      if (!isCurrent() || consent?.canRequestAds !== true) {
         notifyAdsStateChanged();
         return;
       }
+      stage = 'google_initialization';
       await init.initialize();
-      _adsConfigured = _audience === audience;
+      _adsConfigured = isCurrent() && !_privacyBusy;
       notifyAdsStateChanged();
     } catch {
+      // QA-only stage names, never raw consent strings or account identifiers.
+      if (QA_TOOLS_ENABLED) console.warn(`[CricketAdsQA] Configuration failed at ${stage}`);
       _adsConfigured = false;
       notifyAdsStateChanged();
     }
@@ -107,30 +188,37 @@ export async function configureAds(
 }
 
 export async function showAdPrivacyChoices(): Promise<'shown' | 'not_required' | 'unavailable'> {
-  if (_audience === 'none' || _privacyBusy) return 'unavailable';
+  if (_audience === 'none' || _privacyBusy || _qaSessionBusy) return 'unavailable';
   const audience = _audience;
   const M = loadAdMob();
   if (!M?.AdsConsent) return 'unavailable';
+  const revision = ++_audienceRevision;
   _privacyBusy = true;
   _adsConfigured = false;
+  notifyAdsStateChanged();
   try {
     if (_configuration) await _configuration;
     _adsConfigured = false;
     notifyAdsStateChanged();
-    const info = await M.AdsConsent.requestInfoUpdate({ tagForUnderAgeOfConsent: audience === 'teen' });
+    // Suspend personalization while the user edits/withdraws a choice.
+    await synchronizeUnityConsent(audience, false);
+    const info = await M.AdsConsent.requestInfoUpdate(consentOptions(audience));
     const required = info?.privacyOptionsRequirementStatus === 'REQUIRED';
     const result = required ? await M.AdsConsent.showPrivacyOptionsForm() : info;
-    if (result?.canRequestAds === true && _audience === audience) {
+    if (_audience !== audience || _audienceRevision !== revision) return 'unavailable';
+    await synchronizeUnityConsent(audience, result?.canRequestAds === true);
+    if (result?.canRequestAds === true && _audience === audience && _audienceRevision === revision) {
       const init = (M.default ?? M.mobileAds)?.();
       if (init?.initialize) {
         await init.initialize();
-        _adsConfigured = _audience === audience;
+        _adsConfigured = _audience === audience && _audienceRevision === revision;
       }
     }
     notifyAdsStateChanged();
     return required ? 'shown' : 'not_required';
   } catch {
     _adsConfigured = false;
+    await synchronizeUnityConsent(audience, false).catch(() => undefined);
     notifyAdsStateChanged();
     return 'unavailable';
   } finally {
@@ -140,9 +228,17 @@ export async function showAdPrivacyChoices(): Promise<'shown' | 'not_required' |
 }
 
 async function mayRequestAds(): Promise<boolean> {
-  if (_audience === 'none' || !_adsConfigured || _privacyBusy) return false;
+  if (_audience === 'none' || !_adsConfigured || _privacyBusy || _qaSessionBusy) return false;
+  const revision = _audienceRevision;
   try {
-    return (await loadAdMob()?.AdsConsent?.getConsentInfo())?.canRequestAds === true;
+    const permitted = (await loadAdMob()?.AdsConsent?.getConsentInfo())?.canRequestAds === true;
+    if (revision !== _audienceRevision || _privacyBusy) return false;
+    if (!permitted) {
+      _adsConfigured = false;
+      notifyAdsStateChanged();
+      await synchronizeUnityConsent(_audience, false);
+    }
+    return permitted && revision === _audienceRevision && !_privacyBusy && _adsConfigured;
   } catch {
     return false;
   }
@@ -150,7 +246,7 @@ async function mayRequestAds(): Promise<boolean> {
 
 /** Whether a live ad backend is ready (SDK loaded + initialised). */
 export function isAdsReady(): boolean {
-  return _audience !== 'none' && !_privacyBusy && _adsConfigured && loadAdMob() != null;
+  return _audience !== 'none' && !_privacyBusy && !_qaSessionBusy && _adsConfigured && loadAdMob() != null;
 }
 
 /** Return a configured production banner unit, or Google's test unit in dev. */
@@ -162,15 +258,29 @@ export function getBannerAdUnitId(): string | undefined {
 
 /** Let AdMob's UMP/TCF signal select adult serving mode, including limited ads. */
 export function getAdRequestOptions(): { requestNonPersonalizedAdsOnly?: boolean } {
-  return _audience === 'teen' ? { requestNonPersonalizedAdsOnly: true } : {};
+  // The initial iOS port does not request ATT authorization or use IDFA tracking.
+  // Keep its requests contextual until a separately reviewed tracking flow exists.
+  return _audience === 'teen' || isIosRuntime() ? { requestNonPersonalizedAdsOnly: true } : {};
+}
+
+function isIosRuntime(): boolean {
+  try {
+    // Keep pure-engine/test imports independent of React Native's native entry.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return (require('react-native') as typeof import('react-native')).Platform.OS === 'ios';
+  } catch {
+    return false;
+  }
 }
 
 /** Real rewarded ad — resolves completed=true only on EARNED_REWARD. */
 function showRealRewarded(unitId: string, M: AdMobModule): Promise<{ completed: boolean }> {
   const { RewardedAd, RewardedAdEventType, AdEventType } = M;
+  const revision = _audienceRevision;
   return new Promise((resolve) => {
     let earned = false;
     let settled = false;
+    let presenting = false;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const subs: (() => void)[] = [];
     const cleanup = () => {
@@ -193,8 +303,12 @@ function showRealRewarded(unitId: string, M: AdMobModule): Promise<{ completed: 
       const ad = RewardedAd.createForAdRequest(unitId, getAdRequestOptions());
       subs.push(
         ad.addAdEventListener(RewardedAdEventType.LOADED, () => {
+          if (settled || presenting) return;
+          if (!isAdsReady() || _audienceRevision !== revision) { finish(); return; }
+          presenting = true;
           try {
-            ad.show();
+            // Native adapters may reject asynchronously (e.g. stale Activity).
+            void Promise.resolve(ad.show()).catch(finish);
           } catch {
             finish();
           }
@@ -217,13 +331,17 @@ function showRealRewarded(unitId: string, M: AdMobModule): Promise<{ completed: 
 }
 
 /** Real interstitial ad — resolves when the ad closes (or errors/times out). */
-function showRealInterstitial(unitId: string, M: AdMobModule): Promise<boolean> {
+function showRealInterstitial(unitId: string, M: AdMobModule, canPresent: () => boolean): Promise<boolean> {
   const { InterstitialAd, AdEventType } = M;
+  const revision = _audienceRevision;
   return new Promise((resolve) => {
     let settled = false;
     let shown = false;
+    let presenting = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     const subs: (() => void)[] = [];
-    const cleanup = () =>
+    const cleanup = () => {
+      if (timeout) clearTimeout(timeout);
       subs.forEach((u) => {
         try {
           u();
@@ -231,6 +349,7 @@ function showRealInterstitial(unitId: string, M: AdMobModule): Promise<boolean> 
           /* noop */
         }
       });
+    };
     const finish = () => {
       if (settled) return;
       settled = true;
@@ -241,9 +360,13 @@ function showRealInterstitial(unitId: string, M: AdMobModule): Promise<boolean> 
       const ad = InterstitialAd.createForAdRequest(unitId, getAdRequestOptions());
       subs.push(
         ad.addAdEventListener(AdEventType.LOADED, () => {
+          if (settled || presenting) return;
+          if (!isAdsReady() || _audienceRevision !== revision || !canPresent()) { finish(); return; }
+          presenting = true;
           try {
-            ad.show();
+            const presentation = ad.show();
             shown = true;
+            void Promise.resolve(presentation).catch(() => { shown = false; finish(); });
           } catch {
             finish();
           }
@@ -251,8 +374,8 @@ function showRealInterstitial(unitId: string, M: AdMobModule): Promise<boolean> 
       );
       subs.push(ad.addAdEventListener(AdEventType.CLOSED, finish));
       subs.push(ad.addAdEventListener(AdEventType.ERROR, finish));
+      timeout = setTimeout(finish, 20_000);
       ad.load();
-      setTimeout(finish, 20_000);
     } catch {
       finish();
     }
@@ -270,6 +393,7 @@ const loaded: Record<AdKind, boolean> = {
 
 /** Timestamp (epoch millis) of the last shown interstitial, for frequency capping. */
 let lastInterstitialAt = 0;
+let hubInterstitialPending = false;
 const INTERSTITIAL_HISTORY_KEY = 'ads:interstitial-history:v1';
 export const INTERSTITIAL_WINDOW_MS = 60 * 60_000;
 /** Approved closed-test policy: at most four safe-point ads per rolling hour. */
@@ -314,10 +438,11 @@ export async function showRewarded(adsEnabled = true): Promise<{ completed: bool
  * Updates the frequency-cap timestamp when an ad is actually shown.
  * @param adsEnabled pass `false` (e.g. for the removeAds entitlement) to skip.
  */
-export async function showInterstitial(adsEnabled = true): Promise<boolean> {
-  if (!adsEnabled) return false;
+export async function showInterstitial(adsEnabled = true, canPresent: () => boolean = () => true): Promise<boolean> {
+  if (!adsEnabled || !canPresent()) return false;
   if (!(await mayRequestAds())) return false;
   if (!(await isOnline())) return false;
+  if (!canPresent()) return false;
 
   if (MOCK_MODE) {
     lastInterstitialAt = Date.now();
@@ -329,7 +454,7 @@ export async function showInterstitial(adsEnabled = true): Promise<boolean> {
   if (!M || !_adsConfigured) return false;
   const unitId = _unitIds.interstitial ?? M.TestIds?.INTERSTITIAL;
   if (!unitId) return false;
-  const shown = await showRealInterstitial(unitId, M);
+  const shown = await showRealInterstitial(unitId, M, canPresent);
   if (shown) lastInterstitialAt = Date.now();
   return shown;
 }
@@ -345,23 +470,32 @@ export async function maybeShowInterstitial(
   adsEnabled: boolean,
   safePoint: InterstitialSafePoint,
   minGapMs: number = DEFAULT_INTERSTITIAL_GAP_MS,
+  canPresent: () => boolean = () => true,
 ): Promise<boolean> {
   // Require an explicit, reviewed safe navigation point at every call site.
-  if (!adsEnabled || safePoint !== 'career-hub-return') return false;
-  const now = Date.now();
-  const stored = (await getJSON<number[]>(INTERSTITIAL_HISTORY_KEY)) ?? [];
-  const history = stored.filter(
-    (timestamp) => Number.isFinite(timestamp) && now - timestamp < INTERSTITIAL_WINDOW_MS,
-  );
-  const latest = history.length > 0 ? Math.max(...history) : lastInterstitialAt;
-  if (history.length >= INTERSTITIAL_MAX_PER_WINDOW || now - latest < minGapMs) return false;
-  const shown = await showInterstitial(true);
-  if (!shown) return false;
+  if (!adsEnabled || safePoint !== 'career-hub-return' || hubInterstitialPending || !canPresent()) return false;
+  // Reserve synchronously, before the history/consent/network awaits. Rapid
+  // focus changes must not start two ads against the same stale history.
+  hubInterstitialPending = true;
   try {
-    await setJSON(INTERSTITIAL_HISTORY_KEY, [...history, Date.now()]);
-  } catch {
-    // The ad was already shown. Persistence failure must not become an
-    // unhandled rejection in the hub; keep the in-memory gap as a fallback.
+    const now = Date.now();
+    const stored = await getJSON<number[]>(INTERSTITIAL_HISTORY_KEY);
+    const history = (Array.isArray(stored) ? stored : []).filter(
+      (timestamp) => Number.isFinite(timestamp) && now - timestamp < INTERSTITIAL_WINDOW_MS,
+    );
+    // A failed history write must not let an older stored timestamp override
+    // the ad we just showed in this process.
+    const latest = Math.max(lastInterstitialAt, ...history);
+    if (history.length >= INTERSTITIAL_MAX_PER_WINDOW || now - latest < minGapMs) return false;
+    const shown = await showInterstitial(true, canPresent);
+    if (!shown) return false;
+    try {
+      await setJSON(INTERSTITIAL_HISTORY_KEY, [...history, Date.now()]);
+    } catch {
+      // The ad was already shown; the in-memory timestamp still enforces gap.
+    }
+    return true;
+  } finally {
+    hubInterstitialPending = false;
   }
-  return true;
 }

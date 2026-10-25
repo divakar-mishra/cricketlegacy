@@ -113,7 +113,7 @@ export function AcademyScreen({ navigation }: ScreenProps<'Academy'>) {
   };
 
   return (
-    <Screen scroll gradient={gradients.pitch}>
+    <Screen scroll careerNavigation gradient={gradients.pitch}>
       <ScreenHeader
         title="Youth Academy"
         subtitle={`Next intake · ${nextIntake ?? '—'}`}

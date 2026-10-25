@@ -82,6 +82,7 @@ export function transferWindowLabel(save: SaveGame): string {
 /** Route and store guard: players negotiate their own deals, not the club's squad. */
 export function clubTransferAccessReason(save: SaveGame): string | null {
   if (save.mode !== 'manager') return 'Club transfers are only available in Manager Career.';
+  if (save.managerRetired) return 'This Manager career is retired.';
   if (save.managerCareerLevel === 'NATIONAL') {
     return 'Club operations are paused during national duty.';
   }

@@ -1,0 +1,193 @@
+{
+  "origin": "https://sunlight-publisher-site.pages.dev",
+  "checkedAt": "2026-10-21T18:27:47.481Z",
+  "matched": true,
+  "files": [
+    {
+      "route": "/app-ads.txt",
+      "status": 200,
+      "matched": true,
+      "localSha256": "dcf6f4506146385cda858b238018faf4b4c0b54fd91316e6b37b25baf619671c",
+      "remoteSha256": "dcf6f4506146385cda858b238018faf4b4c0b54fd91316e6b37b25baf619671c",
+      "contentType": "text/plain; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/auction-xi-icon.png",
+      "status": 200,
+      "matched": true,
+      "localSha256": "b09da10e7ddae58b784c8fe8a8d03f6a762b6fe5871fe0636b7efe549adee8c6",
+      "remoteSha256": "b09da10e7ddae58b784c8fe8a8d03f6a762b6fe5871fe0636b7efe549adee8c6",
+      "contentType": "image/png",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/auth-return.js",
+      "status": 200,
+      "matched": true,
+      "localSha256": "fddfd5cb723e24f6cf100e97bc73fc560e267d5575fc5bd061aff38657f319b0",
+      "remoteSha256": "fddfd5cb723e24f6cf100e97bc73fc560e267d5575fc5bd061aff38657f319b0",
+      "contentType": "application/javascript",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/favicon.svg",
+      "status": 200,
+      "matched": true,
+      "localSha256": "8517a5b1298b01ff74ea29e3a0264294aa94f0b912bf215e87c8c38f5779c14e",
+      "remoteSha256": "8517a5b1298b01ff74ea29e3a0264294aa94f0b912bf215e87c8c38f5779c14e",
+      "contentType": "image/svg+xml",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "ca13b5dd105b99d548018e29d786abdbe9bd080289db66e7debc68d611fb5701",
+      "remoteSha256": "ca13b5dd105b99d548018e29d786abdbe9bd080289db66e7debc68d611fb5701",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/robots.txt",
+      "status": 200,
+      "matched": true,
+      "localSha256": "16ceb5ee3e0dc13aa9adf31a3ebbe45a1d965b8c2b9f72eaf84e5911e140ed95",
+      "remoteSha256": "16ceb5ee3e0dc13aa9adf31a3ebbe45a1d965b8c2b9f72eaf84e5911e140ed95",
+      "contentType": "text/plain; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/styles.css",
+      "status": 200,
+      "matched": true,
+      "localSha256": "d6aef9ca05516d3ee4371197b5ce5a35304ba3bf5a423731dcea5d36673e7e0d",
+      "remoteSha256": "d6aef9ca05516d3ee4371197b5ce5a35304ba3bf5a423731dcea5d36673e7e0d",
+      "contentType": "text/css; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/delete-account/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "d2aa3703a130e30de225fc865b4b424b201f1c24db3b5b9294bca6978f66d35d",
+      "remoteSha256": "d2aa3703a130e30de225fc865b4b424b201f1c24db3b5b9294bca6978f66d35d",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/images/cricket-legacy-icon.png",
+      "status": 200,
+      "matched": true,
+      "localSha256": "27ade9b1f38bef2f06853486903aaaf22876ca03d9091199406eb03306e93015",
+      "remoteSha256": "27ade9b1f38bef2f06853486903aaaf22876ca03d9091199406eb03306e93015",
+      "contentType": "image/png",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/privacy/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "193e4e88a122a359a571f79af016cdc2154b2a3bd2f2bf997013dab8d968bc3a",
+      "remoteSha256": "193e4e88a122a359a571f79af016cdc2154b2a3bd2f2bf997013dab8d968bc3a",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/publisher/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "e44d041d744dc36535358f00b5ed4ea162d1d62f68d6c312661423335e0496fe",
+      "remoteSha256": "e44d041d744dc36535358f00b5ed4ea162d1d62f68d6c312661423335e0496fe",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/support/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "5c01fc276b3646e948b7cd894dab9dd9f47d44adf1ff3a2cff6e7be823505e87",
+      "remoteSha256": "5c01fc276b3646e948b7cd894dab9dd9f47d44adf1ff3a2cff6e7be823505e87",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/terms/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "081b742a594a34b2dcd30f86fe03ae0099ce876308c4d93e19fb19f887c68440",
+      "remoteSha256": "081b742a594a34b2dcd30f86fe03ae0099ce876308c4d93e19fb19f887c68440",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/products/auction-xi/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "262ffa145dc2a17f877a00b2078fadd351569eef54415da02e2f96d9062bd103",
+      "remoteSha256": "262ffa145dc2a17f877a00b2078fadd351569eef54415da02e2f96d9062bd103",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/products/cricket-player-manager/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "41019a84816b4362ff471e18037299e5c4c688f64c4294f8c05cefbf13f7bafc",
+      "remoteSha256": "41019a84816b4362ff471e18037299e5c4c688f64c4294f8c05cefbf13f7bafc",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/products/auction-xi/delete-data/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "245ebf400185a191bec357513b44f0ee1270fab0a5b1229fe33b1f3da470e01c",
+      "remoteSha256": "245ebf400185a191bec357513b44f0ee1270fab0a5b1229fe33b1f3da470e01c",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/products/auction-xi/privacy/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "454e0350eb036c79a279cae2bc97ed86b576732cf913b1be918ad10eb2cb5db1",
+      "remoteSha256": "454e0350eb036c79a279cae2bc97ed86b576732cf913b1be918ad10eb2cb5db1",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/products/auction-xi/support/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "2fe159ea6df6a278191308041e52c6a8f6708862c11e82d0555cc0bcacb2ea22",
+      "remoteSha256": "2fe159ea6df6a278191308041e52c6a8f6708862c11e82d0555cc0bcacb2ea22",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/products/auction-xi/terms/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "83a037ded88af18d9c2e7730629092220ef2a1fda138d16b033362a42fa61278",
+      "remoteSha256": "83a037ded88af18d9c2e7730629092220ef2a1fda138d16b033362a42fa61278",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    },
+    {
+      "route": "/products/cricket-legacy/privacy/",
+      "status": 200,
+      "matched": true,
+      "localSha256": "6d41198268689e892dbf4fc0c2dd80c89e362f53173a95539609fed5f7606b01",
+      "remoteSha256": "6d41198268689e892dbf4fc0c2dd80c89e362f53173a95539609fed5f7606b01",
+      "contentType": "text/html; charset=utf-8",
+      "nosniff": "nosniff"
+    }
+  ],
+  "legacyRedirect": {
+    "status": 301,
+    "location": "/products/cricket-player-manager/",
+    "matched": true
+  },
+  "securityMatched": true
+}

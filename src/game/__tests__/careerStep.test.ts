@@ -10,6 +10,23 @@ import { isTransferWindowOpen } from '../transferMarket';
 import { makeCareerSave, makeManagerSave } from './_depthHelpers';
 
 describe('career next-step resolver', () => {
+  test('stale wallet energy never blocks a selected match after enough real time elapsed', () => {
+    const now = Date.UTC(2026, 9, 23);
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      const save = makeCareerSave();
+      save.careerPathLevel = 'SCHOOL';
+      save.players[save.userPlayerId!].age = 16;
+      save.playerCalendar = undefined;
+      generateYouthFixtures(save);
+      save.wallet.energy = 0;
+      save.wallet.energyUpdatedAt = now;
+      expect(resolveNextCareerStep(save).action).toBe('REFILL_ENERGY');
+      clock.mockReturnValue(now + 9 * 60_000);
+      expect(resolveNextCareerStep(save).action).toBe('PLAY_MATCH');
+      expect(save.wallet.energy).toBe(0); // Resolver does not mutate a save to render a CTA.
+    } finally { clock.mockRestore(); }
+  });
   test.each([6, 7, 8])('an exhausted Player calendar in month %i can advance without club transfers', (month) => {
     const save = makeCareerSave();
     save.careerPathLevel = 'DOMESTIC';

@@ -58,7 +58,11 @@ export function computeOverall(p: Player): number {
 
 /** True if the player can be used as a bowler in the sim. */
 export function canBowl(p: Player): boolean {
-  return Boolean(p.bowlingStyle) && bowlingMean(p) >= 25;
+  // Youth skills are scaled below the senior part-timer cutoff. A selected
+  // bowling-role player must still enter the eligible pool; the existing
+  // captain/spell rules and actual skill values decide their deliveries.
+  return Boolean(p.bowlingStyle) &&
+    (p.role === 'BOWLER' || p.role === 'ALLROUNDER' || bowlingMean(p) >= 25);
 }
 
 export function isSpinner(p: Player): boolean {

@@ -1,0 +1,130 @@
+CRICKET: PLAYER & MANAGER — AUDITED PRODUCTION AAB
+SUPERSEDED FOR PUBLIC RELEASE: owner requires version1.0.13. This code22
+artifact is technically verified but incorrectly retains public1.0.12.
+Do not upload it as1.0.13 or rename/relabel it. Corrected build/report:
+docs/PRODUCTION_AAB_1.0.13_2026-10-25.txt (follow current status there).
+
+25 October 2026, Asia/Kolkata
+================================================
+
+CURRENT STATUS: SIGNED CODE22 AAB BUILT, DOWNLOADED AND VERIFIED
+=============================================================
+Owner explicitly requested a complete check and, if successful, a production
+AAB. Full host and extended release gates passed, archive inspected, and ONE
+signed EAS production build FINISHED. Not uploaded/submitted to Google Play.
+
+USE THIS ARTIFACT (NOT OLD CODE21)
+--------------------------------
+/Users/divakarmishra/Desktop/APP/cricketlegacy/output/production-1.0.12/cricket-player-manager-1.0.12-vc22.aab
+Bytes111,422,775 (about106.3MiB). SHA256:
+  7401965419ca0630090f00ed04ee369aab1db3a36b55c8a51870875d0a9b186d
+Version1.0.12 / versionCode22. The existing store version name was preserved;
+remote versionCode22, not local QA30 or app.json17, is in the actual manifest.
+
+EAS build: 1ae0f1ee-fa31-4451-908e-701b96ebf7cb
+https://expo.dev/accounts/sunlightpvt/projects/cricket-legacy/builds/1ae0f1ee-fa31-4451-908e-701b96ebf7cb
+Package com.coverdrive.cricket; existing versionName1.0.12 retained.
+Remote production versionCode advanced21->22. Frozen existing remote keystore
+reused; no signing rotation. Profile production, distribution STORE, app-bundle.
+No auto-submit. Old code21 and QA30 do not contain the latest audit/promo changes.
+Cloud start25October15:19:26IST; finish15:36:35IST, about17m09s. Downloaded
+15:38:42IST; artifact checks completed15:40:27IST. One build, no retry/rebuild.
+
+ACTUAL DOWNLOADED ARTIFACT CHECKS — ALL PASS
+-------------------------------------------
+ZIP integrity, bundletool validation and JAR upload signature verified. Matches
+the unchanged established production upload certificate SHA256:
+  DA:68:BA:1D:9A:56:DB:FE:70:92:18:AB:68:E8:78:19:D6:8E:08:F2:EC:37:ED:3D:92:29:64:22:2D:C6:84:20
+Actual manifest: com.coverdrive.cricket, minSdk24, targetSdk36, non-debuggable,
+allowBackup=false, no microphone/broad-storage permission. Compiled Hermes:
+QA_TOOLS_ENABLED=false, purchase mock=false, ad simulation=false. QA negative
+control correctly rejected. QA native diagnostics absent from manifest/R8 map.
+Production ad/backend/legal/purchase public configuration embedded; backend and
+purchase public key sets match code21 without exposing key values in reports.
+Unity consent gate retained and automatic ad SDK initializer absent.
+R8 mapping/native purchase recovery present. All52checked arm64/x86_64 native
+libraries have ELF load alignment >=16KB. Four ABIs retained. Standalone Hermes
+bundle8,247,996bytes, SHA256:
+  3c03999c7a8dc70c619fd9bcb46e02e4b9a084cc1792681ddb0cbd46f3e26031
+Audit fix and promotion markers retained. Actual promo module constants confirm
+15November2026 00:00IST start,48hour gap,max2; no QA start-date bypass.
+Verification helper initially exceeded its128MiB output buffer reading the
+135,147,528byte R8 map (same size as oldcode21). Increased helper-only buffer to
+256MiB; rerun exited0 with all artifact checks PASS. Not an app/build failure.
+Oldcode21 hash rechecked unchanged; kept for historical evidence only.
+
+VERIFIED PREFLIGHT
+-------------------
+Fresh npm run check with NODE_ENV=test: TypeScript, repository quiet lint,
+302suites /2,347tests /2snapshots PASS. Full Jest duration93.775seconds.
+Extended resolver/storage/original failure reproduction gate:5suites /83tests
+PASS,223.108seconds. Fresh EAS/iOS config Node tests12/12 PASS. Patched native
+stale-view host-JVM guard12/12 PASS; vulnerable negative control fails as expected.
+Public production legal URLs +Publisher reachable/content-verified PASS.
+git diff --check PASS. No new runtime fix needed during this build request.
+
+Prepared EAS production archive and SHA256 compared all1,200captured inputs:
+source/assets/native/config/build scripts match. No captured source drift.
+Private .env/local credentials/keystores/agent config/build/output/test artifacts
+excluded. Build-input aggregate:
+  7e0dfda1a13c0032702570ee7cf9866a98dd732b63e6f80d60a1cd7fd0999fab
+This captures the audited source and November campaign, not only the old QA30.
+All1,200captured build inputs rechecked unchanged after upload, download and
+artifact verification. Concurrent saved-list diagnosis added docs/QA harness
+only; none of its proposed runtime optimizations are claimed in this AAB.
+
+INCLUDED SOURCE CHANGES
+------------------------
+Deep-audit fixes: reclaim uncommitted save chunks, preserve successful creation
+after optional resume-pointer failure in both careers, bind delayed ad bonuses
+to their requesting save, reserve interstitial loading, retain the latest cap
+timestamp on storage failure, and revalidate Home/save/paid removal before ads.
+Full findings/repro evidence: docs/DEEP_AUDIT_2026-10-25.txt.
+
+Sunlight publisher recommendation: Android Home after15November2026 00:00IST
+(phone clock), at most2appearances per installation,48hours apart. Both modes
+share durable history. CTA stops future prompts; second dismissal/appearance
+exhausts cap. Exact owner Play developer URL. No installed-app queries. Ad-free
+users excluded; guides/overlays and the first rating invitation are coordinated.
+No QA date bypass, rewards, install tracking or new native dependency/permission.
+Policy/tests: docs/OTHER_GAMES_PROMOTION_2026-10-25.txt.
+
+BUILD WARNINGS / CONFIGURATION
+-------------------------------
+Existing native android directory owns package ID; remote version source owns
+the production counter. app.json's local code17 and debug QA30 do not determine
+the production manifest. EAS warns that channel production is unused without
+expo-updates: this remains a standalone store bundle, not an OTA update.
+CLI reports a newer release is available; kept the already-working CLI rather
+than upgrade the build toolchain mid-release. No runtime/dependency/profile edit.
+
+LIMITS / RELEASE BOUNDARY
+-------------------------
+Passing host tests and a source archive are not physical-device/native UI,
+provider creative, fresh-owned-purchase or private Console certification. The
+earlier10career/218season/9,691result simulation remains applicable engine
+evidence (game/engine unchanged), not a newly rerun native multi-career soak.
+Existing Oppo/splash/SIGKILL/native-memory limits remain. No emulator/phone/save/
+account/purchase action or provider/backend/website/Console change this turn.
+Saved-career listing still performs repeated full primary/backup loads; separate
+source/trace diagnosis is docs/SAVE_LOADING_IMPACT_AUDIT_2026-10-25.txt. Its
+proposed summary/read-coordination optimizations are NOT IMPLEMENTED in code22.
+This is a documented performance limitation, not proof of save corruption or
+a newly observed native crash. Use Play-delivered upgrade/service checks before
+public rollout. This request authorizes packaging, not app publication.
+
+EVIDENCE
+---------
+output/production-android-audited-2026-10-25/
+  quality.log; quality-summary.json; legal.log
+  extended.log; config-tests.log; native-guard.log
+  source-inputs.json; source-comparison.json; archive-verification.json; archive/
+  prior-builds.json; build-attempt.json; build-request.json; build-latest.json
+  build-start.log; release.cjs; verify.cjs; release-notes.txt
+  download.json; artifact-summary.json; verification.log; manifest.xml
+  signature-verification.txt; bundletool-validation.txt
+  compiled-qa-tools-disabled.txt; compiled-purchase-mock-disabled.txt
+  compiled-ad-simulation-disabled.txt; compiled-promotion-policy.txt
+Handbook source: docs/how-to/ (current code22 section precedes historical work).
+Latest-artifact pointer: output/production-1.0.12/LATEST_PRODUCTION.txt.
+Release notes omit ad mediation as requested. No install or Play action made.

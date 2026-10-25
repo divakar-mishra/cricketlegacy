@@ -1,0 +1,13 @@
+
+> app@1.0.12 prelint
+> npm run generate-build-info
+
+
+> app@1.0.12 generate-build-info
+> node scripts/writeBuildInfo.js
+
+Wrote src/config/buildInfo.generated.ts
+
+> app@1.0.12 lint
+> eslint . --quiet
+

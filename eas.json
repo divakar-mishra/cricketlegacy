@@ -4,6 +4,42 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "ios-simulator": {
+      "distribution": "internal",
+      "environment": "preview",
+      "ios": { "simulator": true, "buildConfiguration": "Release" },
+      "env": {
+        "NODE_ENV": "production",
+        "CRICKET_TARGET_PLATFORM": "ios",
+        "CRICKET_IOS_SIMULATOR": "true",
+        "EXPO_PUBLIC_QA_TOOLS": "false",
+        "EXPO_PUBLIC_SUPABASE_ENABLED": "false",
+        "EXPO_PUBLIC_PRIVACY_POLICY_URL": "https://sunlight-publisher-site.pages.dev/privacy/",
+        "EXPO_PUBLIC_TERMS_URL": "https://sunlight-publisher-site.pages.dev/terms/",
+        "EXPO_PUBLIC_SUPPORT_URL": "https://sunlight-publisher-site.pages.dev/support/",
+        "EXPO_PUBLIC_ACCOUNT_DELETION_URL": "https://sunlight-publisher-site.pages.dev/delete-account/",
+        "EXPO_PUBLIC_REVENUECAT_IOS_DISABLED": "true",
+        "EXPO_PUBLIC_ADMOB_IOS_REWARDED_UNIT": "ca-app-pub-3940256099942544/1712485313",
+        "EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_UNIT": "ca-app-pub-3940256099942544/4411468910",
+        "EXPO_PUBLIC_ADMOB_IOS_BANNER_UNIT": "ca-app-pub-3940256099942544/2934735716"
+      }
+    },
+    "ios-production": {
+      "extends": "production",
+      "ios": { "buildConfiguration": "Release" },
+      "env": {
+        "CRICKET_TARGET_PLATFORM": "ios",
+        "CRICKET_IOS_SIMULATOR": "false",
+        "EXPO_PUBLIC_SUPABASE_ENABLED": "true",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://jtyuuwzhrufavbcxrhqp.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_gzM2VEC09TmqLE1O6Aboxw_bNSGaur0",
+        "ADMOB_IOS_APP_ID": "ca-app-pub-4249020515368291~7521033766",
+        "EXPO_PUBLIC_ADMOB_IOS_REWARDED_UNIT": "ca-app-pub-4249020515368291/8543305543",
+        "EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_UNIT": "ca-app-pub-4249020515368291/7613367251",
+        "EXPO_PUBLIC_ADMOB_IOS_BANNER_UNIT": "ca-app-pub-4249020515368291/3900693812",
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_WfoEkqFPQtxLbHszsLTpoQQCWuY"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
@@ -26,7 +62,11 @@
       "autoIncrement": true,
       "env": {
         "NODE_ENV": "production",
-        "EXPO_PUBLIC_QA_TOOLS": "false"
+        "EXPO_PUBLIC_QA_TOOLS": "false",
+        "EXPO_PUBLIC_PRIVACY_POLICY_URL": "https://sunlight-publisher-site.pages.dev/privacy/",
+        "EXPO_PUBLIC_TERMS_URL": "https://sunlight-publisher-site.pages.dev/terms/",
+        "EXPO_PUBLIC_SUPPORT_URL": "https://sunlight-publisher-site.pages.dev/support/",
+        "EXPO_PUBLIC_ACCOUNT_DELETION_URL": "https://sunlight-publisher-site.pages.dev/delete-account/"
       },
       "android": {
         "buildType": "app-bundle"
@@ -35,6 +75,12 @@
   },
   "submit": {
     "production": {},
+    "ios-production": {
+      "ios": {
+        "ascAppId": "6825412889",
+        "appleTeamId": "25PTZT5DNC"
+      }
+    },
     "open-testing": {
       "android": {
         "track": "beta",

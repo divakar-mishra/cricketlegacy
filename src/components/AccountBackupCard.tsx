@@ -28,7 +28,7 @@ export function AccountBackupCard({ onSignIn }: { onSignIn?: () => void }) {
   return (
     <Card style={styles.card}>
       <Text style={styles.title}>Career backup & recovery</Text>
-      <Text style={styles.copy}>{signedIn ? status.message : 'Sign in with Google to back up both careers, remaining balances, tokens and ad-free expiry.'}</Text>
+      <Text style={styles.copy}>{signedIn ? status.message : 'Sign in to back up both careers, remaining balances, tokens and ad-free expiry.'}</Text>
       {signedIn && status.confirmedAt ? <Text style={styles.copy}>Last confirmed: {new Date(status.confirmedAt).toLocaleString()}</Text> : null}
       <Text style={styles.copy}>Before uninstalling, tap Backup now and wait for confirmation. Recovery does not regrant spent packs or restart ad-free time.</Text>
       <View style={styles.action}>

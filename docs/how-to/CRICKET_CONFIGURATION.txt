@@ -1,0 +1,1875 @@
+CRICKET: PLAYER & MANAGER — CONFIGURATION REFERENCE
+Last updated: 26 October 2026 (Asia/Kolkata; work began 21 October)
+Example for this app only. Public IDs below are not reusable IDs for other apps.
+
+ARTIFACT LOCATION UPDATE —26OCTOBER2026
+======================================
+Only retained Android binary:output/production-1.0.13/cricket-player-manager-1.0.13-vc23.aab
+SHA256 b0d02649330772e3e290ab3096f8a7c783b5141a05584af1393550e8e623c34a.
+Owner requested old binary cleanup:37old APK/AAB/APKS files (~3.7GB) moved to
+/Users/divakarmishra/.Trash/cricket-legacy-old-builds-2026-10-26-3a97c623
+with original relative paths intact. inventory/result in
+output/artifact-cleanup-2026-10-26/. Historical old binary paths now absent;
+logs/evidence/signing/source/iOS retained. No new build/install/deployment or
+save change;concurrent saved-career source fix remains separate. Trash not
+emptied;recoverable until removed from Trash. Details:
+docs/ANDROID_ARTIFACT_CLEANUP_2026-10-26.txt.
+
+LATEST SOURCE — SAVED CAREER INDEX / CANCELLATION, 25 OCTOBER
+===========================================================
+Derived index key: sg:summary:v1:<career|manager>:<slot>. Small AES-GCM-protected
+metadata using the slot's existing key and summary-only AAD; schema-aware and
+rebuildable. It never replaces or authorizes the full save. No plaintext names/
+wallet previews, provider credentials, schema migration or backend deployment.
+New list/Continue APIs: listSlotSummaries / getLastPlayedSummary. Full verification
+still required on selected Play/Continue/Delete. Index invalidated before local
+copy mutations; missing/corrupt indexes use full verification, never empty-slot
+assumptions. Backup journal's optional localSaveToken/localSaveTokenBinding are
+generation/account/mode/slot/ID/ack hints only; dirty writes and account changes
+retain their guards. Do not hand-edit index/journal data or delete saves to test.
+Report: docs/SAVE_LOADING_FIX_2026-10-25.txt. Source only: code23 Android AAB and
+iPhone QA4 do not contain this change. Rebuild/install/device checks pending.
+13 focused suites / 310 tests, typecheck/quiet lint/diff/work-count checks PASS.
+
+CURRENT ARTIFACT — ANDROID1.0.13/CODE23 VERIFIED;CODE22 SUPERSEDED
+=====================================================
+android-release.json:version1.0.13,previousProductionVersion1.0.12,
+minimumVersionCode23. Expo/nativeAndroid/package/rootlock aligned1.0.13.
+EAS remote autoIncrement remains authoritative for actual internal code.
+Guard:scripts/checkAndroidReleaseVersion.cjs;tests:nine negative/positive Node
+cases;regular npm run check,EAS Android production pre-install and direct
+Gradle preReleaseBuild enforce it. Actual artifact also needs manifest/signature/
+flags verification,not a renamed file. Current corrected status/report:
+docs/PRODUCTION_AAB_1.0.13_2026-10-25.txt; output evidence:
+output/production-android-1.0.13-2026-10-25/. Corrected actual signed AAB:
+output/production-1.0.13/cricket-player-manager-1.0.13-vc23.aab
+Bytes111,422,774 (~106.3MiB),SHA256:
+  b0d02649330772e3e290ab3096f8a7c783b5141a05584af1393550e8e623c34a
+EAS79b934d9-46f1-4dda-aa1d-4ba670d5e94e FINISHED16:38:06IST;verified16:39:56IST.
+Actual versionName1.0.13/code23,package unchanged,signature matches established
+upload certificate. Compiled QA/purchase mock/ad simulation=false;all52checked
+64-bit libs16KB aligned. Archive1,203inputs unchanged. Fresh2347standard/83
+extended/9version tests,types/lint/config12/native12/public legalPASS. No store
+upload/publish/install or live-device/provider certification. Oldcode22 preserved.
+No gameplay/provider/dependency change; iOS target version must be reconciled
+with App Store Connect separately before any future iOS production submission.
+
+HISTORICAL ARTIFACT — AUDITED PRODUCTION CODE22,25OCTOBER2026
+======================================================
+Package com.coverdrive.cricket, version1.0.12, remote production versionCode22.
+AAB:output/production-1.0.12/cricket-player-manager-1.0.12-vc22.aab
+Bytes111,422,775 (~106.3MiB); SHA256:
+  7401965419ca0630090f00ed04ee369aab1db3a36b55c8a51870875d0a9b186d
+EAS production STORE1ae0f1ee-fa31-4451-908e-701b96ebf7cb FINISHED.
+Start15:19:26IST,finish15:36:35IST,local verification15:40:27IST25October.
+Existing production UPLOAD certificate unchanged, frozen credentials reused.
+Actual manifest min24/target36,nondebuggable,backup=false,no microphone/broad
+storage. Compiled QA_TOOLS_ENABLED=false,purchase mock=false,ad simulation=false;
+QA native diagnostics absent. Unity consent gate retained/auto initializer absent.
+Standalone Hermes8,247,996bytes; native recovery/R8 map present;52checked64-bit
+libraries16KB aligned. Production public providers match prior intended settings.
+1,200archive/build inputs hash-matched and source unchanged after build/download.
+Fresh302suites/2,347tests/2snapshots +extended83tests and config12/guard12PASS.
+Audit fixes and scheduled promotion included. Proposed saved-list optimizations
+below NOT included. No install, live-device test or store/provider deployment.
+Full evidence:output/production-android-audited-2026-10-25/artifact-summary.json;
+report:docs/PRODUCTION_AAB_AUDITED_2026-10-25.txt. Use code22,not oldcode21.
+
+CURRENT DIAGNOSIS — SLOW SAVED CAREER LISTS, 25 OCTOBER
+=====================================================
+No new runtime patch/build/install or provider/device action in this audit.
+src/screens/SavedGamesScreen.tsx awaits full listSlots before publishing; each
+slot load unconditionally reads/opens primary + backup and awaits local VIP
+archive work. No metadata-only summary listing, no full-load request sharing.
+Account recovery scans both modes, refreshes UI on completion, and Continue
+opens one whole career. Tab/focus refreshes repeat reads; stale-result guards
+do not cancel underlying work. Keep those guards and per-slot write order.
+Harness: node qa/ios-device/audit-save-load-work.cjs. Synthetic6Player/4Manager
+with both copies: Player list12opens, two concurrent Player lists24, backup +
+Player list + Continue34, active backup plus queued follow-up40. Actual source
+in VM with strictly mocked boundaries; not native AES/storage performance.
+Same counts verified on current source and frozen Input QA4. Current ordinary
+creation exception uses findCreationSlot: requested empty standard slot gets
+2occupancy checks/0opens; slot-six eligibility fallback still uses listSlots.
+Historical QA4 longest recorded list span8,110.64ms; decoder elapsed includes
+yields, async totals overlap. No fresh phone measurement or RAM/battery claim.
+Affected-path and safe optimization report: docs/SAVE_LOADING_IMPACT_AUDIT_2026-10-25.txt.
+Evidence: docs/evidence/save-load-audit-2026-10-25/verification.json.
+90focused safety tests/5suites PASS, helper lint and count assertions PASS.
+No removal of encryption/checksums/backups/history; proposed summaries must be
+invalidated safely and actual selected saves verified before use/destruction.
+
+CURRENT CAMPAIGN — SUNLIGHT OTHER GAMES,25OCTOBER SOURCE
+=====================================================
+Source constants: src/services/otherGamesPromotion.ts.
+Start2026-11-15T00:00:00+05:30 (15November00:00IST), phone-clock based.
+48hour minimum gap; maximum2reserved appearances per installation across modes.
+URL: https://play.google.com/store/apps/developer?id=Sunlight+Pvt
+AsyncStorage: promotion:sunlight-other-games:v1; version/impressions/lastShownAt/
+stopped. Persist reservation before display; fail closed on bad/read/write state.
+CTA durably stops future asks before HTTPS OS handoff. No app-install queries,
+attribution, tracking/analytics events, campaign SDK, remote config or new native
+permission/dependency. Ordinary updates preserve history; full data clear/
+reinstallation does not. No account-wide/cross-device cap promised.
+OtherGamesPrompt +HubEngagementPrompts replace only the existing rating mount in
+the two hubs. Android Home after5matches, no guide/reward/contract/etc overlays,
+foreground/focus, and NOT ad-free VIP/timed users. Existing first rating and promo
+are separate Home visits. iOS original system-rating component passes through.
+194focused tests/11suites including58new; fresh types/lint/diff PASS. No full
+suite/native/build/install/provider/store action. Oldcode21 remains superseded.
+Evidence/limits: docs/OTHER_GAMES_PROMOTION_2026-10-25.txt and
+output/other-games-promotion-2026-10-25/. Later packaging must include these files.
+
+CURRENT SOURCE — DEEP AUDIT FIXES / OLD AAB ON HOLD, 25 OCTOBER
+=============================================================
+No provider/config/credentials/product-price/schema/native/build-profile change.
+Seven runtime files changed from captured code21 inputs: PlayerCreationScreen,
+TeamSelectScreen, MatchScreen, CareerHubScreen, careerStore, services/ads and
+storage/storage. Six existing test files extended; new diagnostic scripts retain
+the demonstrated failures. All captured engine/game/assets inputs unchanged.
+Creation now tolerates optional last-played pointer failure after durable save;
+delayed match-ad bonuses require the original save; failed chunk writes reclaim
+only uncommitted staged rows, retaining ambiguous commits. Home interstitials
+reserve loading synchronously, respect the newer in-memory cap timestamp and
+recheck live Home focus/save/VIP eligibility. Approved ad cadence unchanged.
+Source gates PASS: 299 suites /2,289 tests /2 snapshots, extended83, types/lint/
+diff. Native stale-view host harness12PASS; public legal URL/content checkPASS.
+10 full careers/218seasons/9,691results all retired; controlled Instant Sim,
+not physical/live-provider verification. Core line83.59%/branch69.87% coverage;
+not a whole-UI/device guarantee. Paid delivery tests cover all14 sold products.
+code21 below has none of these fixes and is SUPERSEDED: DO NOT UPLOAD as current.
+Old AAB hash unchanged. No new binary/install/store/deployment made this turn.
+Current report/repro commands: docs/DEEP_AUDIT_2026-10-25.txt
+Generated logs, hashes, coverage and career report: output/deep-audit-2026-10-25/.
+Native memory/Oppo, real account switching and live ad creatives remain separate
+coverage limits. Existing iOS/provider setup and historical QA facts unchanged.
+
+CURRENT PRODUCTION ARTIFACT — CODE21, VERIFIED 25 OCTOBER 2026
+=============================================================
+Package com.coverdrive.cricket; existing versionName 1.0.12 retained. EAS remote
+counter 20 -> 21; local QA30 and app.json's local code17 do not set this manifest.
+AAB: output/production-1.0.12/cricket-player-manager-1.0.12-vc21.aab
+Bytes 111,415,776; SHA256:
+  dc92efde0a0460539956a1db1130328046be06ea126cc520e841df3c721cb648
+EAS production STORE build 5ca837ef-2403-406b-a0da-33b30037ccd9 FINISHED.
+Existing upload cert SHA256 unchanged: DA:68:BA:1D:9A:56:DB:FE:70:92:18:AB:68:E8:
+78:19:D6:8E:08:F2:EC:37:ED:3D:92:29:64:22:2D:C6:84:20.
+Profile/signing reused, --freeze-credentials, no auto-submit. Actual AAB validates,
+min24 / target36, non-debuggable, backup=false, no broad storage/microphone perms.
+Standalone Hermes 8,238,768 bytes; R8 map/payment-recovery module retained; all
+52 64-bit libraries 16KB-aligned. Four ABIs. QA tools/purchase mocks/ad simulation
+compiled false; QA native diagnostics absent. Production public config and four
+legal URLs retained. All 1,190 captured build inputs unchanged; archive excludes
+local credentials/agent/output/native-build files. Old code20 hash unchanged.
+Final full release check 299 suites / 2,267 tests / 2 snapshots, types/lint/legal/
+diff PASS. Separate EAS/iOS config tests 10 PASS; platform isolation 8 tests PASS.
+EAS compatibility correction: ios-simulator.env no longer has an empty Apple
+SDK-key value (CLI rejects empty env strings). It now sets
+EXPO_PUBLIC_REVENUECAT_IOS_DISABLED=true, which forces the Apple key empty in
+MONETIZATION even if the preview environment supplies a real key. Other flag
+states preserve Apple-key selection; Android key expression and both production
+profiles/real keys unchanged. No gameplay/guide change since owner-approved QA30.
+No device/save/provider/backend/website/store action; no upload/submission.
+Play-delivered upgrade/service QA and existing coverage limits stay separate.
+Evidence: docs/PRODUCTION_AAB_2026-10-25.txt; output/production-android-2026-10-25/.
+Earlier code20/QA entries below are historical, not the latest production AAB.
+
+CURRENT PIXEL 10 — QA30 ATTRIBUTES POPUP, 25 OCTOBER 03:06 IST
+===========================================================
+Pixel_10_Pro_XL / emulator-5554 updated from QA29 to QA 1.0.12 / code 30.
+adb install -r Success; firstInstallTime 2026-10-25 02:33:54 retained,
+lastUpdateTime 03:06:44. Installed SHA256 matches artifact:
+  output/attributes-popup-qa-2026-10-25/
+  cricket-player-manager-attributes-popup-qa-vc30.apk
+  9e7e53dc6beac7d84c136eb5b620ad6d79366623fbe9e296e798340808f6f84a
+V2 debug certificate unchanged; arm64-v8a, min24 / target36. Embedded JS
+8,235,256 bytes matches generated bundle. Standalone internal QA, not Play AAB.
+Build SUCCESS 2m 13s; 384 stable runtime/config inputs, 373 bundled project
+sources match; exactly five runtime changes since QA29 (attributes popup path).
+Fresh 163 focused tests / 17 suites, tsc/src quiet lint/diff and 18 native
+consent tests PASS. Opened portrait main menu with Choose your look popup;
+left choices untouched. No guide/career/save/purchase/sign-in action, reset,
+uninstall, data clear, other-device or provider/backend/website/store change.
+Actual smoothness and save-loading checks remain owner-pending. Production
+AAB/config untouched; wait for owner review before production packaging.
+Evidence: docs/ATTRIBUTES_STATIC_POPUP_2026-10-25.txt. Older entries historical.
+
+SOURCE AFTER QA29 — ATTRIBUTES STATIC POPUP / PLAIN SCROLLER,25 OCTOBER
+====================================================================
+New AttributesGuidePopup: one non-animated, focus/queue-aware modal, Got it /
+backdrop / Android Back dismissal. Form-owned replay/dismissal state. Attributes
+chapter now one explanatory text; Player uses explicit CareerGuide plain mode
+on step1, exposing no target context and no root layout observer. Screen uses
+normal ScrollView there, not GuideScrollView. Attribute targets/+ anchor removed.
+Session wrapper stays mounted to preserve Identity completion; next Club/Review
+pages restore existing docked pointer guide. Other defaults/layouts unchanged.
+163focused tests/17suites, fresh types/src lint/diff PASS. Exact non-attributes
+copy and QA29 Identity/Club/later markup unchanged; Manager/save/storage/Stepper
+hashes unchanged. No config/schema/commerce/native changes. Source-only, not
+built/installed; last verified QA29 below is old interactive attributes behavior.
+Native FPS/smoothness pending a new authorized QA, not established by host mocks.
+Evidence:docs/ATTRIBUTES_STATIC_POPUP_2026-10-25.txt.
+
+CURRENT PIXEL10 — QA29 SHORT PLAYER GUIDE,25 OCTOBER02:33IST
+==========================================================
+Pixel_10_Pro_XL/emulator-5554 nowQA1.0.12/code29, adb install -r Success.
+firstInstallTime=lastUpdateTime=2026-10-25 02:33:54. Before install, game package
+was absent in pm/dumpsys and pm -u. No uninstall/clear/reset by this agent;
+old save retention cannot be claimed. Opened untouched initial Your age setup.
+Artifact:output/short-player-guide-qa-2026-10-25/
+cricket-player-manager-short-player-guide-qa-vc29.apk
+SHA256:28e18a97dab529956734cc9e793dfb03d3b21d00eede63d5a6e130a280fcd5b0
+Installed hash matches; V2 debug cert unchanged,arm64,min24/target36,
+embedded JS8,234,020bytes matches generated bundle. Build2m21s,18native tests;
+155focused tests/16suites, fresh types/src lint/diff PASS.383inputs stable;
+372bundled project sources match. Only two runtime files differ from QA28,
+the short interactive Player guide. Manager/slot loading/shared scroll unchanged.
+No setup choices, guide/career actions, restore/purchase/sign-in, other device,
+provider/backend/website/store action. Native guide review pending owner setup.
+QA only, production AAB/config unchanged. Older source-only/QA28 below historical.
+Evidence:docs/SHORT_PLAYER_WALKTHROUGH_2026-10-25.txt.
+
+SOURCE AFTER QA28 — PLAYER POINTER WALKTHROUGH SHORTENED,25 OCTOBER
+==================================================================
+PlayerCreationScreen now uses docked/session CareerGuide + replay again.
+Identity targets:identity-basics(required name+country),appearance(required
+gender+tone+portrait),role-and-styles(required role; extra style options optional).
+Attributes:attribute-setup(top pathway/difficulty/points),attribute-plus(actual
+Stepper+, manual event or Skip step),attribute-controls(skill rows only).
+Club/review each1popup.155focused tests/16suites, fresh types/src lint/diff PASS.
+Only PlayerCreationScreen and Player creation guide copy changed at runtime.
+Hash-verified unchanged Manager/CreationOverview/saveGames/storage/CareerGuide/
+Screen/Stepper; exact non-Player-creation guide text unchanged. Loading fast path,
+durable save, validation and prior scroll fixes retained. No config/schema change.
+No build/install/device action. Last verified installed QA28 below still has
+INLINE Player help; short interactive source requires new authorized QA.
+Evidence:docs/SHORT_PLAYER_WALKTHROUGH_2026-10-25.txt.
+
+CURRENT PIXEL10 — QA28 COMPACT CREATION,25 OCTOBER00:47IST
+=========================================================
+Pixel_10_Pro_XL/emulator-5554 now1.0.12/code28, adb install -r Success.
+lastUpdateTime2026-10-25 00:47:49; firstInstallTime2026-10-16 02:13:57 retained.
+Artifact:output/compact-creation-qa-2026-10-25/
+cricket-player-manager-compact-creation-qa-vc28.apk
+SHA256:b51e9be01117e32d6d1ff3bde6ee8201b70cd075faca9ace8368c5d07ecd2153
+Installed hash matches. Embedded JS8,232,372bytes matches generated bundle;
+V2 debug cert unchanged, min24/target36,arm64-v8a. Local QA override only.
+Build2m20s,18native tests PASS.137focused tests/12suites, fresh types/src quiet
+lint/diff PASS.383inputs stable;372bundled project sources match. Six runtime
+files differ from QA27, exactly the compact-guide/slot-check changes below.
+Opened menu; retained Karachi Truewind Manager Resume card. No career/guide
+tap, save creation, purchase, sign-in, reset, data clear or other-device action.
+Owner native guide/loading check pending. No production AAB/config/store change.
+Earlier source-only/QA27 statuses below are historical, not current installation.
+Evidence:docs/COMPACT_CREATION_AND_LOADING_2026-10-25.txt.
+
+SOURCE AFTER QA27 — COMPACT CREATION / EMPTY-SLOT FAST PATH,25 OCTOBER
+===================================================================
+CreationOverview + CAREER_GUIDES creation copy now supply one inline collapsible
+card per existing setup page, rather than the measured pointer/docked tour.
+Player:identity/attributes/club/review. Manager:single setup page. Screen scroll
+is normal; required choices stay validated and attributes remain manual.
+Home/training/match pointer code and content unchanged. Storage hasStoredValue
+checks occupancy only; findCreationSlot avoids opening existing worlds for a
+free base slot, while preserving corrupt/backup protection, per-slot queues,
+write identity checks and premium slot-six eligibility via verified saves.
+Both starts still await durable storage, then activate/open Home. Manager now
+rejects same-frame duplicate taps; busy footer names creation/saving.
+137focused tests/12suites, fresh types/src quiet lint/diff PASS. Synthetic host
+slot benchmark197ms -> <1ms,2decryptions -> 0; not actual device latency.
+NO new build/install/config/schema/provider/store change. Last verified QA27
+below does not contain this change. Native layout/tap-to-Home QA remains pending.
+Evidence:docs/COMPACT_CREATION_AND_LOADING_2026-10-25.txt.
+
+CURRENT PIXEL10 — QA27 ATTRIBUTE GUIDE,25 OCTOBER00:09IST
+========================================================
+Pixel_10_Pro_XL/emulator-5554 now1.0.12/code27, adb install -r Success.
+lastUpdateTime2026-10-25 00:09:27; firstInstallTime2026-10-16 02:13:57 retained.
+Artifact:output/attributes-guide-qa-2026-10-25/
+cricket-player-manager-attributes-guide-qa-vc27.apk
+SHA256:68d9a110ccb3c73436c2a3ef2d0815ba082ef3282e7d6c4dc0e5f8fef5d39a6d
+Installed hash matches; unchanged V2 debug cert,min24/target36,arm64-v8a,
+embedded JS8,228,576bytes. Local QA27 override only, production config unchanged.
+Build2m29s,18native tests/0failures;90focused tests/10suites, fresh types/src
+lint/diff PASS.382inputs stable;370bundled project files match; only five guide
+files differ from QA26. Main menu opened with retained Mumbai Sharks Resume;
+no career/guide tap, purchase, sign-in, reset or data clear. Other devices untouched.
+The source fixes below are now packaged. Native attribute smoothness/keyboard/
+guided-flow review remains pending on this QA; older source-only/code26 states
+below are historical. Detail:docs/ATTRIBUTES_GUIDE_LAG_FIX_2026-10-24.txt.
+
+SOURCE AFTER QA26 — ATTRIBUTE ENTRY / SCROLL FEEDBACK FIX
+========================================================
+player.attributes targets now starting-level,creation-difficulty,attribute-budget,
+attribute-plus,attribute-controls,creation-next. Summary is no longer the whole
+page; each setup/list section is independently reachable. GuideScrollView uses
+native innerViewRef/measureLayout content coordinates, deduplicated pending
+scroll commands, scoped stale-result guards and cached highlight scroll deltas.
+Unchanged layouts do not re-reveal; inactive/unused Stepper anchors do not force
+measurement. Guided resetKey remounts the scroller instead of racing a second
+scroll-to-top effect. No new dependency/native config/schema/commerce change.
+90 focused tests/10 suites, fresh types/src quiet lint/diff PASS. Source-only;
+code26 below is STILL installed. Native smoothness and iOS layout not certified.
+Read-only Pixel10 screenshot was already on club selection, not an attribute
+lag reproduction. No taps, reset, build or install. Detailed evidence:
+docs/ATTRIBUTES_GUIDE_LAG_FIX_2026-10-24.txt.
+
+CURRENT PIXEL10 — QA26 GUIDE FOLLOW-UP,24 OCTOBER23:39IST
+=======================================================
+Pixel_10_Pro_XL was restarted without wipe and now uses emulator-5554. Verified
+code25 beforehand; adb install -r Success, now1.0.12/code26/min24/target36.
+lastUpdateTime2026-10-24 23:39:47; firstInstallTime2026-10-16 02:13:57 retained.
+Artifact:output/guide-sequence-qa-2026-10-24/
+cricket-player-manager-guide-sequence-qa-vc26.apk
+SHA256:eecde2ed394cef6951b2538d605bbe5672a9e0b940d1d1a81904cce3861e7bd3
+Installed base.apk matches. Embedded JS8,227,388bytes; unchanged V2 debug cert,
+arm64. Local QA26 override only, production config untouched. Build3m20s;
+18native tests/0failures;69focused tests/7suites, fresh types/src lint/diff PASS.
+382fingerprinted inputs stable;370bundled files match. Only six guide source
+files differ from QA25. Opened main menu: retained Mumbai Sharks Resume card,
+no pre-mode coach. No career action, data clear, new purchase or sign-in.
+Guide fixes described below are now packaged; earlier code25/source-only states
+are historical. Native guide/keyboard/large-text QA still pending owner review.
+Evidence:docs/CREATION_GUIDE_SEQUENCE_SCROLL_FIX_2026-10-24.txt.
+
+SOURCE AFTER CODE25 — GUIDE SESSION / COLOUR / SCROLL FIX
+========================================================
+PlayerCreationScreen and TeamSelectScreen now use CareerGuide progress=session,
+layout=docked. Each new setup ignores old global completed/skip guide keys;
+existing ordinary career guides keep persisted progress. No global preference
+or career save reset. Player identity targets: name,country,gender,skin-tone,
+portrait,role,styles,creation-next. Explicit tone state lives only in the form;
+gender/tone changes invalidate dependent choices, never a saved career.
+GuideScrollView bounds docked creation scrolling to actual active target size;
+dim areas consume unrelated touches, Skip guide unlocks. Text may scroll but
+coach actions do not. Styles and complete allocation controls have real targets.
+Shared Android/iOS UI source only. No SDK/native config/dependency/schema change.
+69 focused tests/7 suites, typecheck, src quiet lint and diff checks PASS;
+native review on a new QA remains pending.
+Installed Pixel10 is still code25 below, NOT this latest source. Detailed logs:
+docs/CREATION_GUIDE_SEQUENCE_SCROLL_FIX_2026-10-24.txt.
+
+CURRENT PIXEL10 INSTALL — CODE25,24 OCTOBER,22:56IST
+==================================================
+Pixel_10_Pro_XL/emulator-5556 now1.0.12/code25, data-preserving adb install -r.
+lastUpdateTime2026-10-24 22:56:48; original firstInstallTime retained.
+Artifact:output/creation-fix-qa-2026-10-24/
+cricket-player-manager-creation-fix-qa-vc25.apk
+SHA256:ea9b44b30c1229aa149b873b8d06c0def1f03a1010cb39301ea0dcd5254fae93
+Installed hash matches. V2 debug signature unchanged, embedded JS8,223,392bytes,
+arm64,min24/target36,QA tools true,source schema46. Production version unchanged.
+Built2m26s;18native tests/0failures, typecheck/src quiet lint/diff PASS.
+382source/config fingerprints stable;367bundled project files match source.
+Opened normal menu only; owner manual creation/female/large-text/gameplay checks
+pending. No career advance, data clear, new purchase or production packaging.
+Prior code24/source-only states below historical. Both platforms require a
+schema46-compatible build for new46saves. Exact evidence:creation-fix report.
+
+CURRENT SOURCE — CREATION / WORLD IDENTITY FIX,24 OCTOBER
+=======================================================
+Creation coach only after mode choice; required GuideTarget readiness; docked
+coach for Player/Manager creation; country modal suppresses coach. Explicit
+gender/portrait/role and valid name/country required. NPC Player.sex drives
+country-specific fictional names and portrait fallback across the Player world.
+Source SAVE_SCHEMA_VERSION46; migration45repairs old female NPC identities only,
+preserving gameplay/ownership/IDs. Later cosmetic edits do not switch leagues.
+Both platforms need a schema46-compatible build to open new46saves. Existing
+Pixel10code24/current phone artifacts NOT updated by this source-only pass.
+26suites/320tests/1snapshot/typecheck/lint/diff PASS; no new native/build result.
+See docs/CREATION_GUIDE_FEMALE_ROSTER_FIX_2026-10-24.txt before packaging.
+
+CURRENT PIXEL10 INSTALL — 24 OCTOBER,21:04IST
+============================================
+Pixel_10_Pro_XL/emulator-5556 now runs existing guide QA1.0.12/code24, NOT23.
+In-place adb install -r Success; lastUpdateTime2026-10-24 21:04:30;
+firstInstallTime2026-10-16 02:13:57 unchanged. Installed base.apk SHA256:
+3580cf15a13ea9fdb6a5cd35f0ffcf4e899ef2064f21ac8cb70fdf53fd5ad674.
+Artifact:output/career-coach-qa-2026-10-24/
+cricket-player-manager-career-coach-qa-vc24.apk. Verified embedded JS/v2 debug
+signature; same existing internal candidate, not a new current-source build.
+Opened to menu coach for owner; no step/guide reset or career advanced. No new
+purchase, save wipe, provider change, AAB or release. Manual checks pending.
+Earlier code23 billing PASS remains scoped to that tested build; not silently
+relabelled as a code24 purchase rerun. Historical5558-only install notes below
+are superseded by this later owner-authorized handoff. See career-coach report.
+
+CURRENT ANDROID PLAY BILLING — 24 OCTOBER
+=========================================
+Native real license-test checkout/owned restore PASS:player_vip and manager_vip,
+INR449.00 each from Play metadata; separate mode entitlements correctly applied.
+Existing Pixel_10_Pro_XL/emulator-5556,1.0.12/code23,debug-signed standalone QA.
+Play itself confirmed always-approves TEST card/no-charge notice before payment;
+no console credentials/settings altered. Owned restores repeated successfully
+including process restarts; Player purchase did not grant Manager VIP.
+Player809Coins/2Gems, Manager11,000Coins/0Gems and displayed$750k Club Balance
+unchanged. Player energy cap60 observed; ordinary real-time regeneration remains.
+Test purchases remain owned; no refund/revoke/reset, mock grant or reinstall.
+Same-install native test only, NOT cross-device/account/final-AAB/iOS approval.
+Evidence:docs/PLAY_VIP_CHECKOUT_RESTORE_2026-10-24.txt. Earlier unverified notes
+are historical for these specific checks; other release gates still apply.
+
+CURRENT CROSS-PLATFORM CONFIG CHECK — 24 OCTOBER
+================================================
+iOS selectors remain scoped:normal/default and EAS Android return base config;
+Firebase Android autolinking retained; separate Android/iOS ads and RevenueCat
+keys verified. Do not leak CRICKET_TARGET_PLATFORM=ios into an Android build.
+Shared layout/navigation/auth fixes affect both platforms and are already in
+the career-coach QA APK:367bundled project source files match current source.
+No regression found:384targeted Jest tests/12Node checks/typecheck/lint PASS.
+Production code20AAB and QA code24APK unchanged. No fresh native run:all ADB
+devices stopped; no game/source/provider mutation. Evidence and snapshot hash:
+docs/IOS_ANDROID_IMPACT_REVIEW_2026-10-24.txt. Recheck future shared edits.
+
+CURRENT ANDROID CAREER COACH — 24 OCTOBER
+=========================================
+Replaces the rejected quick-start; all older quick-start instructions below
+are historical. Full four-step Player creation lands at Home after saving.
+Source:components/CareerGuide.tsx, content/careerGuides.ts, game/coachGuide.ts
+and guided creation/hub/training/match screens. Progress uses existing settings
+dismissedTips:coach-v1:<chapter>:<target>; skip is per common/player/manager.
+Replay one chapter with Show screen guide; reset all through Settings replay.
+No new save shape, balance/reward grant, forced win or automatic paid training.
+Genuine BOWLER/ALLROUNDER with a bowling style now qualify for the existing
+spell pool despite low youth skills; part-timer25cutoff/no-style guard retained.
+Internal APK:output/career-coach-qa-2026-10-24/
+cricket-player-manager-career-coach-qa-vc24.apk
+SHA256:3580cf15a13ea9fdb6a5cd35f0ffcf4e899ef2064f21ac8cb70fdf53fd5ad674
+1.0.12/code24 QA-only override; debug-signed; arm64; embedded JS8,215,784bytes.
+Final Gradle r4 build2m34s; mapping upload excluded. Installed with -r ONLY on
+Cricket_FirstSession_QA/emulator-5558. Pixel10 code23 remains untouched here.
+Final292suites/2,206tests/2snapshots/typecheck/lint/diff PASS. Focused native
+Player/Manager creation/Home/training and Player Watch bowling/batting checked.
+No new production AAB, iOS install, provider/backend/website/store mutation.
+Full reproduction, earlier caught layout issues and honest pending checks:
+docs/CAREER_COACH_2026-10-24.txt.
+
+CURRENT iOS RESPONSIVENESS INVESTIGATION — 24 OCTOBER
+=====================================================
+CURRENT: Input QA 4, Release 1.0.12/build 4, installed IN PLACE; no reset/sign-out.
+Owner reports Saved Games freezes about 15 seconds with neither list visible.
+Input QA 3 stage timings: UTF-8 decode max 5,347.16 ms, 30 calls total 25,807.72
+ms; matching JS gap. EVIDENCED CONTRIBUTOR, not proof of every missed finger tap.
+Fix: src/storage/decodeSaveText.ts + one call in saveEncryption.ts. Same UTF-8
+streaming semantics in 16 KiB chunks, macrotask yields. All encryption, checksums,
+format, keys, backup, ownership and contents preserved. 76 focused Jest + 8 Node
+checks pass; actual Expo decoder tested. Root/candidate typecheck and lint pass.
+Candidate/source: output/ios-device/input-qa-2026-10-24-build4/.
+JS SHA256: 31704c9ed6e20a277440ff5c97cd11a7771d9457daa9d3c15e2e9bc16590311e
+Same frozen build-1 base/native code sections, entitlements/profile; no latest
+root/onboarding/Android integration. Optimized Hermes 98, signature verified.
+Phone listing/Back PASSED (18.833s total); both-list inspection PASSED (14.034s).
+Observed 6 Player + 4 Manager cards, no loading/recovery-error labels; final menu
+inspected. Authenticated controls observed; old exact-5-Player assertion FAILED.
+Extra VIP slot dated 24 October, origin unestablished; never deleted/opened.
+Do NOT turn separate observational pass into strict preservation certification.
+Captured initial build-4 JS heartbeat max excess 890.3ms (one gap), not zero or
+a controlled like-for-like benchmark. Manual retest requested, automation stopped.
+Full current-root Jest: 293 suites / 2,210 tests / 2 snapshots PASS, 85.921s.
+Earlier build-3 listing test ended at MainMenu, with
+intervening manual navigation/ambiguous header locator: NOT a proven list-load
+timeout. Corrected to menu-specific item; owner asked not to tap during checks.
+Build-2 preservation test failed AX before taps, game remained running; current
+exact historical nine-career identity/content parity remains unverified.
+No lost-data claim; current authenticated controls/list counts verified above.
+Logger: foreground MainMenu/Settings/SavedGames numeric input/work times only,
+max 1,024 events, 10-minute elapsed limit per launch, local coalesced cache
+write once per second. No IDs, keys, save data, raw errors or private-screen
+capture. Only Library/Caches/cricket-input-trace-v1.json copied; previous launch
+rotates its own .previous.json. No automatic upload/background monitoring.
+
+HISTORICAL BUILD-1 FINDINGS (superseded install/update status above):
+OPEN owner report:5–10taps, already at main menu, no popup/automation. Artifact
+is the existing Release1.0.12/build1, not Debug/Expo Go or latest integrated
+quick-start source. No game runtime change or replacement install performed.
+Owner comparison now reports Cricket-only missed taps; system Settings normal.
+Both Cricket Settings and Back are owner-reported intermittent. Temporary
+input-logging QA game update was subsequently approved/installed as above. Log
+only touch/press/cancel/navigation timing, not account/save/credential content;
+preserve bundle, signing, sign-in and saves, never uninstall/reset for this.
+Additional testMainMenuShortTapHitAreas passed45.873s:9Settings/Back trips,
+18one-attempt actions across30ms requested contacts, button interiors,150/350ms
+controls and2pt/1pt drift. Total28synthetic actions, no manual pass claimed.
+Direct time-profile export recovered. App-only sample weights:15s idle main334/
+JS55ms;30s requested manual window main555/JS96ms. Not latency, blocked-thread
+or manual-reproduction proof. Owner's pressed-feedback detail still pending.
+Added separate testMainMenuSingleTapNavigation; generated runner:
+output/ios-device/responsiveness-driver-2026-10-24/. Five Settings/Back trips,
+10single center-coordinate actions passed; inspected final menu has no popup.
+Native runner build passed. r1 test failed Audio/AUDIO selector, corrected
+only in test; screenshot already proved that tap opened Settings. Test command
+timings include automation overhead, not true app latency. Time Profiler15s
+capture completed; index export failed139, later direct table export succeeded.
+Old Apple-prep screenshot proves Choose your look blocked Login, not scrolling.
+Phone iOS18.0; Apple18.0.1 notes include iPhone16/16Pro touch fix. Possible
+confounder, not a diagnosis of the reported Cricket-only issue. Apple/sandbox
+still paused. No secrets, OS/accessibility change, provider change or upload.
+Full evidence/limits: docs/IOS_RESPONSIVENESS_DIAGNOSIS_2026-10-24.txt.
+
+CURRENT ANDROID OWNER-QA HANDOFF — 24 OCTOBER
+=============================================
+Verified target Pixel_10_Pro_XL=emulator-5556 (5554=Pixel_8_Pro). Recheck every
+session rather than trusting an old serial assignment. Installed with adb -r:
+output/pixel10-qa-2026-10-24/cricket-player-manager-qa-vc23.apk
+com.coverdrive.cricket1.0.12/code23, arm64, debug-signed, embedded JS; internal
+only, not a production artifact. QA-only version init script beside APK.
+SHA256:b9b3275d33835619d29086a6f44ef1d406163801abe5271f61b9cef4d23587e1
+Package update confirmed01:23:28; storage retained, game left unopened for owner.
+SIGKILL/provider-update correlation and limitations are in
+docs/ANDROID_SIGKILL_FOLLOWUP_2026-10-24.txt. No runtime patch claimed.
+
+HISTORICAL BUILD-1 PHYSICAL IPHONE QA INSTALL — 24 OCTOBER
+========================================================
+Latest install above supersedes this version; recovery evidence below was
+observed on build 1 and is not a post-update preservation certification.
+OWNER PAUSE: Apple/sandbox tests deferred, no background retry or automatic
+resume. No game sign-out/Apple auth/purchase/restore occurred. Driver Login
+visibility failure precedes sign-out; saved diagnostic now inspected and shows
+a covering appearance modal, not offscreen Login:
+output/ios-device/ui-driver-2026-10-24/game-state-before-apple-r5*.
+Sandbox tester existence/device sign-in unconfirmed. Resume from evidence;
+require [Environment: Sandbox] before payment and never sign out of iCloud.
+Complete handoff/setup: docs/IOS_PHYSICAL_DEVICE_PREFLIGHT.txt, OWNER PAUSE.
+Separate UI-test helper: qa/ios-device/{DeviceRecoveryTests.swift,create-project.rb}.
+Generated driver: output/ios-device/ui-driver-2026-10-24/, CricketDeviceQA scheme,
+development team25PTZT5DNC, separate com.coverdrive.cricket.deviceqatests runner.
+Build/signature verified. First automation-initialization timeout superseded by
+owner's automation-ready confirmation and working native app control. Test-only
+locators corrected for icon-inclusive menu and rendered uppercase SLOT labels.
+Four selected runs passed: Account navigation, restored-list inspection,
+one manual recovery retry and post-retry inspection. Owner alone completed
+Google sign-in; game shows authenticated Google success and backup confirmed.
+Fresh-device lists:5Player +4Manager, unchanged after retry. No extra career
+slots. Exact balances/inventory/expiry/content parity is not certified by counts.
+Run serially with -only-testing and -collect-test-diagnostics never; never while
+owner handles Google credentials. No game binary/source changes; legitimate
+account recovery populated local career data. No unrelated personal data read.
+Installed display name Cricket QA; bundle com.coverdrive.cricket;1.0.12/build1.
+App: output/ios-device/device-qa-2026-10-24-r2/derived-data/Build/Products/
+Release-iphoneos/CricketSimulator.app. Native target name is reused; validated
+platform iPhoneOS, not simulator. Minimum iOS16.4, physical iPhone16Pro18.0.
+Apple Development signature deep/strict verified; team25PTZT5DNC, profile
+contains connected phone, get-task-allow=true. Not App Store distribution.
+Hermes JS SHA256:1c682e7ff3b2c9a8912452156f55fb1335ddf9b1ad0b4565534648ad52b7788e
+Devicectl install/query confirmed. Automatic launch timeout retained; owner
+confirmed manual opening. Subsequent native navigation and focused Google
+fresh-install recovery passed as above; not a whole-app QA/consent pass.
+Apple login/linking, another Google identity, offline retry on phone, actual
+sandbox purchases/restore, ads and stability remain separate pending tests.
+No private credentials, user UUIDs, receipts or raw save payloads in handbook;
+app-only screenshots/results remain ignored/local. Do not assume Apple login
+is the same account or that purchase ownership crosses the two stores.
+Read-only Auth settings HTTP200 at2026-10-23T19:10:36.228Z: Apple/Google/
+anonymous=true. That was a flags-only check; later owner-assisted Google login
+was verified separately through real game UI, not by inspecting provider secrets.
+Frozen source excludes the other task's later PlayerCreationScreen edit.
+Exact scope, safe next steps and reproducible helper commands:
+docs/IOS_PHYSICAL_DEVICE_PREFLIGHT.txt.
+
+HISTORICAL PHYSICAL IPHONE / DEVELOPMENT SIGNING FOLLOW-UP — 24 OCTOBER
+===========================================================
+Apple Development identity is now locally valid for team25PTZT5DNC. The missing
+Apple WWDR G3 public intermediate was verified against the existing trusted
+Apple root, then imported into login keychain; no trust override/key export.
+New isolated snapshot: output/ios-device/device-qa-2026-10-24-r2/.
+1117source/test/asset hashes; captured2026-10-23T18:53:51.492Z;35focused tests
+and typecheck passed. Later PlayerCreationScreen changes are excluded until
+rebuilt. Separate Pods/native files and derived data, not the shared simulator.
+Cricket QA uses com.coverdrive.cricket with existing real public Supabase and
+RevenueCat wiring, Google TEST units and no QA cheats/mock purchases. APNs
+excluded only from QA entitlements. Not a store distribution profile/artifact.
+Helpers: scripts/prepareIosDeviceQa.cjs and scripts/buildIosDeviceQa.cjs.
+Unique labels/attempt logs preserve prior evidence. Initial Pod path failure
+resolved with isolated pinned CocoaPods regeneration; locked versions unchanged.
+Install/physical test status: docs/IOS_PHYSICAL_DEVICE_PREFLIGHT.txt.
+
+HISTORICAL PHYSICAL IPHONE / LOCAL SIGNING PREFLIGHT
+========================================
+Verified physical iPhone16Pro, iOS18.0/build22A3351; paired/wired/connected,
+Developer Mode enabled, DDI services available. Private device IDs/name omitted.
+Local codesigning identity list:0usable identities at the check. Remote Apple
+certificate/account state is not established by this local result. Use existing
+team25PTZT5DNC in Xcode Accounts > Manage Certificates to obtain a usable Apple
+Development identity; no API-key recreation, private-key export or revocation.
+No signed DEVICE app/install/physical app QA exists from this preflight.
+First60second loop edits belong to another active task; no overlap/runtime edit.
+Detailed owner instructions and source checkpoint/testing boundary:
+docs/IOS_PHYSICAL_DEVICE_PREFLIGHT.txt.
+
+HISTORICAL / SUPERSEDED PLAYER QUICK START QA — 24 OCTOBER 2026
+========================================================
+Source: PlayerCreationScreen.tsx, Onboarding.tsx, CareerHubScreen.tsx,
+game/playerQuickStart.ts. Quick defaults reuse age16/Grade A, scale0.52,
+Normal, All-Rounder, RHB/right-arm pace, Specialist, standard save/default
+portrait; initial cricket nationality India is editable, NOT a residence answer.
+Future Tier3 club is visible and changes with cricket nationality. Full setup
+retains all options; balanced attributes use the ordinary per-role budget/caps.
+No persisted flag/schema change, first-result rigging, boost or new telemetry.
+Temporary AVD root:/private/tmp/cricket-first-session-qa, name:
+Cricket_FirstSession_QA, serial5558, Android34 Google Play arm64,1080x1920/420dpi.
+No Apple/Google account sign-in or real purchase is needed for this UI pass.
+Use adb install -r; never clear existing owner data or reuse the other game's
+emulators. Existing production1.0.12-vc20 AAB remains unchanged.
+Build uses existing Gradle qa variant, JDK17, EXPO_PUBLIC_QA_TOOLS=true,
+NODE_ENV=production, arm64-v8a. Java25 first attempt failed native configuration;
+do not change engine/dependency versions to work around that local JDK issue.
+Evidence:docs/evidence/player-quick-start-2026-10-23/ (began before midnight).
+Final artifact/result details:docs/PLAYER_QUICK_START_2026-10-24.txt.
+Final QA APK:output/player-quick-start-qa-2026-10-24/
+cricket-player-manager-quick-start-qa.apk, com.coverdrive.cricket1.0.12/code17,
+debug signed, arm64, embedded JS8,199,600bytes; not a Play upload/update package.
+SHA256:a1bfca484d7775344d17548cdb121a799c8e39f22011d2fa75dba71aabd7f359
+Fresh local profile10 added to test without clearing profile0's first QA save.
+Larger text1.3 checked; restored1.0. Final focus guide/result and direct-match
+route verified; no guaranteed novice60second timing claim. One unexplained
+SIGKILL/recovery is recorded, not silently labelled a clean stability pass.
+Gradle ran configured Crashlytics QA mapping task; network delivery was not
+independently verified. For future internal builds exclude only that metadata
+upload with -x :app:uploadCrashlyticsMappingFileQa. Do not disable compilation,
+R8 tests, signing or legal release gates. No production/backend deployment.
+
+CURRENT iOS UI-FIX ARTIFACT / DEVICE MATRIX — 23 OCTOBER 2026
+==========================================================
+Supersedes the earlier unfixed simulator F1/F2/F3 status below. New standalone
+QA ZIP: output/ios-simulator/cricket-player-manager-1.0.12-ios-ui-fixes-2026-10-23.zip
+SHA256:1cfc46203b4e839fb4130a7f484ed2d4fb7ce2e63a646c662470e5ab67229026
+Bundle com.coverdrive.cricket.simulator,1.0.12/build1, no real backend/commerce,
+Google test ad IDs only; not a device IPA. Existing Android AAB is unchanged.
+Actual fixed-screen tests:16Pro402x874pt; compactSE3 375x667pt;
+17ProMax440x956pt UUID8C9DBB70-36DB-441B-B580-B45DE08A68B2.
+ProMax extra-extra-large text pass completed and size restored to large.
+16Pro/17Pro local profiles share display geometry, mask/chrome/sensor bar;
+17Pro duplicate skipped. Apple18Pro/Max specs match tested pixel resolutions,
+but actual18 hardware/runtime remains untested. No Duo/18 type installed.
+Current host Xcode26.6/iOS26.5. Duo native/resizable testing requires installing
+Xcode27.1+ and its matching runtime, then rebuilding the isolated QA app.
+Generic window API resizing is covered by a regression test; NOT a Duo pass.
+Official sources and step-by-step runbook:
+docs/IOS_SIMULATOR_UI_FIXES_2026-10-23.txt.
+Evidence: output/ios-simulator/evidence/ui-fixes-2026-10-23/ and selected images
+in docs/evidence/ios-ui-fixes-2026-10-23/. Only select safe named UI tests.
+
+CURRENT ENERGY / VIP RECOVERY CONFIG — 23 OCTOBER 2026
+=====================================================
+Owner approved+8per completed rewarded ad and1point per3minutes. Capacity stays
+36free/60permanent VIP; match costs unchanged; Gem refill still10Gems, now to
+the actual cap. Source: ECONOMY.rewardedAdEnergy/energyRegenMinutes and shared
+energyCapacity/energyRecovery helpers. Meter, foreground/boundary recovery,
+refills, grants and canonical resource view now share that entitlement logic.
+UI: WalletBar tap -> EnergyRecoveryModal; queued/safe-area scrollable dialog,
+next-point/full countdown, actual remaining ad grant, full/unavailable/loading
+states, Close/free waiting. Home/U19/other-competition shortages use the dialog.
+Store and popup share an in-flight action and original-save reward binding.
+Additional existing VIP streak promise is wired up: day7+10Gems/day30Legend VIP
+frame, idempotent across visits/reload/restore and backward clock corrections.
+No new product/price/provider/region/consent changes. No persisted shape/reset.
+Full14product benefit matrix, source defects and verification:
+docs/ENERGY_IAP_FIX_2026-10-23.txt. Existing release binaries remain unchanged;
+new source verification does not certify native ad presentation/live checkout.
+Final verification PASS: typecheck,quiet lint,287Jest suites/2167tests /
+2snapshots;17Node tests;24isolated SQL checks. No live provider certification.
+
+HISTORICAL ANDROID ENERGY CONFIGURATION AUDIT — 23 OCTOBER 2026
+===================================================
+Source constants: src/data/gameConfig.ts ECONOMY; src/game/economy.ts.
+Current free cap36 /VIP intended60 /regen1 per5real minutes /gem refill10Gems;
+rewarded energy4 in PurchaseScreen. Match cost varies by format and competition,
+not a universal4: international Test10. Current normal VIP regen/gem refill
+incorrectly stop at36; only the unused VIP refresh helper selects60 correctly.
+Source/UI findings and five passing mocked diagnostics are in
+docs/ANDROID_ENERGY_REVIEW_2026-10-23.txt. Owner-reported complaint1.0.12(20),
+Player Career; reviewer device/save not inspected. No new values approved or
+runtime code/build/provider changes made. Do not mistake diagnostic incorrect-
+value assertions for desired acceptance tests. No update to existing release
+artifacts, website, store pricing or published app was made by this review.
+
+CURRENT SIMULATOR UI AUDIT — 23 OCTOBER 2026
+==========================================
+Standalone QA bundle com.coverdrive.cricket.simulator, version1.0.12/build1.
+Installed .app: output/ios-simulator/derived-data/Build/Products/
+Release-iphonesimulator/CricketSimulator.app. Simulator-only, not a device IPA.
+QA iPhone16Pro: 6A85EC9A-070E-41D0-AC4B-D1C578B02886,402x874pt.
+QA iPadA16: BD2DF2E3-48A6-43B0-BE4B-E4816CBAECAC,820x1180pt.
+New isolated compact QA iPhoneSE3: 22A77244-958A-46A9-8E6A-B9C532B1C5D2,
+375x667pt. All tested on iOS26.5. Phone Warm/iPad and compact Classic preserved.
+Raw screenshots/logs/results/backups:
+output/ios-simulator/evidence/ui-ux-audit-2026-10-23/.
+Selected inspected evidence: docs/evidence/ios-ui-ux-audit-2026-10-23/.
+Detailed runbook/findings: docs/IOS_SIMULATOR_UI_UX_AUDIT_2026-10-23.txt.
+Final selected11 tests passed; visual issues F1/F2/F3 remain unfixed. Generated
+test harness is under output/ios-simulator/uitests; NEVER run its whole legacy
+suite blindly because other tests delete saves/accounts. Select exact safe
+tests as recorded in the audit logs. Preserve data and use unique result paths.
+The build disables cloud/RevenueCat and uses test ad IDs; offline store UI is
+expected. Test banners do not certify live ads/consent. Current audit did not
+reverify or alter real providers. Apple=true public check earlier remains the
+latest recorded provider evidence, superseding older false notes below.
+
+CURRENT RELEASE STATUS INDEX — 23 OCTOBER 2026
+============================================
+Use START_HERE.txt's CURRENT iOS RELEASE ORDER for the consolidated remaining
+gates. Public AdMob/RevenueCat client values are received/configured. Owner
+reports credential validation, Apple product/pricing entry, API-key setup and
+RevenueCat import/entitlement mapping complete; these are not new requests.
+Shared Supabase means reuse Android's existing Cricket project. FOLLOW-UP23OCT:
+the iOS production profile/template now contain that existing project's public
+URL/publishable key and enabled=true. Public Auth settings verified Apple=false,
+Google=true, anonymous=true. Private provider/redirect/EAS secrets are uninspected.
+No signed device archive, TestFlight upload, real-device purchase/owned restore
+or final App Review submission is verified. The simulator ZIP cannot serve as
+an App Store upload. Remaining source/privacy/deletion checks, device QA, real
+screenshots, saved store readiness and owner account/regional-age declarations
+are listed in the release order and RELEASE_LOG_AND_CHECKLIST.txt.
+Status review only: no provider change, code edit, build, purchase, deployment
+or store submission was performed for this inventory. Do not infer readiness
+from the five-value client-format gate or from owner-reported setup alone.
+
+LOCAL iOS TOOL AVAILABILITY — 23 OCTOBER 2026
+============================================
+Read-only check: Xcode26.6 (17F113); iOS26.5 runtimes include the existing
+Cricket QA iPhone16Pro and Cricket QA iPadA16, both listed Booted. Other available
+iPhone/iPad simulators remain available. Initial sandbox simctl access failed;
+approved read-only host access listed devices successfully. This is tool
+availability only, not a build/install/QA pass or evidence of a physical device.
+Private signing/account access and physical-device testing remain separate.
+
+APPLE PROVIDER — NEXT OWNER ACTION (23 OCTOBER 2026)
+===================================================
+This is SIGN IN WITH APPLE, not a RevenueCat/App Store IAP/API credential.
+Do not regenerate the already-completed RevenueCat keys or14 store products.
+LATEST UPDATE23OCT: owner subsequently replied done after generating/saving the
+Apple setup. Public GET /auth/v1/settings at2026-10-23T10:03:48.570Z confirmed
+Apple=true, Google=true, anonymous=true on jtyuuwzhrufavbcxrhqp.supabase.co.
+Earlier pending/false notes below are historical. No private credential/expiry,
+Services ID registration, redirect allowlist or actual OAuth login was inspected
+by that check. Do not request the .p8/generated secret or repeat setup by default.
+Evidence: docs/evidence/ios-release-local-2026-10-23/apple-provider-enabled.json.
+Next: verify exact coverdrive://auth/callback is preserved in the redirect list
+and run connected iOS login/recovery with owner handling password/2FA. Simulator
+offline QA and an enabled flag do not certify working provider credentials.
+OWNER CONFIRMED23OCT: only RevenueCat/App Store keys are set up. Apple Services
+ID and Sign in with Apple signing-key setup remain pending. New names below
+are suggested inputs, not claimed registrations or evidence of private access.
+
+VERIFIED PUBLIC CHECK, no backend writes:
+  Existing project: jtyuuwzhrufavbcxrhqp
+  Project URL: https://jtyuuwzhrufavbcxrhqp.supabase.co
+  Google enabled: true. Apple enabled: false. Anonymous users enabled: true.
+  Apple website domain: jtyuuwzhrufavbcxrhqp.supabase.co
+  Apple Return URL: https://jtyuuwzhrufavbcxrhqp.supabase.co/auth/v1/callback
+  Mobile app return allowlist: coverdrive://auth/callback
+The public enabled flag does not verify private credentials, allowed redirects
+or an actual Apple login. No live user was created/deleted for this check.
+
+Owner/private-account steps, retained together to avoid piecemeal requests:
+  1. Apple Developer -> Certificates, Identifiers & Profiles -> Identifiers ->
+     App IDs -> existing com.coverdrive.cricket. Ensure Sign in with Apple is
+     enabled and configured as the primary App ID for this app. Do not create
+     a different bundle ID or change the existing App Store Connect record.
+  2. Identifiers -> Services IDs. Reuse the correct existing web-login Services
+     ID if present. If none exists, suggested Description is Cricket Player
+     Manager Web Sign In; suggested Identifier is com.coverdrive.cricket.web.
+     This suggested Services ID is NOT claimed already registered/available.
+     Enable Sign in with Apple -> Configure -> associate com.coverdrive.cricket.
+     Domains and Subdomains: jtyuuwzhrufavbcxrhqp.supabase.co (no https prefix).
+     Return URLs: exact HTTPS Apple Return URL above. Save/Continue/Register as
+     applicable. Do not enter coverdrive://... into Apple's web Return URL field.
+  3. Apple Developer -> Keys -> reuse/create a Sign in with Apple signing key.
+     Suggested new key name: CricketPM Apple Sign In. Configure the same primary
+     App ID. Register; download .p8 ONCE and keep it privately backed up. Record
+     its Key ID privately. This is not the RevenueCat AuthKey/IAP key type.
+  4. Generate the Apple OAuth client-secret JWT with the official Supabase Apple
+     guide's client-side tool, or an approved local signing workflow. Inputs:
+     Team ID25PTZT5DNC, the actual registered Services ID, the signing Key ID and
+     its PRIVATE .p8. Use the generated JWT in Supabase, not the raw .p8 text.
+     Record the actual expiry and rotate before it; web OAuth secrets require
+     renewal at least every six months. No secret/key is requested in chat.
+  5. Supabase -> existing Cricket project -> Authentication -> Sign In / Providers
+     -> Apple. Enable. Client IDs: actual Services ID FIRST. If other authorized
+     IDs already exist, preserve them and follow Supabase's documented ordering;
+     do not put the native bundle ID first for this browser OAuth implementation.
+     Secret Key: generated JWT. Save. Keep Google and existing users/tables/RLS.
+  6. Authentication -> URL Configuration -> Redirect URLs: ensure exact
+     coverdrive://auth/callback is allowed. Preserve other approved redirects
+     and the existing Site URL fallback; do not add a production-wide wildcard.
+  7. Repeat the public read-only check from this repository:
+       node --env-file=.env.local scripts/checkIosProviders.cjs
+     Apple=true is required, but still not proof of valid private credentials.
+     Complete an actual iOS Apple login next; owner handles password/2FA. Test
+     relay email and same-UUID recovery; distinct accounts must remain isolated.
+
+Supabase does not store provider tokens in the project's database automatically.
+The present delete-account function does NOT invoke Apple's token-revocation
+API. Game-data/Auth deletion success must not be described as Apple permission
+revocation. A secure token capture/storage/revocation integration, or Apple's
+documented missing-token fallback with explicit user guidance, still needs an
+approved implemented/tested path. Do not expose provider refresh tokens, .p8,
+client-secret JWT or service-role credentials to Expo public env or this handbook.
+No backend deletion/revocation deployment or real account deletion was performed.
+
+Primary sources checked23October:
+https://supabase.com/docs/guides/auth/social-login/auth-apple
+https://supabase.com/docs/guides/auth/social-login#provider-tokens
+https://developer.apple.com/support/offering-account-deletion-in-your-app/
+https://developer.apple.com/documentation/technotes/tn3194-handling-account-deletions-and-revoking-tokens-for-sign-in-with-apple
+
+PROJECT AND ARTIFACTS
+=====================
+Repository: /Users/divakarmishra/Desktop/APP/cricketlegacy
+Display/store name: Cricket: Player & Manager
+app.json native name: Cricket
+Expo slug: cricket-legacy
+Expo account/project: sunlightpvt / cricket-legacy
+Framework: Expo ~57.0.9, React Native
+Android package: com.coverdrive.cricket
+URL scheme: coverdrive
+Mobile callback source: src/services/auth.ts -> googleAuthRedirectUrl()
+  makeRedirectUri({ scheme: 'coverdrive', path: 'auth/callback' })
+  Standalone callback is expected as coverdrive://auth/callback; verify the
+  exact generated URL for the build before updating Supabase's allowlist.
+Enabled platforms in app.json: Android ONLY
+Dynamic iOS target now implemented: app.config.js selects scripts/ios-app.config.cjs
+when EAS_BUILD_PLATFORM=ios or CRICKET_TARGET_PLATFORM=ios. Static app.json remains
+Android-first; this no longer means that the simulator port is unimplemented.
+iOS configured bundle identifier: com.coverdrive.cricket
+Apple Developer Team ID: 25PTZT5DNC (OWNER-REPORTED on 21 October 2026).
+Owner pasted the App ID registration form for this team; actual enabled
+capabilities, membership standing and signing remain unverified.
+App Store Connect Apple ID: 6825412889 (OBSERVED in owner's screenshot URL).
+Owner-created record: Cricket: Player & Manager, English (U.S.), version 1.0
+Prepare for Submission. This is not an uploaded build, approval or live release.
+Current source version is 1.0.12; align the console version before signed upload.
+Owner-pasted App Information now confirms Bundle ID com.coverdrive.cricket,
+SKU cricket-player-manager-ios and Apple ID 6825412889, English (U.S.).
+Apple's Standard License Agreement is shown. Category, Content Rights and age
+rating are not completed in that pasted page. Recommended listing subtitle:
+Build your cricket legacy; primary Games, game subcategories Sports / Simulation,
+optional secondary top-level category blank. These recommendations are not saved
+console changes. Rights/licensing, DSA and encryption must be answered truthfully;
+do not invent Apple server-notification URLs or share the shared secret in chat.
+Age questionnaire step 1 recommendation (21 October, NOT saved/confirmed):
+  Parental Controls No; Age Assurance Yes (self-declared numeric age gate only);
+  Unrestricted Web Access No; User-Generated Content No; Social Media No;
+  Social Media Disabled for Users Under 13 No / not applicable; Messaging and
+  Chat No; Advertising Yes for the intended ad-supported iOS release.
+Evidence: App.tsx gates navigation using AdAgePrompt; adAgeChoice.ts stores only
+an age band and applies age/residence rules. Guardian self-declaration is not a
+parent dashboard or verified consent. No Apple Declared Age Range API or ID
+check is implemented. Age Assurance Yes is an interpretation of Apple's broad
+mechanism definition, not legal certification of self-declaration's sufficiency.
+Player Life's social feed is fictional local generated content; there is no
+broad in-app UGC/social distribution or chat. Public leaderboard code is gated
+and no active UI caller was found. Reassess if public/social features are added.
+Age questionnaire mature themes recommendation (21 October, NOT saved/confirmed):
+  Profanity / Crude Humor None; Horror / Fear Themes None;
+  Alcohol, Tobacco, or Drug Use or References Infrequent, NOT None.
+Evidence: active STORY_EVENTS imports/spreads EXTRA_EVENTS. storyEventsExtra.ts
+contains x_rivalry_resolution (bar / beer), x_big_commercial_deal (champagne),
+x_famous_victory (celebration / cork / toast) and x_injury_insurance (grey-market
+treatment and drug-test reference). These are conditional/weighted story beats,
+not a constant gameplay activity. Infrequent is a source-backed recommendation,
+not a measured frequency or on-device display test. No matching profanity or
+horror content found in the reviewed text search; lexical false positives such
+as ghost button styles and AdMob pub IDs are not user-facing mature content.
+Final third-party ad inventory must also be appropriate for the declared rating.
+Age questionnaire medical/wellness recommendation (21 October, NOT saved):
+  Medical or Treatment Information Infrequent; Health or Wellness Topics Yes.
+Interpretation based on occasional injury/rehabilitation advice in injury_setback
+(storyEvents.ts), x_injury_dark_days and x_body_age (storyEventsExtra.ts), plus
+InjuryReportScreen's treatment/physio/recovery timeline. Stories discuss doing
+rehab, seeking sports-psychology help, rest and managing training load. These
+are fictional sports-career narratives, not real-user diagnoses or medical care.
+No measured exposure frequency, medical-device capability, clinical validation
+or compliance certification is claimed. Recheck the final content/ad inventory.
+Age questionnaire sexuality/nudity recommendation (21 October, NOT saved):
+  Mature or Suggestive Themes Infrequent; Sexual Content or Nudity None;
+  Graphic Sexual Content and Nudity None.
+Apple's first descriptor includes real-world crimes and mature ethical dilemmas,
+not only sexual themes. Evidence: temptation_approach (storyEvents.ts) and
+x_fixer_returns / x_injury_insurance (storyEventsExtra.ts) contain corruption,
+blackmail and insurance-fraud choices. A manufactured public-flirtation story
+is non-explicit. These are occasional career narratives, not constant activity.
+No sexual behavior/nudity was found in the reviewed text; portrait-manifest sex
+fields describe demographics and 'feels naked' is a metaphor, not a depiction.
+This was source/text review, not an exhaustive visual or third-party ad audit.
+Age questionnaire violence recommendation (21 October, NOT saved):
+  Cartoon or Fantasy Violence None; Realistic Violence None;
+  Prolonged Graphic or Sadistic Realistic Violence None; Guns or Other Weapons None.
+Reviewed narrative/content/data and wider source matches for fights, physical
+assault, blood/gore and weapons. Matches were cricket strokes ('punched/slapped'),
+competitive metaphors ('fight for a place', 'weapon' meaning a cricket skill,
+'knife's edge'), SDK/code terms and non-graphic sporting injury/recovery.
+No actual combat, gore or weapon use found in that source review. Do not count
+a cricket bat used for cricket as a weapon depiction. Final images and ad
+inventory must remain consistent; this does not certify every possible ad.
+Age questionnaire chance activities recommendation (21 October, NOT saved):
+  Simulated Gambling None; Contests None for the current single-player build;
+  Gambling No; Loot Boxes No.
+Interpretation: no playable casino, currency-staking/settlement, real-money
+wager or cash-out mechanic found. The Needle story has a 'Make a wager' choice
+('loser carries the drinks') but only sets confidence/aggression/rivalBet; no
+stake, financial payout or later rivalBet settlement caller was found. Betting
+endorsement/corruption stories are mature narrative references, not a betting UI.
+Public leaderboard code is opt-in gated and no UI submit/fetch caller was found.
+AI leagues, career tables and locally rewarded Daily Challenge are single-player;
+OS share text ('Can you beat it?') does not create an in-app human contest.
+Contests None interprets Apple's 'users compete with one another' definition;
+reassess if real-user rankings, organized competitions or multiplayer are enabled.
+Purchase catalogue benefits are fixed; legacy crateContents returns deterministic
+coins (250 + tier * 40), not purchased randomized contents. Player bank withdrawal
+only moves fictional Wallet Coins, not real currency. Reassess if these change.
+These are source-backed classification recommendations, not Apple pre-approval
+or legal certification; final release functionality and ad inventory still count.
+Age questionnaire calculated result (21 October, OWNER-PASTED): 13+.
+The dialog also reports automatic Afghanistan non-availability for Games and a
+conditional Republic of Korea classification-number notice. No saved rating or
+regional classification number has been confirmed. Do not invent a number.
+OWNER DECISION (21 October): keep 18+ India and 13+ elsewhere; do not impose
+18+ worldwide. Final Age Categories / Override selection remains PENDING Apple's
+regional-policy clarification, not a further owner audience choice. Apple's instructions
+say a higher EULA minimum must be reflected in the rating and that an override
+applies in all regions. Their public age-rating explanation describes a global
+developer-assigned minimum. These sources do not explicitly resolve this app's
+India-only higher eligibility against the EULA rule; no Apple clearance claimed.
+Do not silently impose a global 18+ override or assert the regional policy is
+already approved with a 13+ listing. Preserve the regional audience and clarify
+the regional/EULA treatment before submission. No runtime age policy was changed.
+WHY INDIA 18: docs/STORE_LEGAL_COMPLIANCE.md records selection on 20 August 2026
+of india_18_elsewhere_13 rather than global_13_parental_consent. The latter
+requires a real verified parent-consent flow; legal.config.json declares that
+flow false. This supports a conservative privacy/implementation rationale, not
+an assertion that cricket content legally requires an adult audience. An age
+self-declaration or guardian-permission checkbox is not verified consent.
+LEGAL TIMING CHECK (21 October, primary sources): DPDP Act section 2(f) defines
+a child as under 18; section 9 sets parental-consent and child tracking/targeted-
+advertising duties, subject to exceptions. G.S.R.843(E) schedules section 9 for
+18 months after November 2025 publication (May 2027); Rules 1(4) likewise defer
+Rule 10. Do not describe those duties as already effective on 21 October 2026,
+or infer a blanket legal ban on under-18 cricket games. Eligibility is a product
+policy, distinct from Apple's calculated content rating; not legal certification.
+https://www.meity.gov.in/static/uploads/2024/02/Digital-Personal-Data-Protection-Act-2023-1.pdf
+https://www.meity.gov.in/static/uploads/2025/11/c56ceae6c383460ca69577428d36828b.pdf
+https://www.meity.gov.in/static/uploads/2025/11/53450e6e5dc0bfa85ebd78686cadad39.pdf
+Age Suitability URL remains optional. A new public age-suitability section was
+deployed and verified during the 21–22 October preparation pass:
+https://sunlight-publisher-site.pages.dev/products/cricket-player-manager/#age-suitability
+It describes eligibility and content without claiming Apple's approval. This
+does not resolve the regional/EULA override question. The earlier failed web
+reader fetch is superseded by the successful all-file public verification.
+Registration description: Cricket Player and Manager; select Explicit Bundle ID.
+Enable Sign in with Apple, configured as a primary App ID. In-App Purchase is
+enabled by default for explicit App IDs; retain it. Other optional capabilities
+are not needed for the current port; Supabase backups do not require iCloud.
+iOS configured build number: 1 (configuration only, not a built/released app)
+Dynamic distribution config now sets ios.appleTeamId=25PTZT5DNC. EAS submit
+profile ios-production now targets ascAppId=6825412889 / team25PTZT5DNC.
+This is configuration from owner-provided IDs, not authenticated Apple signing
+or an upload. Simulator identity/config and Android submit profiles are preserved.
+iOS supportsTablet: true (future port must actually test tablets)
+iOS1.0.12 simulator port now built/tested on iPhone and iPad on 21 October.
+Owner setup/template: .env.ios.example
+Implementation and verification: docs/IOS_PORT_2026-10-21.txt
+App Store metadata worksheet: docs/IOS_APP_STORE_METADATA_DRAFT.txt
+Simulator artifact:
+/Users/divakarmishra/Desktop/APP/cricketlegacy/output/ios-simulator/cricket-player-manager-1.0.12-ios-simulator.zip
+SHA256: 2ad2244b2599c5966de51221e97f93f068764b15e2da57691226c624b33a218b
+This is a simulator .app ZIP, not a signed-device IPA or App Store submission.
+Apple OAuth source and native review request are implemented. Real Apple provider
+login, live ad units and Apple purchases require the owner's real settings/tests.
+Firebase and Unity iOS native integrations remain excluded; do not count Android
+provider evidence as iOS provider completion.
+
+Production Android version: 1.0.12 / versionCode 20
+Verified AAB:
+/Users/divakarmishra/Desktop/APP/cricketlegacy/output/production-1.0.12/cricket-player-manager-1.0.12-vc20.aab
+SHA256: 0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4
+Size: 111388690 bytes
+Build: https://expo.dev/accounts/sunlightpvt/projects/cricket-legacy/builds/a232a24d-277f-4fe7-ad2e-6e6521188a89
+Android min SDK 24 / target SDK 36, per inspected bundle.
+Public upload certificate SHA256 fingerprint:
+DA:68:BA:1D:9A:56:DB:FE:70:92:18:AB:68:E8:78:19:D6:8E:08:F2:EC:37:ED:3D:92:29:64:22:2D:C6:84:20
+This is a fingerprint, not a signing key. Preserve the existing signing identity.
+
+Internal QA artifact (DO NOT upload to Play):
+output/rating-qa-2026-10-21/cricket-player-manager-rating-qa-vc22.apk
+Its local QA code 22 does not make it newer production signing/version evidence.
+
+WEBSITE — EXACT SITE NAME AND URLS
+=================================
+Publisher: Sunlight, operated by Divakar Mishra
+Support contact: devsunlightpvt@gmail.com
+Public location wording: Maharashtra, India
+Cloudflare Pages project name: sunlight-publisher-site
+Production hostname: https://sunlight-publisher-site.pages.dev
+Cloudflare location: Workers & Pages -> sunlight-publisher-site
+Source: legal-site/ in the repository
+Build configuration: legal-site/legal.config.json
+Build output: legal-site/dist
+Build command: npm run build:legal-site
+Framework preset: None; root directory: repository root
+
+Developer website / store developer-site field:
+  https://sunlight-publisher-site.pages.dev/
+App product / marketing page:
+  https://sunlight-publisher-site.pages.dev/products/cricket-player-manager/
+Publisher identity:
+  https://sunlight-publisher-site.pages.dev/publisher/
+Privacy (production app currently embeds this stable route):
+  https://sunlight-publisher-site.pages.dev/privacy/
+App-specific privacy compatibility route:
+  https://sunlight-publisher-site.pages.dev/products/cricket-legacy/privacy/
+Terms:
+  https://sunlight-publisher-site.pages.dev/terms/
+Support:
+  https://sunlight-publisher-site.pages.dev/support/
+Account deletion:
+  https://sunlight-publisher-site.pages.dev/delete-account/
+Authorized ad sellers:
+  https://sunlight-publisher-site.pages.dev/app-ads.txt
+
+Supabase Auth Site URL uses the publisher root as its fallback; its expired-auth
+page guides the user back to the app without forwarding credentials. This is
+different from the Supabase provider callback and mobile callback allowlist.
+
+Do not mix this with Cricket Manager: Auction 2027. Its product/legal routes
+live under /products/auction-xi/, including /delete-data/. Its data practices
+and Unity Game ID are different even though publisher hosting is shared.
+
+PUBLIC BUILD ENVIRONMENT — NAMES AND PURPOSES
+============================================
+eas.json production uses environment=production, channel=production,
+autoIncrement=true, appVersionSource=remote, buildType=app-bundle.
+NODE_ENV=production for native build; EXPO_PUBLIC_QA_TOOLS=false.
+
+EXPO_PUBLIC_PRIVACY_POLICY_URL=https://sunlight-publisher-site.pages.dev/privacy/
+EXPO_PUBLIC_TERMS_URL=https://sunlight-publisher-site.pages.dev/terms/
+EXPO_PUBLIC_SUPPORT_URL=https://sunlight-publisher-site.pages.dev/support/
+EXPO_PUBLIC_ACCOUNT_DELETION_URL=https://sunlight-publisher-site.pages.dev/delete-account/
+
+Supabase names (read actual values from authorized project/EAS configuration):
+  EXPO_PUBLIC_SUPABASE_ENABLED
+  EXPO_PUBLIC_SUPABASE_URL
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  EXPO_PUBLIC_SUPABASE_ANON_KEY — legacy fallback supported in source
+  EXPO_PUBLIC_LEADERBOARDS_ENABLED — separate gated capability
+Do not infer the project reference from a sample .env file. On23October the
+existing local Android public configuration was found and its public Auth
+settings endpoint returned HTTP200 for jtyuuwzhrufavbcxrhqp.supabase.co. The iOS
+release profile/template now use that same URL/public publishable key. Private
+EAS/dashboard credentials, redirect allowlist and live authenticated recovery
+were not inspected by this read-only check. No key value is repeated here.
+
+Purchase names:
+  EXPO_PUBLIC_REVENUECAT_ANDROID_KEY — Android PUBLIC SDK key
+  EXPO_PUBLIC_REVENUECAT_IOS_KEY — Apple PUBLIC SDK key, supplied/configured 23 October
+No secret API keys, service-account JSON or server-role values belong here.
+
+Ad-unit overrides supported by source:
+  EXPO_PUBLIC_ADMOB_REWARDED_UNIT
+  EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT
+  EXPO_PUBLIC_ADMOB_BANNER_UNIT
+Separate iOS ad configuration (never reuse generic Android overrides):
+  ADMOB_IOS_APP_ID — native iOS AdMob App ID, tilde format
+  EXPO_PUBLIC_ADMOB_IOS_REWARDED_UNIT
+  EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_UNIT
+  EXPO_PUBLIC_ADMOB_IOS_BANNER_UNIT
+Simulator profile: ios-simulator; distribution profile: ios-production.
+Missing/placeholder distribution settings fail npm run check:ios-release.
+Play Integrity has separate enabled/project-number configuration; do not enable
+it or leaderboards merely because the variable name exists.
+
+Firebase Android project in integration handoff: cricket-legacy
+Android registration: com.coverdrive.cricket
+Analytics and Crashlytics have independent optional consent controls. Their
+Android delivery evidence does not prove iOS setup or every event's delivery.
+
+ADS — ANDROID IDENTITIES
+========================
+AdMob App ID: ca-app-pub-4249020515368291~8405865949
+Rewarded: ca-app-pub-4249020515368291/1717736882
+Interstitial: ca-app-pub-4249020515368291/6625581037
+Banner: ca-app-pub-4249020515368291/6681421355
+Unity Android Game ID: 800404108
+Unity placements: BP_Rewarded_Android, BP_Interstitial_Android, BP_Banner_Android
+Unity seller / Developer ID: 143233260 (app-ads.txt; NOT the Game ID)
+Unity organization ID: 13469957541110
+Unity project: 91b6305d-eb92-4481-a41e-12b20c71ea33
+Unity app UUID: 9f4d28fb-a2e3-4c43-9505-ee3bde077871
+Native versions: Google Ads 24.9.0, Unity SDK 4.16.6, Unity adapter 4.16.6.0
+RN Google Mobile Ads wrapper: 16.0.3, per integration handoff.
+
+Correct US message: CricketPM – US privacy choices; correct app name above.
+Owner supplied Published row; later in-app US privacy choices were exercised.
+Developer Data: owner chose unchanged. No extra data-access agreement accepted.
+Acquire Optimization: UNKNOWN effective state, despite inspected app responses.
+Owner selected the Yes/full-collection disclosure assumption on 21 October.
+No configuration values were changed merely by choosing that CSV.
+
+Audience rule for THIS game: 18+ India; 13+ elsewhere with required guardian
+permission. This is not a recommended universal rule for another app. Unknown/
+ineligible age must not initialize ads. Teen behavior and provider dashboard
+audience settings require review; an adult test creative cannot certify teens.
+
+DATA SAFETY FILES
+=================
+Original export, preserve:
+/Users/divakarmishra/Downloads/data_safety_export (2).csv
+Owner-selected completed CSV:
+/Users/divakarmishra/Desktop/APP/cricketlegacy/docs/data-safety-complete-full-unity-2026-10-21.csv
+SHA256: 6f5e85d501448624326a29d419c38f68da8a3db0d05dd3a2990d7283369f0f8e
+782 response rows / 5 columns / 10 selected types / all selected follow-ups filled.
+Technical validation passed. Provider setting unverified; not compliance proof.
+Rationale/decision:
+docs/DATA_SAFETY_COMPLETE_CSV_README_2026-10-21.txt
+Detailed review:
+docs/PLAY_DATA_SAFETY_REVIEW_2026-10-21.txt
+
+Other actions is collected already because of cloud gameplay backups. The
+conditional Unity assumption concerns extra sharing, required collection and
+ad-related purposes. Do not treat owner authorization as provider confirmation.
+
+CURRENT SOURCE/EVIDENCE MAP
+===========================
+Release artifact: docs/PRODUCTION_AAB_2026-10-21.txt
+Recovery / US consent / adult banner+interstitial: docs/RELEASE_QA_2026-10-21.txt
+Latest rating / billing / memory: docs/PLAY_RATING_BILLING_MEMORY_2026-10-21.txt
+Backup optimizations: docs/SUPABASE_OPTIMIZATION_2026-10-20.txt
+Wallet timestamp/device follow-up: docs/RELEASE_QA_2026-10-20.txt
+Unity original implementation: docs/UNITY_ADMOB_INTEGRATION_2026-10-19.txt
+Reusable Unity procedure: docs/UNITY_ADMOB_REUSABLE_SETUP_GUIDE.txt
+Website build/deployment: legal-site/README.md
+Firebase history: docs/FIREBASE_RELEASE_HANDOFF.md
+Purchase behavior: src/services/purchases.ts and src/state/careerStore.ts
+Historical purchase notes: docs/IAP_RELEASE_STATUS.md (not current console proof)
+Auth callback: src/services/auth.ts
+Supabase configuration: src/config/supabase.ts
+Cloud backup: accountRecovery.ts, accountCareerCloud.ts, accountBackupJournal.ts,
+  backupFingerprint.ts in the service/source tree; locate with rg --files.
+Public/offline privacy copy: legal-site/build-core.cjs, src/content/privacyPolicy.ts
+
+For conflicting evidence prefer current source plus the latest focused dated
+report. Broad audits contain explicitly historical August/September blockers.
+
+iOS OWNER INPUT REGISTER — WHAT, WHERE AND SECRET BOUNDARY
+=========================================================
+Known identifiers already recorded above: Team 25PTZT5DNC, bundle
+com.coverdrive.cricket, Apple ID 6825412889, SKU cricket-player-manager-ios.
+Do not ask for those again unless a real mismatch is found.
+
+Current client inputs for the ad-supported/purchase-enabled iOS candidate:
+  OWNER-SUPPLIED 22 OCTOBER; configured in ios-production env and iOS template:
+    ADMOB_IOS_APP_ID=ca-app-pub-4249020515368291~7521033766
+    EXPO_PUBLIC_ADMOB_IOS_REWARDED_UNIT=ca-app-pub-4249020515368291/8543305543
+    EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_UNIT=ca-app-pub-4249020515368291/7613367251
+    EXPO_PUBLIC_ADMOB_IOS_BANNER_UNIT=ca-app-pub-4249020515368291/3900693812
+    Public IDs from the owner's pasted creation instructions; no independent
+    authenticated console inspection, ad request or live-serving test claimed.
+    Android IDs and the simulator test-unit profile remain unchanged.
+    Owner-reported unit labels (reuse, do not recreate):
+      Banner       CricketPM_iOS_Banner
+      Interstitial CricketPM_iOS_Interstitial
+      Rewarded     CricketPM_iOS_Rewarded
+    Leave Partner bidding unchecked. Rewarded is not Rewarded interstitial.
+    Rewarded dashboard metadata: amount 1; item Reward. This is not a coin/energy
+    grant: src/services/ads.ts uses the EARNED_REWARD event only, ignoring the
+    amount/type payload. PurchaseScreen grants existing economy-defined energy;
+    MatchScreen grants the actual offered coinsAwarded. No economy change here.
+    Optional SSV URL remains unset; no verified SSV endpoint is provided.
+    Names are internal labels; runtime configuration needs generated slash IDs.
+  OWNER-SUPPLIED 23 OCTOBER; configured in ios-production env and iOS template:
+    EXPO_PUBLIC_REVENUECAT_IOS_KEY=appl_WfoEkqFPQtxLbHszsLTpoQQCWuY
+    RevenueCat -> Project Settings -> API keys -> App-specific public Apple SDK
+    key, appl_... . Not a RevenueCat secret/server API key or a Test Store key.
+    Owner confirmed on23October that the iOS app shows Valid credentials in
+    RevenueCat. Owner-reported, not independently inspected; product/offering
+    mappings and purchase/device behavior remain unverified. No need to resend
+    private credentials or supply the actual Issuer ID to client code/docs.
+    This value is not Apple's Issuer ID. It must not be pasted into that field.
+    Reuse the existing Cricket RevenueCat PROJECT; add/select an Apple App Store
+    APP configuration inside it, not a new project. Internal app label:
+    Cricket: Player & Manager (iOS). Bundle ID: com.coverdrive.cricket.
+    Preserve the Google Play connection, products and restore/transfer settings.
+    A shared project alone does not demonstrate automatic cross-store ownership.
+  Apple Services ID
+    Apple Developer -> Identifiers -> Services IDs -> associated primary App ID.
+    Owner must select/register the actual identity; no identifier guessed here.
+  Apple Key ID and secure OAuth client-secret setup
+    Apple Developer -> Keys, then Supabase Authentication -> Providers -> Apple.
+    Keep .p8/client secrets in the secure provider/secret storage, never here.
+  EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    OWNER DECISION23OCT: reuse Android's EXISTING Cricket Supabase project for
+    iOS, not a new project. Same project URL and a valid public client key can
+    serve both platforms. Keep existing Google auth and add Apple alongside it.
+    Preserve tables/data/RLS; never reuse a service-role/secret key in either app.
+    Public client settings for the selected existing backend. Enable only after
+    correct callbacks, RLS, migrations/functions, deletion and retention checks.
+    Neither a project-ref placeholder nor a service-role key is acceptable.
+  Apple signing / business / DSA details
+    Owner completes authenticated prompts and verified private contact details.
+  Physical iPhone and, for supported tablets, appropriate iPad test coverage
+    TestFlight installation by the intended tester; no simulator-to-IPA shortcut.
+
+Do not send passwords, 2FA codes, private keys, full receipts or store/API secrets
+in chat. Public IDs can be supplied; private setup should be performed in the
+owner's provider console. Keep expiry dates and verification status, not secrets.
+
+22 October input-location clarification (guidance, not a completed setup):
+The original FIVE-value list was four iOS AdMob IDs plus the appl_ SDK key.
+All five values are received/configured as of 23 October. Earlier dated entries
+describing missing public inputs are historical; real service/QA gates remain.
+Do not confuse Apple's three separate .p8 purposes:
+  - App Store Connect -> Users and Access -> Integrations -> In-App Purchase:
+    PRIVATE IAP key; upload directly to RevenueCat with corresponding Issuer ID.
+    Issuer ID is shown at the top of that same In-App Purchase page. Copy it
+    verbatim to RevenueCat -> iOS app -> In-app purchase key configuration ->
+    Issuer ID; Save changes and validate. It is NOT Team25PTZT5DNC, Apple app
+    6825412889, Key ID or .p8 filename. Actual owner Issuer ID not yet supplied.
+    Missing issuer: RevenueCat's guide says creating an App Store Connect API
+    key exposes it; both key types use the same issuer. Check existing keys and
+    team access first. Do not substitute the API .p8 for the required IAP .p8.
+  - App Store Connect -> Integrations -> App Store Connect API:
+    separate PRIVATE API key for the chosen product/price integration.
+  - Apple Developer -> Keys -> Sign in with Apple:
+    separate PRIVATE signing key for the Apple browser OAuth client secret.
+None of these .p8 files is the public RevenueCat appl_ key. A Services ID/Key ID/
+Issuer ID is not a private signing key, but screenshots must exclude secret values.
+The owner-facing quick-start is now at the TOP of START_HERE.txt.
+https://support.google.com/admob/answer/9989980
+https://support.google.com/admob/answer/7356431
+https://www.revenuecat.com/docs/service-credentials/itunesconnect-app-specific-shared-secret/in-app-purchase-key-configuration
+https://www.revenuecat.com/docs/service-credentials/itunesconnect-app-specific-shared-secret/app-store-connect-api-key-configuration
+https://www.revenuecat.com/docs/projects/connect-a-store
+https://www.revenuecat.com/docs/projects/authentication
+https://docs.expo.dev/app-signing/managed-credentials/
+https://developer.apple.com/help/app-store-connect/test-a-beta-version/add-internal-testers
+
+No new Firebase or Unity iOS identity is required for the CURRENT excluded-SDK
+scope. If adding those services, native integration, consent, policies, privacy
+labels and device QA must all be revisited before release. Their exclusion is
+not equivalent to feature parity with Android or a promise never to add them.
+
+iOS LAUNCH PURCHASE CATALOGUE — SOURCE, NOT STORE CONFIGURATION
+==============================================================
+Current catalogue: src/services/purchases.ts CATALOG, POSTPONED_PRODUCT_IDS,
+LAUNCH_CATALOG and RESTORABLE_PRODUCT_IDS. There are 14 launch products:
+
+Exact creation-dialog fields (23 October code-checked guidance):
+Product ID                  Apple Type              Reference Name
+player_vip                  Non-Consumable          Player VIP
+manager_vip                 Non-Consumable          Manager VIP
+bundle_legend               Non-Consumable          Player Legend Edition
+manager_legend_pack         Non-Consumable          Manager Legacy Edition
+starter_pack                Consumable              Starter Pack
+coins_medium                Consumable              Bag of Coins
+coins_large                 Consumable              Sack of Coins
+gems_medium                 Consumable              Bag of Gems
+gems_large                  Consumable              Chest of Gems
+form_recovery               Consumable              Mental Coaching Session
+transfer_budget_sm          Consumable              Transfer Budget Boost
+scout_full_reveal           Consumable              Full Scout Intelligence
+facility_upgrade_token      Consumable              Instant Facility Upgrade
+recovery_pack               Consumable              Squad Conditioning Pack
+
+There are FOUR Non-Consumables and TEN Consumables. No new subscriptions.
+The screenshot shows the creation dialog only, not confirmation that any
+product was saved or that all other catalogue entries are absent. Reuse matching
+existing IDs. Start with player_vip, type Non-Consumable, name Player VIP.
+Do not add a bundle-ID prefix or rename these runtime IDs. Apple IDs are
+immutable after creation and deleted IDs cannot be reused within that app.
+Reference Name is internal; localized customer Display Name is a later field.
+Apple limits: reference64 chars, productID100, display name2-30, description45.
+Names above match CATALOG titles and satisfy reference/display-name limits.
+Restore only the four permanent products' permanent benefits; never reissue
+consumed bundle currency/toolkit/club grants. The ten consumables do not gain
+ordinary store restoration by being listed in RevenueCat. Do not attach them
+to permanent entitlements. Real Apple product/entitlement mapping still pending.
+Next after Create: review availability and Apple price schedule, add English US
+localization and genuine in-app review screenshot/notes. Source INR fallback
+prices are not verified Apple tiers or proof of agreed worldwide pricing.
+Do not invent an iOS screenshot, price schedule or validation result.
+Official field/type references checked23October:
+https://developer.apple.com/help/app-store-connect/manage-in-app-purchases/create-consumable-or-non-consumable-in-app-purchases
+https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-information
+https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-types
+https://www.revenuecat.com/docs/getting-started/entitlements
+
+These are proposed Apple mappings from the implemented grant model, not evidence
+that the store products exist. Do not irrevocably create a conflicting product
+type/ID before checking any existing Apple/RevenueCat catalogue mapping. No Apple
+price tier or market-specific price is invented here. Store metadata wins.
+Do not create new sales for season_pass, remove_ads, training_accelerator,
+contract_boost, player_save_sponsor or manager_save_sponsor from historical code.
+Legacy restore logic does not make those part of the current launch catalogue.
+Do not recreate a Google Play product as an Apple subscription by accident.
+
+23 OCTOBER — COMPLETE iOS PURCHASE DETAIL / PRICING WORKSHEET
+=============================================================
+Owner asked for the full table and all repeatable fields in one place, not one
+question per product. Use this sheet for all14. Do not ask for fourteen separate
+pricing/localization screenshots. Report an actual exception without inventing
+a substitute price, entitlement or store status.
+
+OWNER-REPORTED EXISTING RECORD:
+  Product ID player_vip; Apple IAP ID6825926997 (NOT app ID6825412889).
+  Name Player VIP; type Non-Consumable; status Prepare for Submission.
+  Pasted page offers Add Pricing and Add Display Name/Description. No saved
+  price/localization/review screenshot is established. Availability shown as all
+  selected countries/regions; Family Sharing offers Turn On (currently off).
+  Do not recreate/delete this existing record or infer all other products exist.
+
+PRICE AND COPY TABLE — NOT A CLAIM THAT APPLE PRICES ARE ALREADY SAVED:
+The INR amounts below are the existing game catalogue prices from
+src/services/purchases.ts CATALOG (the four postponed IDs excluded). They are the
+owner's existing price targets for this setup; no new discounts or replacement
+prices have been invented. Actual Apple storefront price points and conversions
+must be selected/reviewed in App Store Connect. No foreign-currency amounts are
+calculated here and no Apple price-point IDs or live price schedule are claimed.
+Use the same name for Reference Name and English (U.S.) Display Name. Descriptions
+are paste-ready drafts, checked at45 characters maximum; display names2-30.
+All products are one-time purchases, not auto-renewing subscriptions.
+
+Product ID | Type | Reference Name / English US Display Name | India INR target | English US Description
+player_vip | Non-Consumable | Player VIP | ₹449 | Permanent Player VIP; no forced ads.
+manager_vip | Non-Consumable | Manager VIP | ₹449 | Permanent Manager VIP; no forced ads.
+bundle_legend | Non-Consumable | Player Legend Edition | ₹899 | Player VIP + 40,000 coins + 1,200 gems.
+manager_legend_pack | Non-Consumable | Manager Legacy Edition | ₹899 | Manager VIP, club funds and toolkit.
+starter_pack | Consumable | Starter Pack | ₹99 | 3,000 coins, 50 gems and 7 ad-free days.
+coins_medium | Consumable | Bag of Coins | ₹299 | Adds 10,000 Wallet Coins.
+coins_large | Consumable | Sack of Coins | ₹499 | Adds 20,000 Wallet Coins.
+gems_medium | Consumable | Bag of Gems | ₹299 | Adds 300 Gems.
+gems_large | Consumable | Chest of Gems | ₹999 | Adds 1,200 Gems.
+form_recovery | Consumable | Mental Coaching Session | ₹99 | Boosts form, confidence and Player Focus.
+transfer_budget_sm | Consumable | Transfer Budget Boost | ₹99 | One $1M fictional club-funds boost.
+scout_full_reveal | Consumable | Full Scout Intelligence | ₹49 | Reveals a selected player's scouting data.
+facility_upgrade_token | Consumable | Instant Facility Upgrade | ₹99 | One optional single-level facility upgrade.
+recovery_pack | Consumable | Squad Conditioning Pack | ₹99 | One conditioning token for your squad.
+
+REPEAT THIS DETAIL-PAGE PROCEDURE FOR EVERY ROW:
+1. Reuse an existing matching ID or create it with the exact Type/Reference Name.
+   IDs cannot be renamed/reused after creation. Do not prefix them with the bundle.
+2. Add Pricing -> base country/region INDIA / INR -> select the row's exact price.
+   If initially hidden, scroll to See Additional Prices. Keep the existing
+   price schedule if one is already present until it is reviewed; do not change
+   the base on an existing scheduled product blindly (Apple may delete scheduled
+   changes). This owner page currently offers initial Add Pricing for Player VIP.
+3. Next -> review Apple's comparable prices for other storefronts. Leave those
+   automatically generated values unchanged if accepting Apple-managed pricing;
+   do not manually apply an exchange-rate formula. Next -> Confirm.
+   India as a pricing base does NOT make the app India-only or alter age policy.
+   If an exact INR target truly is not available after additional price points,
+   flag that row and continue others; do not silently round or invent a new tier.
+4. Display Name and Description -> Add -> English (U.S.) -> paste the name and
+   short description from this sheet. Save that localization and the product.
+5. Availability: keep it aligned with the intended app's current approved sale
+   regions; do not add new regions merely to complete IAP setup. The owner's
+   pasted all-regions selection is a state report, not a regulatory clearance.
+6. Family Sharing: leave OFF for the four non-consumables; N/A for consumables.
+   The current rollout has no verified family-sharing flow. Do not enable it
+   speculatively: Apple says enabling it cannot be undone. This preserves the
+   current off state; it is not an externally applied setting change.
+7. Offer Codes: skip for ordinary full-price setup; no new offer/campaign created.
+   Optional1024x1024 Image: leave blank when not configuring a promotion or offer
+   that requires artwork. This optional image is NOT the App Review Screenshot.
+8. Tax Category: retain Match to parent app as currently shown; owner must ensure
+   the parent app's classification is correct. No tax/legal classification is
+   invented by this sheet. In Business, check the Paid Apps Agreement is active
+   and complete any genuine required owner administration securely.
+9. Review Screenshot: upload a genuine iOS in-app Store/item-detail screenshot
+   clearly showing THIS purchase and its benefits. Use a Player save for Player
+   products and domestic Manager save for Manager products. Do not upload an
+   Android capture, mock price, AI image or invented screenshot as iOS evidence.
+   No final product-review screenshot has been generated/assigned by this table.
+10. Review Notes are optional: use the matching product-specific draft below
+    only after checking it against the actual submitted build/walkthrough.
+    Do not add a claim that sandbox billing/restore passed when untested.
+11. Save. Initial non-consumable AND consumable submissions require a new app
+    version. Add intended products and the correct app version to the same draft
+    review submission when metadata/screenshots/build/QA are ready. Do not press
+    final Submit for Review as part of merely entering this table.
+
+STARTER / CONDITIONAL SCREENSHOT WARNINGS:
+Starter Pack appears only for an eligible account/save after its first completed
+match, within the24-hour contextual offer and before another purchase. Capture
+it before buying other products using a disposable QA account/save; do not reset
+the owner's real data. Mental Coaching is absent/unavailable if its form/
+confidence/Focus benefits are already satisfied. Manager club purchases require
+an active domestic club and may be unavailable during national duty. These are
+existing source gates, not new eligibility rules or excuses to fabricate images.
+
+PRODUCT-SPECIFIC REVIEW NOTES — COPY DRAFTS, NOT OBSERVED QA RESULTS:
+These texts describe the current source's benefits and route. Recheck the final
+signed iOS build, product mappings and real delivery/restore before submission.
+No secret/test-account password is supplied in these public notes.
+
+player_vip — Player VIP
+Open a Player Career save, then Store, and select Player VIP. This is permanent
+Player-mode VIP, not a subscription. It applies across Player saves on the same game
+account, not Manager saves. It removes forced banner/interstitial ads; optional
+rewarded ads remain a user choice. Benefits include 60 Training Focus capacity, a 20%
+match-coin bonus, an extra save slot and 12 earnable cosmetic collections, claimed
+through completed in-game seasons rather than all granted on purchase. Restore
+Purchases restores eligible permanent access; no recurring payment or cash payout.
+
+manager_vip — Manager VIP
+Open a Manager Career save, then Store, and select Manager VIP. This is permanent
+Manager-mode VIP, not a subscription. It applies across Manager saves on the same game
+account, not Player saves. Forced banner/interstitial ads are removed; optional
+rewarded ads remain a user choice. It includes a 20% match-coin bonus, an extra save
+slot and 12 earnable office collections, claimed through completed in-game seasons.
+Restore Purchases restores eligible permanent access. It does not include the Manager
+Legacy club-funds/toolkit grant.
+
+bundle_legend — Player Legend Edition
+Open a Player Career save, then Store, and select Player Legend Edition. One-time
+non-consumable bundle, not a subscription. Includes permanent Player VIP/ad removal,
+60 Focus capacity, standard kit designs and the Legend frame. The initial purchase
+also grants 40,000 Wallet Coins and 1,200 Gems once to the purchased Player save.
+Restore Purchases restores permanent access/cosmetics only; it does not reissue the
+coin/gem grant or pay retirement cash.
+
+manager_legend_pack — Manager Legacy Edition
+Open a domestic Manager Career save with an active club, then Store, and select
+Manager Legacy Edition. One-time non-consumable bundle, not a subscription. Includes
+permanent Manager VIP and Legend boardroom presentation. Initial purchase grants
+$1,000,000 fictional Club Balance once to the purchased Manager save, two full-scout
+tokens, one facility-upgrade token and one squad-conditioning token. It also raises
+board confidence to at least 82 and adjusts club reputation. Club-operation purchases
+are unavailable during national duty. Restore restores eligible permanent benefits
+only, never club cash or consumed toolkit items. Fictional funds have no cash-out
+value.
+
+starter_pack — Starter Pack
+Open an eligible career save and complete the first match before opening Store. Review
+this offer before buying another item: it is shown during the 24-hour starter-offer
+window, before another purchase, and only once per game account. One-time consumable
+grant to the active save: 3,000 Wallet Coins, 50 Gems and seven days of ad removal. No
+subscription or auto-renewal. Restore Purchases does not reissue consumed rewards. Use
+a fresh disposable QA account/save for this walkthrough; do not delete real player
+data.
+
+coins_medium — Bag of Coins
+Open a career save, then Store, and select Bag of Coins. Each purchase adds 10,000
+fictional Wallet Coins to the active save once. These are not the Manager club's Club
+Balance and cannot be exchanged for real money. Repeat-purchasable consumable, not a
+subscription. Restore Purchases does not reissue consumed coins.
+
+coins_large — Sack of Coins
+Open a career save, then Store, and select Sack of Coins. Each purchase adds 20,000
+fictional Wallet Coins to the active save once. These are not the Manager club's Club
+Balance and cannot be exchanged for real money. Repeat-purchasable consumable, not a
+subscription. Restore Purchases does not reissue consumed coins.
+
+gems_medium — Bag of Gems
+Open a career save, then Store, and select Bag of Gems. Each purchase adds 300
+fictional Gems to the active save once. Gems have no real-money cash-out value.
+Repeat-purchasable consumable, not a subscription. Restore Purchases does not reissue
+consumed Gems.
+
+gems_large — Chest of Gems
+Open a career save, then Store, and select Chest of Gems. Each purchase adds 1,200
+fictional Gems to the active save once. Gems have no real-money cash-out value.
+Repeat-purchasable consumable, not a subscription. Restore Purchases does not reissue
+consumed Gems.
+
+form_recovery — Mental Coaching Session
+Open a Player Career save that needs form, confidence or Focus recovery, then Store,
+and select Mental Coaching Session. The item is hidden or unavailable when all
+benefits are already satisfied. Each purchase immediately raises the fictional
+athlete's form and confidence to at least 99 and tops up Player Focus to 36, or 60
+with Player VIP, without lowering already higher values. Applies to this Player save
+only. This is a game mechanic, not real-world health/medical advice. Consumable, not a
+subscription; Restore Purchases does not repeat the grant.
+
+transfer_budget_sm — Transfer Budget Boost
+Open a domestic Manager Career save with an active club, then Store, and select
+Transfer Budget Boost. Each eligible purchase adds $1,000,000 fictional Club Balance
+and transfer-budget support once to the current club; it does not add Wallet Coins.
+Limited to one boost per Manager season and unavailable while club operations are
+paused for national duty. Consumable, not a subscription: it does not automatically
+recur next season. Restore Purchases does not reissue club funds. No real-money
+cash-out.
+
+scout_full_reveal — Full Scout Intelligence
+Open a Manager Career save, then Store, and select Full Scout Intelligence. Purchase
+adds one full-scout token to this save; use the token for a chosen transfer target to
+reveal overall rating, form, fitness, injury status and value. It does not recruit the
+player, guarantee a transfer or provide permanent unlimited scouting. Consumable, not
+a subscription. Restore Purchases does not reissue consumed tokens.
+
+facility_upgrade_token — Instant Facility Upgrade
+Open a Manager Career save, then Store, and select Instant Facility Upgrade. Purchase
+grants one facility-upgrade token for one eligible level of Training Ground, Medical
+Centre or Youth Academy. This is an optional shortcut: upgrades using fictional Club
+Balance remain available and normal upkeep still applies. The token is used in the
+facility upgrade flow; a purchase is not a permanent free-upgrade entitlement.
+Consumable, not a subscription. Restore Purchases does not reissue consumed tokens.
+
+recovery_pack — Squad Conditioning Pack
+Open a Manager Career save, then Store, and select Squad Conditioning Pack. Purchase
+grants one squad-conditioning token. Its use boosts eligible non-injured squad players
+by 20 condition, 20 fitness and 15 morale, subject to game caps. It does not cure
+injured players or guarantee match results. Fictional gameplay only. Consumable, not a
+subscription; Restore Purchases does not reissue consumed tokens.
+
+OFFICIAL DETAIL / PRICING REFERENCES:
+https://developer.apple.com/help/app-store-connect/manage-in-app-purchases/set-a-price-for-an-in-app-purchase
+https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-information
+https://developer.apple.com/help/app-store-connect/configure-in-app-purchase-settings/turn-on-family-sharing-for-in-app-purchases
+https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-in-app-purchase
+
+23 OCTOBER — APPLE SETUP REPORTED DONE / REVENUECAT IMPORT AND MAPPING
+====================================================================
+Owner replied done after the complete Apple pricing/detail worksheet. Record
+the Apple product-entry workflow as OWNER-REPORTED complete. Do not ask the owner
+to repeat all14 fields or recreate products. No independent saved catalogue,
+actual prices, individual review-screenshot files, Ready to Submit status,
+Apple approval or real transaction/restore was inspected from this short reply.
+
+NEXT — EXISTING REVENUECAT PROJECT ONLY:
+1. Open Product catalog -> Products -> + New / Import Products. Select the
+   existing Apple App Store app for com.coverdrive.cricket, not Google Play or
+   Test Store. Import/reuse all14 matching Apple product IDs below. Preserve all
+   Android product records/prices and existing restore/transfer policy.
+2. If automatic import is unavailable, use manual + New product to register an
+   EXISTING store product: select the Apple app/store and enter its exact Apple
+   Product ID. Choose the corresponding non-consumable/consumable type if asked.
+   This registers it in RevenueCat; do not recreate/change the Apple store SKU.
+   A valid IAP .p8 is not proof that the separate App Store Connect API integration
+   for automatic imports is configured. Manual import avoids speculative extra
+   credentials; never paste private .p8/service/API credentials into chat.
+3. Product catalog -> Entitlements: open/reuse the four matching entitlement
+   identifiers. If absent, create only the missing exact identifier. Attach the
+   APPLE product from the matching row and save. Leave existing Android products
+   and any prior valid links attached; do not detach them or rename entitlements.
+4. The ten consumables must NOT unlock permanent entitlements. Never attach
+   currency, Starter Pack or action tokens to a blanket pro/VIP entitlement.
+
+Apple Product ID | RevenueCat entitlement identifier
+player_vip | player_vip
+manager_vip | manager_vip
+bundle_legend | bundle_legend
+manager_legend_pack | manager_legend_pack
+starter_pack | NONE
+coins_medium | NONE
+coins_large | NONE
+gems_medium | NONE
+gems_large | NONE
+form_recovery | NONE
+transfer_budget_sm | NONE
+scout_full_reveal | NONE
+facility_upgrade_token | NONE
+recovery_pack | NONE
+
+No ios_ prefix, bundle prefix or invented pro entitlement. The existing runtime
+checks active entitlement IDs by these exact names. Bundles apply their
+appropriate VIP benefits in the game; preserve existing links rather than
+rewiring the live Android project. Entitlements are project-scoped, so do not
+promise independent-store ownership or cross-store behavior without QA.
+
+OFFERINGS / PAYWALL:
+No new Offering or RevenueCat paywall is needed for THIS build. Source inspection
+of purchases.ts shows getProducts(ids) and purchaseStoreProduct(sku), not
+getOfferings/purchasePackage. Four named permanent entitlements are needed for
+current ownership/restore handling; adding a new Offering does not fix a missing
+entitlement. Do not delete existing Android Offerings or global configuration.
+
+POST-SETUP CHECKLIST:
+  [ ] Fourteen product records belong to the selected Apple app, not Test Store.
+  [ ] Four Apple permanent products attach to the exact matching entitlement.
+  [ ] Ten consumables have no unintended permanent entitlement.
+  [ ] Existing Android links/configuration preserved.
+  [ ] Final iOS build can load Apple prices and complete sandbox purchases.
+  [ ] Owned permanent restore succeeds without repeating currency/toolkit grants.
+  [ ] Review screenshot files, Apple product statuses and final metadata checked.
+FOLLOW-UP23OCTOBER: owner subsequently replied done to the14-product import and
+four-entitlement instructions. Mark RevenueCat catalogue/mapping configuration
+OWNER-REPORTED complete; do not request repeating import/key creation/attachment.
+No independent screenshot, actual transaction or purchase/restore validation was
+provided. Remaining QA/Apple screenshot/status items stay open; a configuration
+done does not establish successful billing or store review readiness.
+Next provider check is Supabase Authentication -> Sign In / Providers -> Apple:
+its enabled status and public OAuth callback URL are needed to guide the real
+Apple Services ID/provider setup without inventing a project hostname. No secret
+field, private key or credentials should be shared in a screenshot/chat.
+
+OFFICIAL REVENUECAT REFERENCES:
+https://www.revenuecat.com/docs/offerings/products-overview
+https://www.revenuecat.com/docs/getting-started/entitlements
+https://www.revenuecat.com/docs/service-credentials/itunesconnect-app-specific-shared-secret/app-store-connect-api-key-configuration
+
+23 OCTOBER — SEPARATE APP STORE CONNECT API KEY FOR AUTO-IMPORT
+================================================================
+Owner supplied RevenueCat's empty App Store Connect API upload field, requiring
+AuthKey_XXXXXXXXXX.p8, and reported automatic import is unavailable. This is a
+separate optional provider integration, not failure of the already-valid IAP
+credential. It enables product/price import; manual product registration remains
+available. Neither this file nor the RevenueCat appl_ SDK key is the other key.
+
+HOW TO OBTAIN THE CORRECT TEAM KEY:
+1. App Store Connect -> Users and Access -> Integrations -> App Store Connect
+   API -> Team Keys (not Individual Keys, In-App Purchase or Apple Developer Keys).
+2. If Request Access appears instead of key controls, the Account Holder must
+   review/submit Apple's API-access request and await approval. The owner handles
+   the authenticated request/terms. This guidance has not accepted them.
+3. Reuse a suitable existing team API key only if its private downloaded file is
+   securely available and it has the needed role. Do not revoke working keys.
+   Otherwise click Generate API Key / + next to Active.
+4. Internal name: RevenueCat iOS Import.
+   Access: App Manager (RevenueCat's documented minimum; do not choose Admin
+   merely to make setup work). A lower-role key created just to expose Issuer ID
+   does not meet RevenueCat's import requirement. Existing key access/name cannot
+   be edited; a correct additional key may be needed without revoking others.
+5. Generate -> Download API Key -> save the private AuthKey_XXXXXXXXXX.p8 securely.
+   Apple allows only one download. Do not rename an IAP .p8 to fake an API key.
+   Team role access applies across the Apple account's apps, not solely this
+   app despite the internal name; it cannot be app-limited in Apple's Team UI.
+6. Copy Issuer ID from the same API Team Keys page. It is the same Apple account
+   issuer used for IAP keys, not Team25PTZT5DNC, app6825412889 or IAP6825926997.
+   If asked for Key ID, copy the matching active key's ID / AuthKey filename ID.
+7. Vendor Number: App Store Connect -> Reports -> upper-left legal-entity menu,
+   beneath the Legal Entity Name. Some provider instructions call this screen
+   Payments and Financial Reports. Use the App Store vendor for this owner,
+   not the Team ID, app ID, key ID or a sample number. Owner/account permissions
+   and actual vendor assignment must be checked if the number is not visible.
+
+UPLOAD DIRECTLY TO REVENUECAT:
+Existing project -> Apps -> Cricket: Player & Manager (iOS) -> App Store Connect
+API -> upload AuthKey_XXXXXXXXXX.p8; enter corresponding Issuer ID and Vendor
+Number, plus Key ID if shown. Save Changes and inspect THIS integration's result.
+Keep the existing In-app purchase key configuration and its Valid credentials
+untouched. One valid credential section is not validation of every other section.
+Then Product catalog -> Products -> Import Products -> select the Apple app ->
+import/reuse the14 intended products, followed by the four entitlement mappings.
+
+SECURITY / STATUS:
+This AuthKey file is a PRIVATE credential with meaningful account access. Upload
+only directly to the intended RevenueCat console; never chat, Git, EXPO_PUBLIC,
+the handbook or app binary. No generated secret/file/actual issuer/vendor value
+is recorded here. No new key generated, API-access request accepted, upload,
+credential validation or automatic import performed by the agent in this pass.
+FOLLOW-UP23OCTOBER: owner replied done after the complete API setup instructions.
+Treat API setup as OWNER-REPORTED completed, not an independently observed key
+file/upload or successful API validation. Do not ask to generate/upload it again.
+No proof of actual14-product import or four entitlement bindings was provided.
+Next import/reuse the Apple14, then apply the four exact entitlement mappings;
+if products are already imported skip duplicates. Request a combined product/
+entitlement summary rather than fourteen individual screenshots. Manual import
+remains supported; this optional API key is not needed for direct SDK checkout.
+
+SOURCES VERIFIED23OCTOBER:
+https://www.revenuecat.com/docs/service-credentials/itunesconnect-app-specific-shared-secret/app-store-connect-api-key-configuration
+https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api
+https://developer.apple.com/help/app-store-connect/getting-paid/view-payments-and-proceeds
+
+SHARED ANDROID / iOS SUPABASE — OWNER DECISION23OCTOBER
+=======================================================
+Owner wants both clients on the same existing project and reports both free
+project slots already used. This does NOT require a third project or a paid
+upgrade just to add an iOS client; no plan allowance/usage limit is promised.
+Use the existing Cricket backend's actual URL and public publishable/legacy anon
+client key. Source SUPABASE_CONFIG is platform-agnostic; cloud career RPCs bind
+to p_owner_id/Supabase user UUID, not to separate OS-specific databases.
+Google and Apple can be configured in the SAME project's Auth provider settings.
+Do not overwrite working Google config, revoke keys, delete either project,
+disable RLS or blindly migrate/duplicate live tables to accommodate the new OS.
+Public client keys are not secrets; service-role/secret keys stay server-side.
+Sharing the project does not automatically merge unrelated Google/Apple users.
+Supabase supports automatic linking under its email/security rules and explicit
+linking for other identities. Different/relay email identities may remain
+different users; never merge saves/ownership by a client-side email comparison.
+Same-user UUID and compatible data are necessary for cross-device recovery;
+actual Android-to-iOS login/restore/account-switch tests are still required.
+Sharing save storage also does not itself establish cross-store IAP ownership.
+At the original policy answer the local template was disabled/blank. Superseded
+by23October's local implementation: the iOS production profile/template use the
+existing URL/public key and enabled=true. Public Auth read verified Apple=false,
+Google=true, anonymous=true. No private provider write/database deployment or
+live account change was made. Simulator QA remains backend-disabled by design.
+https://supabase.com/docs/guides/getting-started/architecture
+https://supabase.com/docs/guides/getting-started/api-keys
+https://supabase.com/docs/guides/auth/auth-identity-linking
+
+APPLE AGE QUESTIONNAIRE — COMPLETE ANSWER REGISTER
+=================================================
+Status: recommendations from 21 October source review; owner supplied calculated
+13+ result. No final save, global override or Apple approval has been observed.
+Recommendations apply to current single-player/ad-supported content, not new
+features. Narrative frequency is an interpretation, not measured ad exposure.
+
+Controls/capabilities:
+  Parental Controls                         No
+  Age Assurance                             Yes, qualified self-declared gate
+  Unrestricted Web Access                   No
+  User-Generated Content                    No broad user-content distribution
+  Social Media                              No
+  Social Media Disabled for Users Under 13   No / not applicable
+  Messaging and Chat                        No
+  Advertising                               Yes for intended ad-supported build
+Age Assurance is an interpretation of Apple's mechanism definition. This app
+does not implement Apple Declared Age Range API, ID checks or verified parent
+consent. A fictional in-game social feed is not real-user social networking.
+External support links/scoped OAuth are not unrestricted in-app web browsing.
+
+Mature themes:
+  Profanity or Crude Humor                   None
+  Horror/Fear Themes                        None
+  Alcohol, Tobacco, Drugs or References      Infrequent
+  Evidence: conditional beer/bar, champagne/cork/toast and drug-test stories.
+Medical/wellness:
+  Medical or Treatment Information           Infrequent
+  Health or Wellness Topics                  Yes
+  Evidence: fictional rehab, physio, sports psychology and load/recovery choices.
+Sexuality/nudity:
+  Mature or Suggestive Themes                Infrequent
+  Sexual Content or Nudity                   None
+  Graphic Sexual Content and Nudity          None
+  First row includes corruption, blackmail and fraud/ethical dilemmas, not just
+  sexuality. A manufactured-flirtation story is non-explicit.
+Violence:
+  Cartoon or Fantasy Violence                None
+  Realistic Violence                         None
+  Prolonged Graphic/Sadistic Realistic       None
+  Guns or Other Weapons                      None
+  Cricket strokes/competitive metaphors and non-graphic injuries are not combat.
+Chance activities:
+  Simulated Gambling                         None
+  Contests                                   None for current single-player scope
+  Gambling                                   No
+  Loot Boxes                                 No
+  Friendly 'wager' story only changes narrative state; no money stake/payout.
+  AI leagues/private daily goals are not an enabled contest between real users.
+  Public leaderboard source is gated/unwired at the reviewed UI boundary.
+  Legacy crateContents grants deterministic coins; it is not purchased random
+  loot. Fictional portfolio/club money has no real-money cash-out.
+
+Do not change these to blanket None simply to force a lower rating. Re-evaluate
+if actual human contests, randomized paid items, financial stakes, chat, social
+distribution, new stories or different third-party ad inventory are enabled.
+Earlier prose in this file identifies the specific source events and limits.
+Calculated result: 13+. Final override: PENDING regional/EULA clarification.
+Owner decision: retain 18+ India / 13+ elsewhere; no global 18+ change authorized.
+
+PREPARED APPLE SUPPORT QUESTION — DRAFT, NOT SENT
+Subject: Regional minimum age versus global calculated age rating
+Our fictional single-player cricket game has a calculated content rating of 13+.
+Our existing eligibility terms require 18+ in India and 13+ elsewhere.
+We are not requesting a worldwide 18+ audience restriction. Your guidance says
+an EULA minimum above the calculated rating must be reflected and an override
+applies in all regions. How should we accurately configure this India-specific
+eligibility condition while preserving the 13+ audience elsewhere? Is a 13+ listing
+with regional in-app eligibility and linked terms acceptable, or is another
+configuration required? Please identify the appropriate regional/EULA handling.
+Use Apple Developer Support/App Review support under the owner's account. Retain
+the answer/case reference and update the final selection; do not claim a reply
+or approval merely because this question was drafted.
+Official reference:
+https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating
+
+APPLE APP PRIVACY WORKSHEET — NOT A FINAL LABEL / NOT AN IMPORT CSV
+=================================================================
+Current intended services: Supabase sign-in/cloud saves, RevenueCat/Apple billing,
+Google Mobile Ads/UMP. Firebase and Unity iOS SDKs are excluded. Cloud and billing
+were disabled in the audited simulator, so it does NOT observe final collection.
+Declare the union of data actually collected by the final app and included SDKs,
+including optional/consented paths when Apple's exception criteria do not apply.
+The Android Data safety CSV must not be imported or copied as an Apple label.
+
+Data type                 Intended source / purposes              Linking status
+Name                      Provider profile if returned/stored;    Linked to account
+                          App Functionality
+Email Address             Auth incl. Apple relay;                 Linked to account
+                          App Functionality
+User ID                   Supabase + RevenueCat account binding;  Linked to account
+                          App Functionality; Analytics if used
+Gameplay Content          Cloud career backups;                   Linked to account
+                          App Functionality
+Purchase History          RevenueCat/Apple receipts;              Linked to account
+                          App Functionality AND Analytics
+Coarse Location           Google IP-derived/UMP processing;       GMA declares linked;
+                          ads/analytics/functionality as used     verify final flow
+Device ID                 GMA/developer-bounded IDs;               GMA declares linked;
+                          advertising/analytics as used           TRACKING REVIEW OPEN
+Product Interaction       GMA/UMP interactions;                   GMA declares linked;
+                          advertising/analytics/functionality     verify final flow
+Advertising Data          GMA ad exposure/interaction;            GMA declares linked;
+                          advertising/analytics                   verify final flow
+Crash Data                GMA technical crash processing;         SDK declares unlinked;
+                          Analytics per manifest                  verify combined paths
+Performance Data          GMA/UMP technical data;                 SDK declares unlinked;
+                          vendor-declared purposes as applicable  verify combined paths
+Other Diagnostic Data     GMA technical diagnostics;              SDK declares unlinked;
+                          vendor-declared purposes as applicable  verify combined paths
+Customer Support          Optional email/support content;         Assess exception and
+                          App Functionality                       actual identity link
+
+Purposes must reflect real processing. Google's manifest also lists developer
+advertising purposes for several types: reconcile those declarations with the
+actual configuration/provider guidance rather than silently dropping them or
+selecting every purpose blindly. RevenueCat's public guide requires purchase
+history Functionality + Analytics; its generic manifest alone understates our
+account-linked use. No custom name/email RevenueCat attribute setter was found
+in this pass, but Supabase/provider collection is separate and still matters.
+
+Do NOT automatically select real-user Health/Fitness or Financial Info because
+fictional athletes get injured or hold virtual investments. Ordinary Apple
+billing does not expose a customer's full card details to this developer.
+No reviewed path calls for precise GPS, phone contacts, microphone recordings,
+unrestricted web history or camera collection. Re-audit if adding such features.
+Locally generated share images do not by themselves establish server collection
+of the user's photo library. Optional support exceptions require ALL Apple's
+criteria; do not assume that every voluntary data flow is exempt.
+
+TRACKING IS PENDING, NOT PRESELECTED NO OR YES:
+The existing simulator's17 privacy manifests were parsed with auditIosPrivacy.cjs.
+GoogleMobileAdsResources.bundle declares DeviceID linked=true/tracking=true;
+other listed GMA data types tracking=false. The app has no ATT usage description
+and requests non-personalized ads. These facts do not settle actual tracking.
+Determine the final SDK configuration/identifier behavior and developer/provider
+use under Apple's definition. If tracking occurs, permission must precede it;
+if it does not, retain supporting evidence. Do not infer no tracking from no ATT
+prompt, from no Firebase, from non-personalized ads or from a successful test ad.
+Do not edit a vendor manifest to hide a declaration. Reinspect the final signed
+DEVICE artifact, not just this simulator's SDK slices.
+
+Static evidence:
+docs/evidence/ios-preparation-2026-10-21/ios-privacy-manifest-inventory.json
+  com.coverdrive.cricket.simulator,1.0.12/build1, iPhoneSimulator;17 manifests.
+  plist: no NSUserTrackingUsageDescription; GADDelayAppMeasurementInit=true;
+  ITSAppUsesNonExemptEncryption=false. These are observed configuration values,
+  not App Privacy certification, an export-law opinion or device network tests.
+  Inventory predates the latest offline-policy edits; use the final archive too.
+
+FORM DECISIONS THAT REQUIRE OWNER / ARTIFACT EVIDENCE
+===================================================
+Content Rights: confirm ownership/licences before choosing the rights answer.
+Standard EULA: shown in supplied console text; no custom EULA uploaded here.
+DSA/trader: owner verification; do not invent private address or legal status.
+Countries/price: owner choice; do not broaden/restrict availability silently.
+Afghanistan: Apple displayed an automatic Games-category exclusion.
+Korea/Vietnam: conditional requirements; no classification/licence supplied.
+Encryption: plist already says false; final crypto/exemption audit still needed.
+Regulated Medical Device: fictional gameplay is not a clinical device; follow
+the real form's applicability conditions rather than claiming medical approval.
+Accessibility: no untested VoiceOver/larger-text/motion conformance claim.
+Server Notifications URLs: use verified integration endpoints only if required
+by the chosen Apple/RevenueCat setup; no placeholder URL in a production form.
+Shared Secret: private credential for applicable subscription receipt flows;
+do not expose it or configure a new subscription just because a field exists.
+
+OFFICIAL iOS REFERENCES — CHECK AGAIN FOR FUTURE RELEASES
+========================================================
+https://docs.expo.dev/versions/v57.0.0/
+https://docs.expo.dev/versions/v57.0.0/config/app/
+https://docs.expo.dev/eas/json/
+https://docs.expo.dev/submit/ios/
+https://supabase.com/docs/guides/auth/social-login/auth-apple
+https://developer.apple.com/app-store/app-privacy-details/
+https://developer.apple.com/documentation/bundleresources/privacy-manifest-files
+https://developers.google.com/admob/ios/privacy/data-disclosure
+https://support.google.com/admob/answer/7311747?hl=en
+https://support.google.com/admob/answer/12436136?hl=en
+https://support.google.com/admob/answer/12374122?hl=en
+https://www.revenuecat.com/docs/platform-resources/apple-platform-resources/apple-app-privacy
+https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating
+https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance
+https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications
+https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app

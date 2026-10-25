@@ -1,0 +1,73 @@
+ANDROID SIGKILL FOLLOW-UP — 24 OCTOBER 2026
+==========================================
+Owner scope: investigate the previous unexplained SIGKILL, replace the QA APK
+on Pixel 10, then stop. Owner will perform gameplay testing. No AAB/release.
+
+INCIDENT EVIDENCE (dedicated Cricket_FirstSession_QA, emulator-5558)
+----------------------------------------------------------------
+At 00:35:16.522, app process13797/thread17905 logged its own Process signal9.
+ApplicationExitInfo previously recorded SIGNALED/status9, no Java crash trace.
+This is not evidence of an OutOfMemoryError or a proven low-memory kill.
+
+Additional read-only log review found a simultaneous Google Play services
+replacement:23.18.18 ->26.41.31. Package lastUpdateTime00:34:53; ActivityManager
+force-stopped the old GMS package as an UPDATE at00:35:12; Finsky recorded the
+replacement installed at00:35:15.316; Chimera rebuilt its module configuration.
+App provider lookups for com.google.android.gms.chimera failed during replacement.
+
+Within00:35:16.522–00:35:17.148, seven processes logged self-issued SIG9:
+13797 (game),14611/14617 (Play Store),7189 (Digital Wellbeing),7660/15382
+(Google Search),7329 (Google keyboard). Event-log process deaths confirm these
+names. The game's WebView child was terminated AFTER its host, as isolated not
+needed; that is not proof that WebView caused the host exit.
+
+The previous APK's bundled measurement23.2.0 includes a deliberate
+PhenotypeProcessReaper killProcess(myPid) routine, with the literal message
+"Killing process to refresh experiment configuration". That message was NOT
+present for gamePID13797. Consequently this particular routine is a possible
+SDK mechanism, NOT a proven stack trace for this incident. Other apps emitted
+that tag at other times; their log messages must not be attributed to the game.
+
+DIAGNOSIS / CHANGE BOUNDARY
+---------------------------
+The synchronized provider update and multi-app restarts make the GMS update the
+leading explanation, substantially stronger than the original memory-pressure
+guess. Exact caller/stack remains unavailable. Do NOT label the incident a
+confirmed gameplay bug, OOM, notification crash, or conclusively fixed SDK bug.
+No speculative game-code/SDK-version/permission/privacy/save change was made.
+The provider update completed automatically. Existing save recovery and repeat
+match passed previously; those observations were not rerun or invented here.
+
+TARGET / INSTALL PLAN
+---------------------
+Current AVD identities checked independently:5554=Pixel_8_Pro;
+5556=Pixel_10_Pro_XL. Target only5556; other apps/AVDs remain untouched.
+Pixel10 GMS26.37.37 last updated13October19:41:31, already settled before build.
+Existing game1.0.12/code22 is replaced IN PLACE with internal QA code23 to
+preserve saves. Do not uninstall, clear storage or use downgrade flags.
+QA-only Gradle version override lives in output/pixel10-qa-2026-10-24/.
+Production version configuration and existing AAB remain unchanged.
+Build excludes uploadCrashlyticsMappingFileQa. No Metro dependency intended.
+Build, artifact verification and actual installation results are appended below
+only after observed completion. Owner testing remains pending.
+
+OBSERVED HANDOFF
+----------------
+assembleQa succeeded in2m44s, with the existing third-party R8/SDK warnings.
+Internal standalone arm64 APK,1.0.12/code23, target36/min24, debug signature
+verified. Embedded assets/index.android.bundle8,199,784bytes, no Metro required.
+APK: output/pixel10-qa-2026-10-24/cricket-player-manager-qa-vc23.apk
+SHA256:b9b3275d33835619d29086a6f44ef1d406163801abe5271f61b9cef4d23587e1
+Build log: output/pixel10-qa-2026-10-24/build.log
+Focused existing quick-start/onboarding regressions:3suites/29tests PASS.
+No runtime source edits in this follow-up; previous complete gate is historical.
+
+adb -s emulator-5556 install -r returned Success. Package metadata confirms
+code23/version1.0.12, updated24October01:23:28; original firstInstallTime remains
+16October02:13:57. In-place replacement preserved application storage; did not
+uninstall, clear data, open saves or launch the game for testing. Existing owner
+progress has NOT been inspected or certified in this pass.
+No other app/emulator controlled, no owner gameplay test, AAB, store upload,
+provider setting change, backend/website deployment or production version bump.
+Owner can now open the installed game on Pixel10 and test. The likely provider
+update explanation is not a claim that all production stability gates passed.

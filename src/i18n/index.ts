@@ -58,6 +58,13 @@ const EN: Dict = {
   'hub.tabProfile': 'Profile',
   'hub.tabTransfers': 'Transfers',
   'hub.tabRecords': 'Records',
+  'hub.tabStats': 'Stats',
+  'hub.tabProgress': 'Progress',
+  'hub.tabMore': 'More',
+  'hub.tabTeam': 'Team',
+  'hub.tabClub': 'Club',
+  'hub.tabCalendar': 'Calendar',
+  'hub.tabAcademy': 'Academy',
 };
 
 const HI: Dict = {
@@ -102,6 +109,13 @@ const HI: Dict = {
   'hub.tabProfile': 'प्रोफ़ाइल',
   'hub.tabTransfers': 'ट्रांसफ़र',
   'hub.tabRecords': 'रिकॉर्ड',
+  'hub.tabStats': 'आँकड़े',
+  'hub.tabProgress': 'प्रगति',
+  'hub.tabMore': 'और',
+  'hub.tabTeam': 'टीम',
+  'hub.tabClub': 'क्लब',
+  'hub.tabCalendar': 'कैलेंडर',
+  'hub.tabAcademy': 'अकादमी',
 };
 
 const STRINGS: Record<Language, Dict> = { en: EN, hi: HI };

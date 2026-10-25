@@ -4,6 +4,17 @@ import path from 'path';
 describe('CareerHub story preview copy', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'CareerHubScreen.tsx'), 'utf8');
 
+  it('keeps optional first-career help below the resolver-owned fixture action', () => {
+    const home = source.slice(source.indexOf('const renderHomeTab'), source.indexOf('const renderStatsTab'));
+    expect(home.indexOf('<GuideReplayButton chapter="player.home"')).toBeGreaterThan(home.indexOf('label={primaryActionLabel}'));
+  });
+  it('uses a scene-focused coach, not a background hub modal over results', () => {
+    const guide = fs.readFileSync(path.join(__dirname, '../../components/CareerGuide.tsx'), 'utf8');
+    expect(guide).toContain('const focused = useIsFocused()');
+    expect(source).toContain("guide={{ chapter: 'player.home'");
+    expect(source).not.toContain('<ModeGuideModal');
+  });
+
   it('uses rendered story text instead of raw event placeholders on the home card', () => {
     expect(source).toContain('storyPreview?.title');
     expect(source).not.toContain('storyPreview?.speaker');
@@ -34,11 +45,12 @@ describe('CareerHub story preview copy', () => {
     expect(source).toContain('<NewspaperModal');
   });
 
-  it('keeps the profile tab focused on profile-only actions', () => {
+  it('keeps the More menu focused on profile and personal actions', () => {
     expect(source).not.toContain('Squad & Tactics');
     expect(source).not.toContain('🔔 Inbox');
     expect(source).toContain('View Full Profile');
-    expect(source).toContain('Records & Hall of Fame');
+    expect(source).toContain('label="Records"');
+    expect(source).toContain('label="Hall of Fame"');
   });
 
   it('keeps the spotlight, wallet and first content card visually separated', () => {

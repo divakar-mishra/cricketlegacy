@@ -1,0 +1,117 @@
+PLAYER CAREER ENERGY — DIAGNOSIS, 23 OCTOBER 2026
+================================================
+FOLLOW-UP: owner subsequently approved implementation. See
+docs/ENERGY_IAP_FIX_2026-10-23.txt for fixed behavior and current verification.
+Everything below is the pre-fix point-in-time diagnosis, not current constants.
+
+Scope: owner requested investigation, not an approved balance change.
+Owner supplied this review for App 1.0.12 (20), Player Career:
+  "Bro when will next update come im waiting for so long the main issue is
+  short energy thing please improve it"
+Review/version are owner-reported. Current source and mocked store behavior
+were checked locally; the reviewer's device/save and published binary were
+not inspected. No runtime code, constants, prices or products changed; no new
+APK/AAB, install, website/backend write or review response was performed.
+
+CONCLUSION
+The complaint is credible. A small meter plus increasing format/stage costs
+limits rapid simulation much more than slow Watch sessions. Separate recovery
+and display defects can make the experience worse. The quote does not identify
+the reviewer's career stage, match format or VIP status, so it cannot prove
+which specific finding affected that person.
+
+VERIFIED CURRENT RULES
+Source: src/data/gameConfig.ts; src/game/economy.ts; src/game/careerStep.ts.
+Free capacity36; intended VIP capacity60; one point per5 real-world minutes.
+Empty-to-full free recovery takes180minutes. Starting Gems0.
+Full-meter budgets below exclude regeneration during play; zero-to-match waits
+start with an empty meter and a fresh regeneration interval.
+
+Stage/format          Cost  Matches from36  Empty-to-one-match wait
+Youth T20                3        12             15min
+Youth ODI                5         7             25min
+Domestic T20             4         9             20min
+Domestic ODI             6         6             30min
+Domestic Test            8         4             40min
+International T20        6         6             30min
+International ODI        8         4             40min
+International Test      10         3             50min
+
+fixtureEnergyCost resolves youth-prefixed competitions first, then bilateral,
+international tournament and U19 World Cup competition types as international.
+Non-selected/rested fixtures have a separate simulation route; a selected
+player without enough energy is directed to REFILL_ENERGY. Player fitness,
+condition and coin/session-limited training are distinct from this match gate.
+
+RECOVERY AND PRESENTATION
+1. PurchaseScreen.onWatchEnergyAd grants4 after a completed available rewarded
+   ad, not the upcoming fixture's cost. From zero, an international Test needs
+   three successful ads absent regeneration. Availability is not guaranteed;
+   this is not a recommendation to weaken age/consent or ad-failure guards.
+2. Gem refill costs10Gems. The paid Mental Coaching Session is a different
+   product with form/confidence benefits. Do not describe it as a mandatory
+   purchase: waiting is free and the store also exposes ad/gem alternatives.
+3. CareerHub REFILL_ENERGY -> showShortageOffer -> form_recovery. Dialog actions
+   are Not now / View option; View option opens the paid product. Free waiting
+   is mentioned but lacks a direct action or recovery ETA. This can feel like
+   a paywall even though free recovery exists. No new screenshot audit claimed.
+4. CareerHub refreshes energy on navigation focus. No periodic energy refresh
+   was found there or in PurchaseScreen, and App.tsx's foreground handler does
+   not explicitly refresh energy. PurchaseScreen's one-second timer updates
+   the starter-offer countdown only. Remaining on these screens can leave
+   wallet/display/gating stale until an explicit refresh/navigation occurs.
+   This is a source-flow finding, not a new physical-device reproduction.
+
+MOCKED REPRODUCTIONS — ALL FIVE DIAGNOSTICS PASS
+Evidence fixture: docs/evidence/android-energy-review-2026-10-23/reproduce-energy.test.ts
+Run explicitly (outside normal Jest src testMatch):
+  npx jest --runInBand --testMatch '**/docs/evidence/android-energy-review-2026-10-23/reproduce-energy.test.ts'
+The fixture intentionally characterizes current defects, not desired contracts.
+Do not promote its incorrect-value expectations to permanent acceptance tests.
+Native storage/secure store/encryption/archive operations are mocked; no real
+save, signed-in account, provider service or installed app is modified.
+
+PASS cost/full-meter/wait arithmetic.
+PASS synthetic45minute sessions with1minute versus8minute match durations.
+  Existing harness: fast international Test4matches with2energy-block episodes;
+  slower international Test4matches with1block episode. Assumed durations, not
+  measured user telemetry. Harness rounds waits, permits a match started before
+  session end to finish later and advances the final wallet beyond the session;
+  do not interpret its ending wallet/ETA as an exact session-end measurement.
+PASS VIP at0 after300minutes: normal refreshEnergy produces36; pure regenEnergy
+  with the intended60cap produces60. setActive/refreshEnergy use default36.
+  A correct refreshEnergyWithVip exists but no runtime caller was found.
+PASS VIP with5energy and10Gems: refillEnergy spends10Gems but fills only36.
+PASS ad reward handler called with existing VIP50energy +4 produces36.
+  UI normally hides that ad action above8; this is a handler/race edge, NOT
+  evidence that a player normally presses Watch ad at50. Fix must preserve
+  existing energy as well as apply the right cap.
+WalletBar/store low-energy text also hard-code a /36 denominator for VIP.
+Paid mental-coaching fulfilment already uses36/60; do not conflate that path
+with the broken gem refill or normal regeneration paths.
+
+EXISTING REGRESSION CHECK
+Six focused suites /136tests passed: game, careerStep, shortageOffers,
+careerStoreRewards, ageEligibility, adsConsent. Passing existing tests does
+not certify pleasant pacing: older no-spend tests assume8minutes per match,
+and the simple harness uses flat4energy rather than international Test10.
+The diagnostic initially failed during fixture import because __DEV__ was not
+initialized before static imports; runtime require after setup fixed the
+fixture and all5 diagnostics then passed. That was not an app runtime failure.
+
+RECOMMENDATION — PENDING OWNER APPROVAL
+A. Fix cap consistency and non-destructive grants/refills; add permanent tests
+   for the correct36/60 behavior, restored ownership and legacy saves.
+B. Refresh from elapsed time on foreground/focus and before the next-match
+   affordability decision; show next playable time and clear free alternatives
+   without creating a heavy recurring career-reconciliation timer.
+C. Then approve a session target and rebalance high-format/fast-sim costs or
+   recovery. No replacement numbers are approved or implemented in this audit.
+   Preserve purchased benefits, canonical match settlement, age/consent guards
+   and free career continuation. No new product, price or bypass is authorized.
+D. Verify full selected-player sessions across youth/domestic/international,
+   free/VIP, simulation modes, offline/foreground/cold-start and zero ad fill.
+   Run focused regressions first; no production rollout implied by local tests.
+
+iOS work paused for this owner-requested Android diagnosis. Apple provider
+enablement remains verified; connected iOS login and release gates remain open.

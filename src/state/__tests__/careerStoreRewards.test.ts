@@ -12,6 +12,8 @@ jest.mock('../../storage/saveEncryption', () => ({
   openSave: async () => null,
   verifySaveIdentity: async () => null,
   sealSave: async () => ({ __env: 2, algorithm: 'AES-256-GCM', data: 'test-only' }),
+  sealSaveSummary: async () => ({ __env: 2, algorithm: 'AES-256-GCM', data: 'test-summary-only' }),
+  openSaveSummary: async () => null,
   markSaveSealed: async () => undefined,
   deleteSaveKey: async () => undefined,
 }));
@@ -494,6 +496,35 @@ describe('career reward integrity', () => {
     expect(second.ok).toBe(false);
     expect(useCareer.getState().save?.wallet.energy).toBe(9);
     expect(useCareer.getState().save?.flags['rewardTx:store-energy:test']).toBe(true);
+  });
+
+  it.each(['career', 'manager'] as const)('never applies a delayed match bonus to a different %s save', mode => {
+    const origin = makeCareerSave();
+    origin.id = 'match-reward-origin';
+    useCareer.getState().setActive(origin, 'career', 1);
+    const next = mode === 'career' ? makeCareerSave() : makeManagerSave();
+    next.id = 'match-reward-other';
+    useCareer.getState().setActive(next, mode, 2);
+    const before = useCareer.getState().save!.wallet.coins;
+    const tx = 'match-double:delayed-fixture';
+    expect(useCareer.getState().grantAdReward(125, tx, origin.id).ok).toBe(false);
+    expect(useCareer.getState().save!.wallet.coins).toBe(before);
+    expect(useCareer.getState().save!.flags[`rewardTx:${tx}`]).toBeUndefined();
+    // Rejecting the wrong save does not consume the original career's claim.
+    useCareer.getState().setActive(origin, 'career', 1);
+    const originalCoins = useCareer.getState().save!.wallet.coins;
+    expect(useCareer.getState().grantAdReward(125, tx, origin.id).ok).toBe(true);
+    expect(useCareer.getState().grantAdReward(125, tx, origin.id).ok).toBe(false);
+    expect(useCareer.getState().save!.wallet.coins).toBe(originalCoins + 125);
+  });
+
+  it.each([NaN, Infinity, -Infinity, 0, -1])('rejects invalid rewarded coin amount %s without consuming its claim', coins => {
+    const save = makeCareerSave();
+    useCareer.getState().setActive(save, 'career', 1);
+    const before = useCareer.getState().save!.wallet.coins;
+    expect(useCareer.getState().grantAdReward(coins, 'match-double:invalid', save.id).ok).toBe(false);
+    expect(useCareer.getState().save!.wallet.coins).toBe(before);
+    expect(useCareer.getState().save!.flags['rewardTx:match-double:invalid']).toBeUndefined();
   });
 
   it('does not grant a pending purchase', async () => {

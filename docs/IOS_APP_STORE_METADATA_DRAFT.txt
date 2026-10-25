@@ -1,0 +1,146 @@
+APPLE APP STORE — METADATA WORKSHEET
+Updated 22 October 2026 | Cricket: Player & Manager
+Metadata remains draft. Owner-created App Store Connect record is visible in the
+21 October screenshot: Apple ID 6825412889, version 1.0 Prepare for Submission.
+No build upload or App Review submission is established by that screenshot.
+
+APP IDENTITY
+Name: Cricket: Player & Manager
+Primary language: English (U.S.), confirmed by owner-pasted App Information
+Bundle ID: com.coverdrive.cricket, confirmed by owner-pasted App Information
+SKU: cricket-player-manager-ios, confirmed by owner-pasted App Information
+Apple team: 25PTZT5DNC (OWNER-REPORTED)
+App Store Connect app ID: 6825412889 (OBSERVED in owner's screenshot URL)
+Version for the current source: 1.0.12
+Console draft version: 1.0; align the version record with the intended signed
+build before selecting/uploading it. Screenshot does not establish a build upload.
+iOS buildNumber currently configured: 1; use a fresh build number for each upload.
+EAS submit profile ios-production now targets this existing app ID and Team ID.
+It contains no private credentials; no device build/upload was performed by this
+configuration change. The simulator artifact predates the latest policy edits.
+Category recommendation: primary Games; game subcategories Sports and Simulation;
+optional secondary top-level category blank. Owner has not confirmed saving these.
+Apple's Standard License Agreement is shown in the owner-pasted App Information.
+Content Rights, age rating, DSA, encryption and Apple server configuration remain
+unfinished; do not infer ownership/licensing or fill invented notification URLs.
+Owner-pasted questionnaire calculated rating: 13+ (21 October). Final save and
+Age Categories / Override selection remain unconfirmed. Existing eligibility is
+18+ in India / 13+ elsewhere. Apple's override applies globally; do not silently
+choose 18+ worldwide. Owner chose to retain the regional audience on 21 October;
+resolve Apple's regional/EULA treatment before completing submission readiness.
+India 18+ is the existing conservative product/privacy choice, not an adult
+cricket-content requirement. Verified parental consent is not implemented.
+DPDP child-data provisions have phased commencement; section 9 / Rule 10 are
+scheduled for May 2027, not already fully effective on 21 October 2026.
+Evidence, interpretation limits and primary sources: docs/how-to/CRICKET_CONFIGURATION.txt.
+Availability / price: OWNER_TO_CONFIRM
+Copyright: OWNER_TO_CONFIRM_YEAR_AND_RIGHTS_HOLDER
+
+SUBTITLE DRAFT
+Build your cricket legacy
+
+PROMOTIONAL TEXT DRAFT
+Two careers. One cricket world. Develop your player or lead a club through
+fictional cricket seasons, squad decisions and matchdays.
+
+DESCRIPTION DRAFT
+Take your place in fictional cricket with two careers in one game.
+
+PLAYER CAREER
+Begin in Grade A cricket, develop your skills and compete for selection as your
+career progresses. Make training and off-field decisions, follow your results
+and build a record across different competitions and formats.
+
+MANAGER CAREER
+Take charge of a club, choose your squad and tactics, develop facilities and
+manage the decisions that shape a season. Explore scorecards, tables and career
+records as you build your team's story.
+
+Follow match scorecards, career records and the decisions that shape your
+cricket story. Local career saves support continued progress on your device.
+
+EDITOR NOTE — NOT PART OF THE PASTEABLE DESCRIPTION:
+Do not add cloud backup, live ads, Apple login or purchase availability claims
+until the final configured iOS candidate has passed those service tests. This
+worksheet is draft metadata, not a finished listing or ownership attestation.
+
+KEYWORDS DRAFT
+cricket,career,manager,sports,simulation,coach,club
+Review store limits/availability before saving. Do not add competitors' names.
+
+PUBLIC LINKS
+Marketing: https://sunlight-publisher-site.pages.dev/products/cricket-player-manager/
+Support: https://sunlight-publisher-site.pages.dev/support/
+Privacy: https://sunlight-publisher-site.pages.dev/privacy/
+Terms: https://sunlight-publisher-site.pages.dev/terms/
+Account deletion: https://sunlight-publisher-site.pages.dev/delete-account/
+Optional Age Suitability URL:
+https://sunlight-publisher-site.pages.dev/products/cricket-player-manager/#age-suitability
+This newly deployed section does not resolve Apple's regional override handling.
+Support contact: devsunlightpvt@gmail.com
+
+REVIEW NOTES TEMPLATE — REPLACE BRACKETS WITH VERIFIED FACTS
+The app offers Player and Manager careers. Guest play is available from Account.
+To inspect account backup/sign-in: [EXACT VERIFIED INSTRUCTIONS].
+Reviewer credentials/access: [PROVIDE SECURELY IN APP STORE CONNECT IF REQUIRED].
+To inspect in-app purchases/restore: [EXACT VERIFIED SANDBOX INSTRUCTIONS].
+In-app account deletion: Account -> Delete account & data.
+Please do not submit these bracketed placeholders as finished review notes.
+
+REVIEWER WALKTHROUGH TO VERIFY ON THE FINAL CANDIDATE
+1. Complete the self-declared age/residence gate with an eligible QA profile.
+   There is no verified-ID or verified-parent flow; do not tell Apple otherwise.
+2. Account -> guest/local play; inspect Player and Manager creation and play.
+3. Account -> supported provider login; complete only the actual configured flow.
+   Account -> Backup & recovery; confirm acknowledged backup, not just a tap.
+4. In-app Store -> choose a supported product; test the sandbox checkout and
+   Restore Purchases with actually-owned permanent access. Consumables must not
+   be regranted by restore; unrelated careers/accounts must remain unchanged.
+5. Settings -> ad privacy choices; verify eligible requests and withdrawal.
+6. Account -> Delete account & data, using a disposable test account only.
+The exact visible labels, reviewer access and backend state must be checked on
+the submitted build; instructions above are not a claimed completed test.
+
+SCREENSHOT PLAN
+Capture real iOS build screens after testing, without debug overlays or errors:
+  1. Main menu / two-career selection.
+  2. Player cricket hub and progression.
+  3. Match presentation and scorecard.
+  4. Manager squad/tactics.
+  5. Club facilities / stadium.
+  6. Career records.
+Use sizes accepted by current App Store Connect for supported iPhone/iPad
+classes. Do not upload Android screenshots or the placeholder sign-in error.
+Native QA attachments in the iOS evidence folder are testing evidence, not an
+automatically approved marketing screenshot set.
+Apple specifications were checked on 21 October; recheck the live console at
+upload time instead of hardcoding a future device-size requirement. Use actual
+supported iPhone/iPad captures, no alpha, device frames or feature claims that
+misrepresent the submitted app. A marketing header is not an app screenshot.
+
+QUESTIONNAIRES AND ADMINISTRATION
+Complete source-backed age-answer register and rationale:
+  docs/how-to/CRICKET_CONFIGURATION.txt -> APPLE AGE QUESTIONNAIRE
+App Privacy collection/purpose/linking worksheet and tracking review:
+  same file -> APPLE APP PRIVACY WORKSHEET
+Step-by-step provider/build/TestFlight/review instructions:
+  docs/how-to/START_HERE.txt -> section 14
+Content Rights, DSA/trader verification, countries/price, final crypto/export
+classification and accessibility claims require truthful owner/artifact evidence.
+No content-rights assertion, private address, classification number or server URL
+has been invented. The Apple regional-age support question is prepared, not sent.
+Apple token revocation on deletion requires provider/implementation verification.
+Use the existing Standard EULA unless the owner authorizes a reviewed replacement.
+
+PRIVACY EVIDENCE
+Static simulator audit: 17 manifests. GMA DeviceID has tracking=true in its SDK
+manifest; no actual runtime tracking verdict follows from this alone. App Privacy
+must reflect the final configured archive and provider behavior, not this draft.
+Report: docs/evidence/ios-preparation-2026-10-21/ios-privacy-manifest-inventory.json
+Website release/verification: docs/evidence/ios-preparation-2026-10-21/
+
+BEFORE SUBMISSION
+Owner must finish Apple account/signing, real provider setup, TestFlight/device
+testing, age-rating and App Privacy questionnaires, export compliance, purchase
+catalogue/review items, final screenshots and reviewer access. Existing Android
+ages/Data safety answers are not a substitute for Apple's app-wide questions.

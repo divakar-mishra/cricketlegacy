@@ -177,7 +177,7 @@ export function ClubStadiumScreen({ navigation }: ScreenProps<'ClubStadium'>) {
   };
 
   return (
-    <Screen scroll gradient={gradients.pitch}>
+    <Screen scroll careerNavigation gradient={gradients.pitch}>
       <ScreenHeader title="Home Ground" subtitle={team.name} onBack={() => navigation.goBack()} />
 
       <Card style={styles.heroCard}>

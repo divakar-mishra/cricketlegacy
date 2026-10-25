@@ -11,8 +11,9 @@ describe('Supabase backend integration source', () => {
     expect(source).toContain('signInAnonymously');
     expect(source).toContain('currentRecoverableSupabaseUserId');
     expect(source).toContain('supabase.auth.getUser()');
-    expect(source).toContain('provider: authProvider(data.session.user)');
-    expect(source).toContain('displayName: authDisplayName(data.session.user)');
+    expect(source).toContain('return userSession(data.session.user)');
+    expect(source).toContain('provider: authProvider(user)');
+    expect(source).toContain('displayName: authDisplayName(user)');
     expect(source).toContain("rpc('record_daily_verification'");
     expect(source).not.toContain('SERVICE_ROLE');
     expect(source).not.toContain('sb_secret');
@@ -31,6 +32,7 @@ describe('Supabase backend integration source', () => {
     expect(source).toContain('supabase.auth.setSession');
     expect(source).toContain('supabase.auth.refreshSession()');
     expect(source).toContain('synchronizePurchaseIdentity()');
+    expect(source).toContain('await currentVerifiedSupabaseSession()');
     expect(source).not.toContain('GOOGLE_CLIENT_SECRET');
   });
 

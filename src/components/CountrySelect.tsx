@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COUNTRIES, getCountry } from '../data/countries';
@@ -21,11 +21,15 @@ type Props = {
   onChange: (countryId: string) => void;
   placeholder?: string;
   testID?: string;
+  onOpenChange?: (open: boolean) => void;
 };
 
 /** Compact, scrollable country selector shared by both career-creation flows. */
-export function CountrySelect({ value, onChange, placeholder = 'Select country', testID }: Props) {
+export function CountrySelect({ value, onChange, placeholder = 'Select country', testID, onOpenChange }: Props) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [open, onOpenChange]);
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();

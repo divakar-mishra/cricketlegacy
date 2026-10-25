@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   Switch,
@@ -26,6 +26,9 @@ import { getCountry } from '../data/countries';
 import { BattingStyle, BowlingStyle, CareerArchetype, Difficulty, Role } from '../domain/types';
 import { buildUserPlayer, createCareerSave } from '../game/createGame';
 import { playerDomesticBlueprints } from '../game/domesticBranding';
+import { GuideReplayButton, GuideTarget } from '../components/CareerGuide';
+import { AttributesGuidePopup } from '../components/AttributesGuidePopup';
+import { guideAction } from '../game/coachGuide';
 import {
   activeCreationAttributeDelta,
   allocatedActiveCreationPoints,
@@ -34,7 +37,7 @@ import {
 import { ScreenProps } from '../navigation';
 import { analytics } from '../services';
 import { useCareer } from '../state/careerStore';
-import { firstFreeSlot, listSlots, setLastPlayed, writeSave } from '../storage/saveGames';
+import { findCreationSlot, setLastPlayed, writeSave } from '../storage/saveGames';
 import {
   fontSize,
   fontWeight,
@@ -98,15 +101,14 @@ type CareerStart = (typeof CAREER_START_OPTIONS)[number]['value'];
 type AttrRow = { group: keyof AllAttrs; key: string; label: string };
 type AttrSection = { id: string; label: string; rows: AttrRow[] };
 
-function initAttrs(): AllAttrs {
-  const b = CREATION.base;
-  return {
-    batting: { technique: b, timing: b, power: b, footwork: b, temperament: b, running: b },
-    bowling: { paceOrSpin: b, accuracy: b, movement: b, variations: b, stamina: b },
-    fielding: { catching: b, throwing: b, agility: b, keeping: b },
-    meta: { fitness: b, confidence: b, aggression: b, discipline: b },
-  };
+const creationBudgetFor = (role: Role, scale: number) =>
+  Math.round((role === 'BATTER' || role === 'BOWLER' ? 150 : CREATION.budget) * scale);
+function initialCreationAttrs(): AllAttrs {
+  return Object.fromEntries(Object.entries(ATTR_META).map(([group, rows]) => [
+    group, Object.fromEntries(rows.map(([key]) => [key, CREATION.base])),
+  ])) as unknown as AllAttrs;
 }
+const CREATION_GUIDES = ['player.identity', 'player.attributes', 'player.club', 'player.review'] as const;
 
 export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerCreation'>) {
   const setActive = useCareer((s) => s.setActive);
@@ -114,19 +116,26 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
   const styles = useThemedStyles(makeStyles);
 
   const [step, setStep] = useState(0);
+  const [attributesGuideOpen, setAttributesGuideOpen] = useState(true);
   const [name, setName] = useState('');
   const [nationality, setNationality] = useState<string | null>(null);
+  const [countryOpen, setCountryOpen] = useState(false);
   const [role, setRole] = useState<Role>('ALLROUNDER');
+  const [roleChosen, setRoleChosen] = useState(false);
+  const [sexChosen, setSexChosen] = useState(false);
+  const [toneChosen, setToneChosen] = useState(false);
+  const [portraitChosen, setPortraitChosen] = useState(false);
   const [battingStyle, setBattingStyle] = useState<BattingStyle>('RHB');
   const [bowlingHand, setBowlingHand] = useState<BowlingHand>('RIGHT');
   const [bowlingDiscipline, setBowlingDiscipline] = useState<BowlingDiscipline>('PACE');
-  const [attrs, setAttrs] = useState<AllAttrs>(initAttrs);
+  const [attrs, setAttrs] = useState<AllAttrs>(initialCreationAttrs);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty>('NORMAL');
   const [careerStart, setCareerStart] = useState<CareerStart>('u14');
   const [archetype, setArchetype] = useState<CareerArchetype>('SPECIALIST');
   const [ironman, setIronman] = useState(false);
   const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(() => ({
     ...DEFAULT_AVATAR_CONFIG,
   }));
@@ -135,7 +144,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
   const bowlingStyle = roleBowls ? resolveBowlingStyle(bowlingHand, bowlingDiscipline) : undefined;
   const careerStartOpt =
     CAREER_START_OPTIONS.find((o) => o.value === careerStart) ?? CAREER_START_OPTIONS[0];
-  const creationBudget = Math.round((role === 'BATTER' || role === 'BOWLER' ? 150 : 230) * careerStartOpt.attrScale);
+  const creationBudget = creationBudgetFor(role, careerStartOpt.attrScale);
 
   /**
    * Show only the attribute groups that are relevant to the chosen role.
@@ -191,6 +200,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
   const changeNationality = (n: string) => {
     setNationality(n);
     setTeamId(null);
+    guideAction('player-country');
   };
 
   const allocated = useMemo(() => {
@@ -201,6 +211,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
   const preview = useMemo(
     () =>
       buildUserPlayer({
+        sex: avatarConfig.sex,
         name: name.trim() || 'New Player',
         nationality: nationality ?? 'india',
         role,
@@ -213,12 +224,14 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
         age: careerStartOpt.ageOverride,
         attrScale: careerStartOpt.attrScale,
       }),
-    [name, nationality, role, battingStyle, bowlingStyle, roleBowls, attrs, careerStartOpt],
+    [name, nationality, role, battingStyle, bowlingStyle, roleBowls, attrs, careerStartOpt, avatarConfig.sex],
   );
 
   const changeRole = (next: Role) => {
     setRole(next);
-    setAttrs(initAttrs());
+    setRoleChosen(true);
+    setAttrs(initialCreationAttrs());
+    guideAction('player-role');
     const bowls = next === 'BOWLER' || next === 'ALLROUNDER';
     if (bowls) setBowlingDiscipline((current) => current ?? 'PACE');
   };
@@ -235,29 +248,44 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
 
   const canProceed = useMemo(() => {
     if (step === 0) {
-      return name.trim().length >= 2 && Boolean(nationality);
+      return name.trim().length >= 2 && Boolean(nationality && getCountry(nationality)) && sexChosen && toneChosen && portraitChosen && roleChosen;
     }
     if (step === 2) return Boolean(teamId);
     return true;
-  }, [step, name, nationality, teamId]);
+  }, [step, name, nationality, teamId, sexChosen, toneChosen, portraitChosen, roleChosen]);
 
   const isLast = step === STEP_TITLES.length - 1;
+  const attributesPage = step === 1;
   const proceedHint =
     step === 0
       ? name.trim().length < 2
         ? 'Enter at least 2 characters for your player name.'
         : !nationality
           ? 'Choose your country to continue.'
-          : null
+          : !sexChosen
+            ? 'Choose Male or Female to continue.'
+            : !toneChosen
+              ? 'Choose a skin tone range to continue.'
+            : !portraitChosen
+              ? 'Choose a portrait or Randomize to continue.'
+              : !roleChosen
+                ? 'Choose your playing role to continue.'
+                : null
       : step === 2 && !teamId
         ? 'Choose a Tier 3 club to start your career.'
         : null;
-  const onBack = () => (step === 0 ? navigation.goBack() : setStep((s) => s - 1));
+  const onBack = () => {
+    if (creatingRef.current) return;
+    if (step === 0) navigation.goBack();
+    else setStep(s => s - 1);
+  };
   const create = async () => {
-    if (!nationality || !teamId || creating) return;
+    if (!nationality || !getCountry(nationality) || !teamId || name.trim().length < 2 || !sexChosen || !toneChosen || !portraitChosen || !roleChosen || creatingRef.current) return;
+    creatingRef.current = true;
     setCreating(true);
     try {
       const player = buildUserPlayer({
+        sex: avatarConfig.sex,
         name: name.trim(),
         nationality,
         role,
@@ -270,8 +298,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
         age: careerStartOpt.ageOverride,
         attrScale: careerStartOpt.attrScale,
       });
-      const slots = await listSlots('career');
-      const slot = route?.params?.slot ?? firstFreeSlot(slots);
+      const slot = await findCreationSlot('career', route?.params?.slot);
       if (!slot) {
         Alert.alert('All slots full', 'Delete a career from Saved Games to start a new one.', [
           { text: 'OK', onPress: () => navigation.navigate('SavedGames') },
@@ -290,7 +317,13 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
         avatarConfig,
       });
       await writeSave('career', slot, save);
-      await setLastPlayed('career', slot);
+      // The career is already durable. Optional resume metadata must not turn
+      // success into a retry that creates a second career in another slot.
+      try {
+        await setLastPlayed('career', slot);
+      } catch {
+        console.warn('Career created; last-played metadata could not be updated.');
+      }
       setActive(save, 'career', slot);
       analytics.setUserProperty('mode', 'career');
       analytics.logEvent(analytics.EVT.CAREER_START, {
@@ -298,6 +331,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
         difficulty,
         new_game_plus: Boolean(route?.params?.legacy),
       });
+      guideAction('player-created');
       navigation.reset({ index: 1, routes: [{ name: 'MainMenu' }, { name: 'CareerHub' }] });
     } catch {
       Alert.alert(
@@ -305,18 +339,27 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
         'The device did not confirm the first save. Check available storage and try again.',
       );
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   };
 
-  const onNext = () => (isLast ? void create() : setStep((s) => s + 1));
+  const onNext = () => {
+    if (!canProceed || creating) return;
+    if (isLast) return create();
+    guideAction('player-creation-next');
+    setStep(s => s + 1);
+  };
 
   return (
     <Screen
       scroll
+      guide={{ chapter: CREATION_GUIDES[step], enabled: !attributesPage && !creating && !countryOpen,
+        layout: attributesPage ? 'plain' : 'docked', progress: 'session' }}
       scrollResetKey={step}
       footer={
         <View>
+          {creating ? <Text accessibilityLiveRegion="polite" style={styles.footerHint}>Creating and saving your career…</Text> : null}
           {proceedHint ? <Text style={styles.footerHint}>{proceedHint}</Text> : null}
           <View style={styles.footerRow}>
             <Button
@@ -324,17 +367,17 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
               variant="ghost"
               fullWidth={false}
               style={styles.flex}
+              disabled={creating}
               onPress={onBack}
             />
-            <Button
+            <GuideTarget id="creation-next" style={styles.flex}><Button
               label={isLast ? 'Start Career' : 'Next'}
               variant={isLast ? 'gold' : 'primary'}
               fullWidth={false}
-              style={styles.flex}
               disabled={!canProceed || creating}
               loading={creating}
               onPress={onNext}
-            />
+            /></GuideTarget>
           </View>
         </View>
       }
@@ -344,6 +387,10 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
         subtitle={`Step ${step + 1} of ${STEP_TITLES.length}`}
         onBack={onBack}
       />
+      {attributesPage ? <Button label="Show screen guide" size="sm" variant="ghost"
+        onPress={() => setAttributesGuideOpen(true)} /> : <GuideReplayButton chapter={CREATION_GUIDES[step]} />}
+      <AttributesGuidePopup visible={attributesPage && attributesGuideOpen}
+        onClose={() => setAttributesGuideOpen(false)} />
       <ProgressBar
         value={(step + 1) / STEP_TITLES.length}
         color={colors.accent}
@@ -352,42 +399,60 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
 
       {step === 0 && (
         <View>
+          <GuideTarget id="identity-basics" ready={name.trim().length >= 2 && Boolean(nationality && getCountry(nationality))}>
           <Label text="Player name" />
-          <TextInput
+          <GuideTarget id="name" ready={name.trim().length >= 2}><TextInput
+            accessibilityLabel="Player name"
             value={name}
             onChangeText={setName}
             placeholder="e.g. Arjun Rao"
             placeholderTextColor={colors.textFaint}
             style={styles.input}
             maxLength={22}
-          />
+          /></GuideTarget>
 
           <Label text="Nationality" style={{ marginTop: spacing.lg }} />
-          <CountrySelect
+          <GuideTarget id="country" ready={Boolean(nationality && getCountry(nationality))}><CountrySelect
             value={nationality}
             onChange={changeNationality}
             testID="player-country-select"
-          />
+            onOpenChange={setCountryOpen}
+          /></GuideTarget>
+          </GuideTarget>
 
+          <GuideTarget id="appearance" ready={sexChosen && toneChosen && portraitChosen}>
           <PortraitPicker
             value={avatarConfig}
             onChange={setAvatarConfig}
             playerName={name.trim() || 'Your Player'}
             testID="player-creation-avatar"
+            creationChoices={{ sex: sexChosen, tone: toneChosen, portrait: portraitChosen }}
+            onChooseSex={(sex) => {
+              if (!sexChosen || sex !== avatarConfig.sex) {
+                setToneChosen(false);
+                setPortraitChosen(false);
+              }
+              setSexChosen(true);
+            }}
+            onChooseTone={() => { setToneChosen(true); setPortraitChosen(false); }}
+            onChoosePortrait={() => setPortraitChosen(true)}
           />
+          </GuideTarget>
 
+          <GuideTarget id="role-and-styles" ready={roleChosen}>
           <Label text="Role" style={{ marginTop: spacing.lg }} />
-          {ROLES.map((r) => (
+          <GuideTarget id="role" ready={roleChosen}>{ROLES.map((r) => (
             <SelectableCard
               key={r.value}
               title={r.label}
               subtitle={r.desc}
-              selected={role === r.value}
+              selected={roleChosen && role === r.value}
               onPress={() => changeRole(r.value)}
               style={{ marginBottom: spacing.sm }}
             />
-          ))}
+          ))}</GuideTarget>
 
+          <GuideTarget id="styles">
           <Label text="Career identity" style={{ marginTop: spacing.lg }} />
           {(
             [
@@ -461,13 +526,17 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
               />
             </>
           )}
+          </GuideTarget>
+          </GuideTarget>
         </View>
       )}
 
       {step === 1 && (
         <View>
+          <View>
           {/* Pathway is chosen BEFORE allocation so the OVR shown here matches the
               review and in-game value (youth pathways start lower but grow higher). */}
+          <View>
           <Label text="Career starting level" />
           {CAREER_START_OPTIONS.map((opt) => (
             <SelectableCard
@@ -479,13 +548,17 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
               style={{ marginBottom: spacing.sm }}
             />
           ))}
+          </View>
+          <View>
           <ChoiceRow
             label="Difficulty"
             value={difficulty}
             onChange={setDifficulty}
             options={DIFFICULTIES}
           />
+          </View>
 
+          <View>
           <Card style={[styles.summary, { marginTop: spacing.lg }]}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryValue}>{preview.overall}</Text>
@@ -504,6 +577,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
               <Text style={styles.summaryLabel}>Points left</Text>
             </View>
           </Card>
+          </View>
           <Card style={styles.attrDashboard}>
             <View style={styles.attrDashHeader}>
               <View>
@@ -525,7 +599,9 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
           <Text style={styles.roleHint}>
             Each tap changes the displayed Grade A rating by up to 3 and uses the same number of points.
           </Text>
+          </View>
 
+          <View>
           {attrSections.map((section) => (
             <View key={section.id} style={{ marginTop: spacing.lg }}>
               <Text style={styles.groupTitle}>{section.label}</Text>
@@ -549,11 +625,12 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
               })}
             </View>
           ))}
+          </View>
         </View>
       )}
 
       {step === 2 && (
-        <View>
+        <GuideTarget id="clubs" ready={Boolean(teamId)}>
           <Label text="Choose your future Tier 3 club" />
           {!nationality && (
             <Text
@@ -567,7 +644,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
               key={t.id}
               title={t.name}
               selected={teamId === t.id}
-              onPress={() => setTeamId(t.id)}
+              onPress={() => { setTeamId(t.id); guideAction('player-club'); }}
               style={{ marginBottom: spacing.sm }}
             />
           ))}
@@ -575,13 +652,14 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
             <Text style={styles.groupTitle}>Starting pathway</Text>
             <Text style={styles.reviewLabel}>Grade A → Under-19 → senior domestic</Text>
           </Card>
-        </View>
+        </GuideTarget>
       )}
 
       {step === 3 && (
-        <View>
+        <GuideTarget id="review">
           <ReviewRow label="Name" value={name.trim() || '—'} />
           <ReviewRow label="Nationality" value={getCountry(nationality ?? '')?.name ?? '—'} />
+          <ReviewRow label="Gender" value={avatarConfig.sex === 'female' ? 'Female' : 'Male'} />
           <ReviewRow label="Role" value={ROLES.find((r) => r.value === role)?.label ?? role} />
           <ReviewRow label="Batting" value={battingStyle === 'RHB' ? 'Right-hand' : 'Left-hand'} />
           {roleBowls && (
@@ -624,7 +702,7 @@ export function PlayerCreationScreen({ navigation, route }: ScreenProps<'PlayerC
           {remaining > 0 && (
             <Text style={styles.warn}>You still have {remaining} unspent points.</Text>
           )}
-        </View>
+        </GuideTarget>
       )}
     </Screen>
   );

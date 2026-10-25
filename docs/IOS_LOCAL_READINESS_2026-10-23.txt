@@ -1,0 +1,98 @@
+CRICKET: PLAYER & MANAGER — LOCAL iOS READINESS PASS
+23 October 2026, Asia/Kolkata
+
+OUTCOME
+Shared-backend configuration and linked-provider login fixes are implemented.
+Final automated checks and two-device simulator smoke tests pass. This is NOT
+a signed device/TestFlight candidate and is NOT ready for App Review submission.
+
+CHANGES
+1. eas.json ios-production and .env.ios.example now use the existing Android
+   Cricket public Supabase configuration, enabled=true. Project:
+   jtyuuwzhrufavbcxrhqp. No third project, schema migration or provider write.
+2. OAuth completion now gets server-validated identities instead of treating the
+   original signup provider as the only usable identity. An already-linked Apple
+   identity on a Google-created account is accepted without changing its UUID.
+   The remembered display provider cannot cross UUIDs; guest linking cannot
+   return another account. No email-based save/entitlement merging is added.
+3. Failed callback validation closes purchase access and attempts local Auth
+   sign-out, without clearing careers or signing out other devices.
+4. Distribution format checks require public backend configuration and reject
+   disabled/missing config or server-only keys. Provider-enabled checks remain
+   a separate read-only diagnostic, not proof of working OAuth credentials.
+5. Added runtime mocked deletion regressions: invalid/missing remote success
+   cannot clear local data; confirmed remote success precedes local clearing.
+   No live account was deleted, no transaction/purchase performed.
+6. Build helper now uses non-overwriting timestamped evidence logs. Historical
+   production Android AAB and simulator ZIP remain unchanged/recoverable.
+
+VERIFIED PUBLIC PROVIDER STATE
+GET /auth/v1/settings at the existing project returned200 using its public key:
+Google enabled=true; Apple enabled=false; anonymous users enabled=true.
+Callback: https://jtyuuwzhrufavbcxrhqp.supabase.co/auth/v1/callback
+Mobile callback: coverdrive://auth/callback (private allowlist not inspected).
+Private Apple/Google secrets, EAS secret values, redirects and backend function
+deployments were not authenticated/inspected. No remote state was changed.
+
+VERIFICATION
+npm run check PASS: typecheck, quiet lint,281 suites /2100 tests /2 snapshots.
+17 Node checks PASS: config, isolated simulator, manifest inventory, public Auth
+diagnostic security/error cases. The full suite initially found stale policy
+assertions for19October and older Unity wording; updated tests to match existing
+21October Android-only policy. Actual policy/website unchanged in this pass.
+
+Final standalone simulator app rebuilt and installed in place on existing QA
+iPhone16Pro and iPadA16 (iOS26.5). Non-destructive native test passed on BOTH:
+menu, Saved Games switching, Account entry, Player/Manager creation prerequisites,
+back navigation and cold restart. No erase/uninstall or save deletion.
+Main menu/Account screenshots on both visually inspected; readable without
+observed clipping. Phone/tablet retain different existing themes; no redesign.
+Screenshots are QA evidence, not a complete final gameplay/IAP store asset set.
+17 privacy manifests inventoried; Google linked/tracking DeviceID declaration
+still open for actual final-device configuration/ATT/App Privacy assessment.
+
+ARTIFACT
+output/ios-simulator/cricket-player-manager-1.0.12-ios-simulator-2026-10-23.zip
+66,256,433 bytes; SHA256:
+e6923c32c000336d4647afa201db968105a63deba1f4efd5ae7d186ad071e133
+Isolated bundle com.coverdrive.cricket.simulator, version1.0.12, build1.
+Ad-hoc simulator signature verified. Backend/RevenueCat disabled; Google test
+ad units; muted audio; production QA/mock flags false. This configuration tests
+local behavior, not real cloud, Apple billing or provider ad delivery.
+Current auth.ts/supabaseClient.ts matched the copied/built workspace exactly.
+No signed DEVICE IPA, TestFlight upload or review submission was produced.
+
+OPEN GATES / NEXT OWNER ACTION
+Apple is disabled in the real backend; finish Sign in with Apple Services ID,
+private signing key/client-secret and exact redirects. This is separate from
+the completed RevenueCat keys/products. Full field names, suggested new names,
+actual callback/domain and secret handling are in docs/how-to/
+CRICKET_CONFIGURATION.txt -> APPLE PROVIDER — NEXT OWNER ACTION.
+
+Automatic Apple permission revocation is NOT implemented. Supabase does not
+automatically store provider tokens; deleting the Auth user cannot be assumed
+to revoke Apple. A secure revocation integration or Apple's documented missing-
+token fallback with explicit guidance still requires implementation/validation.
+Do not enable a partial live deletion change or test on the owner's account.
+
+Other existing gates remain: real OAuth/recovery/account-isolation/device QA,
+Apple sandbox checkout and actually-owned restore, consent/ads, final privacy/
+age/encryption declarations, owner agreements, signing, screenshots/product
+readiness and reviewer access. No production release is authorized by this pass.
+
+EVIDENCE
+docs/evidence/ios-release-local-2026-10-23/verification-summary.json
+docs/evidence/ios-release-local-2026-10-23/privacy-and-artifact-inventory.json
+output/ios-simulator/evidence/ios-build-2026-10-23-auth-recovery-final.log
+output/ios-simulator/evidence/ios-release-local-final-pass-2026-10-23.log
+output/ios-simulator/evidence/ios-release-local-final-2026-10-23.xcresult
+output/ios-simulator/evidence/ios-release-local-final-2026-10-23-attachments/
+
+PRIMARY SOURCES CHECKED BEFORE CHANGES
+https://docs.expo.dev/versions/v57.0.0/
+https://docs.expo.dev/versions/v57.0.0/sdk/auth-session/
+https://docs.expo.dev/versions/v57.0.0/sdk/webbrowser/
+https://supabase.com/docs/guides/auth/social-login/auth-apple
+https://supabase.com/docs/guides/auth/social-login#provider-tokens
+https://developer.apple.com/support/offering-account-deletion-in-your-app/
+https://developer.apple.com/documentation/technotes/tn3194-handling-account-deletions-and-revoking-tokens-for-sign-in-with-apple

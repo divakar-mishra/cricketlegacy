@@ -19,6 +19,7 @@ import {
 } from '../game/domesticBranding';
 import { nationalReplacementQuality } from '../game/nationalTalent';
 import { COUNTRIES, getCountry } from '../data/countries';
+import type { AvatarSex } from '../avatar';
 
 export const DIV1_LEAGUE_ID = 'league-1';
 export const DIV2_LEAGUE_ID = 'league-2';
@@ -42,6 +43,7 @@ function addNationalPoolsAndTeams(
   players: Record<string, Player>,
   teams: Record<string, Team>,
   rng: ReturnType<typeof makeRng>,
+  sex: AvatarSex = 'male',
 ): void {
   for (const nation of COUNTRIES) {
     const existingNationals = Object.values(players).filter(
@@ -49,6 +51,7 @@ function addNationalPoolsAndTeams(
     ).length;
     if (existingNationals < 22) {
       const reserve = generateManagerRoster({
+        sex,
         nationality: nation.id,
         quality: nationalReplacementQuality(nation.id),
         idPrefix: `national-reserve-${nation.id}`,
@@ -178,6 +181,7 @@ const DIVISION_SIZE = 8;
 export function buildPlayerLeagueWorld(
   seed: number,
   opts: {
+    sex?: AvatarSex;
     country: string;
     userDivision: DomesticTier;
     requiredTeamId: string;
@@ -225,6 +229,7 @@ export function buildPlayerLeagueWorld(
 
   for (const blueprint of [...tier1, ...tier2, ...tier3]) {
     const squad = generateManagerRoster({
+      sex: opts.sex,
       nationality: opts.country,
       quality: blueprint.strength,
       idPrefix: blueprint.id,
@@ -244,7 +249,7 @@ export function buildPlayerLeagueWorld(
     };
   }
 
-  addNationalPoolsAndTeams(players, teams, rng);
+  addNationalPoolsAndTeams(players, teams, rng, opts.sex);
 
   const divisions = {
     tier1: tier1.map((team) => team.id),
@@ -320,7 +325,7 @@ export function buildPlayerLeagueWorld(
   ];
 
   const freeAgents: string[] = [];
-  for (const player of generateFreeAgents((seed ^ 0x5bd1e995) >>> 0, 48)) {
+  for (const player of generateFreeAgents((seed ^ 0x5bd1e995) >>> 0, 48, opts.sex)) {
     players[player.id] = player;
     freeAgents.push(player.id);
   }

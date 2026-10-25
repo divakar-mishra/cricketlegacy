@@ -1,0 +1,261 @@
+{
+  "validatedAt": "2026-09-28T20:37:30.611Z",
+  "allPassed": true,
+  "provenance": "Owner-approved staged advanced-career showcases; actual app pixels, not natural-progression evidence.",
+  "checks": [
+    {
+      "name": "eight ordered panels",
+      "passed": true,
+      "detail": [
+        "01-player-legend.png",
+        "02-manager-dream-xi.png",
+        "03-live-match.png",
+        "04-tactics-and-field.png",
+        "05-training-recovery.png",
+        "06-club-development.png",
+        "07-player-life.png",
+        "08-trophies-and-story.png"
+      ]
+    },
+    {
+      "name": "01-player-legend.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2
+      }
+    },
+    {
+      "name": "crop 01-player-legend.png sources/showcase/player-03-ratings.png",
+      "passed": true,
+      "detail": [
+        60,
+        210,
+        1224,
+        645
+      ]
+    },
+    {
+      "name": "crop 01-player-legend.png sources/showcase/player-04-stats.png",
+      "passed": true,
+      "detail": [
+        60,
+        1248,
+        1224,
+        515
+      ]
+    },
+    {
+      "name": "crop 01-player-legend.png sources/showcase/player-03-ratings.png",
+      "passed": true,
+      "detail": [
+        60,
+        894,
+        1224,
+        490
+      ]
+    },
+    {
+      "name": "02-manager-dream-xi.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2
+      }
+    },
+    {
+      "name": "crop 02-manager-dream-xi.png sources/showcase/manager-01-tactics-xi.png",
+      "passed": true,
+      "detail": [
+        60,
+        210,
+        1224,
+        145
+      ]
+    },
+    {
+      "name": "crop 02-manager-dream-xi.png sources/showcase/manager-02-playing-xi.png",
+      "passed": true,
+      "detail": [
+        60,
+        365,
+        1224,
+        1532
+      ]
+    },
+    {
+      "name": "03-live-match.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2
+      }
+    },
+    {
+      "name": "crop 03-live-match.png sources/fresh/player-live-field.png",
+      "passed": true,
+      "detail": [
+        60,
+        720,
+        1224,
+        1465
+      ]
+    },
+    {
+      "name": "04-tactics-and-field.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2
+      }
+    },
+    {
+      "name": "crop 04-tactics-and-field.png sources/showcase/manager-01-tactics-xi.png",
+      "passed": true,
+      "detail": [
+        60,
+        210,
+        1224,
+        1330
+      ]
+    },
+    {
+      "name": "05-training-recovery.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2
+      }
+    },
+    {
+      "name": "crop 05-training-recovery.png sources/reference/04-manager-training.png",
+      "passed": true,
+      "detail": [
+        50,
+        313,
+        980,
+        1295
+      ]
+    },
+    {
+      "name": "crop 05-training-recovery.png sources/fresh/player-physio-info.png",
+      "passed": true,
+      "detail": [
+        50,
+        1258,
+        1245,
+        557
+      ]
+    },
+    {
+      "name": "06-club-development.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2
+      }
+    },
+    {
+      "name": "crop 06-club-development.png sources/reference/06-manager-scout-report.png",
+      "passed": true,
+      "detail": [
+        50,
+        313,
+        980,
+        916
+      ]
+    },
+    {
+      "name": "crop 06-club-development.png sources/reference/09-manager-youth-academy.png",
+      "passed": true,
+      "detail": [
+        88,
+        368,
+        904,
+        770
+      ]
+    },
+    {
+      "name": "crop 06-club-development.png sources/reference/08-manager-home-ground.png",
+      "passed": true,
+      "detail": [
+        88,
+        618,
+        904,
+        814
+      ]
+    },
+    {
+      "name": "07-player-life.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2
+      }
+    },
+    {
+      "name": "crop 07-player-life.png sources/showcase/player-02-profile.png",
+      "passed": true,
+      "detail": [
+        24,
+        210,
+        1296,
+        786
+      ]
+    },
+    {
+      "name": "crop 07-player-life.png sources/showcase/player-02-profile.png",
+      "passed": true,
+      "detail": [
+        60,
+        1213,
+        1224,
+        890
+      ]
+    },
+    {
+      "name": "08-trophies-and-story.png",
+      "passed": true,
+      "detail": {
+        "width": 1080,
+        "height": 1920,
+        "bitDepth": 8,
+        "colorType": 2
+      }
+    },
+    {
+      "name": "crop 08-trophies-and-story.png sources/reference/manager-first-press-conference.png",
+      "passed": true,
+      "detail": [
+        60,
+        410,
+        1224,
+        1360
+      ]
+    },
+    {
+      "name": "crop 08-trophies-and-story.png sources/showcase/player-trophy-cabinet.png",
+      "passed": true,
+      "detail": [
+        60,
+        2080,
+        1224,
+        720
+      ]
+    }
+  ]
+}

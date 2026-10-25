@@ -1,0 +1,186 @@
+INTERACTIVE CAREER COACH — IMPLEMENTATION AND ANDROID QA
+=======================================================
+24 October 2026, Asia/Kolkata. Owner approved replacing the rejected quick-start
+with contextual guidance for BOTH Player and Manager. Internal build/QA only.
+
+LATER OWNER HANDOFF — PIXEL10 UPDATED, 21:04 IST
+----------------------------------------------
+Owner requested installing this existing guide build for their manual review.
+Verified Pixel_10_Pro_XL/emulator-5556 had1.0.12/code23, then adb install -r
+returned Success. Installed metadata now1.0.12/code24, lastUpdateTime
+2026-10-24 21:04:30; original firstInstallTime2026-10-16 02:13:57 unchanged.
+Installed base.apk SHA256 exactly matches the final internal artifact below:
+3580cf15a13ea9fdb6a5cd35f0ffcf4e899ef2064f21ac8cb70fdf53fd5ad674.
+Verified v2 debug signature and embedded8,215,784byte JS bundle before update.
+No uninstall/clear-data, new build, game/source edit, guide reset, save creation,
+career advancement, purchases, provider change or production AAB/submission.
+Opened existing task; screenshot shows main menu with Manager continue card
+and the new first menu coach visible. No guide step tapped/dismissed. Initial
+uiautomator read exited137; screenshot inspection succeeded. Not a gameplay or
+guide-alignment pass and not evidence of a game crash. Post-update full save/VIP
+parity and manual guide acceptance are for subsequent verification, not claimed.
+Handoff screenshot:output/play-vip-qa-2026-10-24/guide24-pixel10-handoff.png.
+Pixel10-untouched statements further below describe the EARLIER implementation
+QA pass and are superseded only for this later install. Other emulators/iPhone
+were not controlled. Owner now has exclusive manual review; automation stopped.
+
+WHAT WAS REVERSED / PRESERVED
+-----------------------------
+Removed the recent Player quick-start route, automatic balanced allocation,
+default country/club selection and direct-to-first-match jump. Restored the
+four-step Identity & Avatar -> Attributes -> Club -> Review creation flow.
+Successful creation now saves first and lands at Home. The old timed batting
+prompts and standalone six-slide hub guides are no longer mounted.
+
+Retained creation write-failure/duplicate/occupied-slot guards, existing saves,
+energy/rewarded-ad/IAP fixes, provider work and unrelated iOS changes. No reset,
+uninstall, package-data clear, save migration or production version change.
+Old PLAYER_QUICK_START report/artifacts are historical, not the current design.
+
+IMPLEMENTATION
+--------------
+- CareerGuide.tsx owns a scene-local, measurable highlight/arrow/card. The scrim
+  does not intercept the actual control. GuideTarget anchors real native Views;
+  GuideScrollView reveals targets in the nearest scroll container.
+- Career chapters/copy are in src/content/careerGuides.ts; pure progress/layout
+  helpers and UI-only action signals are in src/game/coachGuide.ts.
+- Welcome offers Guide me / Explore on my own. No forced slideshow or timer.
+- Player creation covers name, country, portrait, role, the actual attribute +,
+  remaining points, club choice, review and saving. Points are never auto-spent.
+- Home explicitly exposes Customise player and Training. Individual Player and
+  Manager tabs have their own pointers, along with the actual next cricket step.
+- Player Training explains sessions, focus, exact Coins cost, optional Train and
+  Development Centre. Manager Training explains focus, workload/Recovery, saving
+  and player overrides; it never presents Player session spending as club training.
+- Match setup explains conditions, toss and Watch/Key/Instant. Live guides point
+  to the real personal bowling plan, batting approach, score and Manager tactics.
+  A visible live guide pauses simulation; leaving/finishing releases its pause.
+- Back, Skip step, Skip guide and Show screen guide are available. Settings
+  Replay game guides restarts onboarding/progress. Progress uses existing
+  dismissedTips keys coach-v1:<chapter>:<target>; mode skip is independent for
+  common/player/manager. No persisted schema change or new analytics.
+- Guides yield to higher-priority queued dialogs; ordinary native dialogs are
+  never preempted. No background-route coaching over match results.
+- No forced victory, fake reward, paid checkout, selection boost or new grant.
+
+CONCRETE BOWLING REGRESSION FIX
+-----------------------------
+canBowl previously required every player to have bowling mean >=25. Unallocated
+youth bowling skills are18, so genuine BOWLER/ALLROUNDER players with a bowling
+style could be excluded before the existing preferred-role spell logic ran.
+Those two bowling roles now enter the eligible pool when they have a style.
+Part-timers still require25; no style is still ineligible. Actual ability, XI,
+captaincy, legal over limits and innings length remain authoritative. This does
+not guarantee every innings allows a full spell, selection, wickets or a win.
+Regression tests cover both roles at18, no-style/part-timer guards, >=12legal
+balls in the full-length fixture, auto/live parity and unchanged skill values.
+This is a reproducible bug path, not proof of the exact cause of the owner's
+earlier match without that save's full state.
+
+AUTOMATED VERIFICATION
+----------------------
+Final:292 suites /2,206tests /2snapshots PASS,79.77s.
+Typecheck, quiet lint and git diff --check PASS.
+Focused final5suites/41tests passed before final full rerun.
+Mounted real coach tests cover actual-action gating (not elapsed time), Back
+without a repeated spend, resume/remount, skip/replay/mode isolation, hydration,
+focus/queue gates, missing anchors, match pause release, keyboard dismissal and
+keyboard-safe layout. Pure placement tests include320/360/430/768widths.
+Creation tests cover retained full setup, actual manual allocation, country/name
+requirements, save-before-activation, Home landing, duplicate/write retry and
+occupied/unavailable slots. Modal tests cover priority/yield/resume behavior.
+
+Earlier failed obsolete quick-start expectations, mocks, popup contrast and a
+test-only props typing/JSX-extension attempt were corrected, not counted as
+passes. Final suite uses the repository's normal .test.ts matching. Runtime
+source was frozen before final APK; later edits were tests/docs/QA helper only.
+Local logs:
+  /private/tmp/cricket-coach-final-all-tests-r2.log
+  /private/tmp/cricket-coach-final-typecheck.log
+  /private/tmp/cricket-coach-final-lint.log
+
+NATIVE ANDROID EVIDENCE
+-----------------------
+Dedicated Cricket_FirstSession_QA, emulator-5558, Android34 Google Play arm64,
+1080x1920/420dpi; root /private/tmp/cricket-first-session-qa. Existing profile0
+synthetic QuickQA retained. Added CoachQA Player in its own free slot and a
+fictional Chennai Arclight Manager save. No real account login or purchase.
+Pixel_10_Pro_XL/emulator-5556 was NOT replaced, controlled or tested this turn.
+
+Observed:
+- New Game/mode pointers; full Player creation; name/country/role choices.
+- Actual attribute + raised Technique18->21 and points120->117. No wallet spend.
+- Player saved to Home, with Customise player opening actual Kit & Look.
+- Individual Stats tab opened; guide resumed on Home. Optional appearance
+  preference prompt was declined on the synthetic profile, not bought/granted.
+- Initial native run caught keyboard covering portrait-coach buttons. Fixed
+  visible-keyboard bounds plus Keyboard.dismiss on advance; latest APK retest
+  entered KeyboardQA in an UNSAVED form, selected country, reached portrait
+  with no covering keyboard, then highlighted all four roles and tapped actual
+  All-Rounder. Left the unsaved form normally; no extra save/overwrite.
+- Initial Training nested list was cramped below a tall header. Converted it
+  to one outer scrolling page. Latest APK showed focus/cost/Train pointers
+  clearly, then optional guide completion left750Coins/8sessions/36Energy.
+- Manager creation -> Home, all tab pointers, actual Training tile; actual
+  Recovery selection, save -> PLAN SAVED, guide Finish. No purchase/stat grant.
+- In-place latest APK update retained both synthetic career modes and progress.
+  Android font-setting change recreated the Activity; progress resumed when
+  reopening the save. The1.3capture was MENU ONLY, NOT a large-font coach pass.
+  Restored default font scale; final read-back1.0. Large-text native
+  coaching still needs a dedicated pass; pure compact placement coverage passed.
+- Latest APK real Player fixture: setup3steps, Watch, first actual bowling plan
+  at1.0ov, Contain selection -> live resumed; second plan offered at3.0ov.
+  Skip to my batting reached the actual crease at91/4,12.2ov. Batting approach
+  pointer -> real Balanced picker -> score pointer -> Finish -> Balanced selection
+  resumed actual play (91/5,12.3 then96/5,13.4). No forced result.
+- Live animation caused one uiautomator idle capture failure. The local helper
+  was hardened to reject stale controls; screenshots/fresh reads were used.
+  A bowling-plan/read pair overlapped once; later fresh UI/screenshot confirmed
+  correct batting state. This is not a precise timing or exhaustive gesture test.
+- Android notification permission appeared after the fixture; declined only on
+  this synthetic QA profile. Normal result was a1-run defeat, rating7.3,20runs,
+  +161Coins shown. No coach covered Result. Continue -> optional Starter Pack
+  declined -> Home showed Round2,20season runs and20VIP XP. No ad/purchase used.
+  A post-match exit-info recheck retained only package-update/system history
+  for this run: no new app crash/ANR/SIGKILL recorded. Older profile10SIGKILL
+  remains historical and is not erased or relabelled fixed by this feature.
+
+Screenshots/build/helper (local ignored output):
+  output/career-coach-qa-2026-10-24/
+  01..12 = initial native run, including caught failures, not final references.
+  13..16 = final Manager/Home/Training and corrected Player Training.
+  17 = font recreation MENU, not a coach screenshot.
+  18..19 = corrected keyboard/portrait/full-role selector.
+  20..27 = live bowling and batting guidance/release.
+  28 = optional notification prompt;29 = normal uncovered result.
+
+FINAL INTERNAL ARTIFACT
+-----------------------
+output/career-coach-qa-2026-10-24/
+cricket-player-manager-career-coach-qa-vc24.apk
+SHA256:3580cf15a13ea9fdb6a5cd35f0ffcf4e899ef2064f21ac8cb70fdf53fd5ad674
+com.coverdrive.cricket1.0.12/code24; min24/target36; arm64-v8a.
+Debug certificate SHA256:
+8027990eb28a934f33052c41c617c6278494238b58e5c0390837d8c09ee4d290
+Embedded assets/index.android.bundle8,215,784bytes; no Metro required.
+Code24 is an internal Gradle init-script override, not a production bump.
+Final build-r4.log:BUILD SUCCESSFUL2m34s. Existing third-party R8/Gradle warnings
+retained; no dependency upgrade or warning suppression. JDK17, NODE_ENV=production,
+EXPO_PUBLIC_QA_TOOLS=true, existing public legal URLs, :app:assembleQa,
+-PreactNativeArchitectures=arm64-v8a, --max-workers=2, --no-daemon,
+-x :app:uploadCrashlyticsMappingFileQa. No Crashlytics metadata upload intended.
+adb install -r Success ONLY on5558; launch confirmed. No clear/uninstall.
+Earlier r1/r2/r3 build artifacts are not the handoff candidate.
+
+REVIEW / RELEASE BOUNDARY
+-------------------------
+Owner still needs to assess pacing/copy/feel in both careers. No novice timed
+60second outcome or guaranteed initial win is claimed. Manager live-tactics
+pointer, full font/accessibility matrix and iOS native coaching remain unverified
+in this pass. Existing iOS manual missed-tap and purchase/provider/release gates
+are not cleared by Android tests. Earlier SIGKILL remains in its separate report;
+current focused exit-info check showed package-update exits, no new app crash/
+ANR then. This is not a memory soak or a universal stability certificate.
+No production AAB, Play/App Store/TestFlight submission, provider configuration,
+website/backend deployment, account deletion or real purchase occurred.
+Exact Expo57 docs checked before coding:https://docs.expo.dev/versions/v57.0.0/.

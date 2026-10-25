@@ -1,0 +1,122 @@
+CRICKET: PLAYER & MANAGER — iOS PREPARATION / WEBSITE HANDOFF
+Work began 21 October, completed 22 October 2026 (Asia/Kolkata)
+
+SUBSEQUENT 23 OCTOBER PUBLIC SDK KEY UPDATE
+Owner supplied RevenueCat's public Apple appl_ SDK key; now configured in
+ios-production.env and .env.ios.example. All five client-format checks pass with
+that profile. No authenticated credential validation or working purchase claim.
+Nine Node config tests, six focused Jest tests, typecheck and focused lint pass.
+The 22 October pending-key statement below is historical. No native rebuild,
+provider write, signing, purchase or upload occurred during this key update.
+
+SUBSEQUENT 22 OCTOBER PROVIDER-INPUT UPDATE
+Owner supplied all four iOS AdMob IDs. They are now mapped in eas.json's
+ios-production profile and .env.ios.example; Android/simulator settings preserved.
+Banner /3900693812, Interstitial /7613367251, Rewarded /8543305543, App ~7521033766
+share ca-app-pub-4249020515368291. These are owner-supplied IDs, not live ad QA.
+RevenueCat Apple SDK key and actual Apple/provider/device checks remain pending.
+Use the existing Cricket RevenueCat project and add an Apple App Store app,
+not a new project. Detailed current status is in docs/how-to/. The historical
+preparation results below predate this input update; no artifacts were rebuilt.
+
+SCOPE
+Owner asked to complete locally possible preparation, update the developer
+website, keep the Desktop HOW TO record current and document the iOS questions
+in detail. No invented credentials or unobserved store/provider changes.
+
+PUBLIC WEBSITE — DEPLOYED AND VERIFIED
+Site: https://sunlight-publisher-site.pages.dev/
+Cloudflare project sunlight-publisher-site, branch main, deployment dd05cd1a.
+Deployment URL: https://dd05cd1a.sunlight-publisher-site.pages.dev/
+Production verification at 2026-10-21T18:27:47Z: all 20 public file hashes matched;
+301 legacy product redirect and security headers passed. Seven live exact-
+viewport cases passed at 320/390/1440px, including age anchor and Auction XI.
+
+Changed public copy:
+  - iOS in preparation, no App Store release/date/link falsely claimed.
+  - Apple relay login and platform-specific SDK/privacy explanation.
+  - Android Firebase/Unity preserved, not mislabeled as integrated on iOS.
+  - Permanent restore versus consumables, cloud progress and cross-store access.
+  - Apple/Google refund guidance and provider disconnection versus game deletion.
+  - Provider-neutral expired OAuth return guidance, no credential forwarding.
+  - Public age-suitability section, unchanged 18+ India / 13+ elsewhere policy.
+  - Defensive responsive sizing/long-text wrapping, no website redesign.
+Seller file and Auction XI HTML/images preserved. Shared CSS changed.
+Nine public files changed; 13 generated HTML pages / 20 public files total.
+Privacy clarification date 21 October preserves original 20 August effective date.
+
+Public Age Suitability URL (optional in Apple form):
+https://sunlight-publisher-site.pages.dev/products/cricket-player-manager/#age-suitability
+It does not resolve Apple's regional/EULA requirement or establish Apple approval.
+
+SOURCE AND CONFIGURATION
+Updated offline privacy source; historical built AAB/ZIP were NOT rebuilt.
+Set known distribution Apple team 25PTZT5DNC in scripts/ios-app.config.cjs.
+Added EAS submit ios-production -> Apple ID 6825412889 / team 25PTZT5DNC.
+Preserved simulator isolation and existing Android config/submission profiles.
+Added real stable legal URLs and explicit false QA/simulator flags to the iOS
+environment TEMPLATE; live ad/purchase values remain owner placeholders.
+No private key, signing credential or provider secret added to source or docs.
+
+TOOLS / EVIDENCE
+scripts/auditIosPrivacy.cjs — read-only inspection of exact .app privacy manifests.
+scripts/checkPublisherLayout.cjs — new isolated Chrome profile; never attaches
+to or reads an owner's browser session. Screenshots and overflow/anchor checks.
+scripts/verifyPublisherDeployment.mjs — all-file/redirect/security comparison.
+Evidence: docs/evidence/ios-preparation-2026-10-21/
+  website-before.json, website-after.json, website-layout-live.json,
+  ios-privacy-manifest-inventory.json, website-*.png.
+Recoverable temporary pre-edit build/source snapshot:
+  /private/tmp/cricket-ios-site-backup.vN8zEg
+Cloudflare also retains deployment history; a temporary folder is not a permanent
+backup policy. Baseline public hashes are retained in the repository evidence.
+
+PRIVACY FINDING — NOT A FINAL LABEL
+The existing simulator .app contains 17 manifests. GMA declares DeviceID linked
+and tracking uses; no ATT usage description exists. Non-personalized requests
+and absent Firebase do not prove no tracking. Reconcile actual final provider
+configuration/behavior before completing the Apple App Privacy label or ATT work.
+RevenueCat purchase purposes include Functionality and Analytics; account-linked
+receipt processing cannot be labeled anonymous merely from a generic manifest.
+The simulator plist sets non-exempt-encryption=false; final export/crypto review
+still matters. Source privacy edits do not retroactively alter that binary.
+
+DETAILED OWNER RECORD
+docs/how-to/START_HERE.txt: full Android/iOS workflow; section 14 covers Apple
+identity, OAuth, ads, purchases, environment, archive, privacy, forms, TestFlight,
+review/release, website verification and do/don't guidance.
+docs/how-to/CRICKET_CONFIGURATION.txt: identifiers, missing-public-input locations,
+all age questions/answers/evidence, draft Apple regional-age support question,
+App Privacy collection/linking/purpose worksheet, 14 launch product type/restore
+mapping, private-account boundaries and official documentation links.
+docs/how-to/RELEASE_LOG_AND_CHECKLIST.txt: current status, exact evidence and gates.
+docs/IOS_APP_STORE_METADATA_DRAFT.txt: listing copy, URLs, reviewer walkthrough,
+screenshots and unverified owner/legal declarations. Still draft metadata.
+Three handbook files are mirrored to /Users/divakarmishra/Desktop/HOW TO.
+Final equality is checked after copying; unrelated Desktop files are preserved.
+
+VERIFICATION
+PASS: 128 focused Jest tests / 7 suites; 13 Node tests; typecheck; quiet ESLint.
+PASS: website build, internal links, other-app scope, live hashes/security,
+seven browser cases and four legal URLs under explicit production URL settings.
+Initial utility lint issue (Buffer import) was corrected before the final pass.
+Bare legal check first lacked URL env; explicit production URLs passed.
+EXPECTED BLOCK: iOS release-format check in this shell lacks four actual iOS
+AdMob IDs and RevenueCat's actual public Apple SDK key. No guard bypassed.
+
+PENDING / NO CLAIM OF COMPLETION
+Real Apple OAuth/Services ID and secrets, store/RevenueCat setup, iOS ad consent/
+readiness and final tracking assessment; Apple regional-age clarification;
+owner agreements/rights/DSA/private verification, signing, export assessment;
+Apple revocation on account deletion (explicit call not found; provider behavior
+must be verified and required implementation tested); final signed device build,
+TestFlight/device/service QA, owned permanent-item restore, final store captures
+and reviewer access; explicit App Review submission. No Apple upload occurred.
+Firebase/Unity iOS native SDKs remain excluded, not integrated as placeholders.
+
+UNCHANGED ARTIFACTS
+Android 1.0.12/code20 AAB SHA256:
+0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4
+iOS 1.0.12/build1 simulator ZIP SHA256:
+2ad2244b2599c5966de51221e97f93f068764b15e2da57691226c624b33a218b
+These historical artifacts predate this follow-up's policy/config changes.

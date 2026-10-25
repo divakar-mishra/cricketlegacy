@@ -83,7 +83,7 @@ export function AcademyManagementScreen({ navigation }: ScreenProps<'AcademyMana
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll careerNavigation>
       <ScreenHeader title="Cricket Academy" onBack={() => navigation.goBack()} />
 
       {academy ? (

@@ -1,6 +1,8 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { ECONOMY } from '../data/gameConfig';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { energyCapacity } from '../game/economy';
+import { useCareer } from '../state/careerStore';
+import { useEnergyRecovery } from '../state/energyRecoveryStore';
 import { Wallet } from '../domain/types';
 import {
   fontSize,
@@ -25,6 +27,8 @@ export const WalletBar = React.memo(function WalletBar({
 }: WalletBarProps) {
   const styles = useThemedStyles(makeStyles);
   const colors = useColors();
+  const cap = useCareer((s) => energyCapacity(s.save?.entitlements));
+  const openRecovery = useEnergyRecovery((s) => s.open);
   return (
     <View style={styles.bar}>
       <Item
@@ -39,7 +43,9 @@ export const WalletBar = React.memo(function WalletBar({
           icon="flash"
           color={colors.warning}
           value={wallet.energy}
-          suffix={`/${ECONOMY.energyMax}`}
+          suffix={`/${cap}`}
+          onPress={openRecovery}
+          label={`Energy ${wallet.energy} of ${cap}. Show recovery time and free ad options`}
         />
       ) : null}
     </View>
@@ -52,19 +58,36 @@ function Item({
   value,
   suffix,
   format,
+  onPress,
+  label,
 }: {
   icon: IconName;
   color: string;
   value: number;
   suffix?: string;
   format?: (n: number) => string;
+  onPress?: () => void;
+  label?: string;
 }) {
   const styles = useThemedStyles(makeStyles);
-  return (
-    <View style={styles.item}>
+  const content = (
+    <>
       <Icon name={icon} size={16} color={color} />
       <CountUp style={styles.value} value={value} suffix={suffix} format={format} />
-    </View>
+    </>
+  );
+  return onPress ? (
+    <Pressable
+      style={styles.item}
+      onPress={onPress}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      {content}
+    </Pressable>
+  ) : (
+    <View style={styles.item}>{content}</View>
   );
 }
 

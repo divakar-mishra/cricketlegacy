@@ -1,0 +1,109 @@
+{
+  "dateLocal": "2026-10-23",
+  "timezone": "Asia/Kolkata",
+  "scope": "Local iOS preparation; not App Store/TestFlight readiness",
+  "backend": {
+    "projectHost": "jtyuuwzhrufavbcxrhqp.supabase.co",
+    "source": "Existing local Android public configuration; public GET /auth/v1/settings returned HTTP 200",
+    "appleEnabled": false,
+    "googleEnabled": true,
+    "anonymousEnabled": true,
+    "callback": "https://jtyuuwzhrufavbcxrhqp.supabase.co/auth/v1/callback",
+    "remoteWrites": false,
+    "privateConfigurationInspected": false
+  },
+  "automated": {
+    "command": "npm run check",
+    "exitCode": 0,
+    "jestSuites": 281,
+    "jestTests": 2100,
+    "snapshots": 2,
+    "typecheck": true,
+    "quietLint": true,
+    "nodeTests": 17,
+    "fullLog": "output/ios-simulator/evidence/ios-release-local-final-pass-2026-10-23.log",
+    "nodeLog": "output/ios-simulator/evidence/ios-release-local-node-2026-10-23.log",
+    "initialFailures": "One pre-existing policy test had stale 19 October date/older Unity wording; updated assertions to already-current 21 October Android-only copy. Final full run passed."
+  },
+  "native": {
+    "result": "Passed",
+    "devices": [
+      {
+        "name": "Cricket QA iPad A16",
+        "platform": "iOS Simulator",
+        "osVersion": "26.5",
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 0
+      },
+      {
+        "name": "Cricket QA iPhone 16 Pro",
+        "platform": "iOS Simulator",
+        "osVersion": "26.5",
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 0
+      }
+    ],
+    "coverage": [
+      "Main menu",
+      "Saved Games mode switching",
+      "Account entry",
+      "Player creation form",
+      "Manager creation prerequisites/back navigation",
+      "Cold restart"
+    ],
+    "noEraseOrUninstall": true,
+    "liveProviderOrTransactionTests": false,
+    "report": "output/ios-simulator/evidence/ios-release-local-final-2026-10-23.xcresult",
+    "screenshots": "output/ios-simulator/evidence/ios-release-local-final-2026-10-23-attachments/",
+    "visualReview": [
+      "iPhone and iPad main menu and Account screenshots inspected; no observed clipping",
+      "Existing saved theme/state retained; not final store screenshot/IAP asset set"
+    ]
+  },
+  "artifacts": {
+    "newSimulatorZip": {
+      "path": "output/ios-simulator/cricket-player-manager-1.0.12-ios-simulator-2026-10-23.zip",
+      "sha256": "e6923c32c000336d4647afa201db968105a63deba1f4efd5ae7d186ad071e133",
+      "bytes": 66256433
+    },
+    "oldSimulatorZipUnchanged": {
+      "path": "output/ios-simulator/cricket-player-manager-1.0.12-ios-simulator.zip",
+      "sha256": "2ad2244b2599c5966de51221e97f93f068764b15e2da57691226c624b33a218b",
+      "bytes": 66253831
+    },
+    "androidAabUnchanged": {
+      "path": "output/production-1.0.12/cricket-player-manager-1.0.12-vc20.aab",
+      "sha256": "0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4",
+      "bytes": 111388690
+    },
+    "simulatorSignature": "Ad-hoc signature verified, not distribution signing",
+    "authSourceMatchedBuiltWorkspace": true,
+    "supabaseClientSourceMatchedBuiltWorkspace": true
+  },
+  "privacy": {
+    "manifestCount": 17,
+    "reviewRequired": [
+      "GoogleMobileAdsResources.bundle/PrivacyInfo.xcprivacy"
+    ],
+    "finalTrackingVerdict": "Unresolved; static simulator manifests are not final-device App Privacy/ATT proof",
+    "automaticApplePermissionRevocation": "Not implemented or verified; no live deletion performed"
+  },
+  "notPerformed": [
+    "Provider/database writes or migrations",
+    "Real Apple/Google sign-in",
+    "Account deletion",
+    "Purchases or charges",
+    "Website deployment",
+    "Device signing/TestFlight upload",
+    "App Review submission"
+  ],
+  "open": [
+    "Apple Services ID/provider/secret and redirect setup",
+    "Apple revocation integration or explicitly implemented/validated missing-token fallback",
+    "Final privacy/ATT, regional age and encryption decisions",
+    "Real-device cloud/purchase/restore/ads QA",
+    "Signing/TestFlight/store asset and reviewer readiness"
+  ]
+}

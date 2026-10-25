@@ -11,6 +11,7 @@ import {
 import { makeRng } from '../engine/rng';
 import { generateRoster } from '../generation/players';
 import { clamp } from '../utils/math';
+import { playerWorldSex } from './playerIdentity';
 import { isAvailable } from './injuries';
 import { autoXI } from './squad';
 
@@ -216,7 +217,7 @@ function ensureNationalTeam(
     const country = getCountry(countryId);
     const quality = 42 + (country?.strength ?? 1) * 5;
     const rng = makeRng(hashSeed(`${save.id}:${teamId}:squad`));
-    const squad = generateRoster({ nationality: countryId, quality, idPrefix: teamId, rng });
+    const squad = generateRoster({ nationality: countryId, quality, idPrefix: teamId, rng, sex: playerWorldSex(save) });
     for (const player of squad) {
       player.age = 16 + Math.floor(rng() * 4);
       save.players[player.id] = player;

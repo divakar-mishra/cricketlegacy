@@ -1,5 +1,21 @@
 # Mode VIP and permanent collections — approved 8 September 2026
 
+24 October native Android verification: actual Google Play license-test checkout
+and repeated owned restoration passed for both `player_vip` and `manager_vip` on
+the existing Pixel 10 QA installation (1.0.12/code23), including app-process
+restarts. Native Play confirmed no-charge test payment; matching-mode VIP granted,
+Player VIP did not grant Manager VIP, and observed wallet/Club Balance values
+were unchanged. No fresh-install/device, account-switching, refund, bundle or iOS
+certification is implied. See `docs/PLAY_VIP_CHECKOUT_RESTORE_2026-10-24.txt`.
+
+23 October maintenance: normal load/recovery, Gem refills, ad grants and meter
+labels now consistently honor permanent VIP60capacity. Owner-approved optional
+ad reward is8and regeneration is1point per3minutes; fixture costs are unchanged.
+The existing Store-advertised VIP streak (day7:10Gems; day30:Legend VIP frame)
+now settles on eligible visits/load/purchase/restore, idempotently. No new reward,
+price, collection or paid entitlement was introduced. Regression/benefit audit:
+`docs/ENERGY_IAP_FIX_2026-10-23.txt`. Local checks are not live store certification.
+
 This replaces the proposed shared VIP / monthly Season Pass for new purchases.
 
 ## Products and scope

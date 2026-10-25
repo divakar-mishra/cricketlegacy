@@ -64,6 +64,23 @@ const FALLBACK: NamePool = {
   last: ['Stone', 'Rivers', 'Cross', 'Hale', 'Marsh', 'Frost', 'Vale', 'Reed'],
 };
 
-export function namePoolFor(countryId: string): NamePool {
-  return NAME_POOLS[countryId] ?? FALLBACK;
+/** Fictional women's given names; surnames retain the same country pools. */
+export const FEMALE_FIRST_NAMES: Record<string, string[]> = {
+  india: ['Aditi', 'Ananya', 'Kavya', 'Meera', 'Nandini', 'Ishita', 'Priya', 'Riya', 'Sana', 'Tara', 'Vidya', 'Diya'],
+  australia: ['Amelia', 'Chloe', 'Ella', 'Grace', 'Isla', 'Jade', 'Lily', 'Mia', 'Ruby', 'Sienna', 'Zoe', 'Matilda'],
+  england: ['Alice', 'Beatrice', 'Charlotte', 'Daisy', 'Eleanor', 'Florence', 'Georgia', 'Harriet', 'Imogen', 'Lucy', 'Phoebe', 'Sophie'],
+  pakistan: ['Amina', 'Ayesha', 'Farah', 'Hina', 'Iqra', 'Mahira', 'Nadia', 'Rabia', 'Sadia', 'Saira', 'Sana', 'Zara'],
+  south_africa: ['Amara', 'Anika', 'Buhle', 'Elna', 'Lerato', 'Lindiwe', 'Naledi', 'Nandi', 'Nomsa', 'Petra', 'Thandi', 'Zanele'],
+  new_zealand: ['Aria', 'Aroha', 'Charlotte', 'Hana', 'Isla', 'Kaia', 'Maia', 'Mila', 'Moana', 'Paige', 'Piper', 'Willow'],
+  sri_lanka: ['Amaya', 'Anjali', 'Dilini', 'Hiruni', 'Imesha', 'Kavindi', 'Malsha', 'Nadeesha', 'Nimali', 'Sanduni', 'Tharushi', 'Yashoda'],
+  west_indies: ['Aaliyah', 'Aisha', 'Brianna', 'Camille', 'Danielle', 'Janelle', 'Keisha', 'Latoya', 'Monique', 'Nia', 'Shanice', 'Tiana'],
+  bangladesh: ['Afsana', 'Anika', 'Farzana', 'Ishrat', 'Jannat', 'Lamisa', 'Maliha', 'Nabila', 'Nusrat', 'Raisa', 'Samira', 'Tasnim'],
+  afghanistan: ['Ariana', 'Bahara', 'Darya', 'Fariba', 'Freshta', 'Laila', 'Mariam', 'Nargis', 'Parisa', 'Roya', 'Shabnam', 'Zohra'],
+  zimbabwe: ['Anesu', 'Chiedza', 'Danai', 'Fadzai', 'Kudzai', 'Makanaka', 'Nyasha', 'Rudo', 'Rufaro', 'Tariro', 'Tendai', 'Vimbai'],
+  ireland: ['Aoife', 'Caoimhe', 'Ciara', 'Clodagh', 'Eimear', 'Fiadh', 'Maeve', 'Niamh', 'Orla', 'Roisin', 'Saoirse', 'Siobhan'],
+};
+
+export function namePoolFor(countryId: string, sex: 'male' | 'female' = 'male'): NamePool {
+  const pool = NAME_POOLS[countryId] ?? FALLBACK;
+  return sex === 'female' ? { first: FEMALE_FIRST_NAMES[countryId] ?? FALLBACK.first, last: pool.last } : pool;
 }

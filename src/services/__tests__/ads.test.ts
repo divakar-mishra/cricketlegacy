@@ -31,4 +31,11 @@ describe('rewarded ads', () => {
     expect(INTERSTITIAL_WINDOW_MS).toBe(60 * 60_000);
     expect(DEFAULT_INTERSTITIAL_GAP_MS).toBe(15 * 60_000);
   });
+  it('connects the late presentation check to hub focus, career identity and current paid ad removal', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', '..', 'screens', 'CareerHubScreen.tsx'), 'utf8');
+    const request = source.slice(source.indexOf('.maybeShowInterstitial('), source.indexOf('// The modest starter offer'));
+    expect(request).toContain('() => active && useCareer.getState().save?.id === currentSave?.id');
+    expect(request).toContain('!areAdsRemoved(useCareer.getState().save?.entitlements)');
+    expect(source).toMatch(/return \(\) => \{\s*active = false;/);
+  });
 });

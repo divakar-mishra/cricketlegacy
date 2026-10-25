@@ -1,5 +1,6 @@
 import { DarkTheme, DefaultTheme, NavigationContainer, Theme, useNavigationContainerRef } from '@react-navigation/native';
 import { AppearancePrompt } from './src/components/AppearancePrompt';
+import { EnergyRecoveryModal } from './src/components/EnergyRecoveryModal';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -122,6 +123,7 @@ export default function App() {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         if (ageEligible) void syncAccountCareers(true).catch(() => undefined);
+        if (ageEligible) useCareer.getState().tickVipStreak();
         void useCareer.getState().recoverPendingPurchases();
         void useCareer.getState().recoverPendingExchange();
         // Native timers pause with the app. Reconcile the UTC month as soon as
@@ -329,6 +331,7 @@ export default function App() {
               <AdAgePrompt onEligibilityChange={setAgeEligible} />
               {ageEligible ? <Onboarding /> : null}
               <AppearancePrompt eligible={ageEligible} route={appearanceRoute} />
+              <EnergyRecoveryModal enabled={ageEligible} />
               <GlassAlertHost />
               <PlayerContractMoment />
             </GlassBlurProvider>

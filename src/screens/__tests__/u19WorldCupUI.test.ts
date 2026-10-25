@@ -48,7 +48,8 @@ describe('playable U19 World Cup UI', () => {
     expect(tournament).toContain('fixtureEnergyCost(nextFixture)');
     expect(tournament).toContain('playerCalendarAllowsFixture(save, nextFixture.id)');
     expect(tournament).toContain('Restore energy · need ${nextFixtureEnergy}');
-    expect(tournament).toContain("navigation.navigate('Purchase')");
+    expect(tournament).toContain('useEnergyRecovery.getState().open()');
+    expect(tournament).not.toContain("navigation.navigate('Purchase')");
     expect(tournament).toContain('Return to Career Home');
     expect(tournament).not.toContain('disabled={!canPlayNextFixture}');
     expect(targetAt).toBeGreaterThan(-1);

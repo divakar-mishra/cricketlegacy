@@ -7,11 +7,52 @@ jest.mock('../supabaseClient', () => ({
   isSupabaseBackendEnabled: jest.fn(() => false),
 }));
 
-import { parseAccountDeletionResponse } from '../accountDeletion';
+import { deleteCurrentRemoteAccount, parseAccountDeletionResponse } from '../accountDeletion';
+import { currentSupabaseSession, getSupabaseClient, isSupabaseBackendEnabled } from '../supabaseClient';
 
 const root = path.join(__dirname, '..', '..', '..');
 
 describe('account deletion boundary', () => {
+  const invoke = jest.fn();
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(isSupabaseBackendEnabled).mockReturnValue(true);
+    jest.mocked(currentSupabaseSession).mockResolvedValue({ userId: 'account-id', isAnonymous: false, provider: 'apple' });
+    jest.mocked(getSupabaseClient).mockReturnValue({ functions: { invoke } } as never);
+  });
+
+  it('does not invoke deletion without a configured backend or authenticated session', async () => {
+    jest.mocked(isSupabaseBackendEnabled).mockReturnValueOnce(false);
+    expect(await deleteCurrentRemoteAccount()).toEqual({ status: 'NOT_CONFIGURED' });
+    jest.mocked(getSupabaseClient).mockReturnValueOnce(null);
+    expect(await deleteCurrentRemoteAccount()).toEqual({ status: 'NOT_CONFIGURED' });
+    jest.mocked(currentSupabaseSession).mockResolvedValueOnce(null);
+    expect(await deleteCurrentRemoteAccount()).toEqual({ status: 'NO_REMOTE_SESSION' });
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('uses the same authenticated empty-body deletion contract for Apple and Google', async () => {
+    const requestId = 'b'.repeat(64);
+    for (const provider of ['apple', 'google']) {
+      jest.mocked(currentSupabaseSession).mockResolvedValueOnce({ userId: 'account-id', isAnonymous: false, provider });
+      invoke.mockResolvedValueOnce({ data: { status: 'deleted', requestId }, error: null });
+      expect(await deleteCurrentRemoteAccount()).toEqual({ status: 'DELETED', requestId });
+    }
+    expect(invoke.mock.calls).toEqual([
+      ['delete-account', { method: 'POST', body: {} }],
+      ['delete-account', { method: 'POST', body: {} }],
+    ]);
+  });
+
+  it('does not treat unavailable, rejected or malformed deletion responses as success or expose provider errors', async () => {
+    invoke.mockRejectedValueOnce(new Error('private-provider-detail'));
+    expect(await deleteCurrentRemoteAccount()).toEqual({ status: 'FAILED', error: 'The deletion service could not be reached.' });
+    invoke.mockResolvedValueOnce({ data: null, error: new Error('private-provider-detail') });
+    expect(await deleteCurrentRemoteAccount()).toEqual({ status: 'FAILED', error: 'The deletion service could not be reached.' });
+    invoke.mockResolvedValueOnce({ data: { status: 'processing' }, error: null });
+    expect((await deleteCurrentRemoteAccount()).status).toBe('FAILED');
+  });
+
   it('accepts only a durable success response with an opaque request id', () => {
     const requestId = 'a'.repeat(64);
     expect(parseAccountDeletionResponse({ status: 'deleted', requestId })).toEqual({

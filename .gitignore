@@ -35,6 +35,10 @@ __pycache__/
 /coverage/
 /output/
 
+# Generated raw-capture archive exceeds GitHub's regular-file size limit.
+# Keep the expanded marketing source/assets versioned; retain this ZIP locally.
+/marketing/capture-2026-09.zip
+
 # Build outputs and generated metadata
 *.apk
 *.aab

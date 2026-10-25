@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { careerTabs } from '../../navigation/careerNavigation';
 
 const managerHubScreen = fs.readFileSync(
   path.join(__dirname, '..', 'ManagerHubScreen.tsx'),
@@ -111,7 +112,8 @@ describe('manager hub clarity', () => {
   });
 
   it('preserves the existing destination screens through the bottom tabs', () => {
-    expect(managerHubScreen).toContain("navigation.navigate('ClubOffice')");
+    expect(managerHubScreen).toContain('careerNavigation');
+    expect(careerTabs('manager', 'ManagerHub').map((tab) => tab.destination.screen)).toContain('ClubOffice');
     expect(managerHubScreen).toContain("navigation.navigate('Records')");
     expect(managerHubScreen).toContain("label: 'Team Sheet'");
     expect(managerHubScreen).toContain("to: 'Squad'");
@@ -126,7 +128,7 @@ describe('manager hub clarity', () => {
     expect(managerHubScreen).not.toContain('claimQuestReward');
     expect(managerHubScreen).not.toContain('claimWeeklyReward');
     expect(managerHubScreen).toContain('<SeasonPassHomeCard />');
-    expect(managerHubScreen).toContain("navigation.navigate('Purchase')");
+    expect(careerTabs('manager', 'ManagerHub').map((tab) => tab.destination.screen)).toContain('Purchase');
   });
 
   it('uses the saved board confidence instead of deriving a second score from position', () => {

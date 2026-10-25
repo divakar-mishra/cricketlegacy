@@ -41,7 +41,6 @@ import {
   CommentaryTone,
   CountUp,
   FieldView,
-  FirstMatchGuide,
   GlassSurface,
   Icon,
   LastShot,
@@ -53,6 +52,8 @@ import {
   WagonWheel,
 } from '../components';
 import { getAchievement } from '../game/achievements';
+import { GuideTarget, GuideReplayButton } from '../components/CareerGuide';
+import { guideAction } from '../game/coachGuide';
 import { deliveryMoment, haptics, matchMusicScene, moment, music, preloadMatchSounds } from '../audio';
 import { ads } from '../services';
 import { FORMATS } from '../data/gameConfig';
@@ -617,12 +618,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   // Which viewing mode the live loop is running in (KEY = non-interactive highlights).
   const [driveMode, setDriveMode] = useState<Mode | null>(null);
 
-  // FTUE coach tips
-  const playedMatchesAllModes = useSettings((s) => s.playedMatchesAllModes);
-  // First-match-only guided prompts (career mode, before any match ever played).
-  const [firstGuideDone, setFirstGuideDone] = useState(false);
-  const firstGuideDoneRef = useRef(false);
   const guidePauseRef = useRef(false);
+  const setGuidePaused = useCallback((active: boolean) => { guidePauseRef.current = active; }, []);
   // Increments each over so the LiveTacticPanel pulses when the AI re-plans.
   const [tacticPulse, setTacticPulse] = useState(0);
   const [partnershipRuns, setPartnershipRuns] = useState(0);
@@ -1236,18 +1233,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         if (cancelled.current) return;
         await waitForManualResume();
         if (cancelled.current) return;
-        if (
-          mode === 'career' &&
-          playedMatchesAllModes === 0 &&
-          !firstGuideDoneRef.current &&
-          userPlayerId
-        ) {
-          const next = lm.peek();
-          if (next.strikerId === userPlayerId || next.nonStrikerId === userPlayerId) {
-            guidePauseRef.current = true;
-            updateCrease(lm);
-          }
-        }
         await waitForGuideClose();
         if (cancelled.current) return;
         if (instant.current) {
@@ -1539,7 +1524,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       waitForGuideClose,
       speedMult,
       mode,
-      playedMatchesAllModes,
       closeStancePicker,
       openStancePicker,
     ],
@@ -1636,8 +1620,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     commentaryPauseRef.current = false;
     setCommentaryOpen(false);
     guidePauseRef.current = false;
-    firstGuideDoneRef.current = true;
-    setFirstGuideDone(true);
     skipToBatRef.current = false;
     skipRestOfInningsRef.current = false;
     skipBusyRef.current = false;
@@ -1867,6 +1849,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
     return (
       <Screen
         scroll
+        guide={{ chapter: mode === 'career' ? 'player.match.setup' : 'manager.match.setup',
+          enabled: mode === 'career' || mode === 'manager' }}
         gradient={gradients.pitch}
         footer={
           !tossRevealed ? (
@@ -1882,7 +1866,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               <Button label="Continue to Match" variant="secondary" disabled />
             </View>
           ) : (
-            <View style={styles.requirementFooter}>
+            <GuideTarget id="match-play"><View style={styles.requirementFooter}>
               <Text style={styles.requirementText}>Choose how to play</Text>
               <Button
                 label="Watch ball-by-ball"
@@ -1894,11 +1878,12 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                 <Button label="Key moments" size="sm" variant="secondary" style={styles.modeFooterHalf} onPress={() => drive('KEY')} />
                 <Button label="Instant sim" size="sm" variant="ghost" style={styles.modeFooterHalf} onPress={() => drive('INSTANT')} />
               </View>
-            </View>
+            </View></GuideTarget>
           )
         }
       >
         <ScreenHeader title="Matchday" onBack={guardedGoBack} />
+        <GuideReplayButton chapter={mode === 'career' ? 'player.match.setup' : 'manager.match.setup'} />
 
         {/* Cinematic team clash header */}
         <Animated.View entering={FadeIn.duration(500)} style={styles.prematchHeroWrap}>
@@ -1941,7 +1926,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         />
 
         {/* Conditions card */}
-        <Animated.View entering={FadeInDown.duration(350).delay(400)}>
+        <GuideTarget id="match-conditions" focusHeight={140}><Animated.View entering={FadeInDown.duration(350).delay(400)}>
           <Card style={styles.vsCard}>
             <Text style={styles.vsSub}>{FORMATS[setup.format].label}</Text>
             <View style={styles.venueRow}>
@@ -1964,9 +1949,9 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               {surfaceBriefing(setup.conditions, setup.format)}
             </Text>
           </Card>
-        </Animated.View>
+        </Animated.View></GuideTarget>
 
-        <Animated.View entering={FadeInDown.duration(350).delay(460)}>
+        <GuideTarget id="match-toss" focusHeight={180}><Animated.View entering={FadeInDown.duration(350).delay(460)}>
           <Card style={styles.tossCard}>
             <View style={styles.tossHeader}>
               <Text style={styles.tossTitle}>Toss</Text>
@@ -2061,7 +2046,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               </>
             ) : null}
           </Card>
-        </Animated.View>
+        </Animated.View></GuideTarget>
 
         {/* One pre-match briefing; no objective is shown to benched players. */}
         {mode === 'career' ? (
@@ -2473,7 +2458,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                     loading={adBusy}
                     style={{ marginTop: spacing.md }}
                     onPress={async () => {
-                      if (adRewardPendingRef.current || adClaimed) return;
+                      const rewardSaveId = save?.id;
+                      if (!rewardSaveId || adRewardPendingRef.current || adClaimed) return;
                       adRewardPendingRef.current = true;
                       setAdError(null);
                       setAdBusy(true);
@@ -2483,6 +2469,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                           const granted = grantAdReward(
                             coinsAwarded,
                             `match-double:${result.fixtureId}`,
+                            rewardSaveId,
                           );
                           if (granted.ok) {
                             setAdClaimed(true);
@@ -2492,6 +2479,8 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                         } else {
                           setAdError('Reward not granted. Watch the full ad to claim the bonus.');
                         }
+                      } catch {
+                        setAdError('The ad could not be completed. Please try again later.');
                       } finally {
                         adRewardPendingRef.current = false;
                         setAdBusy(false);
@@ -2646,18 +2635,18 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
   if (awaitingPlan) {
     // Bowling plan — shown once per over when user is bowling.
     footer = (
-      <View>
+      <GuideTarget id="bowling-plan"><View>
         <Text style={styles.intentPrompt}>Your over — set your plan</Text>
         <View style={styles.intentGrid}>
           {BOWLER_PLAN_OPTIONS.map((o) => (
-            <Pressable key={o.value} style={styles.intentBtn} onPress={() => onPlan(o.value)}>
+            <Pressable key={o.value} style={styles.intentBtn} onPress={() => { guideAction('bowling-plan-chosen'); onPlan(o.value); }}>
               <Text style={styles.intentEmoji}>{o.emoji}</Text>
               <Text style={styles.intentLabel}>{o.label}</Text>
               <Text style={styles.intentDesc}>{o.desc}</Text>
             </Pressable>
           ))}
         </View>
-      </View>
+      </View></GuideTarget>
     );
   } else {
     const role = matchRole;
@@ -2794,31 +2783,32 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
         <View style={styles.footerRow}>
           {/* Career batting: stance button (replaces Tactics) */}
           {isCareerBatting ? (
-            <Pressable style={styles.stanceIndicatorBtn} onPress={toggleStancePicker}>
+            <GuideTarget id="batting-approach"><Pressable style={styles.stanceIndicatorBtn}
+              onPress={() => { toggleStancePicker(); guideAction('batting-approach-opened'); }}>
               <Text style={styles.stanceIndicatorEmoji}>
                 {BATTING_STANCES.find((s) => s.value === battingStance)?.emoji}
               </Text>
               <Text style={styles.stanceIndicatorLabel}>
                 {BATTING_STANCES.find((s) => s.value === battingStance)?.label}
               </Text>
-            </Pressable>
+            </Pressable></GuideTarget>
           ) : null}
 
           {/* Manager / career bowling: Tactics */}
           {showTactics ? (
-            <Button
+            <GuideTarget id="manager-tactics" style={styles.footerBtn}><Button
               label={tacticsOpen ? 'Close' : '⚙︎ Tactics'}
               variant="secondary"
               fullWidth={false}
-              style={styles.footerBtn}
-              onPress={() =>
+              onPress={() => {
+                guideAction('manager-tactics-opened');
                 setTacticsOpen((v) => {
                   const next = !v;
                   tacticsPauseRef.current = next;
                   return next;
-                })
-              }
-            />
+                });
+              }}
+            /></GuideTarget>
           ) : null}
 
           {/* This control intentionally avoids the animated shared Button. The
@@ -2934,7 +2924,11 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
       {/* Wicket flash overlay — appears on top of everything */}
       <Animated.View style={wicketFlashStyle} pointerEvents="none" collapsable={false} />
       <Animated.View style={[{ flex: 1 }, shakeStyle]}>
-        <Screen scroll gradient={gradients.pitch} footer={footer}>
+        <Screen scroll gradient={gradients.pitch} footer={footer}
+          guide={{ chapter: mode === 'manager' ? 'manager.match.live' : awaitingPlan ? 'player.match.bowling' : 'player.match.batting',
+            enabled: phase === 'live' && driveMode === 'WATCH' &&
+              (mode === 'manager' || (mode === 'career' && (awaitingPlan || controlledPlayerAtCrease))),
+            onActiveChange: setGuidePaused }}>
           <ScreenHeader
             title={`${teamShort(display.battingTeamId)} batting`}
             subtitle={
@@ -2950,7 +2944,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
             </Animated.View>
           )}
 
-          <GlassSurface
+          <GuideTarget id="live-score" focusHeight={135}><GlassSurface
             intensity={0.62}
             style={[
               styles.scoreCard,
@@ -3010,7 +3004,7 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
                 {s.requiredRunRate != null && <RRRBar rrr={s.requiredRunRate} colors={colors} />}
               </>
             ) : null}
-          </GlassSurface>
+          </GlassSurface></GuideTarget>
 
           {/* Keep the 2D field above secondary analysis and commentary on phones. */}
           <View
@@ -3286,19 +3280,6 @@ export function MatchScreen({ navigation, route }: ScreenProps<'Match'>) {
               setAchToastIdx(0);
               clearPendingAchievements();
             }
-          }}
-        />
-        <FirstMatchGuide
-          active={
-            mode === 'career' &&
-            playedMatchesAllModes === 0 &&
-            controlledPlayerAtCrease &&
-            !firstGuideDone
-          }
-          onDone={() => {
-            firstGuideDoneRef.current = true;
-            guidePauseRef.current = false;
-            setFirstGuideDone(true);
           }}
         />
       </Animated.View>

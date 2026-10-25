@@ -145,7 +145,7 @@ export function InvestmentScreen({ navigation }: ScreenProps<'InvestmentScreen'>
 
   return (
     <>
-      <Screen scroll>
+      <Screen scroll careerNavigation>
         <ScreenHeader
           title="Investment Portfolio"
           subtitle={`${holdings.length} active holding${holdings.length === 1 ? '' : 's'}`}

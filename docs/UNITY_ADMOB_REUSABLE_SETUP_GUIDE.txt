@@ -1,0 +1,381 @@
+UNITY ADS THROUGH ADMOB — REUSABLE ANDROID SETUP GUIDE
+Prepared 19 October 2026 from the Cricket: Player & Manager integration.
+
+This is an engineering runbook, not legal advice or proof that another app is
+compliant. Recheck current provider documentation, SDK compatibility and each
+app's audience/data practices before reusing it. Do not copy Cricket's age
+policy, privacy promises, seller identity or app IDs into an unrelated app.
+
+1. WHAT WE BUILT, AND WHAT THIS DOES NOT MEAN
+-------------------------------------------
+AdMob remains the sole ad-serving API used by the game. Unity participates as a
+bidding source through Google's native Unity adapter. Existing AdMob ad units,
+reward fulfilment and ad-removal benefits remain the game's authority.
+The app need not be built with the Unity game engine to use Unity Ads.
+
+For Cricket we added both compatible Android dependencies, a consent metadata
+bridge, delayed Unity library startup, regression coverage, provider disclosures,
+the complete authorized-seller list and an isolated QA diagnostics Activity.
+We did not add a second production UnityAds.initialize/load/show pipeline.
+The agent did not change console groups or build a production AAB. The owner
+later approved and enabled ONLY the existing CricketPM Android Rewarded group;
+the other formats/app remain unchanged.
+
+Website deployment is COMPLETE: Cloudflare deployment eb5da5bb on 19 October
+2026. Live verification at 15:34 UTC (21:04 IST) matched all 20 public files,
+both Cricket policy routes, root app-ads.txt, nosniff headers and the legacy
+product redirect. Only the seller file and two policy pages differed before
+deployment; the other 17 public files already matched the live site.
+
+Actual Unity test-ad rendering is a separate gate. Consult the dated integration
+report for the current observed result; source tests or a compiled adapter do
+not prove a Unity ad was served. A Google sample ad is not a Unity success.
+Current Cricket result: the corrected internal APK initializes Google and opens
+Ad Inspector. The owner later chose to reuse the existing Rewarded ad unit and
+reported its mediation group enabled, keeping Google demand and other formats
+unchanged. Existing-unit Google test creatives loaded/shown/earned once/closed;
+Unity REWARDED test serving subsequently passed: UnityMediationAdapter loaded
+and showed Unity's Test game android creative, EARNED exactly once, then CLOSED,
+with gameGrant=NONE. Banner/Interstitial groups remain paused and untested.
+See the dated report for exact observations and the automatic Play sign-in
+detour, which was backed out of without sign-in/Install. No AAB was built.
+Before that success, the full bidder list and non-empty bidding data proved
+runtime signal collection even while the startup Inspector list was stale.
+
+2. IDENTITIES: WHAT CAN BE SHARED AND WHAT MUST CHANGE
+----------------------------------------------------
+Record these separately for EVERY app and platform:
+
+  Android package       Identifies the Android app/store listing.
+  AdMob App ID          SDK initialization identity; contains a tilde (~).
+  AdMob ad unit IDs     Request identities; contain a slash (/), one per format.
+  Unity Game ID         Unity's platform-specific app identity.
+  Unity Placement IDs   Case-sensitive format mappings within that Game ID.
+  Unity Developer ID    Seller identity for app-ads.txt, not an SDK Game ID.
+  Unity Organization ID Account identity, not the app-ads seller ID.
+  Google publisher ID   Your pub-... authorized seller identity.
+  TCF/ATP vendor IDs    Consent framework identities, neither Game nor seller IDs.
+
+Cricket EXAMPLE ONLY:
+  Package: com.coverdrive.cricket
+  AdMob App: ca-app-pub-4249020515368291~8405865949
+  Rewarded: ca-app-pub-4249020515368291/1717736882
+  Interstitial: ca-app-pub-4249020515368291/6625581037
+  Banner: ca-app-pub-4249020515368291/6681421355
+  Unity Android Game: 800404108
+  Placements: BP_Rewarded_Android / BP_Interstitial_Android / BP_Banner_Android
+  Unity seller: 143233260; organization core ID: 13469957541110
+  Unity displayed EU vendor: Unity Technologies SF, GVL 1549
+  Google Additional Consent Unity ATP: 3234
+
+Our separate Auction 2027 app has Game ID 800403247 and identical placement
+names. Identical names DO NOT make those app mappings interchangeable.
+iOS requires its own Unity Game ID, AdMob App/ad units, adapter and Apple
+privacy/tracking review. This Android work does not implement iOS mediation.
+Never put a reporting API secret or developer credential in public Expo vars.
+
+3. DASHBOARD SETUP — UNITY FIRST, THEN ADMOB
+------------------------------------------
+In Unity Monetization, register/select the correct store app and project.
+Select Google AdMob as mediation partner and bidding placements. Confirm each
+format belongs to the correct platform Game ID. Record IDs from the dashboard.
+Answer child-directed/audience questions truthfully for THAT app, not as a
+revenue optimization. Do not change existing audience settings casually.
+
+In AdMob create one Android mediation group per format, selecting ONLY the
+intended app's matching ad unit(s). Add Unity Ads under BIDDING, complete the
+partnership requirement and map the Game ID plus matching placement.
+Keep existing AdMob Network demand intact. For this integration we kept the
+three new production groups initially PAUSED. Later, the owner explicitly
+approved reusing the existing Rewarded group for QA and reported it enabled.
+That is not a blanket instruction to activate other formats or other apps.
+No reporting API key is needed for this bidding integration. Do not mistake
+waterfall optimization/API-key instructions for bidding setup.
+
+4. COMPATIBLE SDK PAIRS — DO NOT BLINDLY COPY LATEST
+--------------------------------------------------
+First inspect the actual native Google Ads version used by your RN/Flutter/
+native wrapper. Read the provider's version history AND published Maven POM.
+
+Our current pair (not a universal recommendation):
+  react-native-google-mobile-ads 16.0.3 -> Google Ads Android 24.9.0
+  com.google.ads.mediation:unity:4.16.6.0
+  com.unity3d.ads:unity-ads:4.16.6
+
+The adapter POM for this version does NOT pull in Unity itself: include BOTH
+artifacts in android/app/build.gradle. Newer Google adapter versions can require
+a newer Google Ads major version. Do not silently force a wrapper upgrade.
+Resolve with Gradle dependencyInsight and compile against the real artifacts.
+
+For Expo, use a native build, not Expo Go or an old-binary JS-only update.
+Our android/ is tracked and included in EAS inputs. Other Expo apps that
+regenerate Android need a reviewed config plugin/local native module so these
+changes survive prebuild. Do not run prebuild --clean over unpreserved changes.
+Read the exact Expo documentation matching the app's installed SDK first.
+
+5. AGE, CONSENT AND PRIVACY CHOICES
+----------------------------------
+Establish audience eligibility before ad SDK initialization. Keep optional ads
+from blocking normal gameplay. UMP canRequestAds means an eligible ad request
+may be made; it does NOT mean the user accepted personalized ads from Unity.
+Native age-treatment flags and the Unity dashboard audience/content settings
+must agree. Google's max-content-rating flag does not certify every mediated
+creative; review Unity filters and real creative behavior separately.
+
+In AdMob -> Privacy & messaging -> European regulations -> Settings -> ad
+partners, verify Unity Ads is included. Do the same in US state regulations.
+Do not confuse Unity Ads with AdUnity or Unitymedia. Inspect the selected list,
+not merely a green Published badge. Ensure the consent MESSAGE is attached to
+the correct app. Our earlier US message belonged to Auction 2027, so a separate
+Cricket: Player & Manager message was created. Publish the correct app's message.
+
+Pinned older adapters may not forward Google's Additional Consent. Our native
+bridge applies Unity metadata after UMP and before Google initialization, then
+again after privacy edits and stored IAB signal changes. It commits fields
+separately and does not log raw CMP strings. Unity documents that privacy.consent
+overrides the older gdpr.consent; avoid contradictory keys.
+
+Our deliberately restrictive first implementation only allows Unity
+personalization for an eligible adult with confirmed supported AC v1/v2 Unity
+consent AND storage/profile/personalized-ad purposes. Missing, denied, malformed,
+future, TCF-only-without-supported-AC and unsupported GPP/US signals stay opted
+out of Unity personalization. Thus US/non-EU and many current TCF-only sessions
+remain contextual-only. This can reduce personalized demand. Do not describe
+this as a complete universal TCF/GPP consent implementation or copy it without
+reviewing another app's actual CMP and business requirements.
+
+Privacy editing must suspend new loads, unmount banners and invalidate cached/
+already-loading ads. A delayed old ad must not appear after withdrawal, even if
+UMP still permits a new limited-ad request. Changing audience also invalidates
+old requests. Only resume after reapplying current metadata.
+
+The Unity 4.16.6 library contains an AndroidX automatic startup initializer.
+We inspected the merged manifest and the shipped implementation: it sets up
+context/orientation/Cronet before the app's prompt. We remove ONLY that
+initializer's automatic metadata and manually invoke it after eligibility/UMP
+and privacy metadata, preserving other AndroidX initializers. Do not remove the
+entire shared startup provider. Recheck this behavior after any SDK update.
+
+6. APP-ADS.TXT AND PUBLIC WEBSITE
+--------------------------------
+Download the FULL recommended seller list from your Unity dashboard. It is not
+the Game ID and not the organization core ID. Preserve every existing legitimate
+Google DIRECT entry and merge/deduplicate the new seller entries.
+Our verified file has 162 seller lines: original Google DIRECT + 161 Unity
+dashboard entries, including:
+  unity.com, 143233260, DIRECT, 96cabb5fbdde37a7
+Use your OWN current seller list; do not treat this example as another account's
+authorization. Keep the exact domain supplied by the dashboard.
+
+Host at https://YOUR-DEVELOPER-HOST/app-ads.txt, not just under an app subfolder.
+The store listing developer-website hostname must lead crawlers to that file.
+Apps using the same authorized publisher/site may share the root seller file;
+apps using another seller account/hostname need their own correct entries.
+Verify HTTP 200, text/plain and actual text content without login, a WAF challenge
+or SPA fallback. A successful fetch does not prove AdMob/Unity crawler approval.
+
+Update the app-specific privacy page and offline policy: name Unity, describe
+actual data/consent flags and provide privacy-choice access. Review Google Play
+Data safety against the actual native SDK inventory. Do not rewrite policies
+for unrelated apps sharing the publisher website.
+
+Our website source files:
+  legal-site/static/app-ads.txt
+  legal-site/build-core.cjs (Cricket policy)
+  src/content/privacyPolicy.ts (offline app policy)
+
+Our deployment procedure:
+  npm run build:legal-site
+  node --test legal-site/auction-xi.test.cjs
+  npm test -- --runInBand src/config/__tests__/legalSite.test.ts src/config/__tests__/unityMediationConfig.test.ts src/services/__tests__/publisherAuthReturn.test.ts
+  node scripts/verifyPublisherDeployment.mjs https://sunlight-publisher-site.pages.dev
+  npx --yes wrangler@4.151.2 pages deploy legal-site/dist --project-name sunlight-publisher-site --branch main --commit-dirty=true
+  node scripts/verifyPublisherDeployment.mjs https://sunlight-publisher-site.pages.dev
+
+The comparison is intentionally nonzero BEFORE deployment when approved files
+differ. Review every difference. After deployment require all expected files to
+match, not only a successful CLI upload. Adapt project, origin and paths for a
+different website. Existing auth fallbacks/redirects must keep working.
+
+7. ISOLATED QA — BOTH GOOGLE AND UNITY NEED TEST TREATMENT
+-------------------------------------------------------
+Google test-device mode does not guarantee Unity test ads. Prefer adding only
+the QA device in Unity -> Monetization -> Settings -> Test device (the current
+dashboard; older documentation may call this Testing). Select the correct app,
+then Create test device, name the device and choose Android. Use its actual
+advertising ID (GAID), not its Android ID, AdMob test-device hash, Game ID or
+organization ID. On our QA emulator the read-only path is Settings ->
+Security & privacy -> Privacy controls -> Ads; the ID is displayed below the
+reset/delete controls. Do not press either reset or delete. Do not copy this
+project's device identifier into another device's registration. Save and verify
+the per-device test-mode state before requesting Unity ads.
+Alternatively, Force test
+mode ON for a dedicated/not-yet-monetizing app with explicit owner approval.
+Do not force an already monetizing app into global test mode and affect users.
+Verify the selected Unity app/Game ID and screenshot the test setting.
+Never click live ads or assume the word 'test' in a local button proves SDK mode.
+
+Our QA native bridge explicitly marks the Google emulator as a test device.
+The QA Activity mutes Google app ads AFTER SDK initialization; Google Ads 24.9
+throws if setAppMuted is called from the pre-initialize privacy bridge. A
+regression check prevents that ordering mistake. Keep host emulator audio
+disabled (-no-audio), and mute device media independently where supported.
+Verify the volume readback rather than trusting a successful shell command:
+our emulator's AudioHardening ignored shell volume changes. Host -no-audio was
+confirmed from its process arguments. These QA settings do not change
+release treatment or enable Unity test mode through an invented adapter API.
+The actual pinned adapter initializes Unity with client testMode=false, so a
+verified Unity dashboard override/test device is still required.
+
+Build only an internal standalone APK, preserving installed QA version/save
+compatibility. Example (replace JDK path and QA version override as needed):
+  cd android
+  env EXPO_PUBLIC_QA_TOOLS=true NODE_ENV=production JAVA_HOME="YOUR_JDK17_HOME" ./gradlew :app:testQaUnitTest --tests com.coverdrive.cricket.UnityConsentPolicyTest
+  env EXPO_PUBLIC_QA_TOOLS=true NODE_ENV=production JAVA_HOME="YOUR_JDK17_HOME" ./gradlew :app:assembleQa
+  unzip -l app/build/outputs/apk/qa/app-qa.apk
+  adb -s YOUR_QA_SERIAL install -r app/build/outputs/apk/qa/app-qa.apk
+
+Confirm assets/index.android.bundle is packaged. A debug-signed internal APK is
+not a store release. Do NOT uninstall, clear data, downgrade or replace a
+different signed production installation to make installation 'work'. Record
+save counts, first-install time, signer/version and baseline before updating.
+Keep the emulator muted and do not touch another signed-in phone/emulator.
+
+8. QA DIAGNOSTICS IMPLEMENTATION AND PROOF
+-----------------------------------------
+Settings -> QA Tools -> Ad diagnostics (test only) opens a native Activity from
+android/app/src/qa/, not the production source set. Main bridge and JS both
+guard entry; native entry also requires eligible current consent. The Activity
+is not exported. It receives the current app's configured unit IDs from JS.
+It cannot grant coins/tokens, restore purchases or modify a career save.
+
+Source paths worth adapting, not copying blindly:
+  src/services/adDiagnostics.ts
+  android/app/src/main/java/com/coverdrive/cricket/UnityConsentModule.kt
+  android/app/src/qa/AndroidManifest.xml
+  android/app/src/qa/java/com/coverdrive/cricket/AdDiagnosticsActivity.kt
+
+Open Ad Inspector and inspect Adapters. Enable single-ad-source testing for
+Unity Ads, force-restart the app to discard cached ads, then request fresh ads.
+This affects a test session; do not unpause production groups without the
+owner's explicit approval for that specific server-side change.
+If Ad Inspector says no applicable Unity adapter for the unit, verify the
+effective server mapping, exact app/ad unit, partnership status and propagation
+before changing the binary. A compiled AAR or dashboard mapping alone is not
+enough. Separate QA AdMob units/groups are an ISOLATION OPTION, not mandatory:
+map them to the existing correct Unity Game ID/placements and use QA-only
+EXPO_PUBLIC_ADMOB_*_UNIT overrides. Alternatively, with explicit owner approval,
+reuse the existing ad units and enable their correctly mapped group, retaining
+AdMob Network demand. This changes server routing for those units; it does not
+install Unity code into older released binaries. Verify older-build ad behavior
+and do not assume zero ad-serving impact. Start with one approved format.
+The console-side change needs an authorized account operator. Do not create
+new Unity placements solely because you chose separate QA AdMob unit IDs.
+
+If a correctly mapped source is absent, do not assume its SDK was stripped or
+is incompatible. Check the actual packaged classes, pinned compatible versions,
+Adapters tab, and per-request menu -> View all bidders / Third-party bidding
+parameters. The winning waterfall entry alone does not list every losing or
+excluded bidder. Distinguish missing SDK/initialization/signal errors from no
+consent, no bid and effective server configuration. Google documents up to one
+hour for ad-source enablement; this is not proof that delay is the cause. Do
+not clear player data, reset consent or add a separate direct-Unity ad pipeline
+to make a mediated test appear successful.
+
+Observed Cricket sequence, useful when diagnosing another app:
+  1. Exact app/unit/Game ID/placement + enabled source/Active partnership checked.
+  2. Google filled; full bidders separately showed Unity No ad returned.
+  3. Third-party parameter reported Unity SDK/adapter versions and bidding data.
+  4. Cold restart later reported UnityMediationAdapter READY and exposed Unity
+     in the single-source selector. No new APK or dashboard correction needed.
+  5. Selected Unity (Bidding), confirmed the root names that source, and made a
+     NEW request, not a previously cached Google ad. QA observed Unity adapter,
+     test creative, earned-once and close without granting game currency.
+  6. Disable the device-only override after testing and verify Inactive.
+Do not assume this proves every missing-source issue is propagation. Preserve
+the difference between evidence, an inference and a fully tested ad format.
+
+After verifying Unity test mode, mark that confirmation in the QA panel.
+Request banner, interstitial and rewarded formats. Record LOADED/SHOWN/CLOSED,
+mediation adapter class, failure domain/code and earned callback count.
+CricketAdsQA log lines deliberately exclude raw consent/account/bid-token data.
+SUCCESS requires a Unity adapter response and a Unity test creative, not Google
+fallback. The rewarded test observes EARNED only and grants NO game currency.
+
+Test early close (no earned callback), full completion (one earned callback),
+no-fill/error, repeat load, background/resume, privacy decline/withdrawal,
+offline recovery and age restrictions. Separate automated fulfilment tests must
+still prove that real gameplay rewards settle exactly once.
+
+9. REGRESSION AND RELEASE CHECKLIST
+-----------------------------------
+Keep native consent-policy tests, bridge/initialization ordering tests, privacy
+race/cached-ad invalidation, duplicate callbacks, no-reward-on-close, async show
+failure, banner lifecycle and QA-build isolation coverage. Preserve save/IAP
+recovery and Player/Manager progression regressions.
+Run focused tests, typecheck, lint, full app tests, native tests and diff check.
+Check the merged manifest, runtime adapter versions and actual installed build.
+Automated passes do not certify production revenue, every device GPU/OS,
+real-money payments, legal compliance or purchase recovery by themselves.
+
+After testing, stop Ad Inspector's single-source override and force-restart.
+Remove/restore only the test setup you changed; verify Unity test configuration
+before production. Keep QA_TOOLS disabled in release. Recheck the live policy,
+seller crawler status, consent messages, audience/content filters and store
+declarations. Only then ask the owner for production AAB/signing/rollout approval.
+This guide does not grant permission to activate mediation or publish an app.
+
+10. PRIMARY REFERENCES (RECHECK WHEN REUSING)
+--------------------------------------------
+https://developers.google.com/admob/android/mediation/unity
+https://developers.google.com/admob/android/ad-inspector/test-ad-units
+https://developers.google.com/admob/android/ad-inspector/troubleshoot-ad-units
+https://support.google.com/admob/answer/12659455?hl=en-GB
+https://support.google.com/admob/answer/9850777?hl=en
+https://docs.page/invertase/react-native-google-mobile-ads/ad-inspector
+https://docs.unity.com/en-us/grow/ads/privacy/ccpa-compliance
+https://developer.android.com/topic/libraries/app-startup
+https://developers.cloudflare.com/pages/get-started/direct-upload/
+https://docs.expo.dev/versions/v57.0.0/
+
+ADDENDUM — 21 OCTOBER 2026 LIVE QA LESSONS
+-----------------------------------------
+Current application-specific results: docs/RELEASE_QA_2026-10-21.txt. Adult Unity
+banner and interstitial now have actual source/creative proof; don't reuse the
+old paused/untested description for those successful adult test cases. Teen-only
+Unity requests returned no fill and do NOT have creative/content clearance.
+
+For another app, keep region/age overrides test-build-and-test-device guarded,
+ephemeral, and separate from the saved age declaration. Use the real UMP privacy
+entry point. Test an actual US opt-out, save, reopen, and visually verify the
+radio state; not every WebView exposes checked state correctly in UI XML. Read
+sanitized native flags/signals, never export raw consent strings or identities.
+
+Test every format and audience separately. A teen session must preserve its
+TFUA/G/NPA restrictions even when that produces no fill. An adult fill later is
+not a teen fill, and a provider being READY is not a shown creative. Check the
+provider's project-level requirements for per-user age treatment without blindly
+changing legal child/Families declarations. Pinned older SDKs can lack the newer
+TEEN API; do not silently substitute an unsupported enum or weaken protections.
+
+The current app's QA-only Settings controls support regulated-US and teen session
+testing without altering saved age. End the QA privacy session, stop the local
+Ad Inspector source override, verify Inactive and cold-restart. Confirm normal
+flags afterwards. Never present this internal QA APK as a store artifact.
+
+Take memory baselines BEFORE opening Ad Inspector. Preserve interrupted runs and
+external-auth detours separately. A request can load while an unexpected Play
+screen interrupts showing/closing; record loaded, shown, final CLOSED and return
+individually. Some test creatives have multiple close layers. Only use observed
+close controls; do not click Install, CTA or sign into an unsolicited ad detour.
+
+A second physical phone is not required for sequential two-account testing, but
+a second real QA account is. Same-account reinstall/recovery, guest transitions
+and mocked owner-race tests are different coverage. Keep balances/inventory and
+grant-marker hashes, not only visible save counts. Do not call concurrent normal
+save traffic a recovery-only zero-upload proof.
+
+Play purchases can be tested on a suitable Play-enabled emulator with a working
+license-test account. Verify test payment methods explicitly. Billing-unavailable
+or Restore failed is a blocked test, never a successful restore or proof of a
+general purchase-code defect. Never bypass store/account setup using local grants.

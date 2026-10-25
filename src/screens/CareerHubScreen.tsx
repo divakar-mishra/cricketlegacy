@@ -4,11 +4,11 @@
  * Each HubTabBar tab now shows a genuinely different page of content instead
  * of navigating to a separate screen. The "Home" tab shows only the 4-5 most
  * important cards (matchday CTA, player hero, live-ops, league position). The
- * other tabs (Stats, Narrative, Progress, Profile) surface depth without
+ * other tabs (Stats, Progress, More) surface depth without
  * overwhelming the home view.
  */
 import { useFocusEffect } from '@react-navigation/native';
-import { showShortageOffer } from '../components/showShortageOffer';
+import { useEnergyRecovery } from '../state/energyRecoveryStore';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -28,13 +28,11 @@ import {
   Button,
   Card,
   CareerSpotlight,
-  HubTabBar,
   Icon,
   LeagueTable,
   LiveOpsCards,
   LockedFeatureCard,
   MechanicInfoButton,
-  ModeGuideModal,
   NewspaperModal,
   ProgressBar,
   RewardModal,
@@ -50,6 +48,7 @@ import { FranchiseOfferModal } from '../components/FranchiseOfferModal';
 import { DomesticClubOfferModal } from '../components/DomesticClubOfferModal';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { StarterPackModal } from '../components/StarterPackModal';
+import { HubEngagementPrompts } from '../components/HubEngagementPrompts';
 import { useManagedTimers } from '../hooks/useManagedTimers';
 import { getCountry } from '../data/countries';
 import { ECONOMY } from '../data/gameConfig';
@@ -85,6 +84,8 @@ import {
 import { playerIdentityLine } from '../game/careerExperience';
 import { nextPlayerAdvice } from '../game/playerAdvisor';
 import { CareerStepType, resolveNextCareerStep } from '../game/careerStep';
+import { GuideTarget, GuideReplayButton, useGuidePending } from '../components/CareerGuide';
+import { guideAction } from '../game/coachGuide';
 import { activeCompetitionTable } from '../game/competitionTable';
 import { areAdsRemoved, fixtureEnergyCost } from '../game/economy';
 import { renderText } from '../game/narrative';
@@ -102,10 +103,10 @@ import { nextUserFixtureId, nextUserFixturesByCompetition } from '../game/season
 import { CAREER_COMPETITION_STAT_LABELS, earlierCareerStats, emptyStats } from '../game/stats';
 import { getU19WorldCupState, u19WorldCupSelectionStatus } from '../game/u19WorldCup';
 import { careerPlayingTeamId } from '../game/youthFixtures';
-import { ScreenProps } from '../navigation';
+import { ScreenProps, type PlayerHubPage } from '../navigation';
+import { playerHubPage } from '../navigation/careerNavigation';
 import { accountPurchases, ads, analytics } from '../services';
 import { persistenceErrorMessage, useCareer } from '../state/careerStore';
-import { useSettings } from '../state/settingsStore';
 import {
   fonts,
   fontSize,
@@ -136,8 +137,6 @@ const ROLE_LABEL: Record<string, string> = {
   WK_BATTER: 'Wicket-Keeper',
 };
 
-type HubPage = 'home' | 'stats' | 'narrative' | 'progress' | 'profile';
-
 const EMPTY_PRESS_ARCHIVE: readonly NewspaperStory[] = [];
 
 /** Player Home's cricket-ticket palette. Kept local so the shared Player and Manager shell stays intact. */
@@ -150,40 +149,7 @@ const CRICKET_HOME = {
   leatherDark: '#6F211A',
 } as const;
 
-const PLAYER_GUIDE_STEPS = [
-  {
-    icon: 'home' as const,
-    title: 'Follow the next action',
-    body: 'Your next step.',
-  },
-  {
-    icon: 'fitness' as const,
-    title: 'Find your support team',
-    body: 'Open Training, then Development Centre. That is where you compare personal coaches, the performance analyst, physio and role-fitting equipment. Hiring is optional.',
-  },
-  {
-    icon: 'game-controller' as const,
-    title: 'Play your role',
-    body: 'Choose your approach.',
-  },
-  {
-    icon: 'trending-up' as const,
-    title: 'Earn selection and progress',
-    body: 'Selection and milestones.',
-  },
-  {
-    icon: 'chatbubble-ellipses-outline' as const,
-    title: 'Your free career adviser',
-    body: 'At relevant moments, your adviser becomes a story decision. Hear the suggestion or carry on; accepting opens the right screen but never spends for you.',
-  },
-  {
-    icon: 'person' as const,
-    title: 'Explore life off the field',
-    body: 'Open Profile → Player Life for contracts and Finances. Kit Partnership is under Kit & media. The Portfolio appears when senior cricket unlocks it.',
-  },
-] as const;
-
-export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
+export function CareerHubScreen({ navigation, route }: ScreenProps<'CareerHub'>) {
   const {
     save,
     refreshEnergy,
@@ -246,7 +212,8 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   const { colors, gradients } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const compact = useWindowDimensions().width < 480;
-  const [page, setPage] = useState<HubPage>('home');
+  const page = playerHubPage(route.params?.initialTab);
+  const handleTabChange = (initialTab: PlayerHubPage) => navigation.setParams({ initialTab });
   const [canClaimDaily, setCanClaimDaily] = useState(false);
   const [rewardModal, setRewardModal] = useState<RewardModalData | null>(null);
   const [contractFlash, setContractFlash] = useState<string | null>(null);
@@ -255,6 +222,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   const starterPackShownRef = useRef(false);
   const [toastIdx, setToastIdx] = useState(0);
   const [selectedNewspaper, setSelectedNewspaper] = useState<NewspaperStory | null>(null);
+  const [ratingHubReady, setRatingHubReady] = useState(false);
   const prevPendingLenRef = useRef(-1);
 
   useFocusEffect(
@@ -295,6 +263,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      setRatingHubReady(false);
       refreshEnergy();
       const today = Math.floor(Date.now() / 86_400_000);
       setCanClaimDaily(useCareer.getState().save?.lastDailyClaim !== today);
@@ -307,12 +276,18 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       const matchesPlayed = currentSave?.userPlayerId
         ? (currentSave.players[currentSave.userPlayerId]?.careerStats?.matches ?? 0)
         : 0;
-      if (matchesPlayed >= 3) {
-        void ads.maybeShowInterstitial(
-          !areAdsRemoved(currentSave?.entitlements),
-          'career-hub-return',
-        );
-      }
+      const hubInterstitial =
+        matchesPlayed >= 3
+          ? ads
+              .maybeShowInterstitial(
+                !areAdsRemoved(currentSave?.entitlements),
+                'career-hub-return',
+                undefined,
+                () => active && useCareer.getState().save?.id === currentSave?.id &&
+                  !areAdsRemoved(useCareer.getState().save?.entitlements),
+              )
+              .catch(() => false)
+          : Promise.resolve(false);
 
       // The modest starter offer unlocks only after a completed match. Its
       // persisted 24-hour window never resets through navigation or restart.
@@ -323,19 +298,26 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         Boolean(starterUnlockedAt) &&
         Date.now() < (starterUnlockedAt ?? 0) + 24 * 60 * 60 * 1000 &&
         !currentSave?.firstPurchaseDone;
-      void accountPurchases.hasStarterPackPurchase().then((starterPackOwned) => {
-        if (
-          active &&
-          !starterPackOwned &&
-          !hasRemoveAds &&
-          !starterDismissedAt &&
-          starterStillActive &&
-          !starterPackShownRef.current
-        ) {
-          starterPackShownRef.current = true;
-          analytics.logEvent(analytics.EVT.STARTER_PACK_SHOWN);
-          setShowStarterPack(true);
-        }
+      const starterCheck = accountPurchases
+        .hasStarterPackPurchase()
+        .then((starterPackOwned) => {
+          if (
+            active &&
+            !starterPackOwned &&
+            !hasRemoveAds &&
+            !starterDismissedAt &&
+            starterStillActive &&
+            !starterPackShownRef.current
+          ) {
+            starterPackShownRef.current = true;
+            analytics.logEvent(analytics.EVT.STARTER_PACK_SHOWN);
+            setShowStarterPack(true);
+          }
+        })
+        .catch(() => undefined);
+      // Optional engagement must wait for any hub-return ad and starter lookup.
+      void Promise.all([hubInterstitial, starterCheck]).then(() => {
+        if (active) setRatingHubReady(true);
       });
       return () => {
         active = false;
@@ -354,6 +336,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
   };
 
   const handlePlayMatch = async () => {
+    useCareer.getState().synchronizeEnergyClock();
     try {
       playHaptic('impact-medium');
     } catch {
@@ -387,14 +370,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     }
   };
 
-  const handleTabChange = (p: HubPage) => {
-    hapticTap();
-    setPage(p);
-  };
-
-  const dismissedTips = useSettings((s) => s.dismissedTips);
-  const dismissTip = useSettings((s) => s.dismissTip);
-  const showCareerGuide = !dismissedTips.includes('career_hub_guide');
+  const showCareerGuide = useGuidePending('player.home');
   const pressArchive = save?.experience?.mediaScrapbook ?? EMPTY_PRESS_ARCHIVE;
   const pendingPressId = save?.experience?.pendingNewspaperId;
   useEffect(() => {
@@ -483,7 +459,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
       : careerSelectionDecision(save, fixture.format, fixture.id)
     : null;
   const matchEnergyCost = fixture ? fixtureEnergyCost(fixture) : ECONOMY.energyPerMatch;
-  const canPlay = selectionOutlook?.selected === false || save.wallet.energy >= matchEnergyCost;
   const opponentId = fixture
     ? fixture.homeTeamId === fixtureTeamId
       ? fixture.awayTeamId
@@ -521,27 +496,27 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         action: 'DECIDE',
       }
     : earnedSponsorOffers.length
-    ? {
-        kind: 'SPONSOR' as const,
-        icon: 'shirt-outline' as const,
-        title: 'Kit sponsor offers ready',
-        action: 'REVIEW',
-      }
-    : portfolioUnlocked && !portfolioHomeVisited
       ? {
-          kind: 'PORTFOLIO' as const,
-          icon: 'trending-up-outline' as const,
-          title: 'Portfolio is now available',
-          action: 'VIEW',
+          kind: 'SPONSOR' as const,
+          icon: 'shirt-outline' as const,
+          title: 'Kit sponsor offers ready',
+          action: 'REVIEW',
         }
-      : academyReady
+      : portfolioUnlocked && !portfolioHomeVisited
         ? {
-            kind: 'ACADEMY' as const,
-            icon: 'school-outline' as const,
-            title: 'Your academy is ready',
-            action: 'OPEN',
+            kind: 'PORTFOLIO' as const,
+            icon: 'trending-up-outline' as const,
+            title: 'Portfolio is now available',
+            action: 'VIEW',
           }
-        : undefined;
+        : academyReady
+          ? {
+              kind: 'ACADEMY' as const,
+              icon: 'school-outline' as const,
+              title: 'Your academy is ready',
+              action: 'OPEN',
+            }
+          : undefined;
   const careerSeasonNumber = (save.careerSeasons ?? 0) + 1;
   const calendarEvent = nextStep.mode === 'career' ? nextStep.calendarEvent : undefined;
   const countryContractOffers =
@@ -570,19 +545,19 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         ? 'Hear adviser'
         : nextStep.action === 'PLAY_MATCH'
           ? 'Play match'
-        : nextStep.action === 'SIMULATE_MATCH'
-          ? 'Advance while benched'
-          : nextStep.action === 'REFILL_ENERGY'
-            ? 'Restore energy'
-            : nextStep.action === 'ACKNOWLEDGE_PROMOTION'
-              ? 'Continue'
-              : nextStep.action === 'ADVANCE_SEASON'
-                ? `Start Season ${careerSeasonNumber + 1}`
-                : nextStep.action === 'ADVANCE_CAREER_CALENDAR'
-                  ? 'Continue season'
-                  : nextStep.action === 'OPEN_TRAINING'
-                    ? 'Open training'
-                    : 'Continue';
+          : nextStep.action === 'SIMULATE_MATCH'
+            ? 'Advance while benched'
+            : nextStep.action === 'REFILL_ENERGY'
+              ? 'Restore energy'
+              : nextStep.action === 'ACKNOWLEDGE_PROMOTION'
+                ? 'Continue'
+                : nextStep.action === 'ADVANCE_SEASON'
+                  ? `Start Season ${careerSeasonNumber + 1}`
+                  : nextStep.action === 'ADVANCE_CAREER_CALENDAR'
+                    ? 'Continue season'
+                    : nextStep.action === 'OPEN_TRAINING'
+                      ? 'Open training'
+                      : 'Continue';
   const openOffFieldOpportunity = () => {
     if (!offFieldOpportunity) return;
     hapticTap();
@@ -626,7 +601,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         resolveCalendar();
         break;
       case 'REFILL_ENERGY':
-        showShortageOffer(save, 'energy', (productId) => navigation.navigate('Purchase', { productId }));
+        useEnergyRecovery.getState().open();
         break;
       case 'PLAY_MATCH':
         void handlePlayMatch();
@@ -860,7 +835,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
 
   const renderHomeTab = () => (
     <>
-      <View style={styles.fixtureTicketWrap}>
+      <GuideTarget id="next-step" focusHeight={140}><View style={styles.fixtureTicketWrap}>
         <View style={[styles.fixtureTicket, !fixture && styles.fixtureTicketCompact]}>
           <View style={styles.ticketStitchRail}>
             {[0, 1, 2, 3, 4, 5, 6].map((stitch) => (
@@ -875,7 +850,9 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               ? 'CAREER DECISION'
               : nextStep.action === 'OPEN_ADVISER'
                 ? 'ADVISER MOMENT'
-                : fixture ? 'NEXT FIXTURE' : 'NEXT CHAPTER'}
+                : fixture
+                  ? 'NEXT FIXTURE'
+                  : 'NEXT CHAPTER'}
           </Text>
           <Text style={styles.ticketTitle} numberOfLines={2}>
             {primaryIsStory && storyPreview?.title ? storyPreview.title : nextStep.title}
@@ -1088,6 +1065,8 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         ) : null}
       </View>
 
+      </GuideTarget>
+      <GuideReplayButton chapter="player.home" />
       <SeasonPassHomeCard />
 
       {offFieldOpportunity ? (
@@ -1110,9 +1089,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
               {offFieldOpportunity.title}
             </Text>
           </View>
-          <Text style={styles.offFieldOpportunityAction}>
-            {offFieldOpportunity.action} →
-          </Text>
+          <Text style={styles.offFieldOpportunityAction}>{offFieldOpportunity.action} →</Text>
         </Pressable>
       ) : null}
 
@@ -1151,10 +1128,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             const pending = save.pendingDomesticCountry === offer.countryId;
             const increase =
               currentSeasonSalary > 0
-                ? Math.max(
-                    0,
-                    Math.round((offer.seasonSalary / currentSeasonSalary - 1) * 100),
-                  )
+                ? Math.max(0, Math.round((offer.seasonSalary / currentSeasonSalary - 1) * 100))
                 : null;
             return (
               <View
@@ -1406,7 +1380,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 variant="gold"
                 size="sm"
                 style={{ marginTop: spacing.md }}
-                onPress={() => navigation.navigate('Purchase')}
+                onPress={() => useEnergyRecovery.getState().open()}
               />
             ) : null}
           </Card>
@@ -1584,7 +1558,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     </>
   );
 
-  const renderNarrativeTab = () => (
+  const renderCareerStory = () => (
     <>
       {storyN > 0 && (
         <Button
@@ -1631,7 +1605,11 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           ))}
         </>
       ) : null}
+    </>
+  );
 
+  const renderCareerPath = () => (
+    <>
       {/* Promotion alert */}
       {lastPromotion?.promoted
         ? (() => {
@@ -1683,18 +1661,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                     {Math.round(progress * 100)}% toward {nextLabel}
                   </Text>
                 </>
-              )}
-              {nat.capped && isInternationalFixture(fixture) && (
-                <Button
-                  label={canPlay ? `🧢 Represent ${countryName}` : 'Restore energy'}
-                  variant="gold"
-                  style={{ marginTop: spacing.sm }}
-                  onPress={() =>
-                    canPlay
-                      ? navigation.navigate('Match', { intl: true })
-                      : navigation.navigate('Purchase')
-                  }
-                />
               )}
               {nat.capped && nat.caps === 0 && (
                 <>
@@ -1803,13 +1769,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         </>
       )}
 
-      <Button
-        label="Player Life"
-        variant="secondary"
-        style={{ marginTop: spacing.lg }}
-        onPress={() => navigation.navigate('PlayerLife')}
-      />
-
       {/* International Calendar (Feature 5 + 8) */}
       {save.capped && (
         <>
@@ -1894,6 +1853,23 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
 
     return (
       <>
+        <View style={styles.progressLinks}>
+          <Button
+            label="Achievements"
+            variant="secondary"
+            fullWidth={false}
+            style={styles.progressLink}
+            onPress={() => navigation.navigate('Records', { initialTab: 'achievements' })}
+          />
+          <Button
+            label="Hall of Fame"
+            variant="secondary"
+            fullWidth={false}
+            style={styles.progressLink}
+            onPress={() => navigation.navigate('Records', { initialTab: 'hof' })}
+          />
+        </View>
+        {renderCareerPath()}
         <View style={styles.sectionTitleRow}>
           <Text style={styles.sectionTitleInline}>Selection Readiness</Text>
           {save.careerPathLevel === 'U19' ? (
@@ -1991,7 +1967,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             label="View All Achievements →"
             variant="ghost"
             style={{ marginTop: spacing.sm }}
-            onPress={() => navigation.navigate('Records')}
+            onPress={() => navigation.navigate('Records', { initialTab: 'achievements' })}
           />
         </Card>
 
@@ -2025,6 +2001,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             </Card>
           </>
         )}
+        {renderCareerStory()}
         <LiveOpsCards />
       </>
     );
@@ -2059,10 +2036,16 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         onPress={() => navigation.navigate('PlayerCosmetics')}
       />
       <Button
-        label="📊 Records & Hall of Fame"
+        label="Records"
         variant="secondary"
         style={{ marginTop: spacing.sm }}
         onPress={() => navigation.navigate('Records')}
+      />
+      <Button
+        label="Hall of Fame"
+        variant="secondary"
+        style={{ marginTop: spacing.sm }}
+        onPress={() => navigation.navigate('Records', { initialTab: 'hof' })}
       />
       <Button
         label="⚙️ Settings"
@@ -2085,8 +2068,6 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
         return renderHomeTab();
       case 'stats':
         return renderStatsTab();
-      case 'narrative':
-        return renderNarrativeTab();
       case 'progress':
         return renderProgressTab();
       case 'profile':
@@ -2100,41 +2081,11 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
     <>
       <Screen
         scroll
+        guide={{ chapter: 'player.home', enabled: page === 'home' && !showStarterPack && !rewardModal &&
+          !selectedNewspaper && !pendingPressId && offers.length === 0 && domesticClubOffers.length === 0 && pendingAchievementIds.length === 0 }}
         gradient={gradients.pitch}
-        footer={
-          <HubTabBar
-            tabs={[
-              {
-                key: 'home',
-                icon: 'home',
-                label: 'Home',
-                active: page === 'home',
-                onPress: () => handleTabChange('home'),
-              },
-              {
-                key: 'stats',
-                icon: 'stats-chart',
-                label: 'Stats',
-                active: page === 'stats',
-                onPress: () => handleTabChange('stats'),
-              },
-              {
-                key: 'progress',
-                icon: 'trophy',
-                label: 'Progress',
-                active: page === 'progress',
-                onPress: () => handleTabChange('progress'),
-              },
-              {
-                key: 'profile',
-                icon: 'person',
-                label: 'Profile',
-                active: page === 'profile',
-                onPress: () => handleTabChange('profile'),
-              },
-            ]}
-          />
-        }
+        scrollResetKey={`${save.id}:${page}`}
+        careerNavigation
       >
         <ScreenHeader
           title={page === 'home' ? 'Player Career' : user.name}
@@ -2156,9 +2107,11 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             <Button
               label="Retry save"
               variant="gold"
-              onPress={() => void persistCritical(true).catch((error) =>
-                Alert.alert('Save still unavailable', persistenceErrorMessage(error)),
-              )}
+              onPress={() =>
+                void persistCritical(true).catch((error) =>
+                  Alert.alert('Save still unavailable', persistenceErrorMessage(error)),
+                )
+              }
             />
           </Card>
         ) : null}
@@ -2188,11 +2141,12 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                 <Text style={styles.mastheadName} numberOfLines={1} adjustsFontSizeToFit>
                   {user.name}
                 </Text>
-                <Text style={styles.mastheadRole} numberOfLines={1}>
+                <Text style={styles.mastheadProfileHint}>View profile →</Text>
+                <Text style={styles.mastheadRole}>
                   {user.battingStyle === 'RHB' ? 'RIGHT-HAND BAT' : 'LEFT-HAND BAT'} ·{' '}
                   {(ROLE_LABEL[user.role] ?? user.role).toUpperCase()}
                 </Text>
-                <Text style={styles.mastheadPath} numberOfLines={2}>
+                <Text style={styles.mastheadPath}>
                   {CAREER_PATH_LABEL[save.careerPathLevel ?? 'DOMESTIC']} · {countryName} · Age{' '}
                   {user.age}
                 </Text>
@@ -2209,7 +2163,7 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
                     {user.injury ? 'IN RECOVERY' : 'AVAILABLE'}
                   </Text>
                 </View>
-                <Text style={styles.mastheadReadiness} numberOfLines={1}>
+                <Text style={styles.mastheadReadiness}>
                   FORM {Math.round(user.meta.form)} · CONDITION{' '}
                   {Math.round(save.playerCareerResources?.playerCondition ?? 100)} · TRUST{' '}
                   {Math.round(save.playerCareerResources?.coachTrust ?? 55)}
@@ -2237,19 +2191,20 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
             status={`FORM ${Math.round(user.meta.form)} | COND ${Math.round(save.playerCareerResources?.playerCondition ?? 100)} | TRUST ${Math.round(save.playerCareerResources?.coachTrust ?? 55)}`}
           />
         )}
-        <View style={styles.walletSection}>
+        <GuideTarget id="wallet"><View style={styles.walletSection}>
           <WalletBar wallet={save.wallet} />
-        </View>
+        </View></GuideTarget>
+
+        {page === 'home' ? <View style={styles.quickRow}>
+          <GuideTarget id="customise" style={styles.flex}><Button label="Customise player" variant="secondary"
+            onPress={() => navigation.navigate('PlayerCosmetics')} /></GuideTarget>
+          <GuideTarget id="training" style={styles.flex}><Button label="Training" variant="secondary"
+            onPress={() => { guideAction('open-player-training'); navigation.navigate('Training'); }} /></GuideTarget>
+        </View> : null}
 
         <View style={styles.pageContent}>{renderPageContent()}</View>
       </Screen>
       <AchievementToast achievement={currentToast} onDismiss={onDismissToast} />
-      <ModeGuideModal
-        visible={showCareerGuide}
-        modeLabel="Player Career"
-        steps={PLAYER_GUIDE_STEPS}
-        onComplete={() => dismissTip('career_hub_guide')}
-      />
       <RewardModal data={rewardModal} onClose={() => setRewardModal(null)} />
       <NewspaperModal
         story={selectedNewspaper}
@@ -2288,6 +2243,20 @@ export function CareerHubScreen({ navigation }: ScreenProps<'CareerHub'>) {
           dismissStarterPack();
           setShowStarterPack(false);
         }}
+      />
+      <HubEngagementPrompts
+        eligible={
+          ratingHubReady &&
+          page === 'home' &&
+          !showCareerGuide &&
+          !showStarterPack &&
+          !rewardModal &&
+          !selectedNewspaper &&
+          !pendingPressId &&
+          offers.length === 0 &&
+          domesticClubOffers.length === 0 &&
+          pendingAchievementIds.length === 0
+        }
       />
     </>
   );
@@ -2498,6 +2467,11 @@ const makeStyles = (colors: ThemeColors) =>
       top: 0,
     },
     mastheadIdentity: { flex: 1, minWidth: 0 },
+    mastheadProfileHint: {
+      color: colors.accentLight,
+      fontSize: fontSize.xs,
+      marginTop: spacing.xs,
+    },
     mastheadName: {
       color: colors.text,
       fontFamily: fonts.display,
@@ -3233,6 +3207,8 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: spacing.xl,
       marginBottom: spacing.sm,
     },
+    progressLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    progressLink: { flexGrow: 1, flexBasis: 140 },
     sectionTitleRow: {
       minHeight: 44,
       flexDirection: 'row',

@@ -4,6 +4,7 @@ import { BattingStyle, BowlingStyle, Player, Role } from '../domain/types';
 import { computeOverall } from '../engine/rating';
 import { chance, makeRng, pick, randInt, Rng } from '../engine/rng';
 import { clamp } from '../utils/math';
+import type { AvatarSex } from '../avatar';
 
 const PACE_STYLES: BowlingStyle[] = ['PACE', 'MEDIUM', 'LEFT_ARM_PACE'];
 const SPIN_STYLES: BowlingStyle[] = ['OFF_SPIN', 'LEG_SPIN', 'LEFT_ARM_SPIN'];
@@ -13,6 +14,7 @@ function jitter(center: number, spread: number, rng: Rng): number {
 }
 
 export interface GenPlayerOptions {
+  sex?: AvatarSex;
   id: string;
   nationality: string;
   role: Role;
@@ -24,7 +26,7 @@ export interface GenPlayerOptions {
 
 export function generatePlayer(opts: GenPlayerOptions): Player {
   const { id, nationality, role, quality, rng } = opts;
-  const pool = namePoolFor(nationality);
+  const pool = namePoolFor(nationality, opts.sex);
   const name = `${pick(pool.first, rng)} ${pick(pool.last, rng)}`;
   const age = opts.age ?? randInt(19, 34, rng);
 
@@ -98,6 +100,7 @@ export function generatePlayer(opts: GenPlayerOptions): Player {
     id,
     name,
     nationality,
+    sex: opts.sex ?? 'male',
     age,
     role,
     battingStyle,
@@ -131,6 +134,7 @@ const XI_TEMPLATE: Role[] = [
 ];
 
 export function generateSquad(params: {
+  sex?: AvatarSex;
   nationality: string;
   quality: number;
   idPrefix: string;
@@ -138,7 +142,7 @@ export function generateSquad(params: {
 }): Player[] {
   const { nationality, quality, idPrefix, rng } = params;
   return XI_TEMPLATE.map((role, i) =>
-    generatePlayer({ id: `${idPrefix}-p${i + 1}`, nationality, role, quality, rng }),
+    generatePlayer({ id: `${idPrefix}-p${i + 1}`, nationality, role, quality, rng, sex: params.sex }),
   );
 }
 
@@ -158,6 +162,7 @@ const MANAGER_ROSTER_TEMPLATE: Role[] = [
 export const MANAGER_ROSTER_SIZE = MANAGER_ROSTER_TEMPLATE.length;
 
 export function generateRoster(params: {
+  sex?: AvatarSex;
   nationality: string;
   quality: number;
   idPrefix: string;
@@ -165,12 +170,13 @@ export function generateRoster(params: {
 }): Player[] {
   const { nationality, quality, idPrefix, rng } = params;
   return ROSTER_TEMPLATE.map((role, i) =>
-    generatePlayer({ id: `${idPrefix}-p${i + 1}`, nationality, role, quality, rng }),
+    generatePlayer({ id: `${idPrefix}-p${i + 1}`, nationality, role, quality, rng, sex: params.sex }),
   );
 }
 
 /** A 22-player manager squad built for the three-format workload. */
 export function generateManagerRoster(params: {
+  sex?: AvatarSex;
   nationality: string;
   quality: number;
   idPrefix: string;
@@ -180,6 +186,7 @@ export function generateManagerRoster(params: {
   return MANAGER_ROSTER_TEMPLATE.map((role, i) => {
     const player = generatePlayer({
       id: `${idPrefix}-p${i + 1}`,
+      sex: params.sex,
       nationality,
       role,
       quality,
@@ -192,6 +199,7 @@ export function generateManagerRoster(params: {
 
 /** A young prospect: low-to-mid current ability but a high hidden ceiling. */
 export function generateYouth(params: {
+  sex?: AvatarSex;
   id: string;
   nationality: string;
   role: Role;
@@ -205,7 +213,7 @@ export function generateYouth(params: {
 
 /** A pool of unattached players for the transfer market. */
 const FA_ROLES: Role[] = ['BATTER', 'BOWLER', 'ALLROUNDER', 'WK_BATTER'];
-export function generateFreeAgents(seed: number, count = 24): Player[] {
+export function generateFreeAgents(seed: number, count = 24, sex: AvatarSex = 'male'): Player[] {
   const rng = makeRng(seed);
   const nats = COUNTRIES.map((c) => c.id);
   const out: Player[] = [];
@@ -213,7 +221,7 @@ export function generateFreeAgents(seed: number, count = 24): Player[] {
     const nationality = nats[Math.floor(rng() * nats.length)];
     const role = FA_ROLES[Math.floor(rng() * FA_ROLES.length)];
     const quality = 48 + Math.floor(rng() * 30);
-    out.push(generatePlayer({ id: `fa-${i + 1}`, nationality, role, quality, rng }));
+    out.push(generatePlayer({ id: `fa-${i + 1}`, nationality, role, quality, rng, sex }));
   }
   return out;
 }

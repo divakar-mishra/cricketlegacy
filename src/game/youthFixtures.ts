@@ -18,6 +18,7 @@ import { getCountry } from '../data/countries';
 import { autoXI } from './squad';
 import { isU19WorldCupFixture, u19WorldCupControlledTeamId } from './u19WorldCup';
 import { isPlayerFranchiseFixture } from './playerAffiliations';
+import { playerWorldSex } from './playerIdentity';
 
 export const YOUTH_COMP_SCHOOL = 'youth-u14' as const;
 export const YOUTH_COMP_U19 = 'youth-u19' as const;
@@ -103,6 +104,7 @@ export function detachCareerPlayerFromSenior(save: SaveGame): void {
   const replacement =
     save.players[replacementId] ??
     generatePlayer({
+      sex: playerWorldSex(save),
       id: replacementId,
       nationality: team.country,
       role: user.role,
@@ -134,7 +136,7 @@ export function ensureCareerPathTeam(save: SaveGame, level: 'SCHOOL' | 'U19'): s
     const nationality = user.nationality;
     const quality = youthOpponentQuality(level);
     const rng = makeRng(hashSeed(`${save.id}:${id}:squad`));
-    const squad = generateSquad({ nationality, quality, idPrefix: id, rng });
+    const squad = generateSquad({ nationality, quality, idPrefix: id, rng, sex: playerWorldSex(save) });
     for (const player of squad) {
       player.age = level === 'SCHOOL' ? 16 + Math.floor(rng() * 13) : 16 + Math.floor(rng() * 4);
       save.players[player.id] = player;
@@ -327,7 +329,7 @@ export function ensureYouthTeams(save: SaveGame, level: 'SCHOOL' | 'U19'): strin
     }
 
     const rng = makeRng(hashSeed(`youth:${teamId}:${nationality}`));
-    const squad = generateSquad({ nationality, quality, idPrefix: teamId, rng });
+    const squad = generateSquad({ nationality, quality, idPrefix: teamId, rng, sex: playerWorldSex(save) });
     const playerIds: string[] = [];
     for (const p of squad) {
       save.players[p.id] = p;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import type { Entitlements } from '../domain/types';
 import { areAdsRemoved } from '../game/economy';
 import { useTheme } from '../theme';
@@ -16,8 +17,17 @@ type Props = {
  */
 export function BannerAdSlot({ entitlements }: Props) {
   const { colors } = useTheme();
+  const focused = useIsFocused();
+  const [appState, setAppState] = useState(AppState.currentState);
   const [ready, setReady] = useState(ads.isAdsReady());
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', setAppState);
+    // Reconcile a transition between initial render and subscribing.
+    setAppState(AppState.currentState);
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     const update = () => setReady(ads.isAdsReady());
@@ -26,7 +36,10 @@ export function BannerAdSlot({ entitlements }: Props) {
     return unsubscribe;
   }, []);
 
-  if (!ready || failed || areAdsRemoved(entitlements)) return null;
+  // Native-stack routes can stay mounted underneath another screen. Unmount
+  // their native ad/WebView, and backgrounded ads, instead of just hiding it.
+  // This reduces unnecessary WebView work; it cannot fix Chromium/OS Binder bugs.
+  if (!focused || appState !== 'active' || !ready || failed || areAdsRemoved(entitlements)) return null;
   const unitId = ads.getBannerAdUnitId();
   if (!unitId) return null;
 

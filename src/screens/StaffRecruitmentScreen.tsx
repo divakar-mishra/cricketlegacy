@@ -61,7 +61,7 @@ export function StaffRecruitmentScreen({ navigation }: ScreenProps<'StaffRecruit
   };
 
   return (
-    <Screen scroll gradient={gradients.pitch}>
+    <Screen scroll careerNavigation gradient={gradients.pitch}>
       <ScreenHeader
         title="Staff Recruitment"
         subtitle={team.name}

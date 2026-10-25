@@ -1,0 +1,21 @@
+{
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "music": "media/music.wav",
+  "icon": "media/app-icon.png",
+  "titleFont": "fonts/Sora_800ExtraBold.ttf",
+  "bodyFont": "fonts/Inter_500Medium.ttf",
+  "clips": [
+    { "kind": "video", "source": "media/player-live-current.mp4", "seconds": 9, "sourceStart": 0, "crop": [86,165,548,900], "eyebrow": "Live cricket", "line1": "Every ball.", "line2": "A new story." },
+    { "kind": "still", "source": "media/player-home.png", "seconds": 5, "crop": [24,165,1296,1740], "eyebrow": "Player Career", "line1": "Start small.", "line2": "Aim higher." },
+    { "kind": "still", "source": "media/manager-xi.png", "seconds": 4, "crop": [50,265,980,1480], "eyebrow": "Manager Career", "line1": "Your club.", "line2": "Your call." },
+    { "kind": "still", "source": "media/manager-tactics.png", "seconds": 4, "crop": [0,95,1080,1710], "eyebrow": "Matchday decisions", "line1": "Set the plan.", "line2": "Shape the match." },
+    { "kind": "still", "source": "media/manager-training.png", "seconds": 4, "crop": [50,313,980,1290], "eyebrow": "Squad training", "line1": "Train for", "line2": "the next chance." },
+    { "kind": "still", "source": "media/scout-report.png", "seconds": 3, "crop": [0,95,1080,1710], "eyebrow": "Scouting", "line1": "Scout your", "line2": "next signing." },
+    { "kind": "still", "source": "media/ground.png", "seconds": 4, "crop": [0,95,1080,1710], "eyebrow": "Club development", "line1": "Grow your", "line2": "home ground." },
+    { "kind": "still", "source": "media/player-life.png", "seconds": 5, "crop": [0,155,1344,2720], "eyebrow": "Player Life", "line1": "Build beyond", "line2": "the boundary." },
+    { "kind": "still", "source": "media/player-records.png", "seconds": 4, "crop": [40,185,1260,2190], "eyebrow": "Career records", "line1": "Every season", "line2": "leaves a record." },
+    { "kind": "end", "source": "", "seconds": 3, "eyebrow": "", "line1": "Cricket:", "line2": "Player and Manager" }
+  ]
+}

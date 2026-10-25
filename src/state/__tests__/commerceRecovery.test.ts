@@ -635,6 +635,88 @@ describe('durable commerce recovery', () => {
   });
 });
 
+describe('all fourteen launch IAP benefit contracts', () => {
+  const contracts = [
+    { id: 'starter_pack', mode: 'career', coins: 3000, gems: 50 },
+    { id: 'coins_medium', mode: 'career', coins: 10000, gems: 0 },
+    { id: 'coins_large', mode: 'career', coins: 20000, gems: 0 },
+    { id: 'gems_medium', mode: 'career', coins: 0, gems: 600 },
+    { id: 'gems_large', mode: 'career', coins: 0, gems: 2400 },
+    { id: 'player_vip', mode: 'career', coins: 0, gems: 0 },
+    { id: 'manager_vip', mode: 'manager', coins: 0, gems: 0 },
+    { id: 'bundle_legend', mode: 'career', coins: 40000, gems: 1200 },
+    { id: 'manager_legend_pack', mode: 'manager', coins: 0, gems: 0 },
+    { id: 'form_recovery', mode: 'career', coins: 0, gems: 0 },
+    { id: 'transfer_budget_sm', mode: 'manager', coins: 0, gems: 0 },
+    { id: 'scout_full_reveal', mode: 'manager', coins: 0, gems: 0 },
+    { id: 'facility_upgrade_token', mode: 'manager', coins: 0, gems: 0 },
+    { id: 'recovery_pack', mode: 'manager', coins: 0, gems: 0 },
+  ] as const;
+
+  it('has a fulfilment contract for every launch SKU, not just a catalogue assertion', async () => {
+    expect((await purchases.getProducts()).map(p => p.id).sort()).toEqual(contracts.map(c => c.id).sort());
+  });
+
+  it.each(contracts)('$id delivers advertised benefits durably and never replays a receipt', async ({ id, mode, coins, gems }) => {
+    const save = mode === 'career' ? makeCareerSave() : makeManagerSave();
+    save.wallet.energy = 0;
+    save.wallet.energyUpdatedAt = Date.now();
+    activate(save);
+    await flush();
+    if (id === 'starter_pack') {
+      active().experience ??= {};
+      active().experience!.starterPackUnlockedAt = Date.now() - 1000;
+      jest.spyOn(accountPurchases, 'hasStarterPackPurchase').mockResolvedValue(false);
+    }
+    const before = { ...active().wallet };
+    const team = active().userTeamId ? active().teams[active().userTeamId!] : undefined;
+    const budget = team?.budget ?? 0;
+    const reputation = team?.reputation ?? 0;
+    jest.spyOn(purchases, 'purchase').mockResolvedValue(successfulReceipt(id, `contract-${id}`));
+    expect(await useCareer.getState().purchaseProduct(id)).toEqual({ ok: true });
+    expect(active().wallet.coins).toBe(before.coins + coins);
+    expect(active().wallet.gems).toBe(before.gems + gems);
+    if (['player_vip', 'manager_vip', 'bundle_legend', 'manager_legend_pack'].includes(id)) {
+      expect(active().entitlements.modeVip).toMatchObject({ mode, owned: true });
+      expect(active().entitlements.removeAds).toBe(true);
+    }
+    if (id === 'starter_pack') {
+      expect(active().entitlements.removeAds).toBe(false);
+      expect(active().entitlements.removeAdsUntil).toBeGreaterThanOrEqual(Date.now() + 7 * 86400_000 - 1000);
+      expect(mockRows.get('account:purchases:v1')).toContain('contract-starter_pack');
+    }
+    if (id === 'bundle_legend') expect(active().inventory).toMatchObject({ kit_all_colors: 1, avatar_legend_frame: 1, player_legend_bundle_owned: 1 });
+    if (id === 'manager_legend_pack') {
+      expect(active().teams[active().userTeamId!].budget).toBe(budget + 1000_000);
+      expect(active().finances?.transferBudget).toBe(budget + 1000_000);
+      expect(active().boardConfidence).toBeGreaterThanOrEqual(82);
+      expect(active().teams[active().userTeamId!].reputation).toBe(Math.min(95, reputation + 3));
+      expect(active().inventory).toMatchObject({ manager_legend_office_theme: 1, scout_full_reveal_token: 2, facility_upgrade_token: 1, squad_recovery_token: 1 });
+    }
+    if (id === 'transfer_budget_sm') {
+      expect(active().teams[active().userTeamId!].budget).toBe(budget + 1000_000);
+      expect(active().finances?.transferBudget).toBe(budget + 1000_000);
+    }
+    const token = { scout_full_reveal: 'scout_full_reveal_token', facility_upgrade_token: 'facility_upgrade_token', recovery_pack: 'squad_recovery_token' }[id as string];
+    if (token) expect(active().inventory?.[token]).toBe(1);
+    if (id === 'form_recovery') {
+      expect(active().wallet.energy).toBe(36);
+      expect(active().players[active().userPlayerId!].meta).toMatchObject({ form: 99, confidence: 99 });
+    }
+    const granted = { coins: active().wallet.coins, gems: active().wallet.gems, inventory: { ...active().inventory }, budget: active().teams[active().userTeamId!]?.budget };
+    await restartFromDisk(mode);
+    expect(active().wallet.coins).toBe(granted.coins);
+    expect(active().wallet.gems).toBe(granted.gems);
+    expect(active().inventory ?? {}).toEqual(granted.inventory);
+    // Same receipt must be inert even if the consumable could otherwise be bought again.
+    await useCareer.getState().purchaseProduct(id);
+    expect(active().wallet.coins).toBe(granted.coins);
+    expect(active().wallet.gems).toBe(granted.gems);
+    expect(active().inventory ?? {}).toEqual(granted.inventory);
+    expect(active().teams[active().userTeamId!]?.budget).toBe(granted.budget);
+  });
+});
+
 describe('gem exchange atomicity', () => {
   it('a committed exchange survives a failed wallet write and restart without duplication', async () => {
     activate(makeCareerSave(90301)); active().wallet.gems = 100;

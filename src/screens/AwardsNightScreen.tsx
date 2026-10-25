@@ -105,7 +105,7 @@ function AwardReveal({ award, index, save }: { award: Award; index: number; save
           style={styles.awardArtworkRow}
         >
           <AwardArtwork kind={award.artwork} />
-          {player ? <PlayerAvatar name={player.name} role={player.role} size="md"
+          {player ? <PlayerAvatar name={player.name} sex={player.sex} role={player.role} size="md"
             config={ownPlayer ? save.cosmetics?.avatarConfig : undefined}
             kitId={ownPlayer ? save.cosmetics?.kit : undefined}
             profileFrame={ownPlayer ? save.cosmetics?.profileFrame : undefined}

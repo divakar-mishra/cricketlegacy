@@ -1,0 +1,182 @@
+ANDROID STABILITY: DIAGNOSIS, FIXES AND REGRESSION COVERAGE
+19 October 2026
+
+RELEASE BOUNDARY
+The owner has explicitly forbidden a new production AAB until further approval.
+Only an internal, debug-signed, standalone QA APK was built and updated in place
+on the approved muted Pixel 10 Pro XL emulator. No purchase, refund, production
+release or Git push is authorized by this investigation. Pixel 8 is untouched.
+
+Do not submit the existing 1.0.12/code19 production AAB as an ANR-fixed build.
+Its compiled NativeProxy was inspected and does not contain this backport.
+Existing AAB SHA-256:
+f4a728d0f066064c169f446cc25c825f0bfdbf8c07725eb6dba174b887697f6f
+
+CUSTOMER REPORTS AND WHAT IS ACTUALLY KNOWN
+
+1. Reanimated: confirmed native defect and matching customer stack.
+   Customer: Vivo vivo1904, Android 11/API30, release 16/1.0.11, foreground.
+   The main thread prints full exceptions from synchronous prop updates during
+   SVG drawing. RN 0.86's reflected update path in Reanimated 4.5.1 lacks a
+   mounted-view check. Removed view tags throw repeatedly and log full stacks
+   on the UI thread. Retained local logs independently show the same defect.
+
+   Applied a targeted backport of upstream PR10435, without a dependency/SDK
+   upgrade: skip removed tags, continue later buffered tags, retain normal live
+   updates and older-RN compatibility, and keep unexpected errors observable
+   without a full throwable stack on every failed update. A version-pinned,
+   idempotent postinstall patch makes the change survive a clean dependency
+   installation. Changed/partially patched sources fail closed for review.
+
+2. WebView: reduced background exposure; platform ANR not certified resolved.
+   Customer: Oppo A79 5G, Android 14/API34, release 16, background.
+   Main thread is blocked in IWindowManager.getWindowInsets from Chromium's
+   display-change listener. The app does not create its own WebView. Ads/UMP
+   are possible consumers, not proven owners of this precise blocked call.
+   Existing ad-loading/initialization optimization flags were already enabled.
+
+   BannerAdSlot now destroys its native banner when the route is unfocused or
+   the app is inactive/backgrounded. Eligible foreground banners return when
+   active. Consent/readiness, removed-ads ownership, request options and failed
+   ad-load handling are preserved. This is a lifecycle mitigation, not a fix
+   to Android's Binder service or Chromium itself.
+
+3. GPU/libhwui: unresolved, no speculative graphics rewrite.
+   Customer: Oppo A18, Android 13/API33, release 16, foreground.
+   Main thread waits in DrawFrameTask.drawFrame/HardwareRenderer. Play reports
+   unresponsive GPU/native lock contention; other renderer stacks are collapsed.
+   Need affected-device reproduction/system trace or complete renderer stacks
+   to identify a lock owner/GPU stall. An idle rendering frame alone is not a
+   root cause. No hardware-acceleration disable, blanket blur removal or memory
+   threshold was invented. One supplied attachment duplicated this report.
+
+4. SurfaceControl: identified as platform splash handoff, still unverified.
+   The supplied NPE dereferences a null SurfaceControl in
+   ActivityThread.syncTransferSplashscreenViewTransaction -> Transaction.hide.
+   This is distinct from RN's SurfaceMountingManager stale-view defect.
+   Device/OS details for this crash were not supplied.
+
+   Installed Expo splash 57.0.5 already clears the platform exit listener on
+   activity stop for API31-33 and the owning activity. Existing registration
+   occurs before super.onCreate. JS hide only changes the keep-splash boolean;
+   repeated JS hide is not direct SurfaceControl transaction ownership.
+   Added source-contract coverage of existing safeguards; did not pretend a
+   source check reproduces or fixes the OEM/platform crash. No exception
+   swallowing, splash removal rewrite or unrelated App.tsx change was made.
+
+AUTOMATED REGRESSION AND NEGATIVE CASES
+
+A. src/services/__tests__/reanimatedAndroidPatch.test.ts
+   - Only intended native sections change; unchanged code round-trips.
+   - Mounted-view check occurs before the reflected update.
+   - Skip one stale tag without returning from the whole buffer.
+   - Logging retains the concise failure but not full Throwable logging.
+   - Applying twice is idempotent; CRLF files remain CRLF.
+   - Unknown versions, altered/duplicated markers and partial patches fail.
+   - Installed dependency is patched and postinstall retains the patch hook.
+
+B. scripts/testReanimatedAndroidPatch.cjs and its Kotlin fixture
+   Executes the actual installed NativeProxy method on a host JVM with API
+   doubles. This is NOT Android/JNI, native buffer-decoder or GPU coverage.
+   - Mounted views receive unchanged props.
+   - Removed views skip updates without throwable warning spam.
+   - Stale then live tags in one batch still update the live tag.
+   - 10,000 stale updates do not produce full exception-stack floods.
+   - Unexpected update and lookup failures stay observable; later tags work.
+   - Missing optional lookup API preserves the compatibility fallback.
+   - Pre-RN0.86 public API branch is preserved.
+   - Empty buffer performs no unnecessary reflection.
+   - A newly remounted tag receives later updates.
+   - A live tag removed between batches is skipped afterward.
+   - 1,000 valid updates are not dropped/deduplicated.
+   Vulnerable control: 5 pass, 7 fail (expected negative control).
+   Patched method: 12 pass, 0 fail.
+
+C. src/components/__tests__/bannerAdLifecycle.test.ts
+   - Foreground, focused eligible banner and request options preserved.
+   - Initial inactive/background/unknown/null state mounts no banner.
+   - Inactive/background destroys; returning active recreates once.
+   - Underlying unfocused route never creates/recreates an ad.
+   - 50 repeated active events do not duplicate a native banner.
+   - 25 focus/background cycles leave no subscription/native-instance leak.
+   - Removed-ads ownership remains respected after resume.
+   - Readiness revocation while hidden blocks recreation until eligible.
+   - Missing unit ID and failed-load state cannot be bypassed by resume.
+
+D. src/services/__tests__/androidStabilityGate.test.ts
+   - Repeated stale-view warnings fail QA even without a fatal crash.
+   - RetryableMountingLayerException and explicit app ANRs fail QA.
+   - JS/native fatal errors, OOM and splash handoff NPE fail QA.
+   - Benign Crashlytics setting names and idle Binder/renderer frames do not
+     falsely become ANRs. Logs must be app-process scoped, not device-wide.
+   - Usage errors/unreadable inputs fail rather than silently passing.
+
+E. src/services/__tests__/androidSplashLifecycle.test.ts
+   Source-contract checks only: registration order, API31-33 stop mitigation
+   and owning-activity cleanup, JS hide semantics, both removal paths.
+
+EXECUTED GATES
+Focused suites: 55 tests pass (44 added stability cases + 11 existing ads cases).
+Full Jest: 272 suites, 1,928 tests and two snapshots pass.
+Typecheck and quiet lint pass. git diff --check passes.
+Native Reanimated release Kotlin compilation passes.
+Standalone minified QA APK assembles successfully using existing JDK17.
+Its bundled JavaScript and compiled NativeProxy were inspected: existence
+guard present, full Throwable warning absent, concise warning preserved.
+R8 retains MountingManager.getViewExists with its reflective name.
+
+Commands:
+  npm run test:android-native-guard
+  npm test -- --runInBand
+  npm run typecheck
+  npm run lint -- --quiet
+  git diff --check
+  npm run check:android-stability -- --app-process <app-process-log>
+
+DEVICE REGRESSION PROTOCOL (DO NOT CONFUSE WITH COMPLETED RESULTS)
+Use approved QA saves and update with adb install -r; do not clear data.
+Record artifact hash, OS/device, account state, save count and test start time.
+Never click advertisements or confirm a chargeable purchase in this test.
+
+1. Rapid SVG/native screen push/pop, route swaps and modal entry/dismissal.
+   Verify live UI/selected tab after each paced transition; separately record
+   rapid input bursts as input attempts, not confirmed screen visits.
+2. On each eligible banner screen, open a detail screen and return. Verify
+   hidden banner destruction, one foreground recreation and no ownership or
+   consent bypass. Repeat background/resume while changing routes.
+3. Cold start, background during splash, return during splash and rapid relaunch
+   on affected API31-33/OEM builds. Retain full crash/ANR traces if observed.
+4. On affected Oppo graphics hardware, repeat match/watch, scrolling SVG/blur,
+   keyboard/dialog, screen-off/resume and ad-overlay transitions. Capture a
+   system trace around a stall; emulator success does not replace this step.
+5. Compare warmed-up equivalent-screen memory/frame samples across cycles.
+   A single PSS or jank sample is not proof of a leak or of its absence.
+6. Capture own-process logs plus system-side app-specific ANR/exit evidence.
+   Do not ignore nonfatal stale-tag floods, count other apps' crashes, or claim
+   every live production issue is resolved because a test process survived.
+
+Local trace/artifact/test outputs are retained under:
+  output/anr-investigation-2026-10-19/
+Fresh device results are recorded in ANR_INVESTIGATION.txt there:
+- In-place update retained five Player and four Manager saves and the original
+  Resume career; Pixel 8 untouched, no purchase/progression/deletion action.
+- 60 individually verified Manager navigation transitions, five verified
+  background/resume cycles and three cold starts passed on the muted Pixel
+  10 Pro XL (API37.2). Latest continuous process capture has 1,432 lines and
+  zero native/JS fatal errors, stale-view warnings or explicit ANRs. System
+  app-specific event/exit evidence shows no new crash/ANR in this test window.
+- Rapid-burst input is recorded separately: its endpoint assertion failed,
+  normal navigation recovered immediately, and paced full reruns passed.
+- Equivalent-screen warmed PSS moved from 468,334KB to 472,264KB after another
+  30 verified transitions, but WebView/view counts increased. Without retaining
+  paths this proves neither a permanent leak nor leak-free behavior. Memory
+  retention remains open; do not hide it behind the passing crash-log gate.
+- Affected Oppo GPU/splash/Binder behavior was not reproduced on this Pixel
+  emulator; those platform-specific production issues remain unverified.
+
+PRIMARY REFERENCES
+https://github.com/software-mansion/react-native-reanimated/pull/10435
+https://github.com/software-mansion/react-native-reanimated/issues/10280
+https://developer.android.com/topic/performance/anrs/diagnose-and-fix-anrs
+https://developers.google.com/admob/android/optimize-initialization
+https://docs.expo.dev/versions/v57.0.0/sdk/splash-screen/

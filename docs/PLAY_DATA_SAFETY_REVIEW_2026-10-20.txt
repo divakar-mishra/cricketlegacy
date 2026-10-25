@@ -1,0 +1,202 @@
+CRICKET: PLAYER & MANAGER - PLAY DATA SAFETY REVIEW
+Date: 20 October 2026
+Package: com.coverdrive.cricket
+STATUS: REVIEW DRAFT ONLY. DO NOT IMPORT OR SUBMIT YET.
+
+FILES AND SCOPE
+
+Original owner export, read only:
+  /Users/divakarmishra/Downloads/data_safety_export (2).csv
+Original SHA-256:
+  edc162ea9405c9001fb1a2265c786f3295352d44c286c341b48569905fbe4c92
+
+New draft:
+  docs/data-safety-REVIEW-DRAFT-DO-NOT-IMPORT-2026-10-20.csv
+Machine-readable change list and review warnings:
+  docs/data-safety-review-validation-2026-10-20.json
+
+This pass creates local review artifacts only. It does not change the app,
+backend, website, devices, ad filters, Unity terms/settings or Play Console.
+It does not build an AAB or certify release readiness. The September 13 CSV
+remains historical; neither it nor this incomplete draft is today's approved
+submission. The project skill's current-source-first rule was used to avoid
+copying outdated Firebase/cloud assumptions into this review.
+
+WHAT CHANGED: 15 RESPONSE VALUES
+
+1. Other actions: five changes.
+   Selected the type; marked Collected and non-ephemeral; added collection
+   purposes App functionality and Analytics. Account cloud backups contain
+   gameplay state, and optional gameplay telemetry is another collection path.
+   IMPORTANT: Required/Optional is deliberately unanswered. Shared and its
+   purposes remain unchecked, but that is NOT evidence that sharing is absent.
+
+2. User IDs: four changes.
+   Added Shared, replaced Optional with Required, and added App functionality
+   as a sharing purpose. Other existing purposes were preserved. Unity's
+   personal-identifiers category maps to Play's User IDs. RevenueCat also
+   initializes an anonymous customer ID without requiring Google sign-in.
+   This does not mean that names/emails are sent to Unity.
+
+3. Approximate location: four changes.
+   Added App functionality and Fraud prevention/security/compliance to both
+   collection and sharing purposes, reflecting Unity's published disclosure.
+
+4. Diagnostics: two changes.
+   Added App functionality to both collection and sharing purposes, reflecting
+   Unity's published disclosure. Existing purposes remain for whole-app review.
+
+WHAT WAS NOT SILENTLY CHANGED
+
+Name, email, purchase history, crash logs, app interactions, device identifiers,
+existing purposes outside the above additions, OAuth, encryption answers,
+deletion URL and optional badges remain as exported. Preserved does not mean
+independently re-certified. No card/bank, precise location, contacts, installed
+apps, payment credentials or real-health categories were added.
+
+The optional partial-data-deletion answer remains unanswered. No automatic
+90-day deletion or independent security/Families/UPI badge is claimed.
+
+FINALIZATION ITEMS - DO NOT SKIP
+
+A0. Correction after inspecting the Developer Data collection/access panels.
+
+   Owner supplied the expanded panel text. It describes Unity-engine diagnostics
+   and optionally connected sources such as Google Analytics. Our app uses
+   Expo/React Native with the native Unity Ads SDK, not the Unity engine; the
+   supplied project screen also shows no Google Analytics link. Developer Data
+   "Essential Data: Always enabled" therefore does not establish an additional
+   data stream in this app. The optional Unity Ads access description likewise
+   is not evidence that access was granted or that Ads Acquire Optimization is
+   enabled/disabled. Do not accept a DPA, grant access or enable collection to
+   complete this CSV. The earlier suggestion that this panel would establish
+   the Ads SDK setting is withdrawn; do not repeat that navigation as proof.
+
+   Read-only inspection of the QA app's cached Ads configuration was attempted,
+   but run-as reported the currently installed package is not debuggable. No
+   root, reinstall, ad launch, app update or save operation was attempted. Local
+   inspection of SDK 4.16.6 bytecode demonstrates SDK capabilities, not this
+   account's active server configuration, and does not remove the uncertainty.
+
+A. Unity app-usage collection / Acquire Optimization is unresolved.
+
+   Supplied screenshots show Developer Data "Configuration Required", no
+   Firebase link, no purchase/license key, no attribution provider, general-
+   audience designation and Designed for Families disabled. They do not prove
+   Acquire Optimization or app-usage collection is off. No terms were accepted
+   and no configuration was changed to investigate.
+
+   Unity documents conditional app-usage collection under Other actions:
+   - If that collection is verified OFF: the reviewed cloud/optional-telemetry
+     baseline supports Collected, non-ephemeral, Optional, with App functionality
+     and Analytics collection purposes, provided all users retain that choice
+     and service-provider-only processing is confirmed.
+   - If verified ON without an app-level opt-out: Other actions becomes
+     Collected + Shared, non-ephemeral, Required. Add Advertising/marketing and
+     Fraud/security collection purposes alongside the baseline. Sharing purposes
+     are Advertising/marketing, Analytics and Fraud/security for Unity's use.
+
+   Do not treat CSV blanks as an "unknown" option: a blank checkbox is unchecked.
+   Both Required/Optional responses for Other actions were intentionally left
+   blank so this file cannot be mistaken for a completed declaration. Resolve
+   its sharing answers as well before producing a final import copy.
+
+   Read-only question to send Unity support if the current UI lacks the toggle:
+   "For Android Game ID 800404108, app Cricket: Player & Manager, project
+   91b6305d-eb92-4481-a41e-12b20c71ea33, using Unity Ads SDK 4.16.6 through
+   AdMob bidding: is app-usage/retention collection described as Acquire
+   Optimization in your Google Play Data safety guide currently enabled?
+   Where can I inspect its current state without enabling Developer Data,
+   accepting new terms, or changing collection? Please confirm whether the
+   new Developer Data configuration changes that disclosure."
+
+B. Two inherited answers need evidence, not automatic approval.
+
+   Approximate location still has Personalization selected for collection and
+   sharing because the original had it. No location-based game-content feature
+   was established in this review. Ad targeting alone is not evidence for this
+   separate purpose. Verify a real provider/app use or remove those two answers
+   in the final copy; do not assume retaining them is correct.
+
+   Other app performance data remains selected from the earlier declaration.
+   Latest Google Mobile Ads guidance covers a newer SDK, not this build's
+   pinned 24.9.0. Confirm the applicable provider behavior/version before using
+   that page as exact-version proof. There is no Firebase Performance package;
+   that alone does not exclude data from another SDK.
+
+C. No unrelated ad-policy clearance was inferred.
+
+   Owner supplied the correct app's published US privacy-message row. This is
+   console-publication evidence, not a US-region on-device consent test.
+   Show all ads and AdMob Unity Blocking Controls Off remain the owner's choice;
+   secure signal sharing and publisher first-party IDs are unchanged. Teen
+   creative filtering and per-user age treatment are not certified by those
+   screenshots. Do not change child-directed/Families designations to guess a
+   resolution. Unity Rewarded test serving passed in the earlier QA pass;
+   Unity banner/interstitial groups remain paused and untested.
+
+SOURCE EVIDENCE USED
+
+Current repository:
+- App.tsx: eligible startup configures RevenueCat before optional Google login.
+- src/services/purchases.ts: RC.configure, anonymous ID and account identity sync.
+- src/services/accountCareerCloud.ts: JSON.stringify(save), recoverable-owner
+  validation and write_account_career_backup upload.
+- src/services/supabaseClient.ts: recoverable versus anonymous identity gating.
+- src/services/telemetry.ts: independent analytics/crash opt-ins; ad consent off.
+- docs/PLAY_DATA_SAFETY_FIREBASE_REVIEW_2026-09-13.md: historical Firebase review,
+  used with current code, not as current whole-app certification.
+
+Provider/policy guidance rechecked 20 October 2026:
+Google Play definitions, CSV behavior and provider responsibilities:
+https://support.google.com/googleplay/android-developer/answer/10787469?hl=en
+Unity SDK data-type/purpose table and conditional app-usage collection:
+https://docs.unity.com/en-us/grow/ads/privacy/google-data-safety
+RevenueCat purchase processing:
+https://www.revenuecat.com/docs/platform-resources/google-platform-resources/google-plays-data-safety
+Google Mobile Ads disclosure (version limitation noted above):
+https://developers.google.com/admob/android/privacy/play-data-disclosure
+Firebase SDK disclosures:
+https://firebase.google.com/docs/android/play-data-disclosure
+
+Google defines Other actions to include gameplay. Collection remains collection
+when a service provider receives it; a sharing exception depends on actual
+provider terms/instructions. Optional must reflect a choice available to all
+users, not just one region. These are engineering mappings, not legal approval.
+
+HOW TO REUSE THIS PROCESS FOR OTHER APPS
+
+1. Export that app's CURRENT Play declaration first. Keep an untouched copy.
+   Confirm package/app identity; never copy another game's IDs or consent row.
+2. Inventory the actual release SDK versions and every off-device path:
+   account/guest auth, cloud gameplay, purchases, ads, analytics and crashes.
+   Local-only game stats do not automatically belong in a data declaration.
+3. Compare current code and provider disclosures. Combine all applicable paths
+   for each type; do not use one optional SDK to cancel a required path elsewhere.
+   Check dashboard integrations and opt-ins without enabling new processing.
+4. Record each changed response with its evidence. Separate known corrections
+   from uncertain provider behavior. Do not claim a feature is disabled merely
+   because its setup banner, purchase key or analytics link is absent.
+5. Validate CSV row identities, five columns, booleans, exclusivity and required
+   follow-ups. Review the actual CSV values, not only the Console summary count.
+6. Resolve A/B above for THIS app and create a separately named final copy.
+   Importing overwrites existing Console answers: take a fresh backup first,
+   inspect every affected type and the Preview, then have the owner approve
+   submission. Re-export saved answers and compare to the intended final copy.
+
+VALIDATION AND BOUNDARIES
+
+PASS: independent parsing of the saved files confirmed 782 response rows, five
+columns, row order, all question / response IDs, requirements and labels. Only
+the 15 documented response values change. There are 11 selected types versus
+the original 10. Original and draft hash checks, unique-key checks, escaped-
+quote/comma/multiline parsing cases and expected incomplete-answer checks pass.
+The original label's existing trailing space is intentionally preserved, not
+newly introduced. New notes/JSON have no trailing whitespace; git diff --check
+passes. Line endings are normalized to LF. Exact changes and hashes are in the
+JSON companion. Structural PASS is NOT declaration completeness or approval.
+
+This CSV review does not rerun game tests, cloud writes or device tests. Earlier
+QA limits remain in docs/RELEASE_QA_2026-10-20.txt, including fresh-device cloud
+recovery, memory investigation and unverified affected-Oppo behavior. AAB build
+and store release remain separate, explicitly approved steps.

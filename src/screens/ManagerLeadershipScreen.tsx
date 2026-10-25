@@ -102,7 +102,7 @@ export function ManagerLeadershipScreen({ navigation }: ScreenProps<'ManagerLead
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll careerNavigation>
       <ScreenHeader
         title="Team Leadership"
         subtitle={team.name}
@@ -202,7 +202,6 @@ export function ManagerLeadershipScreen({ navigation }: ScreenProps<'ManagerLead
           );
         })}
       </Card>
-
     </Screen>
   );
 }
@@ -284,7 +283,8 @@ const makeStyles = (colors: ThemeColors) =>
       borderRadius: radius.pill,
       overflow: 'hidden',
     },
-    appointButton: { width: 88 },
+    // Reserve room for the full status plus the shared button's side padding.
+    appointButton: { minWidth: 108, flexShrink: 0 },
     footerNote: {
       color: colors.textFaint,
       fontSize: fontSize.xs,

@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-25",
+  "timezone": "Asia/Kolkata",
+  "scope": "Diagnose slow career lists and cross-app impact; not implement another runtime change",
+  "ownerReported": "Saved careers still take a long time to load",
+  "newRuntimeChangesBuildInstallDeviceAutomationOrExternalServiceWrites": false,
+  "newFiles": ["qa/ios-device/audit-save-load-work.cjs", "docs/SAVE_LOADING_IMPACT_AUDIT_2026-10-25.txt"],
+  "fixture": "Synthetic six Player/four Manager careers; healthy primary and backup; no native crypto/storage or backend",
+  "interpretation": "Orchestration counts on actual source with strictly mocked boundaries; not device timings or real user data",
+  "harness": "node qa/ios-device/audit-save-load-work.cjs",
+  "currentAndFrozenQa4BothVerified": {
+    "singlePlayerListCopyOpens": 12,
+    "concurrentIdenticalPlayerListsCopyOpens": 24,
+    "backupPlusPlayerListPlusContinue": {"storageCopyReads": 38, "nonemptyCopyOpens": 34, "markerChecks": 17, "vipArchiveCalls": 17},
+    "requestDuringActiveBackup": {"completedPasses": 2, "copyOpens": 40, "queuedRequestsCoalesce": true, "activeAndFollowupCoalesce": false},
+    "resultStillUnpublishedAfterFirstFiveSlots": true,
+    "hostFixtureWrites": 0
+  },
+  "currentCreationException": {"requestedEmptyStandardSlot": 2, "occupancyChecks": 2, "copyOpens": 0, "frozenQa4PredatesOptimization": true},
+  "historicalPhoneDataRecomputed": {
+    "date": "2026-10-24",
+    "qa3": {"utf8DecodeCalls": 30, "maxSynchronousDecodeMs": 5347.16, "maximumCapturedHeartbeatExcessMs": 6209.33},
+    "qa4": {"wholeListSpans": 4, "maxWholeListSpanMs": 8110.64, "yieldingDecodeCalls": 27, "yieldingDecodeElapsedTotalMs": 22941.11, "maxYieldingDecodeElapsedMs": 1715.55, "maxCapturedHeartbeatExcessMs": 890.3},
+    "newPhoneTimingThisPass": false,
+    "overlappingAsyncTimesMustNotBeSummedAsCpu": true,
+    "controlledBeforeAfterBenchmark": false
+  },
+  "safetyRegression": {"suites": 5, "tests": 90, "passed": true, "seconds": 3.585, "newFullSuiteRun": false, "deviceLatencyProof": false},
+  "helperLintPassed": true,
+  "firstHarnessFailure": "Frozen diagnostic import lacked an explicit mock; refused unmocked dependency; added no-op adapter and reran successfully; not an app failure",
+  "sourceHashes": {
+    "src/storage/integrity.ts": "5b3ca55dbc6042830fb944ca30dc5fe7adff1dd6684ec28a332586d05b25485a",
+    "src/storage/saveGames.ts": "c23093cf0066adc4de0a36c303e9b311d72538b3e94ce5c2e352b1735f82f666",
+    "src/services/accountRecovery.ts": "6fa8fb03d5e463709ad8e2818aa2d59fdc45cb4733caca5ddd3134ba99c1637f",
+    "output/ios-device/input-qa-2026-10-24-build4/workspace/src/storage/saveGames.ts": "43fba449cbe58a6b75f8f0ae77c36efdbf2b7834c60eadfeccb0a9156241ed26"
+  },
+  "noClaimsOf": ["new data loss or corruption", "memory leak or OOM", "device-wide OS cause", "every screen freezing", "sandbox purchase pass", "current Android device timing", "implemented second optimization", "release readiness"],
+  "handbook": "All three docs/how-to files updated and mirrored to Desktop/HOW TO; byte identity checked, unrelated files preserved"
+}

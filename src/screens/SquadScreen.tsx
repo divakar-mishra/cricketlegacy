@@ -159,7 +159,7 @@ export function SquadScreen({ navigation }: ScreenProps<'Squad'>) {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll careerNavigation>
       <ScreenHeader
         title={save.mode === 'manager' ? 'Squad & Tactics' : 'Team & Selection'}
         subtitle={team.name}

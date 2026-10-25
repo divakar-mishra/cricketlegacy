@@ -1,0 +1,131 @@
+iOS PORT -> ANDROID IMPACT REVIEW
+================================
+24 October 2026, Asia/Kolkata. Owner requested checking whether the other
+agent's iOS changes affect the current Android game. Review/diagnostics only;
+no runtime edit, rollback, dependency install, build, deployment or game install.
+
+CONCLUSION
+-----------
+Shared changes DO affect Android source/behavior, particularly navigation,
+layout, provider-neutral account copy and Google OAuth verification. They are
+not all iOS-only. No Android-breaking regression was found in the reviewed
+snapshot and targeted checks. No corrective runtime patch was warranted here.
+This is not a guarantee about future edits, every device, live provider behavior
+or pending production-release gates.
+
+SCOPE / ATTRIBUTION
+-------------------
+Reviewed current source/diffs, iOS port/UI/provider reports, build profiles,
+native Android integration, shared auth/ads/review/recovery/navigation code and
+the previously built career-coach Android QA artifact. The dirty worktree mixes
+multiple tasks; Git alone cannot attribute every uncommitted hunk to one agent.
+Energy/IAP/coach/Unity work was not mistakenly classified as an iOS regression.
+No app changes were made during this review. Direct local test commands avoided
+npm prehooks rewriting generated build metadata.
+
+ISOLATED PLATFORM CONFIGURATION — VERIFIED
+-----------------------------------------
+- app.config.js returns the SAME base configuration for normal local/default
+  and EAS Android targets. Apple's team, plist, test identity and filtered iOS
+  Firebase plugins are applied only for an explicit iOS selector.
+- Android package is still com.coverdrive.cricket. Google Mobile Ads Android
+  App ID and Android rewarded/interstitial/banner defaults are retained.
+- Executed the monetization module with controlled Android/iOS platform mocks:
+  Android defaults survive iOS variables being present, generic Android override
+  still works, iOS selects only iOS units and missing iOS units fail closed.
+- RevenueCat still chooses its Android key on Android and Apple key on iOS;
+  the purchase implementation itself has no diff from HEAD. iOS SDK keys do
+  not replace Google's Android public SDK key.
+- package.json dependency/devDependency declarations equal HEAD. package-lock
+  diff changes only the root app version: no package-version/lock churn.
+- Firebase exclusions are under expo.autolinking.ios, not global. Actual last
+  Android autolinking output retains app/analytics/crashlytics Android entries;
+  Android's static app/Firebase-Crashlytics plugins are retained too.
+- Android Unity bridge/native artifacts remain present. iOS's contextual ad
+  request behavior and missing-unit gate are Platform.OS guarded; Android adult
+  requests retain their own UMP/privacy behavior. Android Unity/consent tests pass.
+- iOS EAS profiles and staged output/ios-* build workspaces are separate. Use
+  the Android production profile for Android; do not run it with a leaked
+  CRICKET_TARGET_PLATFORM=ios selector or source the iOS build shell script.
+  Current review shell had no iOS selector/EAS platform set. This is an operator
+  precaution, not an observed broken Android configuration.
+
+SHARED CHANGES THAT ANDROID DOES RECEIVE
+--------------------------------------
+1. Layout: Wage Ledger now has a bounded flex list/disabled automatic anchoring;
+   Leadership uses an intrinsic minimum width for Selected/Swap role; Player
+   role/pathway/readiness/attribute labels wrap. These are shared layout fixes,
+   not Android wage, leadership, training, rating or progression formula changes.
+2. Navigation: Screen/CareerNavigation/HubTabBar and route params affect both
+   platforms. Tab switching, stack reuse, hardware/back routing, national/retired
+   Manager guards and stale-save protections were included in targeted tests.
+3. Accounts: Apple entry is shown only on iOS, but both providers use the shared
+   callback path. Android Google completion now verifies server identity/linked
+   providers, exact callback and guest-link UUID, with cancellation/retry/single-
+   flight behavior. These are real Android auth changes, not merely Apple copy.
+   Tests passed for ordinary existing Google login, guest linking, Apple-linked
+   Google identity, failed/foreign/expired callbacks and preserving local saves.
+4. Rating prompts: Apple's native request is iOS-only; Android's approved once-
+   after-five-matches prompt/Play CTA and history remain distinct and tested.
+5. Recovery/provider-neutral copy and existing backup optimizations are shared.
+   Owner/epoch/identity checks, recovery conflicts, remaining wallet/inventory
+   preservation, no duplicate consumable grants and mode-VIP fulfillment passed
+   the targeted mocked tests. No new backend/schema migration was applied here.
+6. Privacy/support website and the Supabase/RevenueCat services are shared
+   external surfaces. Changing them later can affect both platforms even if
+   no Android binary changes. This pass did not alter/re-attest remote settings,
+   inspect private credentials or certify live two-account/owned-restore behavior.
+
+CHECKS EXECUTED NOW
+-------------------
+21 focused Jest suites /384tests PASS,28.663s; no skipped/failed suites.
+12 Node iOS/config/device-staging checks PASS.
+TypeScript --noEmit PASS; quiet ESLint PASS; git diff --check PASS.
+Additional direct assertions: default/EAS Android config identity, dependency
+declarations unchanged, Android/iOS ad selection and purchase-key separation PASS.
+No new full-suite result is claimed; prior career-coach full gate remains
+292suites/2,206tests/2snapshots and is recorded separately.
+
+Fresh logs (local diagnostics):
+  /private/tmp/cricket-ios-android-impact-tests-2026-10-24.log
+  /private/tmp/cricket-ios-android-impact-config-2026-10-24.log
+  /private/tmp/cricket-ios-android-impact-types-2026-10-24.log
+  /private/tmp/cricket-ios-android-impact-lint-2026-10-24.log
+Typecheck/lint logs are empty because the direct tools completed successfully.
+
+ARTIFACT / SNAPSHOT CONFIRMATION
+--------------------------------
+Compared367actual /src source-map entries with current files, excluding generated
+build metadata:0mismatches. The initial comparison accidentally also treated a
+dependency's Screen.tsx as the project Screen; corrected to strict /src paths.
+The real project Screen matches. These iOS/shared changes therefore already
+exist in the Android QA binary tested during the preceding coach work.
+APK's embedded Hermes bundle equals the generated QA bundle:
+  be040bc408d482b4c264e5416ac8e54dad219ccc240ad48d67f77f2fb0cd9855
+Existing QA APK SHA256 unchanged:
+  3580cf15a13ea9fdb6a5cd35f0ffcf4e899ef2064f21ac8cb70fdf53fd5ad674
+  output/career-coach-qa-2026-10-24/
+  cricket-player-manager-career-coach-qa-vc24.apk
+Existing production1.0.12/code20 AAB SHA256 unchanged:
+  0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4
+No store/OTA update was sent. Artifact hashes alone do not certify remote backend
+or store-console state; the already-installed public app is not rewritten by
+an unshipped local source edit.
+
+Before/after fingerprint:784source/config/test/native files, excluding generated
+buildInfo.generated.ts; same SHA256 at both checks:
+  24b557d195f051714dd2cd3c90f401eb360d8e94f52412876904c0bcac1e3293
+No overlapping source edit occurred during this audit snapshot.
+
+LIMITS / NEXT SAFE STEP
+-----------------------
+ADB listed no running devices. Attempt to identify isolated5558 confirmed it
+was stopped; no emulator started or game launched, and Pixel10/iPhone untouched.
+No fresh native Wage/Leadership/device test, real Google login, purchase/restore,
+ad fill/consent or multi-device sync was performed in this pass. Prior native
+coach evidence and the verified identical bundled source remain separate facts.
+The iPhone manual missed-tap report is NOT evidence of an Android touch bug;
+its diagnostic report remains open and was not cleared by these automated checks.
+Current source can proceed to the owner's Android review. Recheck any further
+shared edits by the active iOS task before the next release candidate; do not
+roll back valid shared fixes merely because their original test ran on iOS.

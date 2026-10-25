@@ -1,0 +1,128 @@
+COMPACT CAREER CREATION GUIDES AND LOADING FOLLOW-UP
+25 October 2026 | Cricket: Player & Manager | QA28 INSTALLED
+
+FOLLOW-UP — OWNER-AUTHORIZED QA28 BUILD AND INSTALL
+==================================================
+25 October 00:47 IST: standalone QA 1.0.12/code28 installed on Pixel_10_Pro_XL
+(emulator-5554) using adb install -r. Success. Package/version and installed
+APK SHA256 checked; original firstInstallTime retained (16 October 02:13:57).
+lastUpdateTime: 2026-10-25 00:47:49. No uninstall or package-data clear.
+
+Artifact:
+  output/compact-creation-qa-2026-10-25/
+  cricket-player-manager-compact-creation-qa-vc28.apk
+SHA256: b51e9be01117e32d6d1ff3bde6ee8201b70cd075faca9ace8368c5d07ecd2153
+Verified V2 debug certificate unchanged; min24/target36; arm64-v8a; embedded
+assets/index.android.bundle 8,232,372 bytes, hash matches generated bundle.
+Build SUCCESS in 2m20s (wrapper141s); 18 native consent tests, no failures,
+errors or skips. Fresh137tests/12focused suites, tsc/src quiet lint/diff PASS.
+383 runtime/config fingerprints unchanged during build. Exactly six runtime
+files differ from QA27: the creation overview, creation guide copy, both setup
+screens, saveGames and storage. All372 bundled project sources match disk.
+Known third-party R8/Gradle warnings retained, no upgrades or suppressions.
+Local QA version override only; production config/AAB/store unchanged.
+
+Opened existing game activity and inspected menu screenshot. Existing Manager
+Karachi Truewind Resume card is visible; no pre-mode coach. No guide/career tap,
+new save, purchase, sign-in, account action, reset or other-device action.
+Screenshot: output/compact-creation-qa-2026-10-25/pixel10-handoff.png.
+Left main menu for owner's guide and loading review. This confirms packaging/
+install/start only, NOT full native onboarding, latency, save/IAP parity or iOS.
+Source-only findings below are historical evidence now packaged in QA28.
+
+OWNER REQUEST / EVIDENCE
+========================
+Owner reports both careers eventually opened Home after the gold Start button
+showed a spinner. This was not reported as permanently stuck. Owner now wants
+the long creation/attribute guides shortened to one small explanation per screen
+and the waiting time reduced. Interpreted as one overview per EXISTING setup
+page, not one separate page for every attribute. No added creation steps.
+
+IMPLEMENTED IN SOURCE
+=====================
+Player's identity, attributes, club and review pages each have one compact,
+inline, collapsible explanation. Manager's existing country/club/difficulty page
+has one too. Previously these pages had 18 Player and 4 Manager pointer steps;
+now there are 4 Player and 1 Manager overviews. Each body is at most 50 words.
+Shared theme tokens: dark surface, gold title/accent, muted readable copy.
+Guide remains in normal page flow, cannot cover/dim fields or trap scrolling,
+does not measure/auto-scroll targets, and has no forced guide Next sequence.
+Hide/Show guide is accessible; changing Player page opens that page's overview.
+Existing Home, training and match pointer guides/copy/engine are unchanged.
+
+Actual name/country/gender/tone/portrait/role/club prerequisites remain enforced
+by the forms, independently of help visibility. No choices/points auto-spent.
+Female fictional roster and prior creation allocation behavior are unchanged.
+
+LOADING CHANGE AND SAFETY
+========================
+Both creation handlers previously awaited listSlots(mode), which sequentially
+loaded all six slots. Occupied careers were decrypted, migrated and passed to
+the local VIP archive before creation could even select a destination.
+
+findCreationSlot now checks primary/backup occupancy and stops at the first
+empty base slot. A chunk manifest alone means occupied; chunks are not loaded
+or parsed to check occupancy. Damaged JSON/null, broken manifests, backup-only
+slots and read errors are never treated as free. Requested slots are bounded
+and checked explicitly. Extra slot six still requires the existing mode-scoped
+VIP/legacy-pass rule, using full verified save loading only for that uncommon
+case. Normal Saved Games listSlots/loadSave behavior is unchanged.
+
+Selection waits behind pending operations on the slot. writeSave rechecks
+identity inside the existing queue and refuses another career that won a race.
+Encryption, checksums, rolling backups, cloud-dirty journal and durable first
+write are retained. Home opens only after writeSave + last-played pointer, then
+activation. No pretending the career is saved while a background write runs.
+
+Manager now also has a synchronous duplicate-tap guard (Player already had it).
+Creation's own Back controls ignore taps during the first write. Both footers
+explain the spinner with 'Creating and saving your career…'. The spinner is
+retained while genuine world creation/encryption/storage is underway.
+No new save schema, game balance, grants, provider/native config or dependency.
+
+VERIFICATION
+============
+137 tests / 12 focused suites PASS; 0 snapshots. Fresh tsc --noEmit and src
+ESLint --quiet PASS. git diff --check PASS. Not a complete Jest/full release gate.
+Focused coverage includes compact guide Hide/Show/new-page behavior, normal
+scroll reset, no creation pointer wrapper, manual points, field validation,
+both careers waiting for durable storage, same-frame duplicate taps, first-save
+failure/retry, encrypted primary/backup, invalid/corrupt/unreadable destinations,
+pending write/selection races, mode-scoped premium eligibility, chunk limits and
+account journal. Generic pointer-engine regression tests use explicit test-only
+multi-step fixtures; they are NOT claims that creation still has those steps.
+
+Host-only comparison in encryptedSaves.test.ts, one synthetic 700,000-character
+world/history with two rolling copies: old listSlots + firstFreeSlot 197 ms;
+new occupancy check rounded to 0 ms (<1 ms), decryptions 2 -> 0 and VIP archive
+calls 1 -> 0. In-memory storage adapter + Node crypto, not native AsyncStorage
+or a Pixel measurement. Both select slot 2; the fast check changes no stored
+bytes. This proves removed work, not an end-to-end device speed-up percentage.
+Actual world generation, initial encryption/write, activation and first Home
+render still take time and were not bypassed or device-timed this pass.
+
+Logs:
+  /private/tmp/cricket-compact-creation-tests.log
+  /private/tmp/cricket-compact-creation-types.log
+  /private/tmp/cricket-compact-creation-lint.log
+Benchmark: CREATION_SLOT_BENCH=1 with the focused encryptedSaves Jest test.
+Expo 57 versioned reference reviewed before edits:
+  https://docs.expo.dev/versions/v57.0.0/
+
+SOURCE-PASS DEVICE / DELIVERY BOUNDARIES (BEFORE QA28 FOLLOW-UP ABOVE)
+===================================================================
+Read-only adb device identification confirmed emulator-5554 = Pixel_10_Pro_XL;
+one timing-log query returned no entries. No taps, career creation, save reads/
+export, data clear, restart, installation or native guide/performance test.
+No other emulator, iPhone, provider/backend/website/store changes.
+
+No APK/AAB was built or installed in the source-only pass. Its installed build was
+QA 1.0.12/code27 (the OLD multi-step creation guide). The follow-up above records
+the subsequently authorized QA28 install. Owner testing now needs normal manual scrolling and keyboard/
+large text in all creation pages; required choices; +/−; Back/Next; both Start
+actions; elapsed tap-to-Home with existing saves; save re-open; premium slot-six
+behavior. Full release and physical-iPhone checks remain separate.
+
+Living handbook: all three docs/how-to files updated with the source-only
+status. Desktop mirror is synchronized separately with byte-identity checks;
+unrelated Desktop HOW TO files must not be replaced.

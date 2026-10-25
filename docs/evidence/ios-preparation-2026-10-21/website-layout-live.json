@@ -1,0 +1,92 @@
+{
+  "checkedAt": "2026-10-21T18:30:10.210Z",
+  "origin": "https://sunlight-publisher-site.pages.dev",
+  "isolatedProfile": "/var/folders/cx/9r8_x0p90sg4qrwhlk_ntlcm0000gn/T/cricket-website-layout-a99TOa",
+  "passed": true,
+  "results": [
+    {
+      "name": "home-mobile",
+      "route": "/",
+      "width": 390,
+      "height": 1100,
+      "title": "Sunlight · Sunlight",
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "hashFound": true,
+      "overflow": [],
+      "passed": true
+    },
+    {
+      "name": "mobile",
+      "route": "/products/cricket-player-manager/",
+      "width": 390,
+      "height": 1100,
+      "title": "Cricket: Player and Manager · Sunlight",
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "hashFound": true,
+      "overflow": [],
+      "passed": true
+    },
+    {
+      "name": "age",
+      "route": "/products/cricket-player-manager/#age-suitability",
+      "width": 390,
+      "height": 1100,
+      "title": "Cricket: Player and Manager · Sunlight",
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "hashFound": true,
+      "overflow": [],
+      "passed": true
+    },
+    {
+      "name": "privacy-small",
+      "route": "/privacy/",
+      "width": 320,
+      "height": 1000,
+      "title": "Privacy Policy · Sunlight",
+      "viewportWidth": 320,
+      "scrollWidth": 320,
+      "hashFound": true,
+      "overflow": [],
+      "passed": true
+    },
+    {
+      "name": "delete-mobile",
+      "route": "/delete-account/",
+      "width": 390,
+      "height": 1100,
+      "title": "Delete account and data · Sunlight",
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "hashFound": true,
+      "overflow": [],
+      "passed": true
+    },
+    {
+      "name": "auction-mobile",
+      "route": "/products/auction-xi/",
+      "width": 390,
+      "height": 1100,
+      "title": "Auction XI · Sunlight",
+      "viewportWidth": 390,
+      "scrollWidth": 390,
+      "hashFound": true,
+      "overflow": [],
+      "passed": true
+    },
+    {
+      "name": "support",
+      "route": "/support/",
+      "width": 1440,
+      "height": 1150,
+      "title": "Support · Sunlight",
+      "viewportWidth": 1440,
+      "scrollWidth": 1425,
+      "hashFound": true,
+      "overflow": [],
+      "passed": true
+    }
+  ]
+}

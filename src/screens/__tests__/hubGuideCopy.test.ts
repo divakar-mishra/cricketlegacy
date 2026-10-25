@@ -1,48 +1,30 @@
 import fs from 'fs';
 import path from 'path';
-
-const careerHubScreen = fs.readFileSync(path.join(__dirname, '..', 'CareerHubScreen.tsx'), 'utf8');
-const managerHubScreen = fs.readFileSync(
-  path.join(__dirname, '..', 'ManagerHubScreen.tsx'),
-  'utf8',
-);
-const settingsScreen = fs.readFileSync(path.join(__dirname, '..', 'SettingsScreen.tsx'), 'utf8');
-const settingsStore = fs.readFileSync(
-  path.join(__dirname, '..', '..', 'state', 'settingsStore.ts'),
-  'utf8',
-);
-const guideModal = fs.readFileSync(
-  path.join(__dirname, '..', '..', 'components', 'ModeGuideModal.tsx'),
-  'utf8',
-);
-
-describe('mode hub guides', () => {
-  it('shows a dismissible player career guide in the career hub', () => {
-    expect(guideModal).toContain('{modeLabel.toUpperCase()} GUIDE');
-    expect(careerHubScreen).toContain('career_hub_guide');
-    expect(careerHubScreen).toContain('Find your support team');
-    expect(careerHubScreen).toContain('Your free career adviser');
-    expect(careerHubScreen).toContain('Earn selection and progress');
-    expect(careerHubScreen).toContain("body: 'Your next step.'");
-    expect(careerHubScreen).toContain('Open Training, then Development Centre.');
-    expect(careerHubScreen).toContain('modeLabel="Player Career"');
-    expect(guideModal).not.toContain('YOUR NEXT ACTION');
+import { CAREER_GUIDES } from '../../content/careerGuides';
+const read = (file: string) => fs.readFileSync(path.join(__dirname, '../..', file), 'utf8');
+describe('interactive career coaching replaces standalone hub slides', () => {
+  it.each(['CareerHub', 'ManagerHub'])('uses anchored controls in %s', screen => {
+    const text = read(`screens/${screen}Screen.tsx`);
+    expect(text).not.toContain('<ModeGuideModal');
+    expect(text).toContain('<GuideReplayButton');
+    expect(text).toContain('<GuideTarget id="next-step"');
   });
-
-  it('shows a dismissible manager career guide in the manager hub', () => {
-    expect(guideModal).toContain('{modeLabel.toUpperCase()} GUIDE');
-    expect(managerHubScreen).toContain('manager_hub_guide');
-    expect(managerHubScreen).toContain('Recruit with evidence');
-    expect(managerHubScreen).toContain("body: 'Scout before signing.'");
-    expect(managerHubScreen).toContain("body: 'Facilities, staff and academy.'");
-    expect(managerHubScreen).toContain('modeLabel="Manager Career"');
+  it('makes Player customisation and training explicit Home destinations', () => {
+    const source = read('screens/CareerHubScreen.tsx');
+    expect(source).toContain('label="Customise player"');
+    expect(source).toContain("navigation.navigate('PlayerCosmetics')");
+    expect(CAREER_GUIDES['player.home'].some(s => s.target === 'training')).toBe(true);
   });
-
-  it('lets players replay onboarding and dismissed mode guides', () => {
-    expect(settingsScreen).toContain('Replay game guides');
-    expect(settingsScreen).toContain('onPress={s.replayGuides}');
-    expect(settingsStore).toContain(
-      'replayGuides: () => set({ hasOnboarded: false, dismissedTips: [] })',
-    );
+  it('can replay all chapter progress using the existing settings action', () => {
+    expect(read('screens/SettingsScreen.tsx')).toContain('onPress={s.replayGuides}');
+    expect(read('state/settingsStore.ts')).toContain('replayGuides: () => set({ hasOnboarded: false, dismissedTips: [] })');
+    expect(read('components/CareerGuide.tsx')).toContain('replayCareerGuide(chapter');
+  });
+  it('has no timed guide advancement and never simulates a winning career result', () => {
+    const source = read('components/CareerGuide.tsx');
+    expect(source).not.toContain('setTimeout(advance');
+    expect(source).not.toContain('setInterval');
+    expect(source).not.toContain('simulateMatch');
+    expect(read('screens/MatchScreen.tsx')).not.toContain('<FirstMatchGuide');
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "app",
-  "version": "1.0.11",
+  "version": "1.0.13",
   "main": "index.ts",
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
@@ -76,10 +76,13 @@
     "pretypecheck": "npm run generate-build-info",
     "pretest": "npm run generate-build-info",
     "prelint": "npm run generate-build-info",
-    "postinstall": "node scripts/patchGoogleMobileAdsGradle.js && node scripts/writeBuildInfo.js",
+    "postinstall": "node scripts/patchGoogleMobileAdsGradle.js && node scripts/patchReanimatedAndroid.cjs && node scripts/writeBuildInfo.js",
     "start": "expo start",
     "android": "expo run:android",
-    "ios": "expo run:ios",
+    "ios": "CRICKET_TARGET_PLATFORM=ios expo run:ios",
+    "ios:prepare:simulator": "node scripts/prepareIosSimulator.cjs",
+    "check:ios-release": "node scripts/checkIosRelease.cjs",
+    "check:ios-providers": "node scripts/checkIosProviders.cjs",
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -89,6 +92,10 @@
     "audit:monetization-careers": "CAREER_AUDIT_MONETIZATION=1 jest --runInBand --testMatch '<rootDir>/scripts/five-season-career-audit.test.ts'",
     "audit:assets": "node scripts/audit-asset-memory.mjs",
     "qa:android:soak": "bash scripts/android-soak-test.sh",
+    "test:android-native-guard": "node scripts/testReanimatedAndroidPatch.cjs",
+    "check:android-stability": "node scripts/checkAndroidStability.cjs",
+    "check:android-version": "node scripts/checkAndroidReleaseVersion.cjs",
+    "test:android-version": "node --test scripts/checkAndroidReleaseVersion.test.cjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "build:legal-site": "node legal-site/build.mjs",
@@ -96,10 +103,18 @@
     "check:legal": "node scripts/check-legal-readiness.mjs",
     "check:release": "npm run check:legal && npm run check",
     "eas-build-post-install": "node scripts/eas-build-post-install.mjs",
-    "check": "npm run typecheck && npm run lint -- --quiet && npm test -- --runInBand",
+    "eas-build-pre-install": "node scripts/checkAndroidReleaseVersion.cjs --eas-hook",
+    "check": "npm run check:android-version && npm run test:android-version && npm run typecheck && npm run lint -- --quiet && npm test -- --runInBand",
     "format": "prettier --write ."
   },
   "private": true,
+  "expo": {
+    "autolinking": {
+      "ios": {
+        "exclude": ["@react-native-firebase/app", "@react-native-firebase/analytics", "@react-native-firebase/crashlytics"]
+      }
+    }
+  },
   "engines": {
     "node": ">=22.13.0"
   }

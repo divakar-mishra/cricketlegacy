@@ -17,6 +17,7 @@ import { AppText as Text } from '../AppText';
 import { Button } from '../Button';
 import { PortraitAvatar } from './PortraitAvatar';
 import { portraitPickerLayout } from './portraitPickerLayout';
+import { GuideTarget } from '../CareerGuide';
 
 interface PortraitPickerProps {
   kitId?: string;
@@ -24,6 +25,11 @@ interface PortraitPickerProps {
   onChange: (config: AvatarConfig) => void;
   playerName?: string;
   testID?: string;
+  /** Creation requires explicit choices; ordinary cosmetic editing stays unchanged. */
+  creationChoices?: { sex: boolean; tone: boolean; portrait: boolean };
+  onChooseSex?: (sex: AvatarSex) => void;
+  onChooseTone?: () => void;
+  onChoosePortrait?: () => void;
 }
 
 const TONE_SWATCHES: Readonly<Record<AvatarToneBand, string>> = {
@@ -47,6 +53,7 @@ const PortraitCard = memo(function PortraitCard({
   size,
   cardWidth,
   onPress,
+  disabled = false,
 }: {
   kitId?: string;
   portrait: PortraitAssetMetadata;
@@ -54,6 +61,7 @@ const PortraitCard = memo(function PortraitCard({
   size: number;
   cardWidth: number;
   onPress: (portraitId: string) => void;
+  disabled?: boolean;
 }) {
   const styles = useThemedStyles(makeStyles);
   const label = portraitOptionLabel(portrait);
@@ -61,7 +69,8 @@ const PortraitCard = memo(function PortraitCard({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled }}
+      disabled={disabled}
       onPress={() => onPress(portrait.id)}
       style={[
         styles.portraitCard,
@@ -85,6 +94,10 @@ export function PortraitPicker({
   onChange,
   playerName = 'Your player',
   testID,
+  creationChoices,
+  onChooseSex,
+  onChooseTone,
+  onChoosePortrait,
 }: PortraitPickerProps) {
   const styles = useThemedStyles(makeStyles);
   const { width } = useWindowDimensions();
@@ -107,22 +120,26 @@ export function PortraitPicker({
   );
 
   const choosePortrait = useCallback(
-    (portraitId: string) => commit(selectPortrait(safeValue, portraitId)),
-    [commit, safeValue],
+    (portraitId: string) => {
+      onChoosePortrait?.();
+      commit(selectPortrait(safeValue, portraitId));
+    },
+    [commit, onChoosePortrait, safeValue],
   );
 
   return (
     <View style={styles.root} testID={testID}>
+      <GuideTarget id="gender" ready={creationChoices?.sex}>
       <View style={styles.sexRow} accessibilityRole="tablist">
         {(['male', 'female'] as const).map((sex: AvatarSex) => {
-          const selected = safeValue.sex === sex;
+          const selected = safeValue.sex === sex && (creationChoices?.sex ?? true);
           return (
             <Pressable
               key={sex}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               accessibilityLabel={`${sex} portraits`}
-              onPress={() => commit(switchAvatarSex(safeValue, sex))}
+              onPress={() => { onChooseSex?.(sex); commit(switchAvatarSex(safeValue, sex)); }}
               style={[styles.sexButton, selected && styles.sexButtonSelected]}
             >
               <Text style={[styles.sexText, selected && styles.sexTextSelected]}>
@@ -132,6 +149,7 @@ export function PortraitPicker({
           );
         })}
       </View>
+      </GuideTarget>
 
       <View style={styles.previewSurface}>
         <PortraitAvatar
@@ -151,9 +169,12 @@ export function PortraitPicker({
             variant="secondary"
             fullWidth={false}
             style={styles.actionButton}
+            disabled={creationChoices?.sex === false}
             onPress={() => {
               const next = randomAvatarConfig(safeValue.sex, Math.random, safeValue.frameId);
               setSelectedTone(portraitToneBand(next));
+              onChooseTone?.();
+              onChoosePortrait?.();
               commit(next);
             }}
           />
@@ -162,18 +183,22 @@ export function PortraitPicker({
             variant="ghost"
             fullWidth={false}
             style={styles.actionButton}
+            disabled={creationChoices?.sex === false}
             onPress={() => {
               const next = {
                 ...DEFAULT_AVATAR_CONFIGS[safeValue.sex],
                 ...(safeValue.frameId ? { frameId: safeValue.frameId } : {}),
               };
               setSelectedTone(portraitToneBand(next));
+              onChooseTone?.();
+              onChoosePortrait?.();
               commit(next);
             }}
           />
         </View>
       </View>
 
+      <GuideTarget id="skin-tone" ready={creationChoices?.tone}>
       <View style={styles.toneSection}>
         <Text style={styles.sectionTitle}>Skin tone range</Text>
         <Text style={styles.sectionHint}>Choose a range, then a portrait.</Text>
@@ -183,15 +208,16 @@ export function PortraitPicker({
           style={styles.toneRow}
         >
           {AVATAR_TONE_BANDS.map((toneBand) => {
-            const selected = selectedTone === toneBand;
+            const selected = selectedTone === toneBand && (creationChoices?.tone ?? true);
             return (
               <View key={toneBand} style={[styles.toneCell, { width: layout.toneCellWidth }]}>
                 <Pressable
                   accessibilityRole="radio"
                   accessibilityLabel={`Skin tone ${toneBand} of 8`}
-                  accessibilityState={{ selected }}
+                  accessibilityState={{ selected, disabled: creationChoices?.sex === false }}
+                  disabled={creationChoices?.sex === false}
                   hitSlop={2}
-                  onPress={() => setSelectedTone(toneBand)}
+                  onPress={() => { setSelectedTone(toneBand); onChooseTone?.(); }}
                   style={[styles.toneButton, selected && styles.toneButtonSelected]}
                 >
                   <View style={[styles.toneSwatch, { backgroundColor: TONE_SWATCHES[toneBand] }]} />
@@ -201,20 +227,24 @@ export function PortraitPicker({
           })}
         </View>
       </View>
+      </GuideTarget>
 
+      <GuideTarget id="portrait" ready={creationChoices?.portrait}>
       <View style={styles.portraitGrid}>
         {options.map((portrait) => (
           <PortraitCard
             key={portrait.id}
             kitId={kitId}
             portrait={portrait}
-            selected={portrait.id === safeValue.portraitId}
+            selected={portrait.id === safeValue.portraitId && (creationChoices?.portrait ?? true)}
+            disabled={creationChoices?.sex === false || creationChoices?.tone === false}
             size={layout.portraitSize}
             cardWidth={layout.cardWidth}
             onPress={choosePortrait}
           />
         ))}
       </View>
+      </GuideTarget>
     </View>
   );
 }

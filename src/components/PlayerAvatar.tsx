@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { avatarFromSeed, normalizeAvatarConfig } from '../avatar';
-import type { AvatarConfig } from '../avatar';
+import type { AvatarConfig, AvatarSex } from '../avatar';
 import { AppText } from './AppText';
 import { PortraitAvatar } from './avatar';
 import {
@@ -24,6 +24,7 @@ const ROLE_ICON: Record<string, string> = {
 interface Props {
   kitId?: string;
   name: string;
+  sex?: AvatarSex;
   role?: string;
   primaryColor?: string;
   secondaryColor?: string;
@@ -40,6 +41,7 @@ interface Props {
 function PlayerAvatarComponent({
   kitId,
   name,
+  sex = 'male',
   role = 'BATTER',
   primaryColor = '#1A6B3A',
   secondaryColor = '#D5B56D',
@@ -54,8 +56,8 @@ function PlayerAvatarComponent({
 }: Props) {
   const px = SIZE_MAP[size];
   const safeConfig = useMemo(
-    () => (config ? normalizeAvatarConfig(config) : avatarFromSeed(name, 'male', profileFrame)),
-    [config, name, profileFrame],
+    () => (config ? normalizeAvatarConfig(config) : avatarFromSeed(name, sex, profileFrame)),
+    [config, name, sex, profileFrame],
   );
   const activeFrame = legendary ? 'frame_gold' : profileFrame;
   const largeLayout =

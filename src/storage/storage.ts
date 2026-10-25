@@ -114,6 +114,14 @@ async function removeManifestChunks(key: string, manifest: ChunkManifest | null)
     (_, index) => chunkKey(key, manifest.generation, index)));
 }
 
+/** Occupancy only; never interpret a damaged record as free space. */
+export async function hasStoredValue(key: string): Promise<boolean> {
+  // Occupancy only: even a broken manifest or JSON null is NOT an empty slot.
+  // Do not load/reassemble chunks or parse/decrypt another career just to create one.
+  if (await AsyncStorage.getItem(manifestKey(key)) !== null) return true;
+  return await AsyncStorage.getItem(key) !== null;
+}
+
 /** Thin typed JSON wrapper around AsyncStorage. */
 export async function getJSONStrict<T>(key: string): Promise<T | null> {
   let raw: string | null;
@@ -148,6 +156,8 @@ export async function getJSON<T>(key: string): Promise<T | null> {
 }
 
 export async function setJSON(key: string, value: unknown): Promise<void> {
+  let stagedManifest: ChunkManifest | null = null;
+  let publicationAttempted = false;
   try {
     const raw = JSON.stringify(value);
     const previousManifest = await readManifest(key);
@@ -166,19 +176,21 @@ export async function setJSON(key: string, value: unknown): Promise<void> {
 
     const generation = `${Date.now().toString(36)}-${(chunkGeneration += 1).toString(36)}`;
     const chunks = splitIntoChunks(raw);
-    // One native batch/SQLite transaction, instead of a round trip and
-    // transaction for every chunk. Publish the manifest only after success.
-    await AsyncStorage.multiSet(chunks.map((chunk, index) =>
-      [chunkKey(key, generation, index), chunk] as [string, string]));
-    const nextManifest: ChunkManifest = {
+    stagedManifest = {
       __chunked: 1,
       generation,
       chunkCount: chunks.length,
       length: raw.length,
     };
+    // One native batch/SQLite transaction, instead of a round trip and
+    // transaction for every chunk. Publish the manifest only after success.
+    await AsyncStorage.multiSet(chunks.map((chunk, index) =>
+      [chunkKey(key, generation, index), chunk] as [string, string]));
     // The small manifest is the atomic pointer swap. Until it succeeds, the
     // previous raw/manifest representation remains authoritative.
-    await AsyncStorage.setItem(manifestKey(key), JSON.stringify(nextManifest));
+    publicationAttempted = true;
+    await AsyncStorage.setItem(manifestKey(key), JSON.stringify(stagedManifest));
+    stagedManifest = null;
     try {
       await AsyncStorage.removeItem(key);
       await removeManifestChunks(key, previousManifest);
@@ -186,6 +198,20 @@ export async function setJSON(key: string, value: unknown): Promise<void> {
       console.warn(`storage chunk cleanup failed for ${key}`, cleanupError);
     }
   } catch (err) {
+    if (stagedManifest) {
+      try {
+        // A rejected bridge call can be ambiguous: preserve the generation if
+        // the manifest actually committed. If that read fails, leave it intact.
+        // Otherwise reclaim only this write's staged chunks, never the last
+        // good save. This also handles partially completed payload batches.
+        const published = publicationAttempted ? await readManifest(key) : null;
+        if (published?.generation !== stagedManifest.generation) {
+          await removeManifestChunks(key, stagedManifest);
+        }
+      } catch (cleanupError) {
+        console.warn(`storage staged chunk cleanup failed for ${key}`, cleanupError);
+      }
+    }
     console.warn(`storage.setJSON failed for ${key}`, err);
     throw err;
   }

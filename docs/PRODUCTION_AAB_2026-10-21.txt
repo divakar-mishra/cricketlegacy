@@ -1,0 +1,136 @@
+CRICKET: PLAYER & MANAGER — PRODUCTION AAB HANDOFF
+21 October 2026, Asia/Kolkata
+================================================
+
+Outcome
+-------
+Owner authorized production packaging after the completed rating-popup QA pass.
+Built, downloaded and locally verified a production-signed Android App Bundle.
+This is not the earlier debug-signed QA APK. No Google Play submission, rollout,
+console declaration change, backend mutation, device install or save operation
+was performed in this packaging pass. Existing release-test limits remain.
+
+AAB to use
+----------
+output/production-1.0.12/cricket-player-manager-1.0.12-vc20.aab
+Package: com.coverdrive.cricket
+Version: 1.0.12 / production versionCode20
+Bytes: 111388690 (approximately106.2MiB)
+SHA256: 0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4
+EAS build: a232a24d-277f-4fe7-ad2e-6e6521188a89 / FINISHED
+https://expo.dev/accounts/sunlightpvt/projects/cricket-legacy/builds/a232a24d-277f-4fe7-ad2e-6e6521188a89
+
+EAS's existing remote production counter advanced from19 to20. The prior
+internal QA code22 belongs to a separate debug-signed artifact; its code is not
+the production counter. No signing credentials were created/replaced. Older
+AABs were not overwritten/deleted. Do not upload an old code18/19 or the QA APK
+by mistake. This bundle is prepared for the owner's later Play release flow,
+not proof that private Console declarations are correct or saved.
+
+Verification of the actual downloaded AAB
+-----------------------------------------
+PASS: jarsigner signature validation and same upload certificate as prior AABs:
+  DA:68:BA:1D:9A:56:DB:FE:70:92:18:AB:68:E8:78:19:D6:8E:08:F2:EC:37:ED:3D:92:29:64:22:2D:C6:84:20
+PASS: bundletool validate; package/versionCode/versionName/min24/target36.
+PASS: not debuggable; allowBackup=false; no broad storage/microphone permission.
+PASS: standalone Hermes bundle, R8 map and native payment-recovery module.
+PASS: all52 arm64-v8a/x86_64 native libraries have16-KB-compatible load alignment.
+      Included ABIs: arm64-v8a, armeabi-v7a, x86 and x86_64.
+PASS: compiled QA_TOOLS_ENABLED=false, purchase MOCK_MODE=false and ad
+      simulation=false. QA-only AdDiagnosticsActivity absent from manifest/map.
+      As a negative control, the same QA-flag check rejected the QA code22 APK.
+PASS: production ad units and public service configuration embedded; no values
+      of service keys were printed in the handoff.
+PASS: Unity consent bridge/adapter retained; automatic Unity startup initializer
+      remains removed so age/UMP gating is not bypassed.
+PASS: new rating invitation/history and corrected backup/recovery markers kept.
+PASS: all four distinct approved legal URLs embedded.
+PASS: 1136 captured source/asset/build-input hashes match the prepared archive
+      and remain unchanged after the build. Private credentials and generated
+      QA evidence files were excluded from the archive; empty directories are
+      not treated as included private files.
+
+Build and quality procedure
+---------------------------
+Read project skill/product/release rules and exact Expo57 version documentation
+before packaging. The only new tracked build configuration edit in this pass
+was adding the four already-approved public legal URLs to the production
+profile in eas.json. QA tools stayfalse; no gameplay/provider/age rule changed.
+The URLs are https://sunlight-publisher-site.pages.dev/ followed by privacy/,
+terms/, support/ and delete-account/. This does not deploy the website.
+
+Used the existing EAS production environment and remote signing credentials:
+  eas build --platform android --profile production --non-interactive
+    --freeze-credentials --no-wait --json
+No auto-submit flag was supplied. Checked source-archive inputs before starting.
+The cloud build passed its existing legal gate and applied the Reanimated
+stale-view guard during dependency postinstall. Existing third-party warnings
+remain; this is not a warning-free or physical-Oppo certification.
+
+Focused packaging/version/Unity/rating:5 suites /50 tests PASS.
+Full standard test-environment gate:279 suites /2073 tests /2 snapshots PASS,
+zero failed; typecheck and quiet lint PASS. Final git diff --check PASS.
+The initial extra full test invocation mistakenly inherited NODE_ENV=production,
+which disables React test-renderer act and changes test mocks. That run failed
+and is retained as quality.log/full-regression.json. It was not counted as a
+pass or fixed by changing runtime code. The valid repeated gate explicitly used
+NODE_ENV=test; AAB compilation independently used NODE_ENV=production.
+The preceding QA pass's18 native policy tests and actual popup/billing/save
+checks are documented separately; they were not relabeled as new device tests.
+
+The first artifact download timed out; a curl transfer of the same build
+completed. No duplicate build was started. SHA/signature/bundle/compiled-flag
+checks apply to the completed local file, not merely an EAS success status.
+
+Evidence and reproduction helpers (local, not shipped)
+------------------------------------------------------
+output/production-1.0.12/evidence/final-release-2026-10-21/
+  release.cjs: start/status/download/source-drift checks; start refuses duplicate.
+  build-request.json / build-latest.json / download.json
+  archive/ / source-inputs.json / source-comparison.json
+  quality-summary.json / full-regression-standard-test-env.json
+  artifact-summary.json / manifest.xml / mapping.txt
+  production-flags.json / compiled-qa-tools-disabled.txt
+  compiled-purchases-mock-disabled.txt / compiled-ad-simulation-disabled.txt
+  qa-flag-negative-control.json / verify-production-flags.cjs
+Verification command used the existing evidence/verify-release.cjs artifact
+action with RELEASE_VERSION_CODE=20 and the matching build/evidence-directory
+environment values. Production flags were inspected from the actual Hermes
+bytecode, not inferred solely from source. Source hash aggregate:
+d90a32f367b733bcc5a3c1b1b6b23179c821fc3868481a2b5c2b78d2d9493e52
+
+Data safety CSV — October21 follow-up
+-------------------------------------
+The two inherited answers were corrected after current-source/provider review:
+location Personalization removed; Other app performance catch-all removed while
+Crash logs and Diagnostics remain. Corrected review and complete conditional
+Acquire ON/OFF variants are documented in:
+  docs/PLAY_DATA_SAFETY_REVIEW_2026-10-21.txt
+  docs/data-safety-review-validation-2026-10-21.json
+The one unresolved provider fact is Unity's Acquire Optimization/app-usage state.
+The owner cannot find the flag; Developer Data does not prove it either way.
+All variants remain conditional and readyForImport=false. No provider setting
+was guessed or changed. Do not import them as verified final declarations.
+Original export and October20 draft are preserved; the September13 CSV is
+historical, not an approved substitute. CSV-only work did not change this AAB.
+Owner-facing single completed copy, under an explicit full-Unity-collection
+working assumption (not verified account state):
+  docs/data-safety-complete-full-unity-2026-10-21.csv
+  docs/DATA_SAFETY_COMPLETE_CSV_README_2026-10-21.txt
+This is the conditional ON scenario with selected-type answers complete. It
+does not remove the need for accurate provider reconciliation before submission;
+readyForImport remains false. Two supplied dashboard app responses did not
+expose the missing collection flag. No provider setting or AAB was changed.
+The owner controls Play declarations; no saved private Console state was
+independently verified by this build. Finish/reconcile those answers before
+submission rather than importing a file explicitly marked incomplete.
+
+Carried-forward coverage limits
+-------------------------------
+Owned-item restore/checkout, two distinct Google accounts, teen Unity creatives
+that returned no-fill, affected Oppo hardware and leak-free/low-RAM endurance
+are not newly certified. Same-account fresh recovery, nine-career preservation,
+US privacy UI, adult Unity serving and the rating/empty-account-restore checks
+are recorded in docs/RELEASE_QA_2026-10-21.txt and
+docs/PLAY_RATING_BILLING_MEMORY_2026-10-21.txt. Production packaging does not
+erase these limits or authorize a production rollout by itself.

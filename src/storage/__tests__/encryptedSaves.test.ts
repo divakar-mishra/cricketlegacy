@@ -72,11 +72,14 @@ jest.mock('expo-crypto', () => {
 });
 jest.mock('../migrate', () => ({ runMigrations: (save: unknown) => save }));
 import { SaveGame } from '../../domain/types';
-import { deleteSave, firstFreeSlot, listSlots, loadSave, recoverSaveToEmptySlot, replaceSave, SaveDeletedError, writeSave } from '../saveGames';
+import { deleteSave, findCreationSlot, firstFreeSlot, getLastPlayedSummary, listSlotSummaries, listSlots, loadSave, recoverSaveToEmptySlot, replaceSave, SaveDeletedError, setLastPlayed, writeSave } from '../saveGames';
+import * as encryption from '../saveEncryption';
 import { setBackupOwner } from '../accountBackupJournal';
 import * as backupJournal from '../accountBackupJournal';
 import { wrapSave } from '../integrity';
 import { openSave, sealSave, verifySaveIdentity } from '../saveEncryption';
+import { syncVipArchive } from '../../services/vipArchive';
+import { setJSON } from '../storage';
 
 const makeSave = (coins = 500) =>
   ({
@@ -89,6 +92,119 @@ const makeSave = (coins = 500) =>
   }) as unknown as SaveGame;
 const key = 'sg:career:1';
 describe('encrypted career persistence', () => {
+  it('never offers a migration-rejected occupied career as an empty slot', async () => {
+    const snapshot = { ...makeSave(), id: 'summary-rejected-schema' };
+    await writeSave('career', 1, snapshot);
+    mockRows.delete('sg:summary:v1:career:1');
+    const bytes = mockRows.get(key);
+    jest.spyOn(require('../migrate'), 'runMigrations').mockReturnValue(null);
+    expect((await listSlotSummaries('career'))[0]).toEqual({ slot: 1, summary: null, unavailable: true });
+    await expect(loadSave('career', 1)).rejects.toThrow('kept');
+    expect(mockRows.get(key)).toBe(bytes);
+    expect(await findCreationSlot('career', 1)).toBeNull();
+  });
+  it('invalidates the old index before a primary-write failure, preserving the old verified career', async () => {
+    const snapshot = { ...makeSave(), id: 'summary-primary-failure' };
+    await writeSave('career', 1, snapshot);
+    mockFailRow = key;
+    await expect(writeSave('career', 1, { ...snapshot, wallet: { ...snapshot.wallet, coins: 999 } })).rejects.toThrow('disk full');
+    expect(mockRows.has('sg:summary:v1:career:1')).toBe(false);
+    mockFailRow = undefined;
+    expect((await listSlotSummaries('career'))[0].summary?.coins).toBe(500);
+  });
+  it('rebuilds a summary from the verified rolling backup when the primary is corrupt', async () => {
+    const snapshot = { ...makeSave(), id: 'summary-backup-fallback' };
+    await writeSave('career', 1, snapshot);
+    await writeSave('career', 1, { ...snapshot, wallet: { ...snapshot.wallet, coins: 900 } });
+    mockRows.delete('sg:summary:v1:career:1');
+    mockRows.set(key, 'broken-primary');
+    const [first] = await listSlotSummaries('career');
+    expect(first.summary).toMatchObject({ id: snapshot.id, coins: 500 });
+    expect(first.unavailable).not.toBe(true);
+    expect(mockRows.get(key)).toBe('broken-primary');
+  });
+  it('lists/refreshes both modes and Continue without opening complete worlds after save publication', async () => {
+    for (const mode of ['career', 'manager'] as const) {
+      for (let slot = 1; slot <= (mode === 'career' ? 6 : 4); slot++) {
+        const snapshot = { ...makeSave(), id: `summary-${mode}-${slot}`, mode, history: 'x'.repeat(100_000) } as SaveGame;
+        await writeSave(mode, slot, snapshot);
+        await writeSave(mode, slot, snapshot);
+      }
+    }
+    await setLastPlayed('career', 1);
+    const open = jest.spyOn(encryption, 'openSave');
+    const [player, manager, duplicate, resume] = await Promise.all([
+      listSlotSummaries('career'), listSlotSummaries('manager'), listSlotSummaries('career'), getLastPlayedSummary(),
+    ]);
+    expect(player.filter(row => row.summary)).toHaveLength(6);
+    expect(manager.filter(row => row.summary)).toHaveLength(4);
+    expect(duplicate).toEqual(player);
+    expect(resume?.summary.id).toBe('summary-career-1');
+    expect(open).not.toHaveBeenCalled();
+    expect(JSON.stringify(player)).not.toContain('history');
+    expect(mockRows.get('sg:summary:v1:career:1')).not.toContain('summary-career-1');
+    expect(mockRows.get('sg:summary:v1:career:1')).not.toContain('coins');
+  });
+  it('bootstraps a missing/corrupt summary once, including concurrent readers, without altering protected copies', async () => {
+    await writeSave('career', 1, makeSave());
+    await writeSave('career', 1, makeSave(600));
+    const primary = mockRows.get(key), backup = mockRows.get(`${key}:bak`);
+    mockRows.set('sg:summary:v1:career:1', 'bad-json');
+    const open = jest.spyOn(encryption, 'openSave');
+    const [one, two] = await Promise.all([listSlotSummaries('career'), listSlotSummaries('career')]);
+    expect(one[0].summary?.coins).toBe(600);
+    expect(two).toEqual(one);
+    expect(open.mock.calls.filter(([raw]) => raw !== null)).toHaveLength(2);
+    open.mockClear();
+    await listSlotSummaries('career');
+    expect(open).not.toHaveBeenCalled();
+    expect(mockRows.get(key)).toBe(primary);
+    expect(mockRows.get(`${key}:bak`)).toBe(backup);
+  });
+  it('stops an abandoned cold scan before opening the backup or later slots', async () => {
+    await writeSave('career', 1, makeSave());
+    await writeSave('career', 2, { ...makeSave(), id: 'cancel-second' });
+    mockRows.delete('sg:summary:v1:career:1');
+    mockRows.delete('sg:summary:v1:career:2');
+    const controller = new AbortController();
+    const actual = encryption.openSave;
+    const open = jest.spyOn(encryption, 'openSave').mockImplementation(async (raw, context) => {
+      const result = await actual(raw, context);
+      controller.abort();
+      return result;
+    });
+    await expect(listSlotSummaries('career', { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open.mock.calls[0][1]).toBe(key);
+  });
+  it('keeps corrupted occupied data unavailable and verifies playable bytes even when a summary exists', async () => {
+    await writeSave('career', 1, makeSave());
+    mockRows.set(key, '{"__env":2,"algorithm":"AES-256-GCM","data":"tampered"}');
+    await expect(loadSave('career', 1)).rejects.toThrow('kept');
+    mockRows.delete('sg:summary:v1:career:1');
+    const rows = await listSlotSummaries('career');
+    expect(rows[0]).toEqual({ slot: 1, summary: null, unavailable: true });
+    expect(await findCreationSlot('career', 1)).toBeNull();
+  });
+  it('does not trust a summary after key loss or cross-slot ciphertext substitution', async () => {
+    await writeSave('career', 1, makeSave());
+    await writeSave('career', 2, { ...makeSave(), id: 'other-summary' });
+    mockRows.set('sg:summary:v1:career:1', mockRows.get('sg:summary:v1:career:2')!);
+    expect((await listSlotSummaries('career'))[0].summary?.id).toBe('career-1');
+    mockKeys.clear();
+    expect((await listSlotSummaries('career'))[0].unavailable).toBe(true);
+  });
+  it('retains successful local writes when summary publication fails and safely rebuilds on retry', async () => {
+    const snapshot = { ...makeSave(), id: 'summary-publication-failure' };
+    await writeSave('career', 1, snapshot);
+    mockFailRow = 'sg:summary:v1:career:1';
+    await expect(writeSave('career', 1, { ...snapshot, wallet: { ...snapshot.wallet, coins: 987, gems: 12 } })).resolves.toBeUndefined();
+    expect(mockRows.has('sg:summary:v1:career:1')).toBe(false);
+    mockFailRow = undefined;
+    expect((await listSlotSummaries('career'))[0].summary?.coins).toBe(987);
+    await deleteSave('career', 1, snapshot.id);
+    expect((await listSlotSummaries('career'))[0]).toEqual({ slot: 1, summary: null });
+  });
   it('keeps reserved high-numbered QA slots out of account backup metadata', async () => {
     setBackupOwner('owner-a');
     await writeSave('career', 900, { ...makeSave(), id: 'qa-reserved-slot' });
@@ -141,6 +257,72 @@ describe('encrypted career persistence', () => {
     setBackupOwner(null);
   });
   afterEach(() => jest.restoreAllMocks());
+  it('finds an empty slot without decrypting, migrating or refreshing any existing career', async () => {
+    // A large world with two rolling copies reproduces the avoidable old slot scan.
+    await writeSave('career', 1, { ...makeSave(), history: 'x'.repeat(700_000) } as SaveGame);
+    await writeSave('career', 1, { ...makeSave(600), history: 'x'.repeat(700_000) } as SaveGame);
+    const decrypt = jest.spyOn(require('expo-crypto'), 'aesDecryptAsync');
+    jest.mocked(syncVipArchive).mockClear();
+    const before = performance.now();
+    expect(firstFreeSlot(await listSlots('career'))).toBe(2);
+    const fullScanMs = performance.now() - before;
+    expect(decrypt).toHaveBeenCalledTimes(2);
+    expect(syncVipArchive).toHaveBeenCalledTimes(1);
+    decrypt.mockClear();
+    jest.mocked(syncVipArchive).mockClear();
+    const bytesBefore = new Map(mockRows);
+    const quick = performance.now();
+    await expect(findCreationSlot('career')).resolves.toBe(2);
+    const occupancyMs = performance.now() - quick;
+    expect(decrypt).not.toHaveBeenCalled();
+    expect(syncVipArchive).not.toHaveBeenCalled();
+    expect(mockRows).toEqual(bytesBefore);
+    if (process.env.CREATION_SLOT_BENCH === '1') console.info('HOST SLOT BENCH (not emulator)', {
+      fullScanMs: Math.round(fullScanMs), occupancyMs: Math.round(occupancyMs),
+      decryptionsBefore: 2, decryptionsAfter: 0,
+    });
+  });
+  it('never offers corrupt primaries, backup-only or malformed chunk manifests as empty', async () => {
+    mockRows.set('sg:career:1', 'null');
+    mockRows.set('sg:career:2:bak', 'bad-json');
+    mockRows.set('sg:career:3:__chunk_manifest', 'broken');
+    await expect(findCreationSlot('career')).resolves.toBe(4);
+    for (const slot of [1, 2, 3]) await expect(findCreationSlot('career', slot)).resolves.toBeNull();
+  });
+  it('ignores invalid requested slots and treats storage errors as occupied', async () => {
+    for (const slot of [0, 7, -1, 1.5, NaN]) await expect(findCreationSlot('career', slot)).resolves.toBeNull();
+    const storage = require('@react-native-async-storage/async-storage');
+    const original = storage.getItem;
+    jest.spyOn(storage, 'getItem').mockImplementation(async (...args: unknown[]) => {
+      const key = args[0] as string;
+      if (key.startsWith('sg:career:1')) throw new Error('disk unreadable');
+      return original(key);
+    });
+    await expect(findCreationSlot('career')).resolves.toBe(2);
+    await expect(findCreationSlot('career', 1)).resolves.toBeNull();
+  });
+  it('preserves mode-scoped premium slot eligibility, including an explicit slot-six request', async () => {
+    const expiry = Date.now() + 100_000;
+    for (let slot = 1; slot <= 5; slot++) await setJSON(`sg:career:${slot}`, await sealSave(
+      { ...makeSave(), id: `career-${slot}`, entitlements: { removeAds: false,
+        seasonPass: { premium: true, expiresAt: expiry, lastVerifiedAt: Date.now() } } } as SaveGame, `sg:career:${slot}`));
+    await expect(findCreationSlot('career')).resolves.toBe(6);
+    await expect(findCreationSlot('career', 6)).resolves.toBe(6);
+    await expect(findCreationSlot('manager', 6)).resolves.toBeNull();
+    mockRows.set('sg:career:6:bak', 'unreadable');
+    await expect(findCreationSlot('career', 6)).resolves.toBeNull();
+  });
+  it('waits for an in-flight slot write and still rejects a race after selection', async () => {
+    const writing = writeSave('career', 1, makeSave());
+    const finding = findCreationSlot('career');
+    await writing;
+    await expect(finding).resolves.toBe(2);
+    const selected = await findCreationSlot('career', 2);
+    expect(selected).toBe(2);
+    await writeSave('career', 2, { ...makeSave(), id: 'other-creator' });
+    await expect(writeSave('career', 2, { ...makeSave(), id: 'this-creator' })).rejects.toThrow('occupied');
+    expect((await loadSave('career', 2))?.id).toBe('other-creator');
+  });
   it('reseals an account snapshot with a fresh device key after reinstall, preserving remaining paid state', async () => {
     setBackupOwner('owner-a');
     const paid = { ...makeSave(900), wallet: { ...makeSave().wallet, coins: 900, gems: 25 },
@@ -184,7 +366,9 @@ describe('encrypted career persistence', () => {
     // Reload the envelope as storage would after an app restart, not the
     // in-memory SealedData object returned by encryption.
     expect(await loadSave('career', 1)).toEqual(save);
-    expect(mockRows).toEqual(storedRows);
+    // Only the disposable summary may be refreshed; playable bytes/key remain exact.
+    expect(mockRows.get(key)).toEqual(storedRows.get(key));
+    expect(mockRows.get(`${key}:bak`)).toEqual(storedRows.get(`${key}:bak`));
     expect(mockKeys).toEqual(storedKeys);
   });
   it('round-trips unicode, hides wallet/plaintext and uses fresh nonces', async () => {
@@ -216,7 +400,7 @@ describe('encrypted career persistence', () => {
     const encrypt = jest.spyOn(crypto, 'aesEncryptAsync');
     const decrypt = jest.spyOn(crypto, 'aesDecryptAsync');
     await writeSave('career', 1, makeSave(600));
-    expect(encrypt).toHaveBeenCalledTimes(1);
+    expect(encrypt).toHaveBeenCalledTimes(2); // one full save + one small encrypted summary
     expect(decrypt).not.toHaveBeenCalled();
     expect(mockRows.get(`${key}:bak`)).toBe(verifiedPrimary);
     expect((await loadSave('career', 1))?.wallet.coins).toBe(600);

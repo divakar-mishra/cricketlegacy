@@ -1,0 +1,133 @@
+ATTRIBUTES GUIDE — TOP-TO-BOTTOM ENTRY / SCROLL FEEDBACK FIX
+===========================================================
+Owner report: 24 October 2026, Asia/Kolkata, after installing internal QA26.
+Source follow-up completed 25 October 2026, Asia/Kolkata.
+Originally source-only. The subsequent owner-authorized QA27 installation below
+supersedes the original source-only delivery status.
+
+OWNER-AUTHORIZED BUILD / INSTALL — 25 OCTOBER,00:09IST
+-----------------------------------------------------
+Built standalone internal QA1.0.12/code27 with existing JDK17/Gradle, production
+NODE_ENV, QA tools enabled, arm64 and the existing four approved legal URLs.
+Local QA version override only; production configuration unchanged.
+:app:assembleQa + :app:testQaUnitTest SUCCESS2m29s, wrapper150seconds;
+18native UnityConsentPolicy tests/0failures/errors/skips. Fresh90tests/10focused
+suites PASS0.706s, fresh tsc/src quiet lint/diff PASS; full Jest suite not rerun.
+Existing third-party R8/Gradle warnings retained, no warning suppression or SDK
+upgrade.382source/config fingerprints unchanged during build. Only five guide
+runtime files differ from QA26. Final source-map370project sources match current
+source exactly. Build/source/test metadata is in the artifact folder.
+
+Artifact:output/attributes-guide-qa-2026-10-25/
+cricket-player-manager-attributes-guide-qa-vc27.apk
+SHA256:68d9a110ccb3c73436c2a3ef2d0815ba082ef3282e7d6c4dc0e5f8fef5d39a6d
+Verified com.coverdrive.cricket,1.0.12/code27,min24/target36,arm64-v8a;
+assets/index.android.bundle8,228,576bytes, standalone/no Metro required.
+V2 debug signature matches the existing QA certificate SHA256:
+8027990eb28a934f33052c41c617c6278494238b58e5c0390837d8c09ee4d290.
+Internal QA APK only, not a Play production release.
+
+Confirmed emulator-5554=Pixel_10_Pro_XL and installedcode26. Reconfirmed AVD just
+before adb install -r; returned Success. Verified installedcode27,
+lastUpdateTime2026-10-25 00:09:27 and original firstInstallTime2026-10-16
+02:13:57 retained. Installed base.apk hash matches the artifact exactly.
+Opened/foregrounded MainActivity, inspected pixel10-handoff.png in the output
+folder: normal main menu, retained Manager/Mumbai Sharks Resume card, no
+pre-mode coach. Left this screen for owner; device automation stopped.
+No career/guide step entered, save created/advanced, reset, purchase, sign-in,
+uninstall or data clear. No other emulator (5556 was connected), iPhone,
+backend/provider/website or production AAB/store action. No full save/VIP parity
+claim. Actual new-build attribute touch/scroll/keyboard smoothness still awaits
+owner/native QA; a successful install is NOT a native performance pass.
+Fresh logs:/private/tmp/cricket-attributes-install27-{tests,types,lint}.log.
+Original source-only/no-build notes below are historical, not current install
+status. The implementation and its pending native verification remain as stated.
+
+REPORT AND EVIDENCE
+-------------------
+Owner: attributes guide lags heavily and starts near the bottom of the screen.
+Read-only ADB confirmed emulator-5554 is Pixel_10_Pro_XL. Captured/viewed
+/private/tmp/cricket-attributes-guide-before.png without taps or navigation.
+At capture time the owner had already reached Player club selection; this is
+NOT an independently observed reproduction of attribute-screen lag. No native
+before/after frame-time comparison or smoothness certification is claimed.
+
+Source confirmed problems introduced/left in the QA26 guide flow:
+- player.attributes started at attribute-plus, below the pathway/difficulty/
+  summary cards. Revealing that target intentionally skipped down the page.
+- The next target wrapped the WHOLE attribute page, so the next guide step
+  could scroll back up from + instead of proceeding through the screen.
+- Reveal measured target/scroller window positions asynchronously, then added
+  an optimistically changed JS scroll offset before native acknowledgements.
+  Delayed/overlapping results could therefore over-correct the same position.
+- Every scroll event requested fresh native spotlight measurements; repeated
+  layout/reveal events could issue the same scrollTo command while pending.
+- Screen's own scroll-reset effect could race the coach's target reveal.
+- Every Stepper, not only the guided +, registered an unused guide target;
+  unrelated target registration/layout also invalidated the active measurement.
+
+IMPLEMENTED
+------------
+1. Real top-to-bottom attribute targets:
+   starting-level -> creation-difficulty -> attribute-budget -> attribute-plus
+   -> attribute-controls -> creation-next.
+   Setup cards, difficulty, summary and full allocation list now have distinct
+   targets. The follow-up allocation target excludes earlier setup cards. The
+   guide explains pathway, challenge and budget BEFORE revealing the real +.
+   No point, pathway, role, difficulty or career outcome is chosen automatically.
+2. GuideScrollView uses RN0.86's existing public innerViewRef and measureLayout
+   against the actual native content View. No extra layout wrapper or dependency
+   is added. Content-local y remains stable while scroll events arrive late;
+   it is no longer reconstructed from window y plus optimistic offsets.
+3. Coalesces reveal requests per animation frame, rejects superseded results,
+   checks step/chapter scope and unmount lifetime, and retries only on a real
+   layout/step request rather than recursively spinning after measurement failure.
+4. Actual native offset and pending requested offset are separate. Identical
+   pending corrections are deduplicated; no scroll command is sent if already
+   in place. Unchanged viewport/content dimensions do not re-reveal a target.
+5. Normal scroll frames shift the cached spotlight by actual scroll delta,
+   instead of measuring native root/target views on every frame. Current-step
+   bounds and tall-list scrolling remain; fixed coach actions/Skip still work.
+6. Guided form pages remount the native scroller on scrollResetKey, avoiding a
+   competing imperative scroll-to-top effect. Parent form state remains outside
+   the scroller; ordinary unguided screen scroll-reset behavior is retained.
+7. Only a Stepper with guideIncreaseId mounts a GuideTarget. Inactive target
+   registration/layout no longer forces active-target measurement/reveal work.
+   The React Compiler lint constraint is satisfied, not disabled/suppressed.
+
+VERIFIED — MOCKED / SOURCE CHECKS, NOT A NATIVE PERFORMANCE PASS
+--------------------------------------------------------------
+90 tests / 10 focused suites PASS (1.066s), 0 snapshots:
+- Full attribute entry sequence; unrelated + actions cannot skip the intro.
+- Real form target boundaries; setup controls separated from allocation list.
+- Normal drag frames issue no extra native layout/window measures or scrollTo.
+- Repeated identical layout events do not start another reveal.
+- Twenty reveal requests coalesce, delayed results are rejected, optimistic
+  offset accumulation is absent, and a still-pending command is not repeated.
+- Thirty repeated out-of-range events issue one pending correction.
+- Old-step and post-unmount native measurement callbacks cannot scroll.
+- Guided page scroll-container remount; unguided tab/save reset behavior.
+- Previous required-field/tone/portrait/session/Back/skip/replay/country yielding,
+  keyboard height, safe-area, portrait and modal-priority regressions retained.
+Fresh npx tsc --noEmit, npx eslint src --quiet and git diff --check PASS.
+Full Jest suite, native build/tests and actual new-build touch/performance QA
+were NOT run. Logs:
+/private/tmp/cricket-attributes-guide-tests.log
+/private/tmp/cricket-attributes-guide-types.log
+/private/tmp/cricket-attributes-guide-lint.log
+
+DELIVERY / NEXT GATE
+--------------------
+Source files: CareerGuide.tsx, Screen.tsx, Stepper.tsx,
+PlayerCreationScreen.tsx and content/careerGuides.ts, plus focused tests.
+No APK/AAB, install, version increment, data clear, guide reset, career advance,
+purchase, sign-in, backend/provider/website/store operation this pass. Existing
+QA26 and its old guide behavior remain on Pixel10; no emulator taps performed.
+No schema, game engine, allocation limits, wallet, ownership or iOS signing/
+provider changes. Existing female-world and explicit creation choices preserved.
+After owner review/authorization, create a fresh standalone QA, update in place
+with adb install -r, then exercise identity -> attributes transition and each
+attribute coach step with real Android scrolling/keyboard/large text. Include
+rapid taps, lower skill rows, Back and skip. Native smoothness and iOS layout
+remain pending until observed on that rebuilt app. Earlier QA26 build success
+is not evidence that this follow-up has been installed or natively verified.

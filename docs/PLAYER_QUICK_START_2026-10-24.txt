@@ -1,0 +1,152 @@
+PLAYER FIRST-SESSION QUICK START — IMPLEMENTATION / EMULATOR QA
+=============================================================
+HISTORICAL: owner rejected this shortcut after testing. Reversed24October and
+replaced with interactive Player/Manager coaching. Do not build/revive this
+route or use its artifact as the latest candidate. Current source/evidence:
+docs/CAREER_COACH_2026-10-24.txt. The earlier findings below remain as history.
+
+Work began23October; final checks24October2026, Asia/Kolkata.
+Owner authorized implementation and testing on a free emulator, not a release.
+
+IMPLEMENTED
+-----------
+1. Required age eligibility remains first. The subsequent welcome can finish
+   with one "Let's play" action. The existing five-page tour is optional;
+   swipe/dots/skip and Settings replay remain available.
+2. New Player creation opens name, cricket nationality and role. Defaults are
+   existing Grade A age16, scale0.52, Normal, All-Rounder, right-hand bat/
+   right-arm pace, Specialist, standard save and default portrait. India is an
+   editable CRICKET nationality, not a residence/eligibility answer. The future
+   Tier3 club is visible and changes with nationality.
+3. Balanced attributes spend exactly the existing role budget on editable
+   skills. Hidden skills stay at base; no new points, rewards, difficulty
+   assistance, guaranteed selection or scripted result. Full four-step setup
+   remains available before starting; its attribute screen can apply the SAME
+   balanced preset, then edit it normally. Existing careers are not changed.
+4. After confirming local persistence, quick start opens the real match setup
+   only if resolveNextCareerStep permits PLAY_MATCH. Bench/story/calendar and
+   full-customisation routes retain the ordinary hub. Back from match setup
+   reaches the hub; there is no fake demo fixture or automatic result.
+5. The six-step Player guide no longer opens before first cricket unless
+   requested. Its help entry is beneath the fixture action, not ahead of it.
+   Automatic guidance waits for a completed match AND hub focus, so it cannot
+   cover live play/result feedback from the background route.
+6. Creation refuses occupied/unavailable/out-of-list slots, blocks same-frame
+   duplicate starts and does not activate a save after a failed initial write.
+   No persisted shape change, migration, balance/price or provider change.
+
+VERIFICATION
+------------
+Pure tests cover all four roles, exact budgets/caps, unchanged hidden groups,
+all cricket nationalities' default clubs, real unplayed Grade A fixtures and
+the focus/deferred-guide rule. Mounted tests exercise welcome/tour, hydration
+and modal queue, missing name, role/nationality changes, empty-slot selection,
+duplicate taps, failed-save retry, occupied/unavailable/full destinations,
+retained customisation and resolver-owned initial navigation.
+Final focused gate:4suites/37tests PASS. Final full gate:290suites/2198tests/
+2snapshots PASS (84.704s); typecheck, quiet lint and diff whitespace check PASS.
+Logs are in docs/evidence/player-quick-start-2026-10-23/.
+The final TypeScript route literal assertion is type-only (erased at runtime).
+Earlier failed test mocks and the caught route literal type error were fixed;
+the final typecheck passed. Earlier logs are retained, not represented as passes.
+
+ANDROID QA
+----------
+Both existing devices5554/5556 foregrounded com.auctionxi.game. They were left
+untouched. Created separate temporary AVD Cricket_FirstSession_QA, serial5558,
+Android34 Google Play arm64,1080x1920/420dpi. Initial GUI process ended; the
+headless restart used host GPU and completed the tests. AVD root:
+  /private/tmp/cricket-first-session-qa
+No existing AVD was wiped, uninstalled, force-stopped or replaced.
+
+QA profile0 contains synthetic QuickQA; a fresh local profile10 was added
+without erasing it. Profile10 contains LoopQA and DirectQA in separate slots.
+No Google/Apple account credentials, online sign-in or purchase were used.
+Synthetic adult age21 was used only as a local QA fixture. Optional Android
+notifications and starter purchase offers were declined, not granted/bought.
+
+Observed native checks:
+- Required age gate; one-action welcome; optional tour opened and skipped.
+- Missing-name hint; role defaults and visible future club.
+- Customisation still opens Identity & Avatar /Step1of4.
+- Larger text1.3: controls remain scroll-reachable; font restored to1.0.
+  Font change recreated the activity; screenshot21 is preparation/menu only,
+  not a successful quick-start capture. Screenshot22/23 are the valid checks.
+- Real save and first fixture, both bowling Contain and batting Attack choices,
+  delivery/commentary feedback, contextual first-batting guide and canonical
+  Simulate Match settlement. A defeat was observed; no result was forced.
+- Caught/fixed help placement and background deferred-guide-over-result issue.
+  Fresh profile retest: result remained visible, then guide appeared only after
+  Continue to the hub (screens27/28).
+- Final direct-start APK: Start Career opened Matchday, selected DirectQA,
+  correct normal fixture/conditions/toss/play choices (screen30).
+- Both earlier QA careers survived APK updates. DirectQA's saved first result
+  and Player-of-the-Match story survived process death. The following real
+  match completed normally (defeat by9runs, rating8.6), with no new exit record.
+  Four total QA fixtures across three synthetic careers; no real owner saves.
+
+UNRESOLVED NATIVE STABILITY OBSERVATION — DO NOT HIDE
+---------------------------------------------------
+Follow-up24October: docs/ANDROID_SIGKILL_FOLLOWUP_2026-10-24.txt records newly
+correlated GMS replacement and synchronized multi-app restarts. That evidence
+supersedes the weak memory-pressure hypothesis below, not the observed exit.
+The exact SDK caller remains unproven; no speculative runtime patch was applied.
+At00:35:16, profile10's DirectQA process13797 exited with signal9 after the
+Android notification permission result. ApplicationExitInfo reports reason2
+SIGNALED/status9, unknown subreason, no Java crash trace; pss229MB/rss216MB.
+Crash-buffer/AndroidRuntime checks showed no Java exception. Exact killer/root
+cause is NOT established; memory pressure or external termination is only a
+hypothesis, not a verified diagnosis. Many other empty processes were being
+reaped, but no matching lmkd evidence proves this particular exit was OOM.
+
+Relaunch recovered DirectQA's completed match/rewards and pending newspaper;
+the next fixture then completed normally without another process exit.
+Screens32/33 show Android Home/failed continuation during this attempt; they
+are NOT successful result captures. Exit-info files preserve the observation.
+Do not describe this run as crash-free or as a cleared production stability
+gate. A clean single-profile/repeated permission/lifecycle check is still useful
+before release; no speculative memory/permission patch was made for a SIGKILL
+whose cause could not be established.
+
+TIMING LIMIT
+------------
+This is a functional emulator pass, not a timed novice user study. Manual
+inspection, screenshots, guide exploration, font changes and tool round-trips
+were included. Do not claim a guaranteed cold-install-to-action60seconds or
+that a full T20 match completes in60seconds. The shorter route is implemented;
+an actual fresh-person time-to-first-decision measurement remains unverified.
+
+ARTIFACT
+--------
+output/player-quick-start-qa-2026-10-24/cricket-player-manager-quick-start-qa.apk
+com.coverdrive.cricket,1.0.12/code17, debug-signed internal qa build, arm64-v8a.
+Embedded assets/index.android.bundle:8,199,600bytes; no Metro server needed.
+SHA256:a1bfca484d7775344d17548cdb121a799c8e39f22011d2fa75dba71aabd7f359
+Contains prior energy/IAP source fixes as well as this quick-start work.
+Not suitable for Play upload; production1.0.12-vc20 AAB remains unchanged.
+
+Build:EXPO_PUBLIC_QA_TOOLS=true NODE_ENV=production, Gradle assembleQa,
+installed JDK17 at ~/.gradle/jdks/eclipse_adoptium-17-aarch64-os_x.2/
+jdk-17.0.20+8/Contents/Home. Java25 initial attempt failed Worklets configuration.
+Final route build succeeded in2m56s with R8/resource shrinking. Existing SDK XML,
+third-party R8 stack-map and Gradle deprecation warnings remain in logs.
+Gradle's configured uploadCrashlyticsMappingFileQa task executed; this is build
+mapping metadata, not a store/app/backend deployment. Network delivery was not
+independently verified. Future internal runs should exclude that task with:
+  -x :app:uploadCrashlyticsMappingFileQa
+No store submission, production AAB, backend/website deployment, provider
+setting change, real billing/ads certification or physical-device pass claimed.
+The separately prepared iPhone QA source snapshot predates the final direct-
+match navigation refinement; do not treat that isolated iOS build as evidence
+that this final Android quick-start revision was tested on iPhone.
+
+HANDOFF / REPEAT
+---------------
+Verify adb devices and emu avd name first; target only Cricket_FirstSession_QA.
+Use adb -s emulator-5558 install -r <qa.apk>, never clear/uninstall to reset.
+Profile10 is synthetic QA; profile0 retains the earlier QA save. No credentials
+are required. Preserve both. To use a GUI later, shut down ONLY this dedicated
+temporary AVD, then restart it with ANDROID_AVD_HOME pointing to the temp root
+and omit -no-window; do not shut down either occupied other-game emulator.
+Source instructions/docs/how-to and desktop mirror record this work. Existing
+physical iPhone/signing/provider and production release gates remain separate.

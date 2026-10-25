@@ -28,6 +28,7 @@ export function SquadPlayerIdentity({
     <View style={styles.identity}>
       <PlayerAvatar
         name={player.name}
+        sex={player.sex}
         role={player.role}
         size="sm"
         config={own ? save.cosmetics?.avatarConfig : undefined}

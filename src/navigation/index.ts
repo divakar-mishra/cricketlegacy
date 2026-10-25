@@ -1,5 +1,9 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+export type PlayerHubPage = 'home' | 'stats' | 'progress' | 'profile';
+export type RecordsTab = 'records' | 'achievements' | 'hof';
+export type PlayerLifeTab = 'overview' | 'finance' | 'media' | 'legacy';
+
 export type RootStackParamList = {
   Splash: undefined;
   MainMenu: undefined;
@@ -13,7 +17,7 @@ export type RootStackParamList = {
   CricketAcademy: undefined;
   Login: undefined;
   Purchase: { productId?: string } | undefined;
-  CareerHub: undefined;
+  CareerHub: { initialTab?: PlayerHubPage } | undefined;
   ManagerHub: undefined;
   Match: { intl?: boolean; daily?: boolean } | undefined;
   Training: { initialDevelopment?: boolean } | undefined;
@@ -21,8 +25,8 @@ export type RootStackParamList = {
   Squad: undefined;
   Transfers: undefined;
   PlayerProfile: { playerId: string };
-  PlayerLife: { initialTab?: 'overview' | 'finance' | 'media' | 'legacy' } | undefined;
-  Records: undefined;
+  PlayerLife: { initialTab?: PlayerLifeTab } | undefined;
+  Records: { initialTab?: RecordsTab } | undefined;
   Narrative: { adviser?: boolean } | undefined;
   ClubOffice: { focusSponsor?: boolean } | undefined;
   MedicalCentre: undefined;

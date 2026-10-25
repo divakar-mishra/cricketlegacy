@@ -1052,7 +1052,7 @@ export function TransfersScreen({ navigation }: ScreenProps<'Transfers'>) {
   );
 
   return (
-    <Screen>
+    <Screen careerNavigation>
       <View style={styles.listWrap}>
         <FlashList
           data={data}

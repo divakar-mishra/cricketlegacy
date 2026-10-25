@@ -1,0 +1,130 @@
+SUNLIGHT OTHER-GAMES INVITATION — SOURCE IMPLEMENTATION
+25 October 2026, Asia/Kolkata
+======================================================
+
+OWNER REQUEST / DECISIONS
+-------------------------
+Promote the owner's other game through the supplied Google Play developer page,
+never before15November. Owner delegated frequency and suggested alternate days,
+at most two appearances even for people who already installed the other game.
+
+IMPLEMENTED POLICY
+------------------
+Android only; launch at15November2026 00:00IST
+  2026-11-15T00:00:00+05:30 / 2026-11-14T18:30:00Z.
+The date uses the phone's clock. There is no QA bypass or remote/server-time
+check. Unit tests move a test clock; no emulator/phone clock was changed.
+
+At most TWO reserved/displayed invitations per installation, shared by both
+Player and Manager modes, every career and account. Reserve each impression
+durably BEFORE display. Wait at least48hours after the previous reservation:
+e.g.15November10:00IST -> earliest second17November10:00IST. Not the next day.
+After two dismissals/appearances, never automatically offer again on that
+installation. An interrupted display consumes its reservation conservatively.
+Opening the Play link records a permanent stop before handing off to the OS;
+it need not wait for a second dismissal. A failed link can be retried explicitly
+in the current card but cannot cause future automatic invitations.
+
+No installed-app detection. Installing/having the other game does not reset or
+increase the cap. No claim is made that installation was detected or confirmed.
+The cap survives normal updates/restarts, career switches, guide replay and
+ordinary settings changes. Uninstall/reinstall or explicit full local-data
+deletion clears installation-local history; this is NOT an account-wide cloud
+marketing register or cross-device tracking system.
+
+WHERE / WHEN IT APPEARS
+-----------------------
+Only Player Home or Manager Home, after at least five completed matches and
+onboarding/settings hydration. Deferred for guides, offers, newspapers, rewards,
+achievements, contracts, calendar simulation and the Player Home-return ad.
+Shares the existing lowest-priority global modal queue. Never added to a live
+match, result, career creation or checkout route. No background notification/job.
+
+Respect permanent VIP, timed ad removal and active legacy premium. This publisher
+recommendation is suppressed for ad-free users; their paid benefit is not changed.
+If focus/foreground/eligibility is lost, an already-shown appearance ends rather
+than popping back up. Foreground/Home entry refreshes history for a later eligible
+visit. One launch-boundary timer (with native timeout clamping), no polling loop.
+
+The existing rating invitation takes priority: Android snapshots whether rating
+was previously requested BEFORE enabling the rating component. A first rating
+ask cannot be immediately followed by promotion during that same Home visit.
+The campaign can be considered at a later Home entry/foreground. The existing
+five-match/rating policy is otherwise unchanged. iOS routes directly to the
+original PlayRatingPrompt/system-review component; no new Apple promo/lifecycle.
+
+COPY / LINK
+------------
+FROM SUNLIGHT
+Try another game from Sunlight
+Ready for a different challenge? Explore our other games on Google Play.
+Actions: View on Google Play / Not now.
+Android Back and outside taps also dismiss, without opening a URL.
+
+Exact user-supplied URL, opened only after an explicit CTA tap:
+  https://play.google.com/store/apps/developer?id=Sunlight+Pvt
+Uses existing React Native Linking.openURL for HTTPS OS handoff. No new package,
+native intent scheme, package-visibility permission or install query. The OS may
+use Google Play or a browser; a successful handoff is not proof of an install.
+No invented other-game name, store availability, release claim, screenshot,
+reward, benefit, positive-review requirement, tracking event or attribution.
+The browser tool could not fetch the developer page; link tests verify exact
+handoff/error handling, not current contents or regional availability of that page.
+
+STATE / FAILURE HANDLING
+------------------------
+New AsyncStorage key: promotion:sunlight-other-games:v1.
+Shape: version1, impressions0..2, lastShownAt (milliseconds/null), stoppedboolean.
+Independent of settings, career envelopes, save schemas, account backup and IAP.
+Malformed/unreadable state suppresses the invitation rather than resetting it.
+Failed impression writes suppress display; a later successful retry is allowed.
+Shared synchronous claim guard plus serialized history writes prevent retained
+hubs from reserving twice or overwriting a permanent stop with stale state.
+Recheck eligibility after async work. A dismissed/stale CTA cannot open late.
+Opening errors remain inline and dismissible; rapid taps launch once.
+
+VERIFICATION / SCOPE
+--------------------
+PASS194 focused tests /11suites, including58new cases in3new test files.
+  New policy, real popup + durable history, Home coordination.
+  Existing rating controls/service, guide queue, ads/privacy, hub copy/navigation.
+  Date -1ms/exact boundary, foreground across launch,48h -1ms/exact boundary,
+  maximum2, cross-mode/restart history, permanent stop, malformed/storage failures,
+  concurrent claims/stops, focus/background/contract/guide/VIP gates, link failure,
+  duplicate taps and dismissal during the opt-out write.
+PASS fresh typecheck, repository quiet lint and git diff --check.
+Host component/service tests with controlled I/O; not native visual/URL-handler QA.
+No full Jest suite was rerun for this UI iteration. Earlier2,289-test deep audit
+remains historical, not a new full-suite pass for the promotion source.
+
+No APK/AAB build, install, device-clock change, URL opened on a real device,
+real purchase, provider/backend/website/store deployment or submission. Prior
+code21 AAB and installed QA30 do not contain this promotion or later audit fixes.
+Replacement packaging/native upgrade checks still require owner authorization.
+
+FILES / REPEAT CHECKS
+---------------------
+src/services/otherGamesPromotion.ts — date/cap/durable claims/explicit link
+src/components/OtherGamesPrompt.tsx — safe dismissible theme card
+src/components/HubEngagementPrompts.tsx — Android entry coordination/iOS passthrough
+src/screens/CareerHubScreen.tsx and ManagerHubScreen.tsx — replace only rating
+  mount with coordinator, preserving the existing eligibility expressions.
+Three corresponding new __tests__ files are included by the normal Jest match.
+
+Evidence: output/other-games-promotion-2026-10-25/focused-results.json and logs.
+Focused command: npx jest --runInBand --runTestsByPath
+  src/services/__tests__/otherGamesPromotion.test.ts
+  src/components/__tests__/otherGamesPrompt.test.ts
+  src/components/__tests__/hubEngagementPrompts.test.ts
+  src/services/__tests__/storeReview.test.ts
+  src/components/__tests__/playRatingPrompt.test.ts
+  src/components/__tests__/guideModalQueue.test.ts
+  src/services/__tests__/ads.test.ts src/services/__tests__/adsConsent.test.ts
+  src/screens/__tests__/careerHubCopy.test.ts
+  src/screens/__tests__/managerHubCopy.test.ts
+  src/navigation/__tests__/careerNavigation.test.ts
+
+Exact Expo57 reference consulted before writing code:
+  https://docs.expo.dev/versions/v57.0.0/
+  https://docs.expo.dev/versions/v57.0.0/sdk/linking/
+Used the existing React Native Linking boundary; no dependency/native changes.

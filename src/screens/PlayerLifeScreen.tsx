@@ -34,7 +34,8 @@ import {
   premiumSponsorWeeklyRate,
   sponsorshipOffers,
 } from '../game/sponsorship';
-import { ScreenProps } from '../navigation';
+import { ScreenProps, type PlayerLifeTab } from '../navigation';
+import { playerLifeTab } from '../navigation/careerNavigation';
 import { useCareer } from '../state/careerStore';
 import {
   fonts,
@@ -47,7 +48,7 @@ import {
   useThemedStyles,
 } from '../theme';
 
-type LifeTab = 'overview' | 'finance' | 'media' | 'legacy';
+type LifeTab = PlayerLifeTab;
 
 const LIFE_TABS: readonly { id: LifeTab; label: string; icon: IconName }[] = [
   { id: 'overview', label: 'Career', icon: 'speedometer-outline' },
@@ -96,7 +97,8 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
   );
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const [tab, setTab] = useState<LifeTab>(route.params?.initialTab ?? 'overview');
+  const tab = playerLifeTab(route.params?.initialTab);
+  const setTab = (initialTab: LifeTab) => navigation.setParams({ initialTab });
   const [bankAmount, setBankAmount] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [backupText, setBackupText] = useState('');
@@ -307,23 +309,12 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
         />
       </Card>
 
-      {renderSectionTitle('Beyond cricket', financeUnlocked ? undefined : 'Portfolio unlocks at 18 in senior cricket')}
-      <View style={styles.twoButtons}>
-        <Button
-          label="Cricket Academy"
-          variant="secondary"
-          fullWidth={false}
-          style={styles.halfButton}
-          onPress={() => navigation.navigate('AcademyManagement')}
-        />
-        <Button
-          label={financeUnlocked ? 'Stock Portfolio' : 'Portfolio · Locked'}
-          variant="secondary"
-          fullWidth={false}
-          style={styles.halfButton}
-          onPress={() => navigation.navigate('InvestmentScreen')}
-        />
-      </View>
+      {renderSectionTitle('Beyond cricket')}
+      <Button
+        label="Cricket Academy"
+        variant="secondary"
+        onPress={() => navigation.navigate('AcademyManagement')}
+      />
     </>
   );
 
@@ -331,6 +322,13 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
     const income = life.lastSeasonIncome;
     return (
       <>
+        <Button
+          label={financeUnlocked ? 'Stock Portfolio' : 'Portfolio · Locked'}
+          variant="secondary"
+          style={styles.sectionButton}
+          disabled={!financeUnlocked}
+          onPress={() => navigation.navigate('InvestmentScreen')}
+        />
         {!financeUnlocked ? (
           <Card style={[styles.panel, styles.lockedPanel]}>
             <View style={styles.lockHeader}>
@@ -727,10 +725,10 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           ) : null}
         </Card>
         <Button
-          label="Records and Hall of Fame"
+          label="Hall of Fame"
           variant="secondary"
           style={styles.sectionButton}
-          onPress={() => navigation.navigate('Records')}
+          onPress={() => navigation.navigate('Records', { initialTab: 'hof' })}
         />
       </>
     );
@@ -746,7 +744,7 @@ export function PlayerLifeScreen({ navigation, route }: ScreenProps<'PlayerLife'
           : renderOverview();
 
   return (
-    <Screen scroll>
+    <Screen scroll careerNavigation scrollResetKey={`${save.id}:${tab}`}>
       <ScreenHeader title="Player Life" onBack={() => navigation.goBack()} />
       <View style={styles.tabs} accessibilityRole="tablist">
         {LIFE_TABS.map((item) => {

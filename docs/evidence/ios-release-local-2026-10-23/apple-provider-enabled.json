@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-10-23T10:03:48.570Z",
+  "projectHost": "jtyuuwzhrufavbcxrhqp.supabase.co",
+  "callback": "https://jtyuuwzhrufavbcxrhqp.supabase.co/auth/v1/callback",
+  "appleEnabled": true,
+  "googleEnabled": true,
+  "anonymousEnabled": true,
+  "limitation": "Enabled flags do not verify Apple credentials, redirects, account linking, purchases or device QA.",
+  "ownerReport": "Owner replied done after instructions to generate the Sign in with Apple client secret and save the Apple provider.",
+  "method": "Read-only GET /auth/v1/settings using the iOS profile's existing public publishable key.",
+  "privateCredentialsInspected": false,
+  "providerWritesByAgent": false,
+  "actualAppleLoginTested": false
+}

@@ -1,0 +1,170 @@
+CRICKET: PLAYER & MANAGER — RECOVERY / PRIVACY / STABILITY FOLLOW-UP
+20 October 2026, late-evening IST
+=================================================================
+
+Later live results supersede the pending items below where explicitly tested:
+see docs/RELEASE_QA_2026-10-21.txt for fresh recovery, US choices, adult Unity
+banner/interstitial, teen no-fill, memory observations and failed billing restore.
+
+Outcome and scope
+-----------------
+Automated gates and the new internal QA build pass. Fresh-device recovery,
+two different Google owners, US-region consent UI, Unity banner/interstitial
+serving and a current-device billing/restore retest are NOT marked passed.
+This is not submission clearance and no AAB was created or submitted.
+Data safety is owner-owned in this pass; no CSV answers were changed.
+
+The owner reports enabling Unity banner/interstitial mediation groups. That
+supersedes the earlier report's paused-state description, but is not serving
+evidence. No dashboard controls were changed by this session. Unity Developer
+Data, age designation, Families designation, Show all ads and AdMob's Unity
+blocking/signal/first-party-ID settings were left unchanged.
+
+Direct device work completed
+---------------------------
+Pixel_10_Pro_XL / emulator-5556 initially ran the corrected internal code19
+APK, SHA256 9f5645f675be9f7e92b3f61715e2fdf03a35a6b66cb743f8adb750c27e21c550.
+The installed APK hash was checked rather than assuming it was current.
+
+Cricket_Recovery_QA_34 / emulator-5580 still had the older pre-wallet-fix APK.
+It was updated with the corrected code19 APK using adb install -r, preserving
+its installation and data. Its fresh menu and signed-out Account were checked.
+Continue with Google was opened for owner-handled authentication. Chrome setup
+and Google sign-in remain pending; no credentials or authentication screens
+were inspected. No career/account data was cleared to simulate recovery.
+
+Memory investigation
+--------------------
+The guarded driver navigated only Team, Home, Club and Records in the existing
+Manager QA career. It stopped at transition 29, during round 5, when another
+app took over Pixel 10. The observed foreground was Auction 2027, not this app.
+No further foregrounding, taps, orientation changes or installation on Pixel
+10 were attempted. Exclusive QA use was requested from the owner.
+
+Same game process PID 7502, PSS in KB:
+  Home baseline   261645    Views 222    WebViews 1
+  Round 1         329707    Views 794    WebViews 4
+  Round 2         374021    Views 1186   WebViews 5
+  Round 3         360648    Views 1186   WebViews 5
+  Round 4         363364    Views 796    WebViews 4
+Activities remained 1 and AppContexts 27 in those detailed samples.
+At 18:12:48 UTC, a read-only background observation of the same process reported
+PSS 331441 KB. Object counts were unavailable in that observation; null counts
+must not be interpreted as zero. No UI was touched for that measurement.
+
+This shows warm-up and later reclamation, not monotonic growth in every round.
+The planned eight rounds, controlled idle and background/resume sequence did
+not finish. No retained-object heap analysis was possible in this pass, so this
+is neither a confirmed leak diagnosis nor proof of a leak-free steady state.
+Ad Inspector was not opened during this baseline; it adds test-device overhead.
+
+Source review: career section navigation already uses popTo to avoid duplicate
+screen stacks; banners unmount when unfocused/backgrounded/consent-disabled.
+Banner subscription and repeated focus-cycle cleanup tests pass. These are
+mitigations and bounded source tests, not proof of SDK/WebView heap cleanup.
+
+QA-only consent instrumentation
+------------------------------
+Settings has three QA session controls: regulated-US adult geography, simulated
+teen ad treatment and end-session. These use the actual configureAds and Ad
+privacy choices pathways. They do not persist a new age answer or modify saves.
+An existing adult test session, QA JS flag, native qa build and Google's test-
+device check are required before a consent reset/region override is offered.
+Actual saved teen/unknown-age sessions cannot use an override to become adult.
+
+UMP reset temporarily closes ad readiness, revokes Unity personalization and
+invalidates previously loading ads. Overlapping profile/privacy operations are
+blocked. A withdrawn audience cannot be resurrected by a delayed reset. A reset
+error leaves ads unavailable and allows a later explicit QA retry.
+
+Teen QA uses TFUA=true in GMA and UMP, G-rated GMA configuration and explicit
+NPA request extras in the isolated native diagnostics panel. Normal teardown
+removes the debug geography and reuses the normal adult configuration. The
+pinned RN SDK creates a fresh native RequestConfiguration.Builder, clearing the
+QA rating when that optional field is omitted. UNSPECIFIED is not a supported
+RN rating enum and is not used. Cold-restart after ending QA and closing any
+single-source Ad Inspector override. Prior consent is never forcibly regranted.
+
+The diagnostics Activity remains QA-source-set-only, not exported, requires
+UMP permission and a Google test device, and requires manual confirmation of
+Unity dashboard test mode. It cannot verify Unity's dashboard by itself. It
+logs sanitized treatment flags and computed Unity privacy-policy decisions,
+not raw consent strings or account IDs. Those policy computations are not an
+independent readback from Unity's ad server. No game reward is granted.
+
+Console mismatch requiring owner review
+--------------------------------------
+The supplied Unity screenshot says the app is general audience/not directed to
+children. Google's Unity integration guide says Mixed Audience must be enabled
+to process per-user child-directed/under-age-of-consent signals. The pinned
+4.16.6.0 adapter supports forwarding TFUA, but source support alone cannot prove
+the dashboard honors it for this project. Consequently teen Unity serving is
+not certified. Do not blindly change a legal age/Families declaration merely
+to make a test pass; align the actual audience and Unity configuration first.
+
+Primary references checked during this follow-up:
+https://developers.google.com/admob/android/mediation/unity#set_age_treatment
+https://docs.unity.com/en-us/grow/ads/privacy/coppa-compliance
+https://developers.google.com/admob/android/privacy/us-iab-support
+https://developers.google.com/admob/android/ad-inspector/test-ad-units
+https://developer.android.com/google/play/billing/test
+https://docs.expo.dev/versions/v57.0.0/
+
+Automated checks and artifact
+----------------------------
+Focused consent/diagnostics: 48 tests PASS.
+Focused recovery/persistence/age/purchases/banner/Unity: 142 tests PASS.
+Full Jest: 277 suites / 2036 tests / 2 snapshots PASS (104.732 seconds).
+Typecheck PASS; quiet lint PASS; git diff --check PASS before documentation.
+Native UnityConsentPolicy: 18 JVM tests PASS.
+Native Reanimated harness: 12 patched cases PASS, vulnerable control has the
+expected 7 failures. This host harness is not an Oppo GPU/Chromium test.
+Gradle assembleQa and testQaUnitTest PASS, 2m38s. Existing third-party R8 and
+Gradle deprecation warnings remain; no SDK upgrades were made. Gradle ran its
+configured QA Crashlytics mapping upload task. No backend schema/data deployment
+or store-console submission was performed.
+
+New artifact (NOT INSTALLED):
+output/final-qa-2026-10-20/cricket-player-manager-privacy-qa-vc20.apk
+SHA256 b09593db85a56c4475e15f50a9469902caf8062d214b7597fd8ae5dfaa94fc7d
+Version 1.0.12 / local QA code20, arm64, debug-signed, standalone embedded
+Hermes bundle, non-debuggable runtime. This is not a Play release artifact.
+Code20 applies only through the ignored QA variant init script; no production
+version-code decision was made. Prior corrected code19 APK remains preserved.
+Both Reanimated and Worklets native arm64 libraries match corrected code19.
+All five persistence/recovery source hashes match the corrected code19 build.
+
+Cloud preservation
+------------------
+Read-only queries were restricted to the same nine authorized QA career IDs.
+Between 17:58:01 and 18:12:55 UTC, all nine revisions, full snapshot hashes and
+full paid-state hashes stayed identical. All original balances, inventory and
+purchase/entitlement markers remain preserved. No SQL mutations were used.
+
+Remaining runtime work / owner input
+-----------------------------------
+1. Owner finishes original QA Google sign-in on Cricket_Recovery_QA_34. Verify
+   all five Player/four Manager careers and paid benefits really restore.
+2. Owner supplies/signs into a second distinct Google QA account. Test both
+   directions and in-flight isolation without copying tokens or deleting saves.
+3. Confirm exclusive Pixel 10 use before installing the new QA APK with -r.
+   Then test the real US privacy form, opt-out/reopen, teen treatment, each
+   enabled Unity format through single-source test mode, and controlled memory
+   idle/background rounds. Never click a creative/install link.
+4. Use a suitable licensed Google Play test account/device for purchases and
+   restore. A test track alone does not prevent charges. Never confirm payment
+   without an explicit test payment instrument. Do not spend or inflate the
+   preserved nine-career balances. No billing orders/restores ran in this pass.
+5. Oppo A18/A79/platform-splash verification remains unavailable. Low reported
+   crash frequency is not evidence that the OEM-specific cause is fixed. Carry
+   this as an explicit residual release risk rather than marking it passed.
+
+Evidence
+--------
+output/final-qa-2026-10-20/followup-full-regression.json
+output/final-qa-2026-10-20/privacy-qa-artifact.json
+output/final-qa-2026-10-20/followup-memory-result.json
+output/final-qa-2026-10-20/followup-background-observation.json
+output/final-qa-2026-10-20/followup-cloud-preservation.json
+android/app/build/test-results/testQaUnitTest/TEST-com.coverdrive.cricket.UnityConsentPolicyTest.xml
+Earlier completed work is recorded separately in docs/RELEASE_QA_2026-10-20.txt.

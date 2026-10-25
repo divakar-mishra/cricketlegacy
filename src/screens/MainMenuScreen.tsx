@@ -1,20 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import { Emblem, Screen, AppText as Text } from '../components';
 import { HeroBackground } from '../components/HeroBackground';
 import { APP_NAME, APP_TAGLINE, APP_VERSION } from '../config/app';
-import { saveSubtitle } from '../game/saveMeta';
 import { useT } from '../i18n';
 import { ScreenProps } from '../navigation';
 import { purchases } from '../services';
 import { useCareer } from '../state/careerStore';
 import { useSettings } from '../state/settingsStore';
-import { getLastPlayed, ResolvedSave } from '../storage/saveGames';
+import { getLastPlayedSummary, loadSave, ResolvedSummary } from '../storage/saveGames';
 import { useAccountBackup } from '../services/accountRecovery';
 import {
   fonts,
@@ -30,26 +29,24 @@ import {
 
 // ─── Continue Card ────────────────────────────────────────────────────────────
 
-function ContinueCard({ resume, onPress }: { resume: ResolvedSave; onPress: () => void }) {
+function ContinueCard({ resume, onPress, opening }: { resume: ResolvedSummary; onPress: () => void; opening: boolean }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
 
   // Extract snapshot data
-  const save = resume.save;
-  const playerName = save.userPlayerId ? save.players[save.userPlayerId]?.name : null;
-  const teamName = save.userTeamId ? save.teams[save.userTeamId]?.name : null;
-  const season = save.currentSeasonId ? save.seasons[save.currentSeasonId] : null;
+  const save = resume.summary;
   const isCareer = save.mode === 'career';
-  const subtitle = saveSubtitle(save);
+  const subtitle = save.subtitle;
 
   // Latest match result — derive from careerWins / season data
   const lastMatch: { userWon: boolean | null } | null =
-    save.careerWins != null ? { userWon: save.lastMatchWon ?? null } : null;
+    save.hasMatchHistory ? { userWon: save.lastMatchWon ?? null } : null;
 
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={styles.continueWrapper}>
       <Pressable
         onPress={onPress}
+        disabled={opening}
         style={({ pressed }) => [styles.continueCard, pressed && { opacity: 0.9 }]}
       >
         <LinearGradient
@@ -64,7 +61,7 @@ function ContinueCard({ resume, onPress }: { resume: ResolvedSave; onPress: () =
               <Text style={styles.continueMode}>
                 {isCareer ? '🏏 PLAYER CAREER' : '📋 MANAGER CAREER'}
               </Text>
-              <Text style={styles.continueName}>{playerName ?? teamName ?? 'Continue'}</Text>
+              <Text style={styles.continueName}>{save.title}</Text>
               <Text style={styles.continueSub}>{subtitle}</Text>
             </View>
             <View style={styles.continueArrow}>
@@ -81,23 +78,23 @@ function ContinueCard({ resume, onPress }: { resume: ResolvedSave; onPress: () =
                   {lastMatch.userWon ? '✅ Won' : lastMatch.userWon === false ? '❌ Lost' : '—'}
                 </Text>
               </View>
-              {season && (
+              {save.seasonYear != null && (
                 <View style={styles.snapshotItem}>
                   <Text style={styles.snapshotLabel}>Season</Text>
-                  <Text style={styles.snapshotValue}>{season.year}</Text>
+                  <Text style={styles.snapshotValue}>{save.seasonYear}</Text>
                 </View>
               )}
-              {save.wallet && (
+              {save.coins != null && (
                 <View style={styles.snapshotItem}>
                   <Text style={styles.snapshotLabel}>Wallet</Text>
-                  <Text style={styles.snapshotValue}>{save.wallet.coins} 🪙</Text>
+                  <Text style={styles.snapshotValue}>{save.coins} 🪙</Text>
                 </View>
               )}
             </View>
           )}
 
           <View style={styles.resumeButton}>
-            <Text style={styles.resumeButtonText}>Resume</Text>
+            <Text style={styles.resumeButtonText}>{opening ? 'Opening career…' : 'Resume'}</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.black} />
           </View>
         </LinearGradient>
@@ -160,7 +157,11 @@ function MenuButton({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export function MainMenuScreen({ navigation }: ScreenProps<'MainMenu'>) {
-  const [resume, setResume] = useState<ResolvedSave | null>(null);
+  const [resume, setResume] = useState<ResolvedSummary | null>(null);
+  const [opening, setOpening] = useState(false);
+  const openingRef = useRef(false);
+  const focused = useRef(false);
+  const actionEpoch = useRef(0);
   const setActive = useCareer((s) => s.setActive);
   const storeUnlocked = useSettings((s) => s.playedMatchesAllModes >= 2);
   const storeAvailable = purchases.MOCK_MODE || purchases.isStoreReady();
@@ -169,23 +170,39 @@ export function MainMenuScreen({ navigation }: ScreenProps<'MainMenu'>) {
   const t = useT();
   const backupRefresh = useAccountBackup((state) => state.refresh);
 
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    return () => { focused.current = false; actionEpoch.current += 1; };
+  }, []));
+
   useFocusEffect(
     useCallback(() => {
-      let alive = true;
+      const controller = new AbortController();
       (async () => {
-        const last = await getLastPlayed();
-        if (alive) setResume(last);
+        const last = await getLastPlayedSummary({ signal: controller.signal }).catch(() => null);
+        if (!controller.signal.aborted) setResume(last);
       })();
       return () => {
-        alive = false;
+        controller.abort();
       };
     }, [backupRefresh]),
   );
 
-  const onContinue = () => {
-    if (!resume) return;
-    setActive(resume.save, resume.mode, resume.slot);
-    navigation.navigate(resume.mode === 'career' ? 'CareerHub' : 'ManagerHub');
+  const onContinue = async () => {
+    if (!resume || openingRef.current || !focused.current) return;
+    openingRef.current = true;
+    setOpening(true);
+    const epoch = actionEpoch.current;
+    const active = () => focused.current && actionEpoch.current === epoch;
+    try {
+      const save = await loadSave(resume.mode, resume.slot, { isCurrent: active });
+      if (!active()) return;
+      if (!save || save.id !== resume.summary.id || save.mode !== resume.mode) throw new Error('The career changed. Open Saved Games and try again.');
+      setActive(save, resume.mode, resume.slot);
+      navigation.navigate(resume.mode === 'career' ? 'CareerHub' : 'ManagerHub');
+    } catch (error) {
+      if (active()) Alert.alert('Career not opened', error instanceof Error ? error.message : 'Please retry from Saved Games.');
+    } finally { openingRef.current = false; setOpening(false); }
   };
 
   const onExit = () => {
@@ -213,7 +230,7 @@ export function MainMenuScreen({ navigation }: ScreenProps<'MainMenu'>) {
       </HeroBackground>
 
       {/* Continue card (replaces plain button) */}
-      {resume ? <ContinueCard resume={resume} onPress={onContinue} /> : null}
+      {resume ? <ContinueCard resume={resume} onPress={() => void onContinue()} opening={opening} /> : null}
 
       {/* Main menu items */}
       <View style={styles.menu}>

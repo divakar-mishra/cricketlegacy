@@ -5,6 +5,7 @@ import { haptics } from '../audio';
 import { fontWeight, radius, spacing, ThemeColors, useTheme, useThemedStyles } from '../theme';
 import { AppText as Text } from './AppText';
 import { GlassSurface } from './GlassSurface';
+import { GuideTarget } from './CareerGuide';
 
 interface HubTab {
   key: string;
@@ -15,34 +16,49 @@ interface HubTab {
   active?: boolean;
 }
 
-/** A persistent bottom navigation bar for the career/manager hubs. */
+/** Persistent section navigation for career hubs and their ordinary detail screens. */
 export function HubTabBar({ tabs }: { tabs: HubTab[] }) {
   const styles = useThemedStyles(makeStyles);
   const { colors } = useTheme();
-  const swipeStartX = useRef<number | null>(null);
+  const gesture = useRef<{ x: number; y: number; handled: boolean } | null>(null);
   const activeIndex = Math.max(
     0,
     tabs.findIndex((tab) => tab.active),
   );
 
   const onTouchStart = (event: GestureResponderEvent) => {
-    swipeStartX.current = event.nativeEvent.pageX;
+    gesture.current = { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, handled: false };
   };
 
-  const onTouchEnd = (event: GestureResponderEvent) => {
-    if (swipeStartX.current == null) return;
-    const delta = event.nativeEvent.pageX - swipeStartX.current;
-    swipeStartX.current = null;
-    if (Math.abs(delta) < 46) return;
+  const activate = (tab: HubTab) => {
+    haptics.selection();
+    tab.onPress();
+  };
+
+  /** Returns true when this gesture has consumed the release (including vertical drags). */
+  const finishGesture = (event: GestureResponderEvent): boolean => {
+    const start = gesture.current;
+    if (!start) return false;
+    if (start.handled) return true;
+    const delta = event.nativeEvent.pageX - start.x;
+    const vertical = event.nativeEvent.pageY - start.y;
+    if (Math.abs(delta) < 46 && Math.abs(vertical) < 46) return false;
+    start.handled = true;
+    if (Math.abs(delta) < 46 || Math.abs(delta) <= Math.abs(vertical)) return true;
     const nextIndex =
       delta < 0 ? Math.min(tabs.length - 1, activeIndex + 1) : Math.max(0, activeIndex - 1);
-    if (nextIndex === activeIndex) return;
-    haptics.selection();
-    tabs[nextIndex]?.onPress();
+    if (nextIndex !== activeIndex && tabs[nextIndex]) activate(tabs[nextIndex]);
+    return true;
   };
 
   return (
-    <View onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <View
+      onTouchStart={onTouchStart}
+      onTouchEnd={finishGesture}
+      onTouchCancel={() => {
+        if (gesture.current) gesture.current.handled = true;
+      }}
+    >
       <GlassSurface intensity={0.78} rounded={radius.lg} padded={false} style={styles.bar}>
         <View style={styles.tabs}>
           {tabs.map((t) => {
@@ -50,11 +66,20 @@ export function HubTabBar({ tabs }: { tabs: HubTab[] }) {
               t.active ? t.icon : (`${t.icon}-outline` as keyof typeof Ionicons.glyphMap)
             ) as keyof typeof Ionicons.glyphMap;
             return (
-              <Pressable
-                key={t.key}
-                onPress={() => {
-                  haptics.selection();
-                  t.onPress();
+              <GuideTarget key={t.key} id={`tab-${t.key}`} style={{ flex: 1 }}><Pressable
+                onPress={(event) => {
+                  // Both release callback orders are possible. Resolve a real
+                  // touch here too, so a swipe never also activates its origin.
+                  if (
+                    event?.nativeEvent &&
+                    Number.isFinite(event.nativeEvent.pageX) &&
+                    Number.isFinite(event.nativeEvent.pageY) &&
+                    (event.nativeEvent.pageX !== 0 || event.nativeEvent.pageY !== 0)
+                  ) {
+                    if (finishGesture(event)) return;
+                    if (gesture.current) gesture.current.handled = true;
+                  }
+                  activate(t);
                 }}
                 style={styles.tab}
                 accessibilityRole="tab"
@@ -66,7 +91,7 @@ export function HubTabBar({ tabs }: { tabs: HubTab[] }) {
                 <Text style={[styles.label, t.active && styles.labelActive]} numberOfLines={1}>
                   {t.label}
                 </Text>
-              </Pressable>
+              </Pressable></GuideTarget>
             );
           })}
         </View>
@@ -88,6 +113,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
     tab: {
       flex: 1,
+      minWidth: 0,
       minHeight: 48,
       alignItems: 'center',
       justifyContent: 'center',

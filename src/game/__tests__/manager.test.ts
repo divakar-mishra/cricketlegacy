@@ -34,6 +34,15 @@ describe('ensureManagerDepth', () => {
 });
 
 describe('staff & facilities', () => {
+  it.each(['TOKEN', 'CLUB_BUDGET'] as const)('rejects a retired Manager upgrade using %s without any mutation', (payment) => {
+    const save = makeManagerSave();
+    save.managerRetired = true;
+    save.inventory = { ...save.inventory, facility_upgrade_token: 1 };
+    save.teams[save.userTeamId!].budget = 5_000_000;
+    const before = JSON.stringify(save);
+    expect(upgradeFacility(save, 'medical', payment)).toMatchObject({ ok: false, cost: 0, reason: 'This Manager career is retired.' });
+    expect(JSON.stringify(save)).toBe(before);
+  });
   it('investing raises quality and spends budget; fails when broke', () => {
     const save = makeManagerSave();
     const team = save.teams[save.userTeamId!];

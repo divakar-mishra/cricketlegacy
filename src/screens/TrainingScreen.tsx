@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { playHaptic } from '../audio';
 import { showShortageOffer } from '../components/showShortageOffer';
@@ -49,6 +49,7 @@ import {
   useThemedStyles,
 } from '../theme';
 import { ManagerTrainingScreen } from './ManagerTrainingScreen';
+import { GuideTarget, GuideReplayButton } from '../components/CareerGuide';
 
 interface GainPopup {
   id: number;
@@ -163,6 +164,9 @@ export function TrainingScreen({ navigation, route }: ScreenProps<'Training'>) {
 
   return (
     <Screen
+      scroll
+      careerNavigation
+      guide={{ chapter: 'player.training', enabled: !popup && !showDevelopment }}
       footer={
         canContinueWithoutTraining ? (
           <Button
@@ -182,8 +186,9 @@ export function TrainingScreen({ navigation, route }: ScreenProps<'Training'>) {
         onBack={() => navigation.goBack()}
       />
       <WalletBar wallet={save.wallet} />
+      <GuideReplayButton chapter="player.training" />
 
-      <Pressable
+      <GuideTarget id="development"><Pressable
         accessibilityRole="button"
         accessibilityLabel={
           showDevelopment ? 'Return to training sessions' : 'Open Development Centre'
@@ -213,7 +218,7 @@ export function TrainingScreen({ navigation, route }: ScreenProps<'Training'>) {
             color={colors.accent}
           />
         </View>
-      </Pressable>
+      </Pressable></GuideTarget>
 
       {activeAnalysis ? (
         <View style={styles.analystBanner}>
@@ -253,7 +258,7 @@ export function TrainingScreen({ navigation, route }: ScreenProps<'Training'>) {
       ) : null}
 
       {/* Sessions progress bar */}
-      <Animated.View entering={FadeInDown.duration(300)} style={styles.progressBox}>
+      <GuideTarget id="training-sessions"><Animated.View entering={FadeInDown.duration(300)} style={styles.progressBox}>
         <View style={styles.progressRow}>
           <Text style={styles.progressLabel}>Sessions</Text>
           <Text style={styles.progressCount}>
@@ -261,7 +266,7 @@ export function TrainingScreen({ navigation, route }: ScreenProps<'Training'>) {
           </Text>
         </View>
         <ProgressBar value={progressPct} color={colors.primary} style={{ marginTop: spacing.xs }} />
-      </Animated.View>
+      </Animated.View></GuideTarget>
 
       {/* Player OVR card */}
       <Animated.View entering={FadeInDown.duration(320).delay(40)}>
@@ -303,7 +308,7 @@ export function TrainingScreen({ navigation, route }: ScreenProps<'Training'>) {
       ) : null}
 
       {/* Attribute groups */}
-      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+      <View>
         {showDevelopment ? (
           <PlayerDevelopmentPanel />
         ) : (
@@ -344,16 +349,17 @@ export function TrainingScreen({ navigation, route }: ScreenProps<'Training'>) {
               >
                 <Card style={[styles.groupCard, analystRecommended && styles.recommendedGroup]}>
                   <View style={styles.groupHeader}>
-                    <View style={{ flex: 1 }}>
+                    <GuideTarget id={idx === 0 ? 'training-focus' : `training-focus-${idx}`} style={{ flex: 1 }}>
                       <Text style={styles.groupTitle}>{group.label}</Text>
                       {analystRecommended ? (
                         <Text style={styles.recommendedLabel}>Analyst focus</Text>
                       ) : null}
-                      <Text style={styles.groupAvg}>
+                      <GuideTarget id={idx === 0 ? 'training-cost' : `training-cost-${idx}`}><Text style={styles.groupAvg}>
                         Avg {groupAvg} · {groupLeft} left
                       </Text>
-                    </View>
-                    <Button
+                      <Text style={styles.groupAvg}>Session cost: {cost} Coins</Text></GuideTarget>
+                    </GuideTarget>
+                    <GuideTarget id={idx === 0 ? 'training-button' : `training-button-${idx}`}><Button
                       label={
                         isBusy
                           ? 'Training...'
@@ -375,7 +381,7 @@ export function TrainingScreen({ navigation, route }: ScreenProps<'Training'>) {
                           (productId) => navigation.navigate('Purchase', { productId }), cost - save.wallet.coins)) return;
                         void onTrain(group.id);
                       }}
-                    />
+                    /></GuideTarget>
                   </View>
                   {attrs.map((attr) => (
                     <View key={attr.key} style={styles.attrRow}>
@@ -393,7 +399,7 @@ export function TrainingScreen({ navigation, route }: ScreenProps<'Training'>) {
             );
           })
         )}
-      </ScrollView>
+      </View>
 
       {/* Gain popup overlay */}
       {popup ? (

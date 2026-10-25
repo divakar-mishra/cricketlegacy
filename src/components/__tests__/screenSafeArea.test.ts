@@ -1,6 +1,7 @@
 import { createElement, type ComponentProps } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { Screen } from '../Screen';
+jest.mock('../CareerGuide', () => require('../../test/coachGuideMock'));
 
 const mockDimensions = { width: 320, height: 640, scale: 1, fontScale: 1 };
 const mockInsets = { top: 24, left: 0, right: 0, bottom: 24 };
@@ -14,6 +15,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('../GlassSurface', () => ({ GlassBlurProvider: 'GlassBlurProvider' }));
+jest.mock('../CareerNavigation', () => ({ CareerNavigation: 'CareerNavigation' }));
 jest.mock('../../theme', () => ({
   spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
   useTheme: () => ({
@@ -101,5 +103,28 @@ describe('shared screen edge spacing', () => {
     expect(flatten(tree.root.findByType('ScrollView' as any).props.contentContainerStyle)).toMatchObject({
       paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0,
     });
+  });
+
+  it('recomputes gutters and footer safe areas across repeated narrow/wide window changes', () => {
+    // A generic window-resize contract, NOT an iPhone Duo native-fold test.
+    const action = createElement('Action' as any, { testID: 'resize-action' });
+    const props = { scroll: true, footer: action };
+    act(() => { tree = create(screenElement(props)); });
+    for (const [width, height, left, right] of [
+      [375, 667, 0, 0], [820, 700, 40, 20], [440, 956, 0, 0], [375, 667, 0, 0],
+    ]) {
+      Object.assign(mockDimensions, { width, height });
+      Object.assign(mockInsets, { left, right });
+      act(() => { tree.update(screenElement(props)); });
+      const body = flatten(tree.root.findByType('ScrollView' as any).props.contentContainerStyle);
+      const button = tree.root.findByProps({ testID: 'resize-action' });
+      const footerContent = flatten(button.parent!.props.style);
+      const footer = flatten(button.parent!.parent!.props.style);
+      expect(body.paddingHorizontal).toBe(width < 480 ? 20 : 24);
+      expect(footerContent.paddingHorizontal).toBe(body.paddingHorizontal);
+      expect(footer).toMatchObject({ paddingLeft: left, paddingRight: right, flexShrink: 0 });
+      expect(body.width).toBe('100%');
+      expect(body.maxWidth).toBe(980);
+    }
   });
 });

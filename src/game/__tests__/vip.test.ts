@@ -18,11 +18,41 @@ import {
   grantRetirementCollections,
   hasModeVip,
   settleVipSeason,
+  settleVipVisit,
 } from '../vip';
 import { makeCareerSave, makeManagerSave } from './_depthHelpers';
 import { ensureManagerDepth } from '../manager';
 
 describe('mode-specific permanent VIP collections', () => {
+  it.each(['career', 'manager'] as const)('actually awards advertised7day Gems and30day frame once for%s VIP', mode => {
+    const save = mode === 'career' ? makeCareerSave() : makeManagerSave();
+    grantModeVip(save, mode === 'career' ? 'player_vip' : 'manager_vip');
+    const now = Date.UTC(2026, 9, 23);
+    const day = Math.floor(now / 86400_000);
+    save.vipStreakLastDay = day - 1; save.vipStreakDays = 6;
+    const gems = save.wallet.gems;
+    expect(settleVipVisit(save, now)).toMatchObject({ updated: true, days: 7, reward: { gems: 10 } });
+    expect(save.wallet.gems).toBe(gems + 10);
+    expect(settleVipVisit(save, now).updated).toBe(false);
+    expect(settleVipVisit(save, now - 86400_000).updated).toBe(false);
+    expect(save.wallet.gems).toBe(gems + 10);
+    save.vipStreakLastDay = day - 1; save.vipStreakDays = 29;
+    expect(settleVipVisit(save, now).days).toBe(30);
+    expect(save.inventory?.avatar_legend_vip).toBe(1);
+    expect(settleVipVisit(save, now).updated).toBe(false);
+    expect(save.inventory?.avatar_legend_vip).toBe(1);
+    expect(save.wallet.gems).toBe(gems + 10);
+  });
+  it('does not grant the VIP streak to timed ad-free trials and resets a missed day honestly', () => {
+    const save = makeCareerSave();
+    const now = Date.UTC(2026, 9, 23);
+    save.entitlements.removeAds = false;
+    save.entitlements.removeAdsUntil = now + 86400_000;
+    expect(settleVipVisit(save, now)).toEqual({ updated: false, days: 0, reward: null });
+    grantModeVip(save, 'player_vip');
+    save.vipStreakLastDay = Math.floor(now / 86400_000) - 2; save.vipStreakDays = 6;
+    expect(settleVipVisit(save, now)).toEqual({ updated: true, days: 1, reward: null });
+  });
   it('treats legacy saves without entitlements as not owning VIP', () => {
     const save = makeCareerSave();
     delete (save as Partial<typeof save>).entitlements;

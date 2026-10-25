@@ -1,0 +1,10 @@
+PASS src/screens/__tests__/playerQuickStartFlow.test.ts
+PASS src/game/__tests__/playerQuickStart.test.ts
+PASS src/screens/__tests__/careerHubCopy.test.ts
+PASS src/components/__tests__/onboardingInteractions.test.ts
+
+Test Suites: 4 passed, 4 total
+Tests:       36 passed, 36 total
+Snapshots:   0 total
+Time:        1.021 s
+Ran all test suites matching /src\/screens\/__tests__\/playerQuickStartFlow.test.ts|src\/game\/__tests__\/playerQuickStart.test.ts|src\/screens\/__tests__\/careerHubCopy.test.ts|src\/components\/__tests__\/onboardingInteractions.test.ts/i.

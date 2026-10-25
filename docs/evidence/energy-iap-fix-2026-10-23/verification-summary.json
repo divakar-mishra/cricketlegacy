@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-23",
+  "timezone": "Asia/Kolkata",
+  "scope": "Owner-approved energy recovery implementation and local IAP benefit audit",
+  "approvedBalance": {
+    "rewardedAdEnergy": 8,
+    "energyRegenMinutes": 3,
+    "freeCap": 36,
+    "permanentVipCap": 60,
+    "fixtureCostsChanged": false,
+    "gemRefillPriceChanged": false
+  },
+  "fullCheck": {
+    "command": "npm run check",
+    "exitCode": 0,
+    "typecheck": "PASS",
+    "quietLint": "PASS",
+    "jestSuitesPassed": 287,
+    "jestTestsPassed": 2167,
+    "snapshotsPassed": 2,
+    "failures": 0,
+    "jestSeconds": 80.212,
+    "log": "jest-full.log"
+  },
+  "additionalChecks": {
+    "nodeConfigurationPrivacyTestsPassed": 17,
+    "isolatedPostgreSqlChecksPassed": 24,
+    "liveBackendUsed": false,
+    "projectDependenciesChangedForSqlTest": false,
+    "logs": ["node-checks.log", "sql-backup-checks.log"]
+  },
+  "iapCoverage": {
+    "launchProducts": 14,
+    "actualFulfilmentTestedWithMockedProvider": true,
+    "encryptedReloadAndReceiptReplayTested": true,
+    "utilityConsumptionAndRestoreRegressionSuitesPassed": true,
+    "additionalDefectFixed": "Advertised VIP streak rewards had no runtime callers",
+    "pricesOrProductsChanged": false,
+    "realPurchasesOrCharges": false
+  },
+  "nativeBuildOrInstall": false,
+  "publicationOrDeployment": false,
+  "nativeAdPresentationAndLiveBillingVerified": false,
+  "priorAttempt": {
+    "log": "jest-full-attempt1.log",
+    "passedSuites": 286,
+    "failedSuites": 1,
+    "cause": "Old U19 UI assertion expected paid Store navigation rather than the approved recovery dialog",
+    "resolvedInFinalRun": true
+  }
+}

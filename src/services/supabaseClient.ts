@@ -10,6 +10,8 @@ export interface SupabaseUserSession {
   userId: string;
   isAnonymous: boolean;
   provider: string | null;
+  /** Linked identities, not an instruction to merge accounts by email. */
+  providers?: readonly string[];
   displayName?: string;
 }
 
@@ -104,18 +106,37 @@ function authDisplayName(user: unknown): string | undefined {
   return undefined;
 }
 
+function userSession(user: {
+  id: string;
+  identities?: { provider?: string }[];
+}): SupabaseUserSession {
+  return {
+    userId: user.id,
+    isAnonymous: isAnonymousUser(user),
+    provider: authProvider(user),
+    providers: [...new Set((user.identities ?? []).map(identity => identity.provider)
+      .filter((provider): provider is string => Boolean(provider)))],
+    displayName: authDisplayName(user),
+  };
+}
+
 export async function currentSupabaseSession(): Promise<SupabaseUserSession | null> {
   const supabase = getSupabaseClient();
   if (!supabase) return null;
 
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.user) return null;
-  return {
-    userId: data.session.user.id,
-    isAnonymous: isAnonymousUser(data.session.user),
-    provider: authProvider(data.session.user),
-    displayName: authDisplayName(data.session.user),
-  };
+  return userSession(data.session.user);
+}
+
+/** OAuth completion must validate the account/linked identities with Auth,
+ * not trust the cached user or require the original signup provider. */
+export async function currentVerifiedSupabaseSession(): Promise<SupabaseUserSession | null> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) return null;
+  return userSession(data.user);
 }
 
 /**

@@ -76,7 +76,7 @@ describe('purchase screen copy', () => {
       'const rewardedEnergyAvailable = useAdsReady();',
     );
     expect(purchaseScreen).toContain(
-      "label={rewardedEnergyAvailable ? 'Watch ad' : 'Ad unavailable'}",
+      "label={rewardedEnergyAvailable ? `Watch ad · +${ECONOMY.rewardedAdEnergy} energy` : 'Ad unavailable'}",
     );
     expect(purchaseScreen).toContain('!rewardedEnergyAvailable ||');
     expect(purchaseScreen).toContain('style={styles.energyAlertActions}');
@@ -87,7 +87,7 @@ describe('purchase screen copy', () => {
   });
 
   it('keeps optional rewarded energy ads available to remove-ads owners', () => {
-    expect(purchaseScreen).toContain('const res = await ads.showRewarded();');
+    expect(purchaseScreen).toContain('const result = await requestRewardedEnergy(save.id);');
     expect(purchaseScreen).not.toContain('ads.showRewarded(!removeAds)');
     expect(purchaseScreen).toContain(
       'Removes banners and interstitials; optional rewarded ads remain available',

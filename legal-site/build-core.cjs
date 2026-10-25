@@ -203,6 +203,7 @@ function layout(config, { title, description, path, body }) {
   <title>${escapeHtml(title)} · ${escapeHtml(config.publisher.tradingName)}</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
+  ${path === '/' ? '<script src="/auth-return.js" defer></script>' : ''}
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -246,9 +247,10 @@ function privacyPage(config, age) {
   const retention = config.retention;
   return `${pageHeading('Your data', `${config.appName} Privacy Policy`, `How ${config.publisher.tradingName} handles information in ${config.appName}.`, config)}
   <article>
-    <p class="effective">Privacy update: 13 September 2026 — optional Firebase Analytics and Crashlytics diagnostics.</p>
+    <p class="effective">Privacy clarification: 21 October 2026 — platform-specific sign-in, advertising and diagnostics. The 19 October 2026 Android Unity Ads and 13 September 2026 optional Android Firebase disclosures remain in effect.</p>
     <section><h2>Scope of this policy</h2>
       <p>This policy applies specifically to ${escapeHtml(config.appName)} and its related support and web pages. It does not apply to other apps published by ${escapeHtml(config.publisher.tradingName)}; those apps have their own privacy policies.</p>
+      <p>The Android game is listed on Google Play. An iOS version is in preparation; this page does not announce an App Store release. Online sign-in, cloud backup, advertising and purchases depend on the platform, build and enabled services. A feature described conditionally here is not a promise that it is currently available on every platform.</p>
     </section>
     <section><h2>Who is responsible</h2>
       <p>${escapeHtml(config.publisher.tradingName)} provides ${escapeHtml(config.appName)} and is responsible for the personal data described here. The legal operator is identified on the <a href="/publisher/">Publisher Information</a> page.</p>
@@ -257,13 +259,13 @@ function privacyPage(config, age) {
     <section><h2>Information the app handles</h2>
       ${list([
         '<strong>Local game data:</strong> careers, squads, match history, settings, rewards and other progress stored on your device.',
-        '<strong>Account and cloud data:</strong> an anonymous or linked account identifier, authentication records and cloud saves when the online backend is enabled.',
+        '<strong>Account and cloud data:</strong> an anonymous or linked account identifier, authentication records and cloud saves when the online backend is enabled. Google or Apple sign-in, where available, can supply a provider identifier, email address and profile information permitted by the provider. Sign in with Apple may supply a private relay email rather than your personal email; a name is not always supplied. The app does not receive your Google or Apple password.',
         `<strong>Purchases:</strong> product, entitlement, transaction status and pseudonymous verification identifiers supplied by Google Play, Apple or RevenueCat. ${escapeHtml(config.publisher.tradingName)} does not receive your full payment-card number.`,
         '<strong>Online play and security:</strong> leaderboard entries you submit, server timestamps, app/build version, fraud checks, IP address and service logs.',
-        '<strong>Age preferences:</strong> the app stores your self-declared age band, India/outside-India residence choice and, where applicable, parent or guardian permission on your device. It does not ask for a date of birth or upload these answers. This is a self-declaration, not verified identity or parental consent.',
-        '<strong>Advertising:</strong> Google Mobile Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices according to the build and your settings. Ads are not initialized for unknown-age users, children under 13, teens in India, or teens without parent or guardian permission. Eligible teens outside India receive child-directed, G-rated, non-personalized ads. For adults, Google uses the consent choice to determine whether personalized, non-personalized, or eligible limited ads may be served. Both eligible groups wait for the Google consent flow to permit requests. Declining consent does not guarantee that a limited ad will be available. Ad privacy choices are available in Settings. Non-personalized or limited ads may still involve technical processing.',
+        '<strong>Age preferences:</strong> the app stores your self-declared age band, India/outside-India residence choice and, where applicable, parent or guardian permission on your device. It does not ask for a date of birth or upload the raw answers; advertising SDKs receive age-treatment and consent flags. This is a self-declaration, not verified identity or parental consent.',
+        '<strong>Advertising:</strong> Google Mobile Ads and, in Android builds with mediation enabled, Unity Ads may process device or advertising identifiers, IP address, ad interactions, diagnostics and consent choices according to the build and your settings. Ads are not initialized for unknown-age users, children under 13, teens in India, or teens without parent or guardian permission. Eligible teens outside India are flagged as under the age of consent; the app requests G-rated, non-personalized treatment. On Android, adult Google requests use the consent choice to determine whether personalized, non-personalized, or eligible limited ads may be served. The current iOS implementation requests non-personalized ads and does not include the Unity Ads SDK or request App Tracking Transparency permission. This does not mean advertising is data-free. Android Unity personalization requires a confirmed, supported vendor-and-purpose consent grant; otherwise Unity receives an opt-out signal, including for teens and unsupported regional consent signals. Both eligible groups wait for the Google consent flow to permit requests. Declining consent does not guarantee that a limited ad will be available. Ad privacy choices are available in Settings. Non-personalized or limited ads may still involve technical processing.',
         '<strong>Support:</strong> your email address, message and attachments if you contact support.',
-        '<strong>Optional diagnostics:</strong> if you enable Usage analytics in Settings, Google Firebase Analytics processes app-instance identifiers, app/device information, sessions and limited gameplay events to measure usage. Its SDK may also derive approximate location from masked IP addresses and collect in-app purchase/subscription events, including product and price information. This does not give us your payment-card details or precise GPS location. If you enable Crash reports, Firebase Crashlytics processes installation identifiers, app/device diagnostics, session information and crash traces to diagnose failures. Both choices are off by default and can be withdrawn in Settings. We do not attach account names, emails or save contents to Firebase reports. Analytics advertising-ID collection and advertising consent are disabled. Turning these options off stops future reporting; it does not automatically erase reports already received by Google. Provider retention and deletion procedures apply to previously received data; contact us using the details above for a privacy request.',
+        '<strong>Optional Android diagnostics:</strong> if you enable Usage analytics in Settings, Google Firebase Analytics processes app-instance identifiers, app/device information, sessions and limited gameplay events to measure usage. Its SDK may also derive approximate location from masked IP addresses and collect in-app purchase/subscription events, including product and price information. This does not give us your payment-card details or precise GPS location. If you enable Crash reports, Firebase Crashlytics processes installation identifiers, app/device diagnostics, session information and crash traces to diagnose failures. Both choices are off by default and can be withdrawn in Settings. We do not attach account names, emails or save contents to Firebase reports. Analytics advertising-ID collection and advertising consent are disabled. Turning these options off stops future reporting; it does not automatically erase reports already received by Google. The current iOS build does not include Firebase Analytics or Crashlytics; its advertising and store SDKs may still process their own technical data. Provider retention and deletion procedures apply to previously received data; contact us using the details above for a privacy request.',
         '<strong>Device features:</strong> notification permission and locally scheduled reminders. The current app does not upload a push-notification token.',
       ])}
       <p>The public legal site does not intentionally set advertising or analytics cookies. Cloudflare may process ordinary network and security logs when it hosts these pages.</p>
@@ -278,7 +280,7 @@ function privacyPage(config, age) {
       <p>Depending on the context and applicable law, processing is based on providing the service you request, your consent, legitimate service-security interests, or a legal obligation. You may withdraw consent for optional processing, although this does not affect earlier lawful processing.</p>
     </section>
     <section><h2>Service providers and disclosures</h2>
-      <p>Information may be processed for ${escapeHtml(config.publisher.tradingName)} by Supabase (authentication and cloud data), RevenueCat (purchase entitlement management), Google Play and Apple (billing), Google Mobile Ads (advertising), Google Firebase Analytics and Crashlytics (optional usage and crash diagnostics), and Cloudflare (site delivery and security). Their handling is also governed by their own terms and privacy notices.</p>
+      <p>Depending on enabled services, information may be processed for ${escapeHtml(config.publisher.tradingName)} by Supabase (authentication and cloud data), RevenueCat (purchase entitlement management), Google and Apple (sign-in and their respective stores), Google Mobile Ads (advertising), Unity Ads (Android ad mediation only), Google Firebase Analytics and Crashlytics (optional Android usage and crash diagnostics), and Cloudflare (site delivery and security). Their handling is also governed by their own terms and privacy notices. See <a href="https://unity.com/legal/privacy-policy">Unity privacy information</a>.</p>
       <p>Information may also be disclosed when required by law, to protect users or the service, or in connection with a business transfer. ${escapeHtml(config.publisher.tradingName)} does not sell personal data. Public leaderboard information is shared publicly only when that feature is enabled and you submit an entry.</p>
     </section>
     <section><h2>Storage, transfers and retention</h2>
@@ -322,6 +324,7 @@ function termsPage(config, age) {
     </section>
     <section><h2>Purchases, VIP and save-bound rewards</h2>
       <p>The store processes payment and supplies the final localized price, taxes and refund rules. The current Android catalogue offers one-time purchases, not a recurring Season Pass. Player VIP and Manager VIP are permanent purchases for their respective modes; neither unlocks the other mode. Player Legend includes Player VIP, and Manager Legacy Edition includes Manager VIP.</p>
+      <p>An iOS version is in preparation. Purchases are available only when the relevant store and product are configured and offered in your build. A Google Play purchase does not automatically become an App Store purchase; cross-platform access must be supported and verified by the game. Do not repurchase an item just to troubleshoot an account or restore problem: contact support first.</p>
       <p>VIP collection progress is earned through completed in-game seasons. Retirement grants remaining eligible collection cosmetics, not Coins, Gems, club funds or consumable rewards.</p>
       <p>Eligible permanent purchases can be restored through the app. Currency, boosts and tokens, including those bundled with a permanent purchase, are granted once to the purchased save and are not reissued by restoring purchases or moving to another save. Local-only progress is not a cloud backup.</p>
       <p>If you have a legacy subscription, it continues under its original store terms until cancelled. Deleting the app or account does not cancel it. Legacy save-bound sponsors remain attached to their original save and mode and may require periodic online verification; they are not offered in the current launch catalogue.</p>
@@ -357,6 +360,12 @@ function supportPage(config) {
     </section>
     <section><h2>Purchase help</h2>
       <p>Use Restore Purchases in the in-app Store for eligible non-consumables and active subscriptions. For a charge, refund or billing problem, include the product name, store, approximate purchase date and the store’s non-secret order reference. Billing and refunds are ultimately handled under Google Play or Apple policies.</p>
+      <p>Use the same store account that made the purchase and, where applicable, the same in-game account. Restore does not regrant spent currency, one-time bundle currency or consumable tokens. It is not a substitute for recovering a career backup. Do not uninstall or clear app data while troubleshooting unless you have independently verified your backup.</p>
+      <p>For an Apple-billed purchase, use <a href="https://reportaproblem.apple.com/">Apple purchase and refund support</a>. For a Google Play charge, use <a href="https://support.google.com/googleplay/answer/2479637">Google Play refund guidance</a>. Account deletion and uninstalling do not cancel store subscriptions.</p>
+    </section>
+    <section><h2>iOS availability and sign-in</h2>
+      <p>The iOS version is in preparation, not announced here as publicly released. Services in testing builds may be unavailable until configured. On a supported iOS build, choose Account and the available Apple or Google sign-in button. Complete passwords and two-factor prompts only on the provider’s own screen. A private relay email from Apple is a valid account address; it does not automatically identify an existing Google account.</p>
+      <p>If browser sign-in expires, return to the game and start a new attempt. Signing out is not account deletion. Do not assume two different provider identities share careers or purchases unless an explicit account-linking and recovery flow confirms that result.</p>
     </section>
     <section><h2>Account and privacy help</h2>
       <p>For deletion, follow the <a href="/delete-account/">account-deletion instructions</a>. For access, correction or another privacy request, use the support email and put “Privacy request” in the subject.</p>
@@ -384,6 +393,7 @@ function deletePage(config) {
         <li>Read the warning and confirm. The signed-in account is verified by the server; the app never asks you to type or send your account identifier in the deletion request.</li>
       </ol>
       <p>If the account is local-only, the same screen deletes the data stored on that device.</p>
+      <p>For a linked Apple or Google account, request deletion from the game or the verified support route below. Removing the app or disconnecting it in the provider’s settings alone does not request deletion of the game’s cloud account, and deleting the game account does not delete your Apple or Google account.</p>
     </section>
     <section class="action-card"><h2>Cannot access the app?</h2>
       <p>Email ${escapeHtml(config.publisher.tradingName)} to start a manually verified deletion request. Support will ask only for information needed to establish control of the account or purchase. Do not email a password, access token, full receipt or payment-card information.</p>
@@ -422,7 +432,15 @@ function productCard(config, product) {
 }
 
 function homePage(config) {
-  const body = `<section class="studio-hero">
+  const body = `<section id="google-sign-in-retry" class="auth-return" hidden aria-labelledby="google-sign-in-retry-title">
+    <p class="kicker">Cricket: Player and Manager · Account</p>
+    <h1 id="google-sign-in-retry-title" tabindex="-1">Sign-in not completed</h1>
+    <p id="google-sign-in-retry-message" class="lede">Return to the game and start a new sign-in attempt.</p>
+    <p>This attempt did not sign you into the game. Do not uninstall the game to retry.</p>
+    <p><a id="google-sign-in-return" class="button" href="coverdrive://auth/callback?error=access_denied&amp;error_code=bad_oauth_state&amp;error_description=Sign-in%20did%20not%20complete.">Return to Cricket: Player and Manager</a></p>
+    <p>If the button does not open the game, close this browser tab, reopen the game, and choose Account → Continue with Google or the Apple button where available. Wait for account backup confirmation before uninstalling.</p>
+  </section>
+  <div id="publisher-content" class="publisher-content"><section class="studio-hero">
     <div class="studio-hero-copy">
       <p class="kicker">Independent studio · ${escapeHtml(config.publisher.location)}</p>
       <h1>${escapeHtml(config.publisher.tradingName)}</h1>
@@ -439,7 +457,7 @@ function homePage(config) {
   <section class="product-list" aria-label="${escapeHtml(config.publisher.tradingName)} products">
     ${config.products.map((product) => productCard(config, product)).join('')}
   </section>
-  <section class="contact-summary"><div><p class="kicker">Publisher</p><h2>Independent, reachable, transparent.</h2></div>${contactBlock(config, { showPublisherLink: false })}</section>`;
+  <section class="contact-summary"><div><p class="kicker">Publisher</p><h2>Independent, reachable, transparent.</h2></div>${contactBlock(config, { showPublisherLink: false })}</section></div>`;
   return layout(config, {
     title: config.publisher.tradingName,
     description: config.site.description,
@@ -469,6 +487,8 @@ function productPage(config, product) {
   <section class="highlight-grid" aria-label="${escapeHtml(product.name)} highlights">
     ${product.highlights.map((highlight, index) => `<article><span class="highlight-number">0${index + 1}</span><h3>${escapeHtml(highlight.title)}</h3><p>${escapeHtml(highlight.description)}</p></article>`).join('')}
   </section>
+  ${isPrimaryApp ? `<section class="notice" id="ios-availability"><h2>iPhone and iPad</h2><p>An iOS version is in preparation. No public App Store release or release date is announced here. Sign-in, purchases and advertising must be configured and tested for iOS; Android availability does not confirm those services on Apple devices.</p></section>
+  <section id="age-suitability"><h2>Age suitability and eligibility</h2>${paragraphs(AGE_POLICIES[config.agePolicy].terms)}<p>The game contains fictional cricket careers and occasional non-graphic injury, recovery, alcohol and mature off-field story references. App-store content ratings and regional eligibility rules describe different things; follow both the applicable store rating and these eligibility terms. This page does not claim a final Apple rating or a verified parental-consent service.</p></section>` : ''}
   ${
     isPrimaryApp
       ? `<section class="section-intro legal-intro"><div><p class="kicker">Official information</p><h2>Legal &amp; support</h2></div><p>These pages apply specifically to ${escapeHtml(config.appName)}. Future ${escapeHtml(config.publisher.tradingName)} products will receive their own product-specific policies before release.</p></section>

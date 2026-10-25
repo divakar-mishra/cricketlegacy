@@ -1,0 +1,226 @@
+{
+  "date": "2026-10-25",
+  "timezone": "Asia/Kolkata",
+  "scope": "Owner-authorized source fix for saved-career loading, cancellation and overlapping backup reads",
+  "implemented": [
+    "encrypted versioned derived summaries for lists and Continue",
+    "selected full-save and expected-identity verification",
+    "duplicate-tap/navigation-epoch guards",
+    "queued/between-copy/between-slot cancellation",
+    "generation/account/acknowledgement-bound backup tokens",
+    "dirty bound saves opened once for upload",
+    "safe summary invalidation and failure fallback"
+  ],
+  "safety": {
+    "primaryEncryptionAndRollingBackupsRetained": true,
+    "mutableFullSaveCache": false,
+    "saveSchemaChanged": false,
+    "cloudChecksumContractChanged": false,
+    "migrationsRejectOccupiedAsUnavailable": true,
+    "providerConfigurationChanged": false,
+    "publicVersionChanged": false
+  },
+  "focusedTests": {
+    "passed": true,
+    "suites": 11,
+    "tests": 235,
+    "snapshots": 0,
+    "seconds": 37.815,
+    "log": "/private/tmp/cricket-summary-tests.log"
+  },
+  "additionalFulfilmentTests": {
+    "passed": true,
+    "suites": 2,
+    "tests": 75,
+    "snapshots": 0,
+    "seconds": 4.698,
+    "log": "/private/tmp/cricket-summary-fulfilment-tests.log"
+  },
+  "totalDistinctFocusedTests": 310,
+  "checks": {
+    "typecheck": true,
+    "quietLint": true,
+    "gitDiffCheck": true,
+    "actualOrchestrationRegression": true,
+    "expo57DocsReadBeforeCode": true
+  },
+  "counts": {
+    "interpretation": "Actual source orchestration, mocked boundaries and synthetic 6 Player/4 Manager saves with both copies; operation counts, NOT device timings, AES performance or actual user data.",
+    "currentSource": {
+      "playerList": {
+        "storedCopyReads": 0,
+        "nonemptyCopyOpens": 0,
+        "sealedMarkerChecks": 0,
+        "vipArchiveCalls": 0,
+        "metadataReads": 6,
+        "summaryOpens": 6,
+        "summaryWrites": 0,
+        "occupancyChecks": 6,
+        "backupSessions": 0
+      },
+      "twoConcurrentPlayerLists": {
+        "storedCopyReads": 0,
+        "nonemptyCopyOpens": 0,
+        "sealedMarkerChecks": 0,
+        "vipArchiveCalls": 0,
+        "metadataReads": 12,
+        "summaryOpens": 12,
+        "summaryWrites": 0,
+        "occupancyChecks": 12,
+        "backupSessions": 0
+      },
+      "backupPlusPlayerListPlusContinue": {
+        "storedCopyReads": 0,
+        "nonemptyCopyOpens": 0,
+        "sealedMarkerChecks": 0,
+        "vipArchiveCalls": 0,
+        "metadataReads": 18,
+        "summaryOpens": 17,
+        "summaryWrites": 0,
+        "occupancyChecks": 21,
+        "backupSessions": 1,
+        "backupRefresh": 1
+      },
+      "requestDuringRunningBackup": {
+        "storedCopyReads": 0,
+        "nonemptyCopyOpens": 0,
+        "sealedMarkerChecks": 0,
+        "vipArchiveCalls": 0,
+        "metadataReads": 20,
+        "summaryOpens": 20,
+        "summaryWrites": 0,
+        "occupancyChecks": 28,
+        "backupSessions": 2,
+        "queuedRequestsCoalesce": true,
+        "activePassAndFollowupCoalesce": false
+      },
+      "coldBackupPlusPlayerListPlusContinue": {
+        "storedCopyReads": 20,
+        "nonemptyCopyOpens": 20,
+        "sealedMarkerChecks": 10,
+        "vipArchiveCalls": 10,
+        "metadataReads": 18,
+        "summaryOpens": 7,
+        "summaryWrites": 10,
+        "occupancyChecks": 21,
+        "backupSessions": 1
+      },
+      "twoConcurrentColdPlayerLists": {
+        "storedCopyReads": 12,
+        "nonemptyCopyOpens": 12,
+        "sealedMarkerChecks": 6,
+        "vipArchiveCalls": 6,
+        "metadataReads": 12,
+        "summaryOpens": 6,
+        "summaryWrites": 6,
+        "occupancyChecks": 12,
+        "backupSessions": 0
+      },
+      "standardCreationSelection": {
+        "available": true,
+        "storedCopyReads": 0,
+        "nonemptyCopyOpens": 0,
+        "sealedMarkerChecks": 0,
+        "vipArchiveCalls": 0,
+        "metadataReads": 0,
+        "summaryOpens": 0,
+        "summaryWrites": 0,
+        "occupancyChecks": 2,
+        "backupSessions": 0
+      }
+    },
+    "lastObservedIphoneBuild4": {
+      "playerList": {
+        "storedCopyReads": 12,
+        "nonemptyCopyOpens": 12,
+        "sealedMarkerChecks": 6,
+        "vipArchiveCalls": 6,
+        "metadataReads": 0,
+        "summaryOpens": 0,
+        "summaryWrites": 0,
+        "occupancyChecks": 0,
+        "backupSessions": 0
+      },
+      "twoConcurrentPlayerLists": {
+        "storedCopyReads": 24,
+        "nonemptyCopyOpens": 24,
+        "sealedMarkerChecks": 12,
+        "vipArchiveCalls": 12,
+        "metadataReads": 0,
+        "summaryOpens": 0,
+        "summaryWrites": 0,
+        "occupancyChecks": 0,
+        "backupSessions": 0
+      },
+      "backupPlusPlayerListPlusContinue": {
+        "storedCopyReads": 38,
+        "nonemptyCopyOpens": 34,
+        "sealedMarkerChecks": 17,
+        "vipArchiveCalls": 17,
+        "metadataReads": 1,
+        "summaryOpens": 0,
+        "summaryWrites": 0,
+        "occupancyChecks": 0,
+        "backupSessions": 1,
+        "backupRefresh": 1
+      },
+      "requestDuringRunningBackup": {
+        "storedCopyReads": 48,
+        "nonemptyCopyOpens": 40,
+        "sealedMarkerChecks": 20,
+        "vipArchiveCalls": 20,
+        "metadataReads": 0,
+        "summaryOpens": 0,
+        "summaryWrites": 0,
+        "occupancyChecks": 0,
+        "backupSessions": 2,
+        "queuedRequestsCoalesce": true,
+        "activePassAndFollowupCoalesce": false
+      },
+      "listWaitsForLastSlot": {
+        "completedCopyOpensBeforeLastSlot": 10,
+        "resultPublishedBeforeLastSlot": false,
+        "finalCopyOpens": 12
+      },
+      "standardCreationSelection": {
+        "available": false,
+        "reason": "Earlier snapshot predates occupancy optimization"
+      }
+    },
+    "sourceFingerprints": {
+      "src/storage/integrity.ts": "5b3ca55dbc6042830fb944ca30dc5fe7adff1dd6684ec28a332586d05b25485a",
+      "src/storage/saveGames.ts": "b404afea8d31fa9719963cfec8028cc1cc529ee51aec3a5742ef701b16b9e58a",
+      "src/domain/types.ts": "92b5b465849b76437e5343e1ef2fb05b3e57a7658d36717cb23af14a0d5d3af3",
+      "src/game/saveMeta.ts": "2690333f584cb12c50d7ab96f172302f24335d350c9bd746ba5de818a5d79521",
+      "src/storage/saveSummary.ts": "26d8813058425349cfd5b88884b408d030399ea106bf0b2d58e04803de3a86ce",
+      "src/storage/accountBackupJournal.ts": "8093c581b217439c0a74148ff924762899b4f91e5ba96e199a2826f9cf7f948e",
+      "src/services/accountRecovery.ts": "26aaba220169ec5e4ef158076287a2646e721bc145569fc5ccef7c53c7251284",
+      "output/ios-device/input-qa-2026-10-24-build4/workspace/src/storage/integrity.ts": "5b3ca55dbc6042830fb944ca30dc5fe7adff1dd6684ec28a332586d05b25485a",
+      "output/ios-device/input-qa-2026-10-24-build4/workspace/src/storage/saveGames.ts": "43fba449cbe58a6b75f8f0ae77c36efdbf2b7834c60eadfeccb0a9156241ed26",
+      "output/ios-device/input-qa-2026-10-24-build4/workspace/src/services/accountRecovery.ts": "6fa8fb03d5e463709ad8e2818aa2d59fdc45cb4733caca5ddd3134ba99c1637f"
+    }
+  },
+  "boundaries": {
+    "nativeCryptoTest": "Real Node AES-GCM adapted to Expo native API; not native device timing",
+    "harness": "Synthetic six Player/four Manager careers, mocked storage/crypto/provider boundaries; actual orchestration and cache helper",
+    "newPhysicalDeviceTiming": false,
+    "newManualResponsivenessPass": false,
+    "fullSuiteRun": false,
+    "build": false,
+    "install": false,
+    "storeOrProviderOrBackendWrite": false,
+    "userSaveOrCredentialCapture": false,
+    "existingAndroidCode23IncludesFix": false,
+    "existingIphoneQa4IncludesFix": false
+  },
+  "pending": [
+    "Owner review of source change",
+    "Authorized QA rebuild/install",
+    "Fresh manual iPhone and Android input/list/Continue/backup timings",
+    "Native memory/profile coverage; legitimate full-save work remains"
+  ],
+  "handbook": {
+    "repositoryUpdated": true,
+    "desktopMirror": "all three handbook files mirrored to /Users/divakarmishra/Desktop/HOW TO; byte identity verified; unrelated files preserved"
+  }
+}

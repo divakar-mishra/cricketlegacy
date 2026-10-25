@@ -36,6 +36,7 @@ describe('player creation attribute dashboard', () => {
 
   it('returns every creation step to the top before rendering its content', () => {
     expect(source).toContain('scrollResetKey={step}');
+    expect(source).not.toContain('quickStart');
   });
 
   it('keeps every bowling-style option in the shared equal-width selector', () => {

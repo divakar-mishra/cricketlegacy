@@ -15,6 +15,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 jest.mock('../../storage/saveEncryption', () => ({
   openSave: async () => null,
   sealSave: async () => ({}),
+  sealSaveSummary: async () => ({}),
+  openSaveSummary: async () => null,
   markSaveSealed: async () => {},
 }));
 jest.mock('../../services/vipArchive', () => ({ syncVipArchive: jest.fn(async () => {}) }));
@@ -26,6 +28,22 @@ const { makeCareerSave, makeManagerSave } = jest.requireActual<
 >('../../game/__tests__/_depthHelpers');
 
 describe('mode VIP purchase fulfilment', () => {
+  it('settles and saves VIP streak benefits through the actual career load, without duplicate rewards', async () => {
+    const now = Date.UTC(2026, 9, 23);
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    const save = makeCareerSave();
+    save.entitlements.removeAds = true;
+    save.vipStreakDays = 6;
+    save.vipStreakLastDay = Math.floor(now / 86400_000) - 1;
+    const before = save.wallet.gems;
+    useCareer.getState().setActive(save, 'career', 1);
+    expect(useCareer.getState().save?.wallet.gems).toBe(before + 10);
+    expect(useCareer.getState().persist).toHaveBeenCalled();
+    useCareer.getState().tickVipStreak();
+    useCareer.getState().setActive(useCareer.getState().save!, 'career', 1);
+    expect(useCareer.getState().save?.wallet.gems).toBe(before + 10);
+    await new Promise<void>(resolve => setImmediate(resolve));
+  });
   beforeEach(() => {
     useCareer.setState({
       persist: jest.fn(async () => {}),

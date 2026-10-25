@@ -1,0 +1,351 @@
+PHYSICAL IPHONE — MISSED-TAP / RESPONSIVENESS INVESTIGATION
+24 October 2026 | Diagnosis, not a runtime fix or release certification
+
+STATUS: OPEN
+============
+25 OCTOBER FOLLOW-UP: owner reports saved-career lists still load slowly.
+The prior decoder fix improved scheduling, not the full-world list design.
+Current-source/frozen-QA4 operation-count audit and complete cross-app impacts:
+docs/SAVE_LOADING_IMPACT_AUDIT_2026-10-25.txt. No fresh phone timing/runtime patch
+in that follow-up. Historical physical results below are not an instant-load
+or manual-performance clearance. Last observed phone build is QA4, not a new
+verification that the device still has that version today.
+
+LATEST: the owner-reported Saved Games freeze led to a measured save-decoder
+stall and a yielding-decoder candidate. Current phone install is Input QA 4,
+1.0.12/build 4, IN PLACE; native code/data sections and entitlements preserved.
+No reset/sign-out. Both-list/navigation checks passed; MANUAL retest pending. Shared
+runtime delta is ONLY decodeSaveText.ts + its call in saveEncryption.ts;
+other agent's root changes remain excluded from this frozen phone candidate.
+No whole-app or release certification; original nine-career recovery must be
+rechecked after updates. The sections below retain historical intermediate work.
+
+SAVED GAMES / MEASURED STALL / CANDIDATE FIX
+==========================================
+Owner reports 1-2 failed Settings/Back attempts in 12 tries; Saved Games shows
+neither career list and freezes/Back takes about 15 seconds. First manual log:
+20 root touches, 18 recognized presses (9 Settings/9 Back), zero cancels,
+21 route entries, 25 JS gaps, expiration at 600.084 seconds. Recognized presses
+were followed by route callbacks in 5.03-39.46 ms, NOT proof of all physical
+attempts or visual latency. An excluded-screen interval was about 12.626 seconds.
+
+Extended timing-only build 3, signed/installed in place, added SavedGames and
+known save-loading stage durations. Seven helper tests/typecheck/lint passed.
+It retained encryption/read order/contents. Initial system Ruby lacked xcodeproj;
+used the existing pinned local tooling. Separate runner compiled/signed.
+saved-games-r1.xcresult FAILED (50.538 seconds): final inspected screenshot is
+MAIN MENU, not a stuck list. The log includes intervening manual navigation and
+the old driver could match a retained Saved Games header rather than the icon-
+delimited menu item. Do NOT call this a controlled reproduced list-load timeout.
+Corrected driver to the menu-specific item; owner asked not to tap during run.
+
+Build-3 input-trace-first-list.json DOES isolate synchronous UTF-8 work:
+30 decode calls total 25,807.72 ms; maximum 5,347.16 ms in one call; matching
+heartbeat excess delay 5,448.32 ms immediately afterward. Other async stage
+times overlap and include scheduling delays; do not add their totals as CPU.
+AES sealed-data conversion max 1.46 ms; JSON parsing max 10.48 ms; integrity
+checking max 108.32 ms in this captured sample. Four full-list spans up to
+21,567.59 ms include concurrent/background work; they are not exact UI latency.
+The slow stage is new TextDecoder().decode(plaintext), not a missing save key
+or a reason to disable encryption/checksums. This is an evidenced contributor,
+not yet an explanation of EVERY intermittent physical tap failure.
+
+Fix: decode authenticated plaintext using the SAME standard streaming decoder
+in 16 KiB pieces with a setTimeout(0) macrotask between pieces. Preserve partial
+multibyte characters/BOM/end-of-stream handling and join the text before the
+unchanged JSON/integrity checks. No disk format, encryption/AAD/key, migration,
+rolling backup, ownership, purchase or career changes. No custom UTF-8 decoder
+and no dependency upgrade. Android uses the same semantically equivalent helper
+in future integrated builds; no Android package was built/installed here.
+76 focused Jest tests pass (decoder, real AES protected-save tests and account
+recovery); 8 Node checks pass, including the ACTUAL installed Expo UTF-8 decoder
+with Unicode, invalid bytes/BOM and byte-offset views. Root and frozen candidate
+typechecks/focused lint pass. These are correctness checks, not phone latency.
+
+Input QA 4 artifact/source: output/ios-device/input-qa-2026-10-24-build4/.
+JS SHA256: 31704c9ed6e20a277440ff5c97cd11a7771d9457daa9d3c15e2e9bc16590311e
+Native code/data sections unchanged; optimized Hermes 98, same signing identity,
+entitlements/profile. Signature verified; in-place install succeeded. Current
+selected test: saved-games-build4-r2.xcresult PASSED in 18.833 seconds. No Play/Delete/
+New/Retry, provider, purchase or explicit backup actions. Owner replied unlocked
+and ready. Input log bounds/privacy/expiry are as below, now three screens.
+
+BUILD-4 PHONE RESULTS / IMPORTANT PRESERVATION LIMIT
+===================================================
+saved-games-build4-r2 passed: Player list appeared, one Back returned to menu.
+12.080 seconds command-and-observation includes XCTest overhead, not input
+latency; list loading is NOT instant. Initial captured build-4 log: one excess
+heartbeat delay of 890.3 ms. Old build-3 capture had multiple multi-second gaps.
+Different workload/window, not a controlled percentage/speedup benchmark.
+Whole yielding-decode elapsed time includes scheduled waits and cannot be
+reported as one synchronous block. A residual pause still needs investigation
+if manual taps remain poor. No FPS/memory or global freeze-free claim.
+
+preservation-build4-r3 FAILED its old exact Player count assertion: authenticated
+controls were observed, but six Play cards appeared instead of the historical
+five. It stopped before Manager. Read-only player-list-count-build4-r4 capture
+PASSED; inspected AX shows six distinct cards, with the additional VIP slot
+dated 24 October. Origin not established; never open/delete it to fit a test.
+No claim that the patch created it, nor that all old save IDs/balances match.
+Separate observation test lists-build4-r5 PASSED (14.034 seconds): Player 6,
+Manager 4; neither list has Loading saves or Save needs recovery labels.
+Final main-menu screenshot inspected; authenticated controls re-observed.
+This new inspection DOES NOT turn the strict preservation failure into a pass.
+Normal background account recovery can run; agent did not request a backup,
+authenticate, open/create/delete a career or advance a match.
+
+All UI automation now stopped. Owner asked to test Settings/Back and both Saved
+Games tabs by hand in Input QA 4. Manual result pending. Phone lock twice held
+the runner before execution; owner privately unlocked it. Offered temporary
+Settings > Display & Brightness > Auto-Lock > Never with instruction to restore
+normal Auto-Lock afterward; agent did not inspect/change that setting.
+Full shared-worktree regression PASSED: 293 suites / 2,210 tests / 2 snapshots
+(85.921 seconds). This includes the other agent's current root source; the
+phone candidate still contains only the frozen base plus this targeted fix.
+Root/candidate typecheck, focused lint, 8 Node checks and whitespace check pass.
+
+Owner reports that Cricket QA needs5–10taps for actions, including the main
+menu before opening a career. Owner explicitly confirms this persists after
+closing popups and opening normally without Automation Running. Do not dismiss
+that report because an automated navigation or cloud-recovery test succeeds.
+Apple sign-in and sandbox purchase work remain paused while this is unresolved.
+
+LATEST OWNER COMPARISON / TARGETED FOLLOW-UP
+==========================================
+Owner reports: Cricket still misses finger taps, but the iPhone's own Settings
+works normally. Treat this as an app-specific report; do not use the generic
+iOS18.0 issue as an established cause or substitute an OS update for diagnosis.
+Owner further clarified that BOTH Cricket's Settings and Back buttons sometimes
+work and sometimes fail; system Settings remains normal. Visible pressed/dim
+feedback and exact correlation with trace timestamps are not established.
+Owner approved the temporary diagnostic update ("yeah go ahead man"). It is now
+prepared, signed, installed IN PLACE and queried as Cricket QA 1.0.12/build 2.
+Owner subsequently confirmed ready after being asked to see "Input QA 2".
+Only touch/press/cancel/navigation timing and event-loop gaps on MainMenu and
+Settings are recorded. No credentials, account content or save payloads.
+The bundle/signing identity and entitlements are retained; no uninstall, reset
+or sign-out. Post-update sign-in/nine-career preservation is NOT yet observed:
+the named preservation test failed at its first accessibility snapshot, before
+any game taps, with kAXErrorServerNotFound. The game process remained running.
+Do not label this instrumentation a fix, a crash or a passed preservation test.
+
+INPUT QA 2 — VERIFIED BUILD / INITIAL FINDINGS
+=============================================
+Isolated artifact/source: output/ios-device/input-qa-2026-10-24-build2-r2/.
+The source is the existing frozen build-1 snapshot plus diagnostics ONLY;
+the other agent's latest root/onboarding/Android changes are excluded.
+Delta: App.tsx, MainMenuScreen.tsx, SettingsScreen.tsx and ScreenHeader.tsx;
+two added src/diagnostics modules. Shared root runtime files were not patched.
+Reused the verified Release native container; generated optimized Hermes 98
+bytecode and re-signed with the same existing development identity/profile.
+No native dependency/compiler upgrade. All file-backed Mach-O code/data sections
+and all 18 framework files compared unchanged. The executable's signature bytes
+necessarily changed; do NOT claim whole-executable byte identity after signing.
+Info.plist differs only in build 1 -> 2; entitlements/profile unchanged.
+Deep/strict signature verification and the in-place device install succeeded.
+Current JS SHA256:
+08b755aa7ac379b45e7ca39010ed36f1b625cc56e7e8e8cde79474c980c685fc
+Six focused diagnostic/helper tests, snapshot typecheck and targeted lint pass.
+No full-suite rerun, production artifact, release upload or provider changes.
+
+Diagnostic design: passive pointerEvents=none badge; no new touch responder,
+debounce, navigation timing or gesture policy. Numbers-only event whitelist;
+bounded 1,024 events, 10-minute per-launch limit, MainMenu/Settings only,
+foreground only. One coalesced local cache write/UI publish per second.
+Only its own previous diagnostic cache file is rotated on a subsequent launch.
+No automatic upload, private-screen logging or background monitoring.
+Read ONLY Library/Caches/cricket-input-trace-v1.json from this app's container;
+never enumerate/copy saves, credentials or unrelated app storage for this check.
+
+Initial local cache: 20 delayed JS timer callbacks, maximum excess delay
+4,142.18 ms (100 ms heartbeat; log threshold 250 ms). These followed foreground
+at 26.563 seconds; last recorded event at 50.942 seconds. Both initial and r2
+retrievals contain the same events and NO touch/press/cancel attempts. This is
+evidence of JS callback scheduling delays, NOT proof of CPU saturation, hardware
+touch loss, a particular save-sync function or an owner-reproduced failed tap.
+The later unchanged file does not establish whether the app was stalled,
+inactive, on an excluded screen, or another recording condition applied.
+Manual Settings/Back reproduction with the badge visible is requested.
+
+A new app-only 20-second Time Profiler recording completed (input-gaps-r1.trace).
+Both targeted export attempts exited 139; the host xctrace crash report shows
+EXC_BAD_ACCESS/SIGSEGV in objc_release. Unlike the old traces below, this new
+trace has NOT been successfully decoded. No new CPU hotspot/root cause claim.
+The phone remained unlocked and Cricket's exact process was still running.
+
+Failed preparation attempts retained: XML-only Info.plist reader rejected a
+binary plist; corrected to in-memory conversion and fresh r2 staging. Hermes
+bundling then passed but the entitlement extraction form was non-XML; corrected
+and sign-only retry passed. Neither failed artifact was installed. An initial
+helper lint error (missing explicit Buffer import) was fixed before verification.
+verify-input-update-r5.xcresult remains a failed pre-tap accessibility execution,
+not a game crash, a failed restore or evidence that existing data was lost.
+
+HISTORICAL BUILD-1 AUTOMATION / PROFILE CHECKS
+============================================
+
+Added runner-only testMainMenuShortTapHitAreas. Native build SUCCEEDED;
+short-tap-r3.xcresult PASSED45.873s. Nine Settings/Back round trips,18actions,
+each one attempt with no retry. Settings probes:30ms requested contact at the
+centre, label, icon, chevron, upper/lower button interiors;150/350ms centre
+controls;30ms start with2pt x/1pt y drift. Back used30ms requested contacts.
+All destinations observed. Before/after game evidence inspected; returned to
+the main menu, no popup. Actual synthesized contact duration is not measured.
+This brings automated navigation checks to28observed actions, not28manual
+finger successes. No game code/build/install, setting or career mutation.
+
+The original15s profile was subsequently readable via DIRECT time-profile
+table export, bypassing the crashing index exporter. A second30s app-only trace
+was recorded with NO UI automation while the owner was asked to reproduce
+Settings/Back by hand. Whether a missed tap occurred IN that window, and whether
+the button visibly reacted, is not yet owner-confirmed. Do not call this a
+verified manual reproduction or a manual performance pass.
+
+ORIGINAL BUILD-1 ARTIFACT (UNCHANGED BASE, NOT CURRENT INSTALLED BUILD)
+===================================================================
+Physical iPhone16Pro, iOS18.0/build22A3351. Installed previously: Cricket QA,
+com.coverdrive.cricket,1.0.12/build1, development-signed Release/iPhoneOS arm64.
+It is NOT Expo Go or a Metro-dependent Debug game. Its target/executable is
+named CricketSimulator, but its verified platform is iPhoneOS.
+Frozen source: output/ios-device/device-qa-2026-10-24-r2/workspace/.
+Game artifact: .../derived-data/Build/Products/Release-iphoneos/CricketSimulator.app.
+Original main.jsbundle SHA256 rechecked unchanged before diagnostic preparation:
+1c682e7ff3b2c9a8912452156f55fb1335ddf9b1ad0b4565534648ad52b7788e
+Later shared-worktree/quick-start edits are not in that frozen device build.
+
+VERIFIED CORRECTION TO EARLIER APPLE-PREPARATION DIAGNOSIS
+=======================================================
+The saved game-state-before-apple-r5 screenshot/accessibility tree has now been
+inspected. A visible Choose your look modal covered the menu. Its full-screen
+Dismiss appearance choice layer intercepted background touches. Login was
+inside the viewport, not merely scrolled offscreen. The earlier description
+of the failed Apple-preparation navigation as a scrolling problem was wrong.
+That run stopped BEFORE sign-out; no Apple authentication failure was observed.
+This modal explains that OLD driver failure only. It does not explain the
+owner's separate no-popup/no-automation main-menu report.
+
+CURRENT NATIVE SINGLE-TAP CHECK
+==============================
+Owner reconnected the phone after an initial paired-but-disconnected check.
+Exact installed game process resolved; no new game launch/install/reset.
+Added testMainMenuSingleTapNavigation to qa/ios-device/DeviceRecoveryTests.swift.
+Separate runner workspace: output/ios-device/responsiveness-driver-2026-10-24/.
+No game target, game source patch, replacement bundle or save injection.
+
+Test issues retained honestly:
+  - Standalone swiftc typecheck without Xcode's XCTest Swift overlay failed to
+    resolve XCTest assertions; not an app build failure. Native runner builds
+    through its generated Xcode project then SUCCEEDED.
+  - single-tap-r1 failed its Audio selector. Inspected screenshot proves the
+    ONE Settings tap DID navigate, and native AX renders the heading as AUDIO.
+    Corrected ONLY the test to case-insensitive exact heading matching.
+    r1 remains a failed execution, not a reproduced game touch failure.
+
+single-tap-r2 PASSED in28.703seconds:
+  - Five main-menu Settings -> Back round trips.
+  - Each of10measured actions issued exactly ONE center-coordinate tap.
+  - No automatic retry taps or scrolling. Every action reached its destination.
+  - Test stopped for known blocking modals/native alerts rather than dismissing
+    them or treating background controls as usable.
+  - A single identified Settings -> Back setup action restored the known menu
+    state left by r1; it is not counted among the10measured actions.
+  - Before/after screenshots inspected; final game screen is the main menu,
+    no blocking appearance/energy/alert modal visible.
+  - No setting value changed, account/provider action, purchase, career opened,
+    match advanced, save creation/deletion or manual backup request.
+  - Normal app lifecycle/focus handlers may still perform ordinary background
+    sync; no claim that navigating leaves every internal storage byte untouched.
+
+Logged command-and-observation durations1.937–2.192seconds INCLUDE XCTest
+quiescence, event synthesis, native AX snapshots and polling. They are NOT
+measured app touch latency, input-to-photon time, FPS or JS/UI-thread stalls.
+The test does not reproduce actual finger contact, edge/palm rejection, cable
+effects or every gameplay control, and cannot clear an intermittent issue.
+
+PROFILING — DIRECT EXPORT RECOVERED, LIMITATIONS RETAINED
+========================================================
+A15second Time Profiler recording attached ONLY to the already running game
+process and completed. Local/ignored trace:
+  output/ios-device/responsiveness-idle-2026-10-24-r1.trace
+Both read-only xctrace INDEX-export attempts exited139 (host tool, not game
+crashes). A targeted table export later succeeded:
+  xcrun xctrace export --input <local.trace> \
+    --xpath '/trace-toc/run[@number="1"]/data/table[@schema="time-profile"]' \
+    --output <local-time-profile.xml>
+Summarize without publishing device IDs/raw stacks:
+  ruby qa/ios-device/summarize-time-profile.rb <local-time-profile.xml>
+The script resolves XML references, deduplicates repeated inclusive stack frames
+per sample, omits raw addresses/IDs, and fails if no samples are present.
+
+Statistical Running sample weights, NOT measured input latency/stall duration:
+  Trace                            Sample span    Main       JavaScript
+  responsiveness-idle-...-r1      15.111seconds   334ms      55ms
+  responsiveness-manual-...-r4    30.097seconds   555ms      96ms
+The second trace's busiest aligned100ms buckets contain6main and3JS samples.
+No continuous CPU saturation is visible in these sampled windows. That does
+NOT exclude a blocked/waiting thread, input cancellation, a missed intermittent
+event, or an issue outside the sampled window. No memory, FPS, input-to-photon,
+direct finger-event or end-to-end navigation latency metric is claimed.
+The30s trace/export/summary stay ignored under output/ios-device/ as
+responsiveness-manual-2026-10-24-r4.{trace,...}; no all-process recording.
+
+SOURCE REVIEW — CANDIDATES, NOT A CONFIRMED CAUSE
+==============================================
+Reviewed the frozen main-menu handlers, shared Button/Screen/GlassSurface,
+global modals, settings/appearance lifecycle, account recovery and protected
+save read paths. Main-menu actions use ordinary immediate Pressable handlers,
+not the shared Button's sound/haptic path; a sound-only diagnosis is inadequate.
+Recovery reads/decrypts both save copies and serializes/hashes career content.
+These are profiling candidates, not proof of a constant main-menu input stall.
+No proven infinite render/backup loop or hidden current touch overlay found.
+Do not disable save encryption, checksums, backup or consent as a speculative
+optimization. Do not upgrade SDKs or alter animation flags without reproduction.
+
+OFFICIAL DEVICE-SOFTWARE FINDING
+================================
+Apple's iOS18.0.1 release notes document a fix for temporarily unresponsive
+touchscreens under certain circumstances on iPhone16/16Pro. The observed phone
+is on18.0, so this is a relevant POSSIBILITY, not proof of this owner's cause.
+https://support.apple.com/en-us/121161
+Owner was asked to compare manual Cricket Settings/Back taps with taps in the
+iPhone's own Settings after automation ended. Owner says Cricket still misses
+taps while system Settings works normally. Do not treat the old OS bug as the
+diagnosis of this app-specific report.
+No OS update, phone accessibility setting or private device setting changed by
+the agent. If updating, use the current compatible update offered by Settings
+> General > Software Update, with owner approval/backups; do not seek an old
+18.0.1 installer or claim an update is guaranteed to fix an app-specific bug.
+
+NEXT SAFE CHECK / RELEASE GATE
+=============================
+  1. Confirm whether the failed finger tap produced visible pressed/dim feedback
+     during the requested manual window. Do not equate synthetic taps with it.
+  2. If app-only: correlate native touch delivery/cancel, PressIn/Out/Press,
+     navigation and JS-event-loop timing during a reproduced manual failure.
+     Centre/edge and requested short/long synthetic contacts already passed.
+     Input QA 2 is approved and installed as detailed above; the owner-assisted
+     manual failure/correlation and post-update preservation check remain open.
+  3. Only if device-wide: owner checks current iOS update and Apple touch guidance;
+     retest this SAME unchanged game build to distinguish OS from app changes.
+     https://support.apple.com/en-us/102567
+  4. Implement only an evidenced fix once authorized, preserve all9careers,
+     rebuild a clearly identified QA candidate only when requested, then verify
+     manual taps plus a focused single-tap regression before resuming release QA.
+No runtime fix, manual responsiveness pass, Apple/sandbox completion or store
+readiness is claimed. No sign-out, provider/backend/website change or upload.
+
+OTHER REFERENCES CHECKED
+========================
+https://docs.expo.dev/versions/v57.0.0/
+https://reactnative.dev/docs/performance
+https://docs.swmansion.com/react-native-reanimated/docs/guides/performance/
+Generic performance guidance is not a measured cause in this particular app.
+
+EVIDENCE / PRIVACY
+==================
+Raw XCTest results, app screenshots/AX and profiling data remain local/ignored
+under output/ios-device/. r1/r2 logs, result bundles and exported attachments
+are in responsiveness-driver-2026-10-24/. Never publish raw results containing
+account/device details. Broad automatic test diagnostics disabled with
+-collect-test-diagnostics never. No capture during private authentication.
+Sanitized register: docs/evidence/ios-device-qa-2026-10-24/verification-summary.json.

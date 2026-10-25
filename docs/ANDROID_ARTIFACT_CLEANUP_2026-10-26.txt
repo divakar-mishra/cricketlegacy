@@ -1,0 +1,43 @@
+ANDROID BUILD ARTIFACT CLEANUP —26OCTOBER2026 (ASIA/KOLKATA)
+=========================================================
+Owner explicitly requested removing old AABs/APKs from this project. Completed
+as a recoverable move to macOS Trash,not permanent deletion. Exactly37old files:
+27APK,5supersededAAB,and5APK-set(.apks)archives,3,702,597,500bytes (~3.7GB).
+All are generated/untracked under output/ or the old native QA APK output.
+None is newer than the retained AAB. node_modules/.git excluded from inventory.
+
+RETAINED / VERIFIED UNCHANGED
+----------------------------
+output/production-1.0.13/cricket-player-manager-1.0.13-vc23.aab
+111,422,774bytes;SHA256:
+  b0d02649330772e3e290ab3096f8a7c783b5141a05584af1393550e8e623c34a
+Final project inventory finds only this Android package artifact. No new build,
+install/uninstall,device/save access,store action or provider/website change.
+Application source,signing keys,iOS work,logs/reports and verification evidence
+were not removed. Concurrent saved-career loading work remains untouched;its
+changes are still NOT retroactively included in the existingcode23 AAB.
+
+RECOVERY
+--------
+Trash folder:
+/Users/divakarmishra/.Trash/cricket-legacy-old-builds-2026-10-26-3a97c623
+Original project-relative paths preserved beneath that folder. Exact37paths,
+sizes,mtimes and SHA256 hashes:
+  output/artifact-cleanup-2026-10-26/inventory.json
+Verified completion:
+  output/artifact-cleanup-2026-10-26/result.json
+All source files validated against inventory immediately before move;all Trash
+destinations hash-verified afterward. Retained AAB hash-verified before/after.
+To recover a specific old binary,move its recorded relative path from this Trash
+folder back to the same project-relative location. Stop if a replacement exists;
+do not overwrite a newer file. Old report links to removed local binaries are
+historical;restore the corresponding binary first if needed for reproduction.
+Trash was NOT emptied. Moving within the disk removes project clutter but does
+not permanently reclaim those bytes until the trashed files are deleted.
+
+HANDBOOK
+--------
+Three docs/how-to files updated with cleanup/recovery record;mirror to the
+owner-requested Desktop/HOW TO after preserving concurrent source-fix entries.
+No gameplay test/build rerun needed for this binary-only cleanup. git diff
+--check passed;no application/configuration code changed by this task.

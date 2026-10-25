@@ -1,6 +1,6 @@
 import { ManagerCalendarPhase, PlayerCalendarEvent, SaveGame } from '../domain/types';
 import { careerSelectionDecision } from './career';
-import { fixtureEnergyCost } from './economy';
+import { energyCapacity, fixtureEnergyCost, regenEnergy } from './economy';
 import { managerControlledTeamId, managerPhaseProgress } from './managerCalendar';
 import { nextPlayerAdvice } from './playerAdvisor';
 import { currentPlayerCalendarEvent } from './playerCalendar';
@@ -76,7 +76,7 @@ function playerMatchStep(save: SaveGame, fixtureId: string): ResolvedCareerStep 
   const decision = careerSelectionDecision(save, fixture?.format ?? 'T20', fixtureId);
   if (decision.selected) {
     const energyCost = fixture ? fixtureEnergyCost(fixture) : 0;
-    const needsEnergy = save.wallet.energy < energyCost;
+    const needsEnergy = regenEnergy(save.wallet, Date.now(), energyCapacity(save.entitlements)).energy < energyCost;
     return {
       mode: 'career',
       type: CareerStepType.MATCHDAY_SELECTED,

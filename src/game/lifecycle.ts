@@ -6,6 +6,7 @@
 import { COUNTRIES } from '../data/countries';
 import { Role, SaveGame, Team } from '../domain/types';
 import { Rng } from '../engine/rng';
+import { playerWorldSex } from './playerIdentity';
 import {
   generatePlayer,
   generateYouth,
@@ -25,7 +26,7 @@ function promoteToRoster(save: SaveGame, team: Team, year: number, rng: Rng, tar
     const role = FILL_ROLES[n % FILL_ROLES.length];
     const id = `y-${year}-${team.id}-${n++}`;
     if (save.players[id]) continue; // Never overwrite an existing prospect.
-    save.players[id] = generateYouth({ id, nationality: team.country, role,
+    save.players[id] = generateYouth({ id, nationality: team.country, role, sex: playerWorldSex(save),
       quality: Math.max(45, team.reputation - 6), rng });
     save.players[id].condition = save.managerCalendar ? 100 : undefined;
     team.playerIds.push(id);
@@ -108,8 +109,8 @@ export function refreshFreeAgents(save: SaveGame, year: number, rng: Rng): void 
       // A mix of youth and journeymen keeps the market interesting.
       save.players[id] =
         rng() < 0.5
-          ? generateYouth({ id, nationality, role, quality: 48 + Math.floor(rng() * 22), rng })
-          : generatePlayer({ id, nationality, role, quality: 50 + Math.floor(rng() * 24), rng });
+          ? generateYouth({ id, nationality, role, quality: 48 + Math.floor(rng() * 22), rng, sex: playerWorldSex(save) })
+          : generatePlayer({ id, nationality, role, quality: 50 + Math.floor(rng() * 24), rng, sex: playerWorldSex(save) });
       list.push(id);
     }
     n++;

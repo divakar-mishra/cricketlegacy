@@ -1,0 +1,278 @@
+{
+  "reviewDate": "2026-10-21",
+  "app": "Cricket: Player & Manager",
+  "package": "com.coverdrive.cricket",
+  "scope": "Offline response corrections and conditional candidates; no Console submission or provider change",
+  "status": "Two inherited issues corrected; Acquire Optimization state remains unverified",
+  "readyForImport": false,
+  "original": {
+    "path": "/Users/divakarmishra/Downloads/data_safety_export (2).csv",
+    "sha256": "edc162ea9405c9001fb1a2265c786f3295352d44c286c341b48569905fbe4c92",
+    "modified": false
+  },
+  "priorDraft": {
+    "path": "docs/data-safety-REVIEW-DRAFT-DO-NOT-IMPORT-2026-10-20.csv",
+    "sha256": "d384667996615746245b3a897e01e13ef30887e0447c2e763d9958b28b0396a0",
+    "modified": false
+  },
+  "commonCorrections": [
+    {
+      "questionId": "PSL_DATA_TYPES_APP_PERFORMANCE",
+      "responseId": "PSL_OTHER_PERFORMANCE",
+      "before": "true",
+      "after": "",
+      "label": "App info and performance / Other app performance data"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_APPROX_LOCATION:DATA_USAGE_COLLECTION_PURPOSE",
+      "responseId": "PSL_PERSONALIZATION",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Approximate location) / Why is this user data collected? Select all that apply. / Personalization"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_APPROX_LOCATION:DATA_USAGE_SHARING_PURPOSE",
+      "responseId": "PSL_PERSONALIZATION",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Approximate location) / Why is this user data shared? Select all that apply. / Personalization"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_PERFORMANCE:PSL_DATA_USAGE_COLLECTION_AND_SHARING",
+      "responseId": "PSL_DATA_USAGE_ONLY_COLLECTED",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Other app performance data) / Is this data collected, shared, or both? / Collected"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_PERFORMANCE:PSL_DATA_USAGE_COLLECTION_AND_SHARING",
+      "responseId": "PSL_DATA_USAGE_ONLY_SHARED",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Other app performance data) / Is this data collected, shared, or both? / Shared"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_PERFORMANCE:PSL_DATA_USAGE_EPHEMERAL",
+      "responseId": "",
+      "before": "false",
+      "after": "",
+      "label": "Data usage and handling (Other app performance data) / Is this data processed ephemerally?"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_PERFORMANCE:DATA_USAGE_USER_CONTROL",
+      "responseId": "PSL_DATA_USAGE_USER_CONTROL_REQUIRED",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Other app performance data) / Is this data required for your app, or can users choose whether it's collected? / Data collection is required (users can't turn off this data collection)"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_PERFORMANCE:DATA_USAGE_COLLECTION_PURPOSE",
+      "responseId": "PSL_ANALYTICS",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Other app performance data) / Why is this user data collected? Select all that apply. / Analytics"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_PERFORMANCE:DATA_USAGE_COLLECTION_PURPOSE",
+      "responseId": "PSL_FRAUD_PREVENTION_SECURITY",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Other app performance data) / Why is this user data collected? Select all that apply. / Fraud prevention, security, and compliance"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_PERFORMANCE:DATA_USAGE_COLLECTION_PURPOSE",
+      "responseId": "PSL_ADVERTISING",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Other app performance data) / Why is this user data collected? Select all that apply. / Advertising or marketing"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_PERFORMANCE:DATA_USAGE_SHARING_PURPOSE",
+      "responseId": "PSL_ANALYTICS",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Other app performance data) / Why is this user data shared? Select all that apply. / Analytics"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_PERFORMANCE:DATA_USAGE_SHARING_PURPOSE",
+      "responseId": "PSL_FRAUD_PREVENTION_SECURITY",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Other app performance data) / Why is this user data shared? Select all that apply. / Fraud prevention, security, and compliance"
+    },
+    {
+      "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_PERFORMANCE:DATA_USAGE_SHARING_PURPOSE",
+      "responseId": "PSL_ADVERTISING",
+      "before": "true",
+      "after": "",
+      "label": "Data usage and handling (Other app performance data) / Why is this user data shared? Select all that apply. / Advertising or marketing"
+    }
+  ],
+  "candidates": {
+    "unconfirmed": {
+      "path": "docs/data-safety-UNITY-UNCONFIRMED-DO-NOT-IMPORT-2026-10-21.csv",
+      "sha256": "f4c00acc6d067e515d8bf7b96ae975a5aa137e395e91f717530cc9218937ffad",
+      "responseRows": 782,
+      "uniqueResponseKeys": 782,
+      "selectedTypes": [
+        "PSL_NAME",
+        "PSL_EMAIL",
+        "PSL_USER_ACCOUNT",
+        "PSL_PURCHASE_HISTORY",
+        "PSL_APPROX_LOCATION",
+        "PSL_CRASH_LOGS",
+        "PSL_PERFORMANCE_DIAGNOSTICS",
+        "PSL_USER_INTERACTION",
+        "PSL_OTHER_APP_ACTIVITY",
+        "PSL_DEVICE_ID"
+      ],
+      "incomplete": [
+        {
+          "type": "PSL_OTHER_APP_ACTIVITY",
+          "missing": [
+            "required/optional"
+          ]
+        }
+      ],
+      "selectedTypeFollowUpsComplete": false,
+      "condition": "No provider state assumed; incomplete review only",
+      "providerConfigurationVerified": false,
+      "readyForImport": false,
+      "modifiedResponseValuesFromOctober20Draft": 13,
+      "modifiedResponseValuesFromOriginal": 28,
+      "conditionalChanges": []
+    },
+    "off": {
+      "path": "docs/data-safety-CONDITIONAL-ACQUIRE-OFF-2026-10-21.csv",
+      "sha256": "fb767f6b96f5fbe48d9e7c32f058eb26b38c79c243a22574cbc130746091c255",
+      "responseRows": 782,
+      "uniqueResponseKeys": 782,
+      "selectedTypes": [
+        "PSL_NAME",
+        "PSL_EMAIL",
+        "PSL_USER_ACCOUNT",
+        "PSL_PURCHASE_HISTORY",
+        "PSL_APPROX_LOCATION",
+        "PSL_CRASH_LOGS",
+        "PSL_PERFORMANCE_DIAGNOSTICS",
+        "PSL_USER_INTERACTION",
+        "PSL_OTHER_APP_ACTIVITY",
+        "PSL_DEVICE_ID"
+      ],
+      "incomplete": [],
+      "selectedTypeFollowUpsComplete": true,
+      "condition": "Only after verified Acquire OFF and baseline service-provider handling confirmed",
+      "providerConfigurationVerified": false,
+      "readyForImport": false,
+      "modifiedResponseValuesFromOctober20Draft": 14,
+      "modifiedResponseValuesFromOriginal": 29,
+      "conditionalChanges": [
+        {
+          "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:DATA_USAGE_USER_CONTROL",
+          "responseId": "PSL_DATA_USAGE_USER_CONTROL_OPTIONAL",
+          "before": "",
+          "after": "true",
+          "label": "Data usage and handling (Other actions) / Is this data required for your app, or can users choose whether it's collected? / Users can choose whether this data is collected"
+        }
+      ]
+    },
+    "on": {
+      "path": "docs/data-safety-CONDITIONAL-ACQUIRE-ON-2026-10-21.csv",
+      "sha256": "6f5e85d501448624326a29d419c38f68da8a3db0d05dd3a2990d7283369f0f8e",
+      "responseRows": 782,
+      "uniqueResponseKeys": 782,
+      "selectedTypes": [
+        "PSL_NAME",
+        "PSL_EMAIL",
+        "PSL_USER_ACCOUNT",
+        "PSL_PURCHASE_HISTORY",
+        "PSL_APPROX_LOCATION",
+        "PSL_CRASH_LOGS",
+        "PSL_PERFORMANCE_DIAGNOSTICS",
+        "PSL_USER_INTERACTION",
+        "PSL_OTHER_APP_ACTIVITY",
+        "PSL_DEVICE_ID"
+      ],
+      "incomplete": [],
+      "selectedTypeFollowUpsComplete": true,
+      "condition": "Only after verified Acquire ON without universal app-level opt-out",
+      "providerConfigurationVerified": false,
+      "readyForImport": false,
+      "modifiedResponseValuesFromOctober20Draft": 20,
+      "modifiedResponseValuesFromOriginal": 35,
+      "conditionalChanges": [
+        {
+          "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:PSL_DATA_USAGE_COLLECTION_AND_SHARING",
+          "responseId": "PSL_DATA_USAGE_ONLY_SHARED",
+          "before": "",
+          "after": "true",
+          "label": "Data usage and handling (Other actions) / Is this data collected, shared, or both? / Shared"
+        },
+        {
+          "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:DATA_USAGE_USER_CONTROL",
+          "responseId": "PSL_DATA_USAGE_USER_CONTROL_REQUIRED",
+          "before": "",
+          "after": "true",
+          "label": "Data usage and handling (Other actions) / Is this data required for your app, or can users choose whether it's collected? / Data collection is required (users can't turn off this data collection)"
+        },
+        {
+          "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:DATA_USAGE_COLLECTION_PURPOSE",
+          "responseId": "PSL_FRAUD_PREVENTION_SECURITY",
+          "before": "",
+          "after": "true",
+          "label": "Data usage and handling (Other actions) / Why is this user data collected? Select all that apply. / Fraud prevention, security, and compliance"
+        },
+        {
+          "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:DATA_USAGE_COLLECTION_PURPOSE",
+          "responseId": "PSL_ADVERTISING",
+          "before": "",
+          "after": "true",
+          "label": "Data usage and handling (Other actions) / Why is this user data collected? Select all that apply. / Advertising or marketing"
+        },
+        {
+          "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:DATA_USAGE_SHARING_PURPOSE",
+          "responseId": "PSL_ANALYTICS",
+          "before": "",
+          "after": "true",
+          "label": "Data usage and handling (Other actions) / Why is this user data shared? Select all that apply. / Analytics"
+        },
+        {
+          "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:DATA_USAGE_SHARING_PURPOSE",
+          "responseId": "PSL_FRAUD_PREVENTION_SECURITY",
+          "before": "",
+          "after": "true",
+          "label": "Data usage and handling (Other actions) / Why is this user data shared? Select all that apply. / Fraud prevention, security, and compliance"
+        },
+        {
+          "questionId": "PSL_DATA_USAGE_RESPONSES:PSL_OTHER_APP_ACTIVITY:DATA_USAGE_SHARING_PURPOSE",
+          "responseId": "PSL_ADVERTISING",
+          "before": "",
+          "after": "true",
+          "label": "Data usage and handling (Other actions) / Why is this user data shared? Select all that apply. / Advertising or marketing"
+        }
+      ]
+    }
+  },
+  "onlyRemainingConfigurationQuestion": "For Game ID 800404108, is Acquire Optimization/app-usage retention collection currently enabled? Developer Data is not evidence either way.",
+  "ownerReply": "Cannot find this setting",
+  "verification": {
+    "responseRows": 782,
+    "schemaPreservedAgainstOriginal": true,
+    "identifiersLabelsOrderRequirementsPreserved": true,
+    "roundTrip": true,
+    "unitTests": 10,
+    "independentRubyCsvSchemaCheck": true,
+    "productionAabUnchanged": true
+  },
+  "productionAab": {
+    "path": "output/production-1.0.12/cricket-player-manager-1.0.12-vc20.aab",
+    "sha256": "0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4"
+  },
+  "limits": [
+    "Structural completeness is not confirmation of private provider settings or legal approval.",
+    "Other app performance mapping is based on identified data and Play definitions; latest Google guidance is not exact-version proof for SDK 24.9.0.",
+    "Conditional OFF assumes baseline service-provider handling with no other app-usage-sharing integration.",
+    "Unrelated owner-exported responses were preserved, not newly certified.",
+    "No new device, gameplay, purchase, ad-serving or OEM crash test was performed."
+  ]
+}

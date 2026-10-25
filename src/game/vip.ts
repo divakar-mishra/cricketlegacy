@@ -1,5 +1,29 @@
 import type { GameMode, SaveGame } from '../domain/types';
 import { MONTHLY_PASS_CONTENT, type MonthlyPassContent } from '../data/seasonPassContent';
+import { addGems } from './economy';
+
+/** Existing advertised daily VIP streak, settled on a visit/purchase, not a timer. */
+export function settleVipVisit(save: SaveGame, now = Date.now()): {
+  updated: boolean; days: number; reward: { gems?: number; title?: string } | null;
+} {
+  if (!save.entitlements.removeAds) return { updated: false, days: 0, reward: null };
+  const today = Math.floor(now / 86_400_000);
+  const lastDay = save.vipStreakLastDay;
+  // Do not turn a backward clock change into a second streak reward.
+  if (lastDay != null && lastDay >= today) return { updated: false, days: save.vipStreakDays ?? 0, reward: null };
+  const days = lastDay === today - 1 ? (save.vipStreakDays ?? 0) + 1 : 1;
+  save.vipStreakDays = days;
+  save.vipStreakLastDay = today;
+  let reward: { gems?: number; title?: string } | null = null;
+  if (days === 7) {
+    save.wallet = addGems(save.wallet, 10);
+    reward = { gems: 10, title: '7-Day VIP Streak!' };
+  } else if (days === 30) {
+    save.inventory = { ...save.inventory, avatar_legend_vip: 1 };
+    reward = { title: 'VIP Legend Frame unlocked!' };
+  }
+  return { updated: true, days, reward };
+}
 
 export const VIP_PRODUCT_IDS = { career: 'player_vip', manager: 'manager_vip' } as const;
 export const vipProductId = (mode: GameMode) => VIP_PRODUCT_IDS[mode];

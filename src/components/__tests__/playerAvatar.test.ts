@@ -51,7 +51,8 @@ describe('fixed player portraits', () => {
     expect(rendererSource).not.toContain("frameId === 'frame_none') return null");
     expect(rendererSource).not.toContain('<Svg');
     expect(wrapperSource).toContain('<PortraitAvatar');
-    expect(wrapperSource).toContain("avatarFromSeed(name, 'male', profileFrame)");
+    expect(wrapperSource).toContain('avatarFromSeed(name, sex, profileFrame)');
+    expect(wrapperSource).not.toContain("avatarFromSeed(name, 'male', profileFrame)");
   });
 
   it('edits and reuses the same persisted AvatarConfig on profile surfaces', () => {

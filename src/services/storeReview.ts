@@ -1,52 +1,85 @@
-/**
- * Store review prompt — wraps expo-store-review.
- *
- * Shows the native rating dialog at high-value moments (first big win,
- * milestone match, etc). Guards:
- *  - Only prompts if `isAvailableAsync()` returns true.
- *  - Rate-limits: at most once per 7 days (tracked in AsyncStorage).
- *  - Only after enough "positive sentiment" matches (3+ wins before first ask).
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Linking, Platform } from 'react-native';
+
+// Installation-local engagement state, never part of a career/cloud save.
+export const PLAY_RATING_PROMPT_KEY = 'sr:play-prompt:v1';
+export const PLAY_RATING_MIN_MATCHES = 5;
+const LEGACY_PROMPT_KEY = 'sr:lastPrompt';
+export const PLAY_REVIEW_URL =
+  'https://play.google.com/store/apps/details?id=com.coverdrive.cricket&showAllReviews=true';
+const PLAY_REVIEW_DEEP_LINK = 'market://details?id=com.coverdrive.cricket&showAllReviews=true';
+let claiming = false;
+const APPLE_PROMPT_KEY = 'sr:apple-prompt:v1';
+let appleClaiming = false;
+
+/** Use Apple's system review API, without a custom rating pre-prompt or store ID.
+ * A completed request never proves Apple displayed a dialog or a review was sent.
  */
-
-const _lastPromptKey = 'sr:lastPrompt';
-
-async function getStorage() {
+export async function requestAppleStoreReview(isCurrent: () => boolean): Promise<boolean> {
+  if (Platform.OS !== 'ios' || appleClaiming || !isCurrent()) return false;
+  appleClaiming = true;
   try {
-    const m = await import('@react-native-async-storage/async-storage');
-    return m.default;
+    if (await AsyncStorage.getItem(APPLE_PROMPT_KEY) !== null || !isCurrent()) return false;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const review = require('expo-store-review') as typeof import('expo-store-review');
+    if (!(await review.isAvailableAsync()) || !isCurrent()) return false;
+    await AsyncStorage.setItem(APPLE_PROMPT_KEY, 'requested');
+    if (!isCurrent()) return false;
+    await review.requestReview();
+    return true;
   } catch {
-    return null;
+    return false;
+  } finally {
+    appleClaiming = false;
   }
 }
 
-const MIN_DAYS_BETWEEN = 7;
-const MIN_WINS_BEFORE_FIRST = 3;
+export function hasRatingExperience(completedMatches: number): boolean {
+  return Number.isFinite(completedMatches) && completedMatches >= PLAY_RATING_MIN_MATCHES;
+}
 
-/** Call after a win. Internally guards frequency. */
-export async function maybeRequestReview(totalWins: number): Promise<void> {
-  // In-app review is meaningful only for store-distributed builds. Dev clients can
-  // report the native API as available and then fail after a completed match.
-  if (__DEV__) return;
-  if (totalWins < MIN_WINS_BEFORE_FIRST) return;
+/** Existing native-review history is respected; unreadable storage never nags. */
+export async function hasSeenPlayRatingPrompt(): Promise<boolean> {
   try {
-    const StoreReview = await import('expo-store-review').catch(() => null);
-    if (!StoreReview) return;
-    const available = await StoreReview.isAvailableAsync().catch(() => false);
-    if (!available) return;
-
-    const storage = await getStorage();
-    if (storage) {
-      const raw = await storage.getItem(_lastPromptKey).catch(() => null);
-      if (raw) {
-        const last = parseInt(raw, 10);
-        const daysSince = (Date.now() - last) / 86_400_000;
-        if (daysSince < MIN_DAYS_BETWEEN) return;
-      }
-      await storage.setItem(_lastPromptKey, String(Date.now())).catch(() => {});
-    }
-
-    await StoreReview.requestReview().catch(() => {});
+    const [current, legacy] = await Promise.all([
+      AsyncStorage.getItem(PLAY_RATING_PROMPT_KEY),
+      AsyncStorage.getItem(LEGACY_PROMPT_KEY),
+    ]);
+    return current !== null || legacy !== null;
   } catch {
-    // Never block gameplay on this.
+    return true;
+  }
+}
+
+/** Persist before displaying, so closing/relaunching cannot repeat the ask. */
+export async function claimPlayRatingPrompt(isCurrent: () => boolean): Promise<boolean> {
+  if (claiming || Platform.OS !== 'android') return false;
+  claiming = true;
+  try {
+    if ((await hasSeenPlayRatingPrompt()) || !isCurrent()) return false;
+    await AsyncStorage.setItem(PLAY_RATING_PROMPT_KEY, 'shown');
+    return isCurrent();
+  } catch {
+    return false;
+  } finally {
+    claiming = false;
+  }
+}
+
+/** A user-tapped rating CTA opens Play, not its quota-limited in-app API.
+ * Success means only that the URL opened, never that a review was submitted.
+ */
+export async function openPlayStoreReview(): Promise<boolean> {
+  if (Platform.OS !== 'android') return false;
+  try {
+    await Linking.openURL(PLAY_REVIEW_DEEP_LINK);
+    return true;
+  } catch {
+    try {
+      await Linking.openURL(PLAY_REVIEW_URL);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

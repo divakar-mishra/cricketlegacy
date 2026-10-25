@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { setMusicEnabled } from '../audio';
 import { showAdPrivacyChoices } from '../services/ads';
+import { openPlayStoreReview } from '../services/storeReview';
+import { openQaAdDiagnostics, prepareQaAdSession } from '../services/adDiagnostics';
 import { FranchiseOfferModal } from '../components/FranchiseOfferModal';
+import { PlayRatingPrompt } from '../components/PlayRatingPrompt';
 import { GlassAlert as Alert } from '../components/GlassAlertModal';
 import {
   AppText as Text,
@@ -46,6 +49,7 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
   const qaImportCaptureSave = useCareer((state) => state.qaImportCaptureSave);
   const [qaAuctionPreviewOpen, setQaAuctionPreviewOpen] = useState(false);
   const [qaCaptureImportBusy, setQaCaptureImportBusy] = useState(false);
+  const [qaRatingPreviewOpen, setQaRatingPreviewOpen] = useState(false);
 
   const qaAuctionOffers =
     activeSave?.mode === 'career' && activeSave.userPlayerId
@@ -108,6 +112,47 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
         <>
           <Text style={styles.section}>QA Tools</Text>
           <Card style={styles.group}>
+            <Button
+              label="Preview rating invitation (QA only)"
+              variant="secondary"
+              onPress={() => setQaRatingPreviewOpen(true)}
+            />
+            <Text style={styles.qaBalance}>
+              Uses the real rating popup without changing match counts, saved prompt history or careers.
+            </Text>
+            <Divider />
+            <Button
+              label="Ad diagnostics (test only)"
+              variant="secondary"
+              onPress={async () => {
+                try { await openQaAdDiagnostics(); }
+                catch (error) {
+                  Alert.alert('Ad diagnostics unavailable', error instanceof Error ? error.message : 'Try again after consent initializes.');
+                }
+              }}
+            />
+            <Divider />
+            {(['us-adult', 'teen', 'normal'] as const).map((profile) => (
+              <Button
+                key={profile}
+                label={profile === 'us-adult' ? 'QA US privacy region (session only)'
+                  : profile === 'teen' ? 'QA teen ad treatment (session only)'
+                    : 'End QA ad privacy session'}
+                variant="secondary"
+                onPress={async () => {
+                  try {
+                    const ready = await prepareQaAdSession(profile);
+                    Alert.alert('QA ad session',
+                      `${profile}: ads ${ready ? 'permitted by UMP' : 'not ready'}. Saved age answers unchanged. ${profile === 'normal'
+                        ? 'Test region removed. Cold-restart after closing diagnostics. Prior consent is not forcibly re-granted.'
+                        : 'Use Ad privacy choices and Ad diagnostics. Test devices only; no game rewards.'}`);
+                  } catch (error) {
+                    Alert.alert('QA profile unavailable', error instanceof Error ? error.message : 'QA session unavailable');
+                  }
+                }}
+              />
+            ))}
+            <Divider />
             <Button
               label={
                 qaCaptureImportBusy ? 'Loading capture save…' : 'Load isolated QA capture save'
@@ -250,6 +295,10 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
         />
       ) : null}
 
+      {QA_TOOLS_ENABLED && qaRatingPreviewOpen ? (
+        <PlayRatingPrompt eligible qaPreview onDismiss={() => setQaRatingPreviewOpen(false)} />
+      ) : null}
+
       <Text style={styles.section}>{t('settings.theme')}</Text>
       <View style={styles.optionList}>
         {themeOptions.map((opt) => (
@@ -335,6 +384,17 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
         </>
       ) : null}
 
+      {Platform.OS === 'android' ? <Button
+        label="Rate on Google Play"
+        variant="secondary"
+        style={{ marginTop: spacing.sm, marginBottom: spacing.sm }}
+        onPress={async () => {
+          if (!await openPlayStoreReview()) {
+            Alert.alert('Google Play unavailable', 'Could not open the store. Check your connection and try again.');
+          }
+        }}
+      /> : null}
+
       <Button
         label="Ad privacy choices"
         variant="secondary"
@@ -352,7 +412,7 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
       />
 
       <Text style={styles.section}>Build Information</Text>
-      <Card style={styles.group}>
+      {Platform.OS === 'android' ? <Card style={styles.group}>
         <Text style={styles.rowLabel}>Optional diagnostics</Text>
         <Text style={styles.qaBalance}>
           Share gameplay usage or crash diagnostics with Google Firebase to help improve the game.
@@ -366,7 +426,7 @@ export function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
         />
         <Divider />
         <ToggleRow label="Crash reports" value={s.crashReports} onChange={s.setCrashReports} />
-      </Card>
+      </Card> : null}
       <Card style={styles.group}>
         <InfoRow label="Version" value={BUILD_INFO.appVersion} />
         <Divider />

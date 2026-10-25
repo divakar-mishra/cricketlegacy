@@ -1,0 +1,426 @@
+ANDROID UNITY / ADMOB INTEGRATION — 19 OCTOBER 2026
+
+20 OCTOBER FOLLOW-UP: owner supplied the correct app's "CricketPM – US privacy
+choices" row showing Published (modified 19 October). Console publication is
+confirmed from that supplied row; an on-device US-region CMP test, Unity age/
+category controls and current Play Data safety answers are still unverified.
+Latest combined QA/fix results: docs/RELEASE_QA_2026-10-20.txt. No new AAB.
+
+CURRENT RESULT: UNITY REWARDED TEST SERVING VERIFIED
+---------------------------------------------------
+The existing Rewarded mapping is correct and a Unity test creative has now
+loaded, displayed, completed and closed through AdMob on the registered,
+host-muted Pixel_10_Pro_XL QA emulator. EARNED occurred exactly once and the
+isolated diagnostics granted no game currency. This supersedes the earlier
+Google-only/unverified observations retained chronologically below. Banner and
+Interstitial groups remain paused/untested; this is NOT all-format, teen-device,
+production-revenue or universal-regression certification. No production AAB.
+
+LATEST OWNER DECISION: REUSE EXISTING UNITS / REWARDED GROUP
+----------------------------------------------------------
+The owner chose to skip API setup and separate QA ad units, and approved using
+the existing Cricket: Player & Manager ad units/groups. The live old app has no
+Unity SDK/adapter; only the internal QA APK contains this integration. Enabling
+a console group cannot install Unity code into the old app, though server-side
+ad routing remains a separate change. No Unity-enabled production AAB exists.
+The owner reported the existing Rewarded group enabled, with AdMob Network
+retained and the other formats/app unchanged. This is owner-reported, not a
+console write performed by this agent. The earlier paused/QA-only plan below is
+historical. No AAB, purchase or save-deletion authorization was added.
+
+Baseline using the EXISTING Rewarded ID on the registered test emulator:
+22:14 IST: LOADED via com.google.ads.mediation.admob.AdMobAdapter, SHOWN,
+EARNED callbackCount=1 with gameGrant=NONE, then CLOSED at 22:16 IST.
+The creative visibly said Test Ad. No advertiser link was clicked. No currency
+or career changes were made. This is a Google test-ad success, NOT a Unity pass.
+Evidence: output/unity-mediation-2026-10-19/existing-unit-rewarded-google-test.png.
+After the owner's enabled confirmation, the QA app was cold-restarted (without
+clearing data) to fetch fresh mediation configuration. Unity verification is
+in progress and must be recorded separately below.
+
+Post-enablement in-context retry at 22:20 IST used the same existing Rewarded ID.
+It again LOADED via AdMobAdapter, SHOWN, EARNED exactly once (gameGrant=NONE),
+and CLOSED using Android Back after completion. Ad Inspector confirms this
+exact /1717736882 Rewarded request contains only one source: AdMob Network
+Bidding, 1003 ms, Fill. Its single-source selector STILL offers only AdMob;
+Unity is not currently selectable. No test override was started.
+Evidence: output/unity-mediation-2026-10-19/rewarded-post-enable-request-log.png.
+The exact QA APK hash still matches the installed candidate artifact recorded
+below. R8 mapping retains UnityAdapter and UnityMediationAdapter under their
+original names; both adapter descriptors and UnityAds are present in its DEX.
+Thus Unity was not simply omitted from this APK by shrinking. This is not by
+itself proof of serving or runtime adapter initialization.
+The owner has been asked for enabled-group Ad units/Bidding sources details
+to verify the exact unit, Unity source/partnership status and mapping. A
+propagation delay or console configuration issue remains to be distinguished.
+Actual Unity serving is STILL unverified; no AAB has been created in this pass.
+Subsequent owner screenshots confirm group CricketPM_Android_Rewarded (priority
+4, group URL ID 4301344589) enabled, the Rewarded career-rewards unit for
+Cricket: Player & Manager selected, both AdMob Network and Unity Ads enabled,
+and both partnerships Active. The mapping edit link is present. The screenshot
+does not expose the full selected unit ID or mapping values; those were shown
+earlier as /1717736882 and 800404108 / BP_Rewarded_Android respectively.
+A further fresh QA restart began at approximately 22:30 IST; Google readiness
+succeeds, but its initial adapter status still lists only MobileAds. This is
+not yet a Unity runtime pass. No binary/config changes were made for this retry.
+The fresh session's single-source selector again offered only Google. A current
+Unity mapping-dialog screenshot was requested to verify the selected ad unit,
+Game ID and placement without modifying them. The selection was cancelled,
+the override verified Inactive and Ad Inspector closed. This retry did not
+request or show another creative. No AAB, code edit or save mutation occurred.
+
+LATEST MAPPING VERIFIED / TARGETED DIAGNOSIS
+-------------------------------------------
+The owner's latest mapping-dialog screenshot now confirms the FULL identity:
+ca-app-pub-4249020515368291/1717736882 -> Unity Game ID 800404108 ->
+BP_Rewarded_Android, for Cricket: Player & Manager. Combined with the preceding
+enabled-group and Active-partnership screenshots, the requested dashboard
+checks are complete. Do not ask for those same screenshots again or change the
+mapping without new evidence.
+Google's current Android integration changelog explicitly lists adapter
+4.16.6.0 as built/tested with GMA 24.9.0 and Unity Ads 4.16.6, matching this APK.
+Its missing-adapter guidance distinguishes an absent source in the effective
+configuration from an explicit Adapter not found / initialization failure.
+The observed Google-only source list does NOT establish an SDK version bug.
+Ad source enablement can take up to one hour according to Google's status-edit
+documentation; propagation is a possibility, not a proven diagnosis or a
+guarantee that Unity will serve after an hour. Full bidder/parameter diagnostics
+are the next check, rather than upgrading the entire SDK stack speculatively.
+References:
+https://developers.google.com/admob/android/mediation/unity?hl=en
+https://support.google.com/admob/answer/12659455?hl=en-GB
+https://support.google.com/admob/answer/9850777?hl=en
+
+22:48:54 IST fresh test request: Google filled in 1395 ms. The request's
+overflow -> View all bidders shows TWO sources: AdMob Network Won; Unity Ads
+No ad returned. Thus the single winning waterfall row is not the full bidder
+list. Third-party bidding parameter -> Unity Ads reports SDK 4.16.6, adapter
+4.16.6.0, class com.google.ads.mediation.unity.UnityMediationAdapter, and
+non-empty buyer-generated data (1.4K characters). No token was copied into this
+report. This is runtime evidence that the Unity adapter loaded and collected
+signals. It is NOT evidence of a Unity creative being served. The Inspector
+request loaded a test creative but its View action was not used to show it.
+Evidence: output/unity-mediation-2026-10-19/unity-all-bidders.png.
+The single-source selector still offered Google only in that same process;
+it was cancelled and override verified Inactive before closing Inspector.
+The QA app was cold-restarted at 22:52:59 IST, without clearing app/save data,
+to check whether its startup source list now reflects the effective bidder
+configuration. No SDK upgrade, console edit or production AAB was made.
+
+UNITY REWARDED RUNTIME PROOF (SAME APK, NO NEW CODE)
+--------------------------------------------------
+22:53:01 IST: Unity SDK initialized with Game ID 800404108. At QA entry,
+UnityMediationAdapter reported READY, latency 784 ms. Inspector now offered
+Unity Ads (Bidding). It was selected in the device-only single-source test;
+the UI's radio checked attribute remained false despite a visibly selected
+blue Unity radio, so the screenshot was used to confirm selection before
+Start test. The root subsequently explicitly named Unity Ads (Bidding).
+22:57:28: fresh QA REWARDED REQUEST, googleTestDevice=true.
+22:57:34: LOADED via com.google.ads.mediation.unity.UnityMediationAdapter;
+response latency 2536 ms, errorCode=null.
+22:57:35: SHOWN, placement BP_Rewarded_Android.
+22:59:50: EARNED callbackCount=1; gameGrant=NONE, immediately followed by CLOSED.
+The diagnostics screen returned with these exact callbacks. No game reward,
+purchase, sign-in, career opening/deletion or save reset was performed.
+
+The creative displayed Unity's logo and Test game android. An unexpected
+automatic Google Play sign-in detour occurred after show, without an ad-body
+or Install tap from this agent. Android Back returned to the Unity test
+creative; only its visible close X controls were then tapped. No sign-in or
+Install was chosen. This detour is disclosed, not claimed as a tested purchase
+or normal production creative behavior. Successful earned/closed callbacks were
+observed only after dismissing its final end card.
+Evidence:
+output/unity-mediation-2026-10-19/unity-source-choice.png
+output/unity-mediation-2026-10-19/unity-rewarded-after-play-back.png
+output/unity-mediation-2026-10-19/unity-rewarded-dismiss-state.png
+
+The transition from absent effective source -> bidder signal -> READY and
+selectable Unity happened without a binary change or mapping correction.
+This is consistent with configuration propagation/startup refresh, not proof
+of a root-cause defect in either SDK. Do not upgrade SDKs speculatively to fix
+the earlier stale list. Cleanup of the device-only override follows below.
+
+Cleanup at 23:02 IST: Inspector Stop test confirmed, Single ad source test
+explicitly verified Inactive, then Inspector closed. Evidence:
+output/unity-mediation-2026-10-19/unity-test-override-inactive.png
+output/unity-mediation-2026-10-19/unity-rewarded-qa-callbacks.png
+The QA app was force-stopped/restarted after cleanup to discard cached ads.
+No app data was cleared. Owner-enabled Rewarded console routing was left as
+approved; Banner/Interstitial and the other app were not enabled or modified.
+Only documentation changed during this diagnostic follow-up; no new APK/AAB,
+SDK upgrade or production runtime edit was needed. git diff --check passed.
+The previously recorded 275-suite/1961-test automated gate applies to this
+unchanged candidate; it was not represented as freshly rerun for doc-only edits.
+
+FOLLOW-UP: WEBSITE DEPLOYED; DEVICE TEST PREPARATION AUTHORIZED
+-------------------------------------------------------------
+The owner subsequently requested the website deployment and actual Unity ad
+tests. This supersedes the earlier automated-only restriction recorded below,
+but not the prohibition on production AABs or production mediation activation.
+Cloudflare production deployment eb5da5bb completed. Live verification at
+15:34 UTC (21:04 IST) matched all 20 public files and the legacy product
+redirect/security headers. Only the seller file and two Cricket privacy pages
+changed; the existing other app, auth fallback, styles and assets were preserved.
+The root app-ads.txt SHA-256 is:
+dcf6f4506146385cda858b238018faf4b4c0b54fd91316e6b37b25baf619671c
+This proves public hosting, not the providers' crawler approval.
+
+QA-only diagnostics have been added to observe Google/Unity adapter responses,
+ad presentation and earned callbacks without changing game saves or granting
+currency. Google emulator test treatment and app mute are native QA-only.
+The owner reported the Unity test-device registration completed. Production
+groups remain untouched. Actual Unity rendering is NOT yet certified. Final
+device results will be appended when observed.
+
+An internal QA APK was installed in place on Pixel_10_Pro_XL / emulator-5556.
+Version 1.0.12/code19 and the original 16 October first-install time were
+preserved. The UI lists all five Player and four Manager careers after update.
+No career was opened, deleted, recovered or awarded currency during this check.
+Initial diagnostics were safely blocked: the new QA-only mute call preceded
+MobileAds.initialize. Inspection of the actual GMA 24.9 bytecode confirmed the
+IllegalStateException precondition. The pre-init mute call was removed; mute
+is applied in the QA Activity after SDK readiness. Host process inspection
+confirms Pixel_10_Pro_XL was launched with -no-audio. A later readback showed
+this emulator's AudioHardening ignores shell media-volume changes (index stayed
+5 despite a successful command exit), so zero OS volume is NOT claimed.
+Host audio remains disabled independently.
+A regression check covers that ordering. The corrected internal APK built and
+was installed in place. Google initialization now succeeds and the QA panel
+shows googleTestDevice=true and MobileAds READY. The isolated panel opens and
+closes Ad Inspector successfully. The device remains muted.
+
+OBSERVED RUNTIME RESULT / REMAINING CONSOLE GATE
+------------------------------------------------
+Ad Inspector confirms the expected package/AdMob App ID and GMA v24.9.0.
+Its Adapters tab currently says "No adapters found" and single-source testing
+offers ONLY "AdMob Network / Ad Exchange (Bidding)". Unity cannot be selected in
+this effective configuration. This is consistent with the production Unity
+groups being paused; it is NOT evidence that a Unity ad was served. We did not
+enable those groups, force a direct Unity SDK request, or count Google fallback
+as success. No ad load/show or game-reward test was run in this device pass.
+The selection dialog was cancelled, its override verified Inactive, and
+Ad Inspector closed. Its SDK-version comparison endpoint logged a failure;
+we therefore do not use its online latest-version check as compatibility proof.
+The installed runtime version and Gradle dependency checks are the evidence.
+
+Next step requires the authorized console operator: create three separate QA
+ad units (Banner/Interstitial/Rewarded) for THIS app and enabled QA-only bidding
+groups mapped to Unity Game ID 800404108 and the corresponding BP placements.
+Include ONLY the QA ad units in those groups. Keep production groups paused.
+Supply the QA unit IDs for an internal-only environment override/rebuild, then
+verify Unity adapter/test creative, presentation and earned callbacks. This
+console-side setup is pending. Actual Unity serving is NOT yet certified.
+
+Evidence: output/unity-mediation-2026-10-19/ad-inspector-adapters.png and
+ad-inspector-test-sources.png. No account/CMP tokens are included.
+Final internal APK (NOT an AAB/store artifact):
+output/unity-mediation-2026-10-19/cricket-player-manager-unity-qa-vc19.apk
+SHA-256: 581ac7a4dd51a03f5a60816906cfcf761acd257b397a21e58575f3c0c7d1e3dd
+Version 1.0.12/code19, debug signing matched the pre-update QA installation;
+assets/index.android.bundle is packaged. No release signing was used.
+
+Follow-up verification: 275 Jest suites / 1,961 tests / 2 snapshots passed;
+18 native UnityConsentPolicy JVM cases passed; typecheck, lint and diff check
+passed. Website re-verification at 15:59:54 UTC matched all 20 public files,
+root seller MIME/hash, security headers and legacy redirect. Billing on this
+no-Play-account QA emulator is unavailable; purchases were not exercised or
+certified in this ad-integration pass. Pixel 8 was not touched.
+
+Reusable implementation/deployment/test instructions are in
+docs/UNITY_ADMOB_REUSABLE_SETUP_GUIDE.txt.
+
+The following sections record the earlier implementation/automated-only pass.
+
+Scope and authority
+-------------------
+Android implementation and automated checks only. The owner explicitly chose
+not to build/update the QA emulator in this pass. No APK/AAB packaging, device
+installation, production signing, purchase, Git push, site deployment or AdMob
+group activation is authorized by these checks. Existing artifacts are not new
+Unity-enabled release artifacts. This is not a production release certificate.
+
+Identities supplied/verified by the owner
+----------------------------------------
+App: Cricket: Player & Manager, com.coverdrive.cricket.
+Unity Game ID: 800404108; Unity Developer/seller ID: 143233260.
+Placements: BP_Rewarded_Android, BP_Interstitial_Android, BP_Banner_Android.
+AdMob App ID: ca-app-pub-4249020515368291~8405865949 (unchanged).
+Do not substitute the separate Auction 2027 app / Game ID 800403247.
+Placements and Game ID are configured in AdMob, not hardcoded into SDK init.
+The owner's three Android bidding mediation groups were last shown paused.
+
+SDK implementation
+------------------
+Unity adapter com.google.ads.mediation:unity:4.16.6.0 and Unity SDK
+com.unity3d.ads:unity-ads:4.16.6 are both explicit Android Gradle dependencies.
+The published adapter POM does not itself include the Unity SDK.
+Google Ads remains 24.9.0 through react-native-google-mobile-ads 16.0.3.
+Gradle dependencyInsight confirmed both the RN library and Unity adapter resolve
+against Google Ads 24.9.0; no Google Ads major-version upgrade was introduced.
+This compatible pin is not the newest Unity adapter. A later upgrade needs a
+new compatibility/privacy review rather than blindly changing the version.
+
+MainApplication registers CricketUnityConsent through UnityConsentPackage.
+The bridge only sets privacy metadata and performs deferred library startup.
+AdMob continues to own Unity ad initialization, bidding and placement selection.
+No direct UnityAds.initialize call or parallel ad-serving stack was added.
+No Unity SDK/adapter is configured for iOS in this change.
+
+The actual Unity 4.16.6 AAR manifest contains AdsSdkInitializer, which normally
+runs through AndroidX startup before the app age prompt. Its bytecode performs
+context/orientation setup and installs Cronet. The app manifest removes only
+that initializer's automatic metadata entry, not the entire AndroidX provider.
+The consent bridge invokes AndroidX manual initialization after privacy metadata,
+only for an eligible audience with UMP canRequestAds=true. Other AndroidX
+initializers and existing Google delay-measurement flags remain intact.
+
+This repository tracks android/ and includes it in its EAS build inputs.
+Do not run a destructive prebuild --clean and discard these native changes.
+The new JS must ship with a matching native binary, not as an old-binary OTA.
+An Android binary without the privacy bridge fails ad initialization closed.
+
+Consent and age behavior
+------------------------
+Existing age eligibility remains: unknown/under-13/India-teen/no-guardian or
+failed age-storage gates do not initialize ad serving. Eligible teens outside
+India retain TFUA=true, G-rated Google request configuration and NPA requests;
+TFCD remains false because the app is not directed to under-13 children.
+Do not silently change the Unity dashboard to child-directed or Mixed Audience.
+Verify Unity content controls/creative suitability before activating this path;
+Google's maximum-content-rating request alone does not certify Unity creatives.
+
+UMP canRequestAds is permission to request an eligible ad, NOT proof that Unity
+personalization is allowed. Unity receives privacy.consent=false by default.
+Only an adult with current request permission, gdprApplies=1, consent for storage
+and personalized-ad purposes 1/3/4, and a valid Additional Consent v1/v2 explicit
+grant for Unity ATP 3234 can receive privacy.consent=true. A disclosed-only
+provider is not a consent grant. Missing/wrong-typed/malformed/future signals,
+teens, request denial and unsupported regional signals remain opted out.
+
+The resolver does not decode raw TCF vendor strings or GPP to infer grants.
+An otherwise valid TCF-only Unity grant (the dashboard displays GVL vendor 1549)
+without supported Additional Consent therefore remains contextual-only. US and
+other non-EU users also receive the conservative Unity opt-out by default. This
+can reduce personalized Unity demand; it is not a promise of fill or revenue.
+Google's existing adult UMP serving-mode selection is not changed.
+
+privacy.consent is the single authoritative Unity consent key; Unity documents
+that it overrides the older gdpr.consent key. user.nonbehavioral is also set
+restrictively, but is not treated as proof of dashboard audience compliance.
+Each metadata field is committed separately. No raw CMP strings are logged or
+uploaded by the bridge. Native shared-preference changes reapply restrictions;
+the listener unregisters when the RN module is invalidated.
+
+Privacy editing immediately closes banner readiness, invalidates pending ad
+requests and suspends Unity personalization. After the form, metadata is applied
+again before readiness returns. Age changes/stale initializations cannot reopen
+ads. Previously loading ads are discarded even if request permission later
+returns or a declined choice still permits limited-ad requests.
+
+Ad rewards / existing behavior
+------------------------------
+No IAP, wallet, career-save schema, payout size, removal entitlement or cap was
+changed by this integration. Rewarded completion still requires EARNED_REWARD.
+Closing, load failure or show failure alone cannot grant a reward. Duplicate
+loaded callbacks present an ad at most once; duplicate completion/close callbacks
+settle one result. Native asynchronous show rejection is handled, and completed
+interstitials now clear their safety timeout rather than leaving it queued.
+Existing 15-minute gap / four-per-rolling-hour safe-point interstitial rules
+and background/unfocused banner unmount behavior remain in place.
+
+Seller file and disclosures
+---------------------------
+legal-site/static/app-ads.txt preserves the original Google DIRECT entry and
+adds all 161 owner-supplied Unity dashboard entries: 162 unique seller lines.
+It uses unity.com, 143233260, DIRECT, 96cabb5fbdde37a7, not the Game ID or
+organization core ID. Syntax, exact identities and duplicate checks are covered.
+The site build copies this file to legal-site/dist/app-ads.txt.
+
+The offline policy and both Cricket policy web routes now disclose Android
+Unity mediation, processed data and age/consent flags, dated 19 October 2026.
+The earlier inaccurate 'child-directed' teen description is corrected to the
+actual TFUA/G-rated-request behavior. Existing age limits, original publication
+date, retention commitments, optional Firebase choices and Auction XI policy
+are preserved. The generated site has NOT been deployed in this pass.
+
+Automated regression coverage
+------------------------------
+Native UnityConsentPolicyTest: 18 JVM tests, zero failures/errors/skips.
+Cases: explicit AC v1/v2; v2 without disclosed list; request permission vs
+personalization; denial with old stored grant; teen/none/unknown audience;
+disclosed-only and empty lists; exact provider vs substring/seller/Game IDs;
+missing/wrong types; unknown geography; malformed/future AC; missing storage,
+profile or personalized-ad purpose; malformed purpose bits; unsupported GPP/US;
+withdrawal overriding an earlier grant.
+
+JS adsConsent tests cover UMP gating, transient fallback, concurrent startup,
+retry, banner readiness, privacy editing, restrictive teen configuration,
+privacy-before-initialize ordering, native bridge failure, stale init/age change,
+delayed load after withdrawal, async presentation failure, no reward on close,
+duplicate earned/closed/loaded callbacks and paid-removed/skipped requests.
+Native bridge tests cover Android parameter forwarding, restriction reset,
+iOS no-op, missing old-binary bridge and native error propagation.
+Configuration tests cover compatible dependency pins, registration, deferred
+startup, no direct UnityAds init, complete seller identities and both policies.
+Existing banner lifecycle, reward fulfilment, IAP recovery, save migrations,
+Player/Manager progression and legacy navigation suites are retained.
+
+Verification commands/results
+------------------------------
+PASS: native :app:testQaUnitTest --tests com.coverdrive.cricket.UnityConsentPolicyTest
+      Compiles the real Android bridge and SDK dependencies; JVM tests execute
+      the pure resolver, not an on-device Unity renderer or real CMP interaction.
+PASS: dependencyInsight qaRuntimeClasspath confirms Google Ads 24.9.0.
+PASS: npm run typecheck; npm run lint -- --quiet.
+PASS: npm test -- --runInBand --silent: 274 suites, 1954 tests, 2 snapshots
+      before the final manifest-only lazy-startup change. Final focused startup
+      and native-compile checks are recorded at handoff below.
+PASS: npm run build:legal-site: 13 pages generated locally.
+PASS: final focused ad/consent/banner/config/legal regression: 6 suites, 65 tests.
+PASS: final native compile + all 18 resolver JVM tests after lazy-startup change.
+PASS: final merged QA manifest excludes Unity's automatic initializer but keeps
+      ProcessLifecycleInitializer, the correct AdMob app ID and blocked
+      microphone/broad-storage permissions. This is an intermediate manifest,
+      not a packaged release-bundle manifest.
+PASS: generated root seller file matches the canonical source byte-for-byte.
+PASS: separate Auction XI site regression: all 5 tests.
+PASS: git diff --check.
+
+Console evidence and remaining activation gates
+-----------------------------------------------
+Screenshots confirm Unity Ads included in BOTH EU and US partner lists.
+EU entry is Unity Ads / Unity Technologies SF / GVL ID 1549, not AdUnity or
+Unitymedia. Existing EU Cricket message was published. The new US message was
+last shown as a draft for the correct Cricket: Player & Manager app; the owner
+was instructed to name/publish it. The separate Auction 2027 message is untouched.
+Do not infer successful publication until the correct row shows Published.
+
+Before any Unity production activation:
+1. Confirm the correct app's US message is Published and EU settings are saved.
+2. Review Unity ad-content controls for eligible teens; do not rely on Google
+   rating flags alone. Reconcile Google Play Data safety/provider disclosures.
+3. Obtain site-deployment approval, deploy policy + root seller file, then verify
+   the live HTTPS content and AdMob/Unity crawler verification. Local build is
+   not hosting or crawler certification. Live retrieval was not verified here.
+4. With separate approval, build/install a matching QA APK preserving saves and
+   verify native startup/consent, cold start, background/resume and privacy reset.
+5. Configure a test-only mediation route and mark the device for BOTH Google and
+   Unity test ads. Verify adapter status and single-source Unity banner,
+   interstitial and rewarded serving in Ad Inspector. Do not click live ads or
+   enable production groups merely to test. Check no-fill, cancellation, earned
+   rewards once, privacy acceptance/decline/withdrawal and teen treatment.
+6. Only after those gates and explicit owner approval prepare a NEW production
+   AAB. This pass does not certify real Unity serving, production revenue,
+   device/Oppo-specific ANRs, real-money UPI or reinstall/cross-device recovery.
+
+Primary implementation references
+----------------------------------
+https://docs.expo.dev/versions/v57.0.0/
+https://developers.google.com/admob/android/mediation/unity
+https://dl.google.com/dl/android/maven2/com/google/ads/mediation/unity/4.16.6.0/unity-4.16.6.0.pom
+https://docs.unity.com/en-us/grow/ads/privacy/ccpa-compliance
+https://developer.android.com/topic/libraries/app-startup#manual-initialization
+Google adapter source: UnityMediationAdapter.UNITY_ADS_ATP_ID = 3234;
+UnityAdsAdapterUtils documents AC parsing in the later Google adapter.
+Actual pinned Unity AAR manifest/AdsSdkInitializer bytecode inspected locally.

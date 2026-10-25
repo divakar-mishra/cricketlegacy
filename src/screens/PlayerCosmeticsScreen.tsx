@@ -295,6 +295,7 @@ export function PlayerCosmeticsScreen({ navigation }: ScreenProps<'PlayerCosmeti
   return (
     <Screen
       scroll
+      careerNavigation
       gradient={gradients.pitch}
       footer={
         hasChanges ? <Button label="Save My Look" variant="gold" onPress={onSave} /> : undefined

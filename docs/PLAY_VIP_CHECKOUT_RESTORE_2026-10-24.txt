@@ -1,0 +1,124 @@
+GOOGLE PLAY VIP CHECKOUT / OWNED RESTORE — NATIVE QA
+==================================================
+24 October 2026, Asia/Kolkata; native payment/restore observations approximately
+20:33–20:44 IST. Requested by owner before preparing the production Android AAB.
+
+RESULT
+------
+PASS for actual Google Play license-test checkout, matching-mode entitlement
+fulfillment, process-restart persistence and owned-purchase restore of BOTH
+player_vip and manager_vip on the existing Pixel 10 emulator installation.
+The earlier statement that actual checkout and owned VIP restore were unverified
+is superseded for this tested Android installation and these two products.
+This is NOT a certification of a future AAB, fresh-install/device restoration,
+another store account, refunds, bundles/consumables or iOS StoreKit.
+
+DEVICE / BUILD / SAFETY
+----------------------
+Verified AVD Pixel_10_Pro_XL, emulator-5556, Play-Store-enabled Android image.
+Existing com.coverdrive.cricket 1.0.12/code23 remained installed throughout;
+lastUpdateTime 2026-10-24 01:23:28. No APK install/build/update in this pass.
+Existing QA APK SHA256:
+b9b3275d33835619d29086a6f44ef1d406163801abe5271f61b9cef4d23587e1
+output/pixel10-qa-2026-10-24/cricket-player-manager-qa-vc23.apk
+
+Owner previously reported that this Google account was a license tester. In this
+pass, the actual Google Play checkout UI independently confirmed test ordering
+for BOTH VIP products: explicit test-order/no-charge notice and Test card,
+always approves. Price metadata displayed INR449.00 each. No real card/UPI
+payment confirmed, credentials entered or password/2FA inspected.
+Initial selected instrument simulated approval followed by chargeback; changed
+to Google's always-approves TEST instrument BEFORE confirming either payment.
+Both native sheets subsequently displayed Payment successful.
+
+Only normal app/provider test-purchase writes and save persistence were used.
+No local mock purchase, QA grant, manual entitlement/receipt injection, save
+editing, uninstall, clear-data, account sign-out, backend/store setting change,
+refund/revoke or production submission. The test purchases remain owned; no
+refund/revocation was attempted. The menu displayed Login: game-account-linked
+purchase/recovery and a sign-in transition are not certified by this run.
+
+OBSERVED SEQUENCE
+-----------------
+1. Cold-started the existing AVD without wiping userdata. First startup stopped
+   at an emulator crash-report consent dialog before Android boot. Its process
+   ignored TERM; stopped only that newly launched blocked emulator process and
+   retried with crash-report-mode disabled and snapshot loading/saving disabled.
+   One retry collided with the still-running first process. Final retry booted.
+   This startup obstacle is NOT an observed game crash or billing failure.
+2. Resumed existing Player career 'ee', Grade A, Round2. Baseline809Coins,
+   2Gems,36/36energy; Player VIP unowned. Dismissed optional Starter Pack.
+   Real restore before checkout returned no applicable purchases for this mode.
+3. Opened Player VIP's Play sheet, verified TEST instrument/no-charge notice,
+   confirmed one test purchase. Play reported success; VIP screen switched to
+   owned presentation, removed Buy and exposed View my player. Hub displayed
+   Permanent access and energy capacity60 (37/60 after normal real-time regen).
+   Coins809/Gems2 unchanged. No season collection claimed or match played.
+4. Force-stopped ONLY the game process, reopened and resumed the SAME Player
+   save. VIP60capacity and permanent access survived. Real Restore purchases
+   completed successfully, then repeated successfully. Returned hub still
+   Coins809/Gems2, no collection claim or XP replay.
+5. Saved/exited normally, opened existing Manager slot1 (Mumbai Sharks).
+   Manager VIP remained unowned after Player VIP purchase. Manager-mode restore
+   of the account's Player VIP returned no applicable purchases for this mode;
+   Manager Buy remained available. This verifies Player -> Manager isolation.
+6. Manager baseline was11,000Coins/0Gems and Club Office displayed$750k.
+   Opened plain Manager VIP, NOT Manager Legacy Edition. Verified native Play
+   TEST instrument/no-charge notice, confirmed one test order, Play success.
+   VIP screen became owned, Buy removed; Store displayed Active, day1VIP streak.
+7. Real Manager owned restore succeeded. Restarted only the game process,
+   resumed Manager slot1, observed permanent access, and restored successfully
+   again. Wallet remained11,000Coins/0Gems; Club Balance remained displayed$750k.
+   No surprise bundle currency grant, repeated streak payment or XP observed.
+   Club Balance comparison is the UI-formatted value, not a raw-save export.
+
+RESTORE AUTHORITY / COVERAGE
+----------------------------
+Inspected src/services/purchases.ts and src/state/careerStore.ts: these native
+non-mock flows call RevenueCat purchaseStoreProduct/restorePurchases, resolve
+active permanent entitlements and apply matching-mode grants with critical
+save persistence. VipCollectionsScreen uses those same career-store actions.
+The native success responses above are provider-backed tests, not a Jest mock.
+
+Owned restore was performed while legitimate cached ownership was retained.
+We deliberately did NOT erase entitlement state to manufacture a fresh restore.
+Thus: real owned-provider restore + idempotent fulfillment + restart persistence
+PASS; from-zero/fresh-install/device recovery remains a separate test.
+No independent transaction acknowledgement/refund-console inspection, other
+payment outcome, all14product checkout, toolkit inventory comparison, wrong-
+mode Manager -> Player-only experiment, account switching or cross-device test
+is claimed. No comprehensive gameplay/ad-removal-benefit retest in this pass.
+
+EVIDENCE
+--------
+Local screenshots (no email/password/receipt/order token in report):
+output/play-vip-qa-2026-10-24/
+  player-play-test-sheet.png — explicit test card and no-charge notice
+  player-vip-granted.png — owned collection screen; no Buy
+  player-owned-restore-success.png — successful restore after restart
+  manager-unowned-after-player-vip.png — no cross-mode VIP grant
+  manager-play-test-sheet.png — explicit test card and no-charge notice
+  manager-owned-restore-success.png — successful owned restore
+  manager-club-balance-after-restore.png — Club Office unchanged displayed value
+  manager-owned-store-wallet.png — Active VIP and unchanged Manager wallet
+Navigation helper is scoped to emulator-5556, rejects stale UI captures/password
+screens, redacts email/order labels, and rechecks product + explicit TEST card
++ no-charge notice immediately before native confirmation. It is QA evidence,
+not shipped runtime source. Screenshots are local diagnostics, not store assets.
+
+Official reference checked during this task:
+https://developer.android.com/google/play/billing/test?hl=en
+License testing supports matching-package sideloaded/debug-signed test builds;
+test-track participation alone is not proof of a no-charge payment. Always
+inspect the actual payment method/test notice before confirming.
+
+HANDOFF / REMAINING RELEASE BOUNDARY
+----------------------------------
+No app-code fix warranted by these checks, so no new unit/full-suite result is
+claimed. Existing dirty worktree and other-agent iOS changes preserved.
+Production code20 AAB still unchanged, SHA256:
+0bf074c60ff630f776c1412b4c02298f4c3f1f4a5c052b48aa9d637e8b86dbe4
+These tests clear the specifically requested Play checkout/owned-VIP-restore
+gap on code23. Owner review of latest coach build, final current-source QA,
+production configuration/signing/version checks and final AAB remain separate.
+Do not present debug-signed QA code23 as the production artifact.

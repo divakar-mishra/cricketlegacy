@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useEnergyRecovery } from '../state/energyRecoveryStore';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Button, Card, Screen, ScreenHeader } from '../components';
 import { AppText as Text } from '../components/AppText';
@@ -113,7 +114,7 @@ export function U19WorldCupScreen({ navigation }: ScreenProps<'U19WorldCup'>) {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll careerNavigation>
       <ScreenHeader title="U19 World Cup" onBack={() => navigation.goBack()} />
 
       <Animated.View entering={FadeInDown.duration(280)}>
@@ -162,7 +163,7 @@ export function U19WorldCupScreen({ navigation }: ScreenProps<'U19WorldCup'>) {
               variant="gold"
               style={{ marginTop: spacing.md }}
               onPress={() =>
-                canPlayNextFixture ? playNextMatch() : navigation.navigate('Purchase')
+                canPlayNextFixture ? playNextMatch() : useEnergyRecovery.getState().open()
               }
             />
           ) : nextFixture ? (
